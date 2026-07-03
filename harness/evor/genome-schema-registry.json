@@ -1,0 +1,29 @@
+{
+  "schema_extensions": {
+    "dropout_rate": {
+      "type": "float",
+      "valid_range": [0.0, 1.0],
+      "introduced_by_node_id": "root"
+    },
+    "attention_heads": {
+      "type": "int",
+      "valid_range": [1, 64],
+      "introduced_by_node_id": "root"
+    },
+    "label_smoothing": {
+      "type": "float",
+      "valid_range": [0.0, 0.5],
+      "introduced_by_node_id": "root"
+    },
+    "weight_decay": {
+      "type": "float",
+      "valid_range": [0.0, 1.0],
+      "introduced_by_node_id": "root"
+    },
+    "mixup_alpha": {
+      "type": "float",
+      "valid_range": [0.0, 2.0],
+      "introduced_by_node_id": "root"
+    }
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "tool_name": "Bash",
+  "tool_input_preview": "{\"command\":\"cd /storages_local/research/oh-my-evor && python scripts/l3-e2e.py 2>&1\",\"timeout\":60000,\"description\":\"Run the L3 e2e driver\"}",
+  "error": "Exit code 1\nTraceback (most recent call last):\n  File \"/storages_local/research/oh-my-evor/scripts/l3-e2e.py\", line 439, in <module>\n    sys.exit(main())\n  File \"/storages_local/research/oh-my-evor/scripts/l3-e2e.py\", line 270, in main\n    genome_ref = store.blob(config_bytes)\nAttributeError: 'ContentAddressedStore' object has no attribute 'blob'\n====================================================================\noh-my-evor  L3 release-gate e2e  (CPU-tabular / GATED: GPU-vision)\n===============...",
+  "timestamp": "2026-07-03T16:30:48.628Z",
+  "retry_count": 1
+}

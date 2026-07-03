@@ -1,0 +1,548 @@
+"""
+harness/tests/test_contracts.py — L2 unit tests for harness/evor/contracts.py
+
+Tests Pydantic v2 strict-mode model construction, the 7-tag ApproachFamily
+literal, the legacy 'augmentation'→'data-augmentation' alias validator, and
+invalid-input rejection via ValidationError.
+
+Only contracts.py is imported; no other harness module is touched.
+"""
+
+from __future__ import annotations
+
+import pytest
+from pydantic import ValidationError
+
+from evor.contracts import (
+    AcquisitionProvenance,
+    AngleEntry,
+    AngleRegistry,
+    BenchmarkUpgrade,
+    Budget,
+    CriticReview,
+    GoalContract,
+    Hypothesis,
+    LegacyMetric,
+    LessonEntry,
+    MetricSpec,
+    MutationProposal,
+    StrategyState,
+    StopCondition,
+    TreeNode,
+)
+
+# ─── Shared fixtures ──────────────────────────────────────────────────────────
+
+ISO_TS = "2026-01-01T00:00:00Z"
+UUID_A = "550e8400-e29b-41d4-a716-446655440000"
+
+VALID_METRIC_SPEC = MetricSpec(
+    metric_name="accuracy",
+    direction="higher",
+    domain_applicability="all",
+    aggregation_rule="macro_avg",
+    role="primary_fitness",
+)
+
+VALID_STOP_CONDITION = StopCondition(type="beat-baseline")
+
+VALID_BUDGET = Budget(
+    max_iterations=50,
+    plateau_window=8,
+    circuit_breaker=5,
+    max_cost_usd=100.0,
+)
+
+VALID_GOAL_CONTRACT_KWARGS: dict = dict(
+    mission_id="m-001",
+    mode="from-scratch",
+    mission_type="fixed",
+    task_description="Train image classifier on CIFAR-10 subset",
+    dataset_ref="s3://bucket/cifar10",
+    metrics=[LegacyMetric(name="accuracy", direction="higher", primary=True)],
+    metric_specs=[VALID_METRIC_SPEC],
+    fitness_mode="aggregate",
+    eval_version="v1",
+    baseline_value=0.72,
+    stop_condition=VALID_STOP_CONDITION,
+    wildness=0.5,
+    budget=VALID_BUDGET,
+    locked_split_hash="abc123",
+    eval_script_hash="def456",
+    allowed_licenses=["MIT", "Apache-2.0"],
+    created_at=ISO_TS,
+)
+
+VALID_TREE_NODE_KWARGS: dict = dict(
+    id=UUID_A,
+    parent_ids=[],
+    approach_family="arch",
+    hypothesis_id="h-001",
+    code_ref="sha256:abc",
+    genome_ref="sha256:def",
+    data_version_ref="sha256:ghi",
+    config={"lr": 0.001},
+    metrics={"accuracy": 0.85},
+    eval_version="v1",
+    lesson_ids=[],
+    citations=[],
+    integrity_status="passed",
+    status="done",
+    is_crossover=False,
+    visit_count=0,
+    depth=0,
+    created_at=ISO_TS,
+)
+
+VALID_CRITIC_REVIEW = CriticReview(
+    h001_one_hypothesis="pass",
+    h002_family_streak="pass",
+    h003_intra_tick_diversity="pass",
+    integrity_risk="pass",
+    instrumentation_check="pass",
+    schema_valid="pass",
+    verdict="approved",
+)
+
+
+# ─── ApproachFamily ───────────────────────────────────────────────────────────
+
+
+APPROACH_FAMILY_TAGS = [
+    "arch",
+    "training",
+    "data-curation",
+    "data-augmentation",
+    "data-acquisition",
+    "algo",
+    "other",
+]
+
+
+class TestApproachFamily:
+    """7-tag taxonomy enforced via Literal on every model that carries the field."""
+
+    @pytest.mark.parametrize("tag", APPROACH_FAMILY_TAGS)
+    def test_all_seven_tags_accepted_on_tree_node(self, tag: str) -> None:
+        node = TreeNode(**{**VALID_TREE_NODE_KWARGS, "approach_family": tag})
+        assert node.approach_family == tag
+
+    @pytest.mark.parametrize("tag", APPROACH_FAMILY_TAGS)
+    def test_all_seven_tags_accepted_on_mutation_proposal(self, tag: str) -> None:
+        prop = MutationProposal(
+            proposal_id="prop-001",
+            parent_node_ids=[UUID_A],
+            approach_family=tag,
+            idea="test idea",
+            hypothesis=Hypothesis(
+                id="h-001",
+                statement="stmt",
+                prediction="pred",
+            ),
+            citations=[],
+            wildness=0.5,
+            critic_approved=True,
+            critic_review=VALID_CRITIC_REVIEW,
+        )
+        assert prop.approach_family == tag
+
+    def test_invalid_tag_rejected_on_tree_node(self) -> None:
+        with pytest.raises(ValidationError):
+            TreeNode(**{**VALID_TREE_NODE_KWARGS, "approach_family": "vision"})
+
+    def test_completely_unknown_tag_rejected(self) -> None:
+        with pytest.raises(ValidationError):
+            TreeNode(**{**VALID_TREE_NODE_KWARGS, "approach_family": "nlp"})
+
+
+# ─── Legacy alias: 'augmentation' → 'data-augmentation' ─────────────────────
+
+
+class TestLegacyAugmentationAlias:
+    """The @field_validator(mode='before') on approach_family normalises the
+    legacy 'augmentation' tag to 'data-augmentation' at parse time."""
+
+    def test_alias_on_tree_node(self) -> None:
+        node = TreeNode(**{**VALID_TREE_NODE_KWARGS, "approach_family": "augmentation"})
+        assert node.approach_family == "data-augmentation"
+
+    def test_alias_on_mutation_proposal(self) -> None:
+        prop = MutationProposal(
+            proposal_id="prop-alias",
+            parent_node_ids=[],
+            approach_family="augmentation",  # legacy value
+            idea="augment with random crop",
+            hypothesis=Hypothesis(id="h-a", statement="s", prediction="p"),
+            citations=[],
+            wildness=0.2,
+            critic_approved=True,
+            critic_review=VALID_CRITIC_REVIEW,
+        )
+        assert prop.approach_family == "data-augmentation"
+
+    def test_alias_on_lesson_entry(self) -> None:
+        entry = LessonEntry(
+            lesson_id="l-001",
+            node_id=UUID_A,
+            run_id="run-001",
+            mission_id="m-001",
+            approach_family="augmentation",  # legacy value
+            hypothesis_verdict="confirmed",
+            observation="rand crop helped",
+            actionable_lesson="use rand crop by default",
+            citations=[],
+            tags=[],
+            created_at=ISO_TS,
+        )
+        assert entry.approach_family == "data-augmentation"
+
+    def test_canonical_data_augmentation_still_accepted(self) -> None:
+        node = TreeNode(**{**VALID_TREE_NODE_KWARGS, "approach_family": "data-augmentation"})
+        assert node.approach_family == "data-augmentation"
+
+
+# ─── GoalContract ─────────────────────────────────────────────────────────────
+
+
+class TestGoalContract:
+    def test_valid_construction(self) -> None:
+        gc = GoalContract(**VALID_GOAL_CONTRACT_KWARGS)
+        assert gc.mission_id == "m-001"
+        assert gc.mission_type == "fixed"
+        assert gc.metric_specs[0].role == "primary_fitness"
+
+    def test_open_ended_mission_type(self) -> None:
+        gc = GoalContract(**{**VALID_GOAL_CONTRACT_KWARGS, "mission_type": "open_ended"})
+        assert gc.mission_type == "open_ended"
+
+    def test_model_dump_roundtrip(self) -> None:
+        gc = GoalContract(**VALID_GOAL_CONTRACT_KWARGS)
+        data = gc.model_dump()
+        gc2 = GoalContract.model_validate(data)
+        assert gc2.mission_id == gc.mission_id
+        assert gc2.eval_version == gc.eval_version
+
+    def test_invalid_mode_rejected(self) -> None:
+        with pytest.raises(ValidationError):
+            GoalContract(**{**VALID_GOAL_CONTRACT_KWARGS, "mode": "clone"})
+
+    def test_invalid_fitness_mode_rejected(self) -> None:
+        with pytest.raises(ValidationError):
+            GoalContract(**{**VALID_GOAL_CONTRACT_KWARGS, "fitness_mode": "min-loss"})
+
+    def test_missing_required_field_rejected(self) -> None:
+        kwargs = {k: v for k, v in VALID_GOAL_CONTRACT_KWARGS.items() if k != "mission_id"}
+        with pytest.raises((ValidationError, TypeError)):
+            GoalContract(**kwargs)
+
+
+# ─── TreeNode ─────────────────────────────────────────────────────────────────
+
+
+class TestTreeNode:
+    def test_valid_construction(self) -> None:
+        node = TreeNode(**VALID_TREE_NODE_KWARGS)
+        assert node.id == UUID_A
+        assert node.integrity_status == "passed"
+        assert node.is_crossover is False
+
+    def test_optional_fields_default_to_none(self) -> None:
+        node = TreeNode(**VALID_TREE_NODE_KWARGS)
+        assert node.fitness_value is None
+        assert node.ucb1_score is None
+        assert node.completed_at is None
+        assert node.parent_patch_ref is None
+
+    def test_model_dump_roundtrip(self) -> None:
+        node = TreeNode(**VALID_TREE_NODE_KWARGS)
+        data = node.model_dump()
+        node2 = TreeNode.model_validate(data)
+        assert node2.id == node.id
+        assert node2.approach_family == node.approach_family
+
+    def test_invalid_integrity_status_rejected(self) -> None:
+        with pytest.raises(ValidationError):
+            TreeNode(**{**VALID_TREE_NODE_KWARGS, "integrity_status": "unknown"})
+
+    def test_invalid_status_rejected(self) -> None:
+        with pytest.raises(ValidationError):
+            TreeNode(**{**VALID_TREE_NODE_KWARGS, "status": "cancelled"})
+
+    def test_invalid_approach_family_rejected(self) -> None:
+        with pytest.raises(ValidationError):
+            TreeNode(**{**VALID_TREE_NODE_KWARGS, "approach_family": "kernel"})
+
+
+# ─── MutationProposal ─────────────────────────────────────────────────────────
+
+
+class TestMutationProposal:
+    def _make(self, **overrides) -> MutationProposal:
+        base = dict(
+            proposal_id="prop-001",
+            parent_node_ids=[UUID_A],
+            approach_family="training",
+            idea="Switch from SGD to AdamW",
+            hypothesis=Hypothesis(id="h-001", statement="AdamW converges faster", prediction="+2pp"),
+            citations=["https://arxiv.org/abs/1711.05101"],
+            wildness=0.3,
+            critic_approved=True,
+            critic_review=VALID_CRITIC_REVIEW,
+        )
+        return MutationProposal(**{**base, **overrides})
+
+    def test_valid_construction(self) -> None:
+        prop = self._make()
+        assert prop.proposal_id == "prop-001"
+        assert prop.critic_review.verdict == "approved"
+
+    def test_rejected_verdict_with_reason(self) -> None:
+        review = CriticReview(
+            h001_one_hypothesis="pass",
+            h002_family_streak="fail",
+            h003_intra_tick_diversity="pass",
+            integrity_risk="pass",
+            instrumentation_check="pass",
+            schema_valid="pass",
+            verdict="rejected",
+            rejection_reason="Family streak exceeded",
+        )
+        prop = self._make(critic_approved=False, critic_review=review)
+        assert prop.critic_review.verdict == "rejected"
+        assert prop.critic_review.rejection_reason == "Family streak exceeded"
+
+    def test_invalid_verdict_rejected(self) -> None:
+        review_dict = VALID_CRITIC_REVIEW.model_dump()
+        review_dict["verdict"] = "pending"
+        with pytest.raises(ValidationError):
+            CriticReview(**review_dict)
+
+    def test_empty_citations_accepted(self) -> None:
+        prop = self._make(citations=[])
+        assert prop.citations == []
+
+
+# ─── AcquisitionProvenance ───────────────────────────────────────────────────
+
+
+class TestAcquisitionProvenance:
+    def _make(self, **overrides) -> AcquisitionProvenance:
+        base = dict(
+            acquisition_id="acq-001",
+            acquisition_type="external",
+            license_identifier="CC-BY-4.0",
+            license_in_allowlist=True,
+            citation="Common Crawl 2024-01 snapshot",
+            sample_count=50000,
+            acquired_at=ISO_TS,
+            ingestion_contamination_cleared=True,
+        )
+        return AcquisitionProvenance(**{**base, **overrides})
+
+    def test_valid_external(self) -> None:
+        prov = self._make()
+        assert prov.acquisition_type == "external"
+        assert prov.license_in_allowlist is True
+
+    def test_valid_synthetic_with_generator_config(self) -> None:
+        prov = self._make(
+            acquisition_type="synthetic",
+            generator_config={"model": "gpt-4o", "temperature": 0.7},
+        )
+        assert prov.acquisition_type == "synthetic"
+        assert prov.generator_config == {"model": "gpt-4o", "temperature": 0.7}
+
+    def test_invalid_acquisition_type_rejected(self) -> None:
+        with pytest.raises(ValidationError):
+            self._make(acquisition_type="crowd-sourced")
+
+    def test_missing_citation_rejected(self) -> None:
+        with pytest.raises((ValidationError, TypeError)):
+            AcquisitionProvenance(
+                acquisition_id="acq-002",
+                acquisition_type="external",
+                license_identifier="MIT",
+                license_in_allowlist=True,
+                # citation omitted
+                sample_count=100,
+                acquired_at=ISO_TS,
+                ingestion_contamination_cleared=True,
+            )
+
+
+# ─── AngleRegistry ────────────────────────────────────────────────────────────
+
+
+class TestAngleRegistry:
+    def _make_angle(self, **overrides) -> AngleEntry:
+        base = dict(
+            angle_id="angle-cifar10-acc",
+            eval_version_added="v1",
+            sota_bar=0.985,
+            sota_source_ids=["src-papers", "src-mlcommons"],
+            sota_quorum_met=True,
+            baseline_model_score_before_finetune=None,
+            sota_retrieved_at=ISO_TS,
+            held_out_split_hash="sha256:xyz",
+            is_public_benchmark=True,
+            pretraining_contamination_risk="medium",
+        )
+        return AngleEntry(**{**base, **overrides})
+
+    def test_valid_registry_with_one_angle(self) -> None:
+        reg = AngleRegistry(
+            mission_id="m-001",
+            angles=[self._make_angle()],
+            updated_at=ISO_TS,
+        )
+        assert len(reg.angles) == 1
+        assert reg.angles[0].sota_quorum_met is True
+
+    def test_empty_angles_list(self) -> None:
+        reg = AngleRegistry(mission_id="m-001", angles=[], updated_at=ISO_TS)
+        assert reg.angles == []
+
+    def test_null_baseline_model_score(self) -> None:
+        angle = self._make_angle(baseline_model_score_before_finetune=None)
+        assert angle.baseline_model_score_before_finetune is None
+
+    def test_numeric_baseline_model_score(self) -> None:
+        angle = self._make_angle(baseline_model_score_before_finetune=0.82)
+        assert angle.baseline_model_score_before_finetune == 0.82
+
+    def test_invalid_contamination_risk_rejected(self) -> None:
+        with pytest.raises(ValidationError):
+            self._make_angle(pretraining_contamination_risk="extreme")
+
+    def test_model_dump_roundtrip(self) -> None:
+        reg = AngleRegistry(
+            mission_id="m-001",
+            angles=[self._make_angle()],
+            updated_at=ISO_TS,
+        )
+        data = reg.model_dump()
+        reg2 = AngleRegistry.model_validate(data)
+        assert reg2.mission_id == reg.mission_id
+        assert len(reg2.angles) == 1
+
+
+# ─── StrategyState ────────────────────────────────────────────────────────────
+
+
+class TestStrategyState:
+    def _make(self, **overrides) -> StrategyState:
+        base = dict(
+            meta_iteration=0,
+            selection_policy="ucb1",
+            ucb1_c=1.41,
+            wildness=0.5,
+            family_mix={"arch": 0.5, "training": 0.5},
+            winning_families=["arch"],
+            wins_by_family={"arch": 3},
+            meta_loop_interval=5,
+            post_upgrade_exploration_boost=None,
+            post_upgrade_exploration_ticks=0,
+            rescore_mode="sync",
+            updated_at=ISO_TS,
+        )
+        return StrategyState(**{**base, **overrides})
+
+    def test_valid_construction(self) -> None:
+        state = self._make()
+        assert state.selection_policy == "ucb1"
+        assert state.rescore_mode == "sync"
+        assert state.ucb1_c == pytest.approx(1.41)
+
+    def test_null_post_upgrade_exploration_boost(self) -> None:
+        state = self._make(post_upgrade_exploration_boost=None)
+        assert state.post_upgrade_exploration_boost is None
+
+    def test_non_null_boost_with_ticks(self) -> None:
+        state = self._make(post_upgrade_exploration_boost=2.0, post_upgrade_exploration_ticks=8)
+        assert state.post_upgrade_exploration_boost == 2.0
+        assert state.post_upgrade_exploration_ticks == 8
+
+    def test_rescore_mode_async(self) -> None:
+        """Q1 — rescore_mode is single source of truth for BenchmarkUpgrade re-score."""
+        state = self._make(rescore_mode="async")
+        assert state.rescore_mode == "async"
+
+    @pytest.mark.parametrize("policy", ["ucb1", "mcts", "beam"])
+    def test_all_selection_policies(self, policy: str) -> None:
+        state = self._make(selection_policy=policy)
+        assert state.selection_policy == policy
+
+    def test_invalid_selection_policy_rejected(self) -> None:
+        with pytest.raises(ValidationError):
+            self._make(selection_policy="greedy")
+
+    def test_invalid_rescore_mode_rejected(self) -> None:
+        with pytest.raises(ValidationError):
+            self._make(rescore_mode="eager")
+
+    def test_zero_post_upgrade_exploration_ticks_accepted(self) -> None:
+        # ticks=0 means no boost countdown active
+        state = self._make(post_upgrade_exploration_ticks=0)
+        assert state.post_upgrade_exploration_ticks == 0
+
+
+# ─── BenchmarkUpgrade ─────────────────────────────────────────────────────────
+
+
+class TestBenchmarkUpgrade:
+    def _make(self, **overrides) -> BenchmarkUpgrade:
+        base = dict(
+            upgrade_id="upg-001",
+            mission_id="m-001",
+            from_eval_version="v1",
+            to_eval_version="v2",
+            proposed_by="probe",
+            proposal_citations=["https://arxiv.org/abs/2101.00001"],
+            consent_granted=True,
+            new_domains_added=["tabular-churn"],
+            domains_removed=[],  # DEFENSIVE INVARIANT: always empty (Q4)
+            rescore_status="pending",
+            rescore_deadline_ticks=10,
+            decision_log_ref="decision-log.md",
+            created_at=ISO_TS,
+        )
+        return BenchmarkUpgrade(**{**base, **overrides})
+
+    def test_valid_construction_empty_domains_removed(self) -> None:
+        upg = self._make()
+        assert upg.upgrade_id == "upg-001"
+        assert upg.domains_removed == []  # invariant
+
+    @pytest.mark.parametrize("status", ["pending", "in_progress", "complete", "partial"])
+    def test_all_rescore_statuses(self, status: str) -> None:
+        upg = self._make(rescore_status=status)
+        assert upg.rescore_status == status
+
+    @pytest.mark.parametrize("proposer", ["user", "probe", "sage", "policy"])
+    def test_all_proposed_by_values(self, proposer: str) -> None:
+        upg = self._make(proposed_by=proposer)
+        assert upg.proposed_by == proposer
+
+    def test_optional_consent_at(self) -> None:
+        upg = self._make(consent_at=ISO_TS)
+        assert upg.consent_at == ISO_TS
+
+    def test_model_dump_roundtrip(self) -> None:
+        upg = self._make()
+        data = upg.model_dump()
+        upg2 = BenchmarkUpgrade.model_validate(data)
+        assert upg2.upgrade_id == upg.upgrade_id
+        assert upg2.domains_removed == []
+
+    def test_invalid_proposed_by_rejected(self) -> None:
+        with pytest.raises(ValidationError):
+            self._make(proposed_by="admin")
+
+    def test_invalid_rescore_status_rejected(self) -> None:
+        with pytest.raises(ValidationError):
+            self._make(rescore_status="done")
+
+    def test_zero_rescore_deadline_ticks_accepted(self) -> None:
+        # zero deadline = demote immediately (valid edge case)
+        upg = self._make(rescore_deadline_ticks=0)
+        assert upg.rescore_deadline_ticks == 0

@@ -1,0 +1,25 @@
+{
+  "name": "oh-my-evor",
+  "version": "0.1.0",
+  "description": "Autonomous ML research evolution engine for Claude Code",
+  "author": {
+    "name": "oh-my-evor contributors"
+  },
+  "license": "MIT",
+  "skills": [
+    "./skills/evor/",
+    "./skills/evor-setup/",
+    "./skills/evor-run/",
+    "./skills/evor-dashboard/",
+    "./skills/evor-report/"
+  ],
+  "agents": [
+    "./agents/evor-sage.md",
+    "./agents/evor-mutagen.md",
+    "./agents/evor-probe.md",
+    "./agents/evor-forge.md",
+    "./agents/evor-selector.md"
+  ],
+  "mcpServers": "./.mcp.json",
+  "commands": "./commands/"
+}

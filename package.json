@@ -1,0 +1,17 @@
+{
+  "name": "oh-my-evor",
+  "version": "0.1.0",
+  "description": "Autonomous ML research evolution engine for Claude Code",
+  "type": "module",
+  "scripts": {
+    "build": "npm run build --workspace=mcp",
+    "test": "npm run test --workspace=mcp",
+    "typecheck": "npm run typecheck --workspace=mcp",
+    "lint": "node scripts/l1-check.mjs",
+    "lint:l1": "node scripts/l1-check.mjs"
+  },
+  "workspaces": [
+    "mcp"
+  ],
+  "devDependencies": {}
+}

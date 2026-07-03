@@ -1,0 +1,60 @@
+name: L1 + L2 gates
+
+on:
+  pull_request:
+    branches: ["**"]
+  push:
+    branches: [main, master]
+
+jobs:
+  l1-l2:
+    name: L1 structural + L2 unit
+    runs-on: ubuntu-latest
+
+    steps:
+      # ── checkout ───────────────────────────────────────────────────────────
+      - uses: actions/checkout@v4
+
+      # ── Node setup ─────────────────────────────────────────────────────────
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install Node deps (workspace root installs mcp/ workspace too)
+        run: npm install
+
+      # ── Python setup ───────────────────────────────────────────────────────
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install Python deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install pydantic>=2 fastapi "uvicorn[standard]" httpx pytest ruff
+          # Install harness package in editable mode so harness.evor.* is importable
+          pip install -e harness/
+
+      # ── L1: structural lint ─────────────────────────────────────────────────
+      - name: L1 — plugin manifest + path check
+        run: npm run lint:l1
+
+      # ── L1: TypeScript type-check ───────────────────────────────────────────
+      - name: L1 — TypeScript (tsc --noEmit)
+        run: npm run typecheck
+
+      # ── L1: Python import smoke-test ────────────────────────────────────────
+      - name: L1 — Python contracts importable
+        run: python -c "import harness.evor.contracts; print('harness.evor.contracts OK')"
+
+      # ── L2: MCP unit tests (vitest) ─────────────────────────────────────────
+      - name: L2 — vitest (mcp/)
+        run: npm test
+
+      # ── L2: Python unit tests (pytest) ──────────────────────────────────────
+      - name: L2 — pytest (harness/tests/)
+        run: pytest harness/tests/ -v --tb=short

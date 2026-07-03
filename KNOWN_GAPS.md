@@ -1,0 +1,31 @@
+# oh-my-evor — Known Gaps (intentional, tracked deferrals)
+
+This file is the canonical, honest record of what is **not** yet executable, why it's
+safe to defer, and which milestone/condition closes it. Per the project's "no
+assumptions / no faking" principle: these are gated with a clear runtime error and
+reported here — never silently faked. Everything NOT listed here is real, tested logic.
+
+## Legend
+- **GPU-gated**: requires a GPU + ML framework (torch/etc.) to *execute*. The surrounding
+  machinery (subprocess launch, isolation, parsing, flow-wiring) is real and tested with
+  fake fixtures; only the real model run is gated. Expected to remain gated in any
+  environment without a GPU.
+- **M6-wiring**: an integration seam that milestone M6 connects. Should be cleared
+  (no bare `TODO`) once M6 lands — either fully wired or reduced to a GPU-gated error.
+
+| ID | Location | Kind | Description | Closed by |
+|----|----------|------|-------------|-----------|
+| G1 | `harness/evor/benchmark.py::_eval_seed_model` | GPU-gated | Evaluate the seed/foundation model checkpoint on a new angle's held-out split to capture `baseline_model_score_before_finetune` (Risk B de-contamination discount). Flow + storage wired; wiring comments added (M6). The model run itself needs a GPU. | GPU present (exec) |
+| G2 | `harness/evor/scheduler.py::preflight` | GPU-gated | Preflight smoke micro-train (5 steps) to verify `loss_decreasing`. Env probe + import check + GPU detection real (M6). The micro-train itself requires GPU + eval_script; raises `NotImplementedError` (→ this file) when GPU is detected but worktree not yet materialised. | GPU present + eval_script supplied to `preflight()` |
+| G4 | `harness/evor/store.py::apply_delta` (git-format-patch case) | By-design delegation | Store applies generic unified-diff (`patch -u`) itself; git-format-patch application belongs to Forge/genome.py inside a candidate worktree (`git apply`). Not a gap in the store — documented boundary. | N/A (design boundary) |
+| G5 | `harness/evor/integrity.py::verification_rerun` | GPU-gated | Tournament re-evaluation of the winner on locked splits. Requires a live EvaluatorAdapter, GPU stack, and a materialised candidate worktree. The surrounding gate logic (split hash, integrity report) is fully tested; only the live EvaluatorAdapter.run() call is gated. | GPU present + EvaluatorAdapter wired |
+| G6 | `harness/evor/integrity.py::_load_aug_sample_bytes` | Data-pipeline gated | Load actual augmented sample bytes for near-dup check (check 8). Returns `[]` (silent no-op) rather than raising, so the rest of the integrity pipeline always runs. Real bytes come from the data pipeline materialised by Forge; tests supply bytes directly via `check()` kwargs or mock `_dpt.check_near_dup()`. | Data pipeline + Forge integration (M11-full) |
+| L3 | `scripts/l3-e2e.py` | Partially runnable (CPU real; GPU gated) | Tabular-churn CPU e2e is **real and runnable with ZERO third-party deps** (verified in a fresh venv with no numpy/sklearn): 4 tick iterations training **real pure-Python models** (SGD logistic regression + CART decision tree), real IntegrityGate (13 checks incl. `no_test_leakage` rejection of a seeded cheat), real EvaluatorAdapter subprocess, real prune+gc+best_frontier. Observed: logistic baseline acc≈0.62 → decision-tree mutation acc≈0.91 (a genuine, not staged, improvement). sklearn/numpy are used automatically if present (faster) but are NOT required. Only the GPU/vision benchmark (cifar10) and the fully agent-orchestrated (Evor-in-the-loop) evolution remain gated. | GPU present (vision); live Claude session (full agent orchestration) |
+
+## Rules for contributors
+1. Do not add a bare `TODO`/`FIXME` in core module code. If something must be deferred,
+   add a row here and raise a clear, message-bearing error at the call site that points
+   to this file (e.g. `raise NotImplementedError("... — see KNOWN_GAPS.md#G3")`).
+2. A deferred **GPU execution** is acceptable (gated + listed here). A half-written core
+   method in a module's own responsibility is **not** — finish it.
+3. When a milestone closes a gap, delete its row here in the same change.

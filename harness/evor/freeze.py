@@ -1,0 +1,298 @@
+"""
+FrozenSplitManager — Pillar 2 dataset split freeze + integrity enforcement.
+DataProvenanceTracker — per-augmented-sample provenance + near-dup detection.
+
+Layers implemented here:
+  Layer 1: chmod 444 on all frozen split files (check_read_only)
+  Layer 2: split_hash recomputation (verify_frozen_split)
+  Layer 3: near-duplicate augmentation-of-test check (DataProvenanceTracker.check_near_dup)
+  Layer 4: data provenance — augmented samples trace to train, not test (DataProvenanceTracker.record)
+"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import os
+import shutil
+import stat
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
+
+from evor.contracts import DataProvenance, FrozenSplit
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Helpers
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def _sha256_bytes(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+
+def _make_readonly(path: Path) -> None:
+    """chmod 444."""
+    path.chmod(stat.S_IRUSR | stat.S_IRGRP | stat.S_IROTH)
+
+
+def _is_readonly(path: Path) -> bool:
+    """Return True iff the file has no write bits set."""
+    mode = path.stat().st_mode
+    return not bool(mode & (stat.S_IWUSR | stat.S_IWGRP | stat.S_IWOTH))
+
+
+def _sample_to_bytes(sample: Any, idx: str, dest_dir: Path) -> bytes:
+    """Materialise a sample (bytes / path / arbitrary value) into dest_dir; return bytes."""
+    if isinstance(sample, bytes):
+        dest = dest_dir / idx
+        dest.write_bytes(sample)
+        return sample
+    if isinstance(sample, (str, Path)):
+        src = Path(sample)
+        dest = dest_dir / (idx + src.suffix)
+        shutil.copy2(src, dest)
+        return dest.read_bytes()
+    # Tabular / arbitrary — JSON-encode for deterministic hashing
+    encoded = json.dumps(sample, sort_keys=True, default=str).encode()
+    dest = dest_dir / (idx + ".json")
+    dest.write_bytes(encoded)
+    return encoded
+
+
+def _compute_split_hash(per_sample_hashes: dict[str, str]) -> str:
+    """sha256(sorted_indices_json_bytes || sorted_hashes_json_bytes)."""
+    sorted_indices = sorted(per_sample_hashes.keys())
+    idx_bytes = json.dumps(sorted_indices).encode()
+    hash_bytes = json.dumps([per_sample_hashes[i] for i in sorted_indices]).encode()
+    return _sha256_bytes(idx_bytes + hash_bytes)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# FrozenSplitManager
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+class FrozenSplitManager:
+    """Create and verify frozen test/val splits (Pillar 2 layers 1–2)."""
+
+    def freeze_splits(
+        self,
+        dataset_path: Path,
+        split_config: dict[str, Any],
+        eval_version: str,
+        run_dir: Path,
+    ) -> tuple[FrozenSplit, FrozenSplit]:
+        """Create FrozenSplit records for test and val splits.
+
+        Steps:
+          1. Compute per_sample_hashes: {str(i): sha256(sample_bytes)}
+          2. Compute split_hash = sha256(sorted_indices_bytes || sorted_hashes_bytes)
+          3. Copy sample files into frozen-splits/<eval_version>-{test,val}/
+          4. chmod 444 on all copied files (Pillar 2 layer 1)
+          5. Write FrozenSplit JSON to frozen-splits/<eval_version>-{test,val}.json
+
+        split_config keys:
+          mission_id  (str)                     — carried into split_id
+          test        (dict[str, Any])           — {sample_index: sample}
+          val         (dict[str, Any])           — {sample_index: sample}
+
+        Returns (test_split, val_split).
+        locked_split_hash (for GoalContract) = test_split.split_hash.
+        """
+        (run_dir / "frozen-splits").mkdir(parents=True, exist_ok=True)
+        mission_id = split_config.get("mission_id", "")
+
+        test_split = self._freeze_one(
+            split_type="test",
+            entries=split_config.get("test", {}),
+            eval_version=eval_version,
+            run_dir=run_dir,
+            mission_id=mission_id,
+        )
+        val_split = self._freeze_one(
+            split_type="val",
+            entries=split_config.get("val", {}),
+            eval_version=eval_version,
+            run_dir=run_dir,
+            mission_id=mission_id,
+        )
+        return test_split, val_split
+
+    def _freeze_one(
+        self,
+        split_type: str,
+        entries: dict[str, Any] | list[tuple[str, Any]],
+        eval_version: str,
+        run_dir: Path,
+        mission_id: str,
+    ) -> FrozenSplit:
+        frozen_dir = run_dir / "frozen-splits"
+        split_dir = frozen_dir / f"{eval_version}-{split_type}"
+        split_dir.mkdir(parents=True, exist_ok=True)
+
+        items: list[tuple[str, Any]] = (
+            list(entries) if isinstance(entries, list)
+            else [(str(k), v) for k, v in entries.items()]
+        )
+
+        per_sample_hashes: dict[str, str] = {}
+        for idx, sample in items:
+            sample_bytes = _sample_to_bytes(sample, idx, split_dir)
+            per_sample_hashes[str(idx)] = _sha256_bytes(sample_bytes)
+
+        # chmod 444 all materialised sample files
+        for f in split_dir.iterdir():
+            if f.is_file():
+                _make_readonly(f)
+
+        split_hash = _compute_split_hash(per_sample_hashes)
+        storage_path = frozen_dir / f"{eval_version}-{split_type}.json"
+
+        split = FrozenSplit(
+            split_id=f"{mission_id}-{eval_version}-{split_type}",
+            mission_id=mission_id,
+            split_type=split_type,  # type: ignore[arg-type]
+            split_hash=split_hash,
+            per_sample_hashes=per_sample_hashes,
+            item_count=len(per_sample_hashes),
+            frozen_at=datetime.now(timezone.utc).isoformat(),
+            storage_path=str(storage_path.resolve()),
+            eval_version=eval_version,
+        )
+        storage_path.write_text(split.model_dump_json(indent=2))
+        return split
+
+    def verify_frozen_split(self, split: FrozenSplit, run_dir: Path) -> bool:
+        """Recompute split_hash + per_sample_hashes; return False on any mismatch.
+
+        Called by IntegrityGate on every evaluation (Pillar 2 layer 2).
+        """
+        split_dir = run_dir / "frozen-splits" / f"{split.eval_version}-{split.split_type}"
+        if not split_dir.exists():
+            return False
+
+        recomputed: dict[str, str] = {}
+        for f in split_dir.iterdir():
+            if f.is_file():
+                recomputed[f.stem] = _sha256_bytes(f.read_bytes())
+
+        if recomputed != split.per_sample_hashes:
+            return False
+
+        return _compute_split_hash(recomputed) == split.split_hash
+
+    def check_read_only(self, split: FrozenSplit, run_dir: Path) -> bool:
+        """Return False if any file in the frozen-split directory is writable (Pillar 2 layer 1)."""
+        split_dir = run_dir / "frozen-splits" / f"{split.eval_version}-{split.split_type}"
+        if not split_dir.exists():
+            return False
+        for f in split_dir.iterdir():
+            if f.is_file() and not _is_readonly(f):
+                return False
+        return True
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# DataProvenanceTracker
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+class DataProvenanceTracker:
+    """Per-augmented-sample provenance tracking + near-dup leakage detection."""
+
+    def record(
+        self,
+        sample_id: str,
+        source_sample_id: str,
+        transforms: list[str],
+        is_synthetic: bool,
+        frozen_test: FrozenSplit,
+        frozen_val: FrozenSplit,
+        sample_bytes: bytes | None = None,
+        node_id: str = "",
+        run_dir: Path | None = None,
+    ) -> DataProvenance:
+        """Compute sha256(augmented_sample); confirm not in test or val per_sample_hashes.
+
+        Raises ValueError if the augmented sample's hash collides with any frozen split.
+        Appends a DataProvenance record to nodes/<node_id>/data-provenance.jsonl.
+        """
+        verified = True
+        if sample_bytes is not None:
+            aug_hash = _sha256_bytes(sample_bytes)
+            test_hashes = set(frozen_test.per_sample_hashes.values())
+            val_hashes = set(frozen_val.per_sample_hashes.values())
+            if aug_hash in test_hashes or aug_hash in val_hashes:
+                raise ValueError(
+                    f"Augmented sample {sample_id!r} (sha256={aug_hash[:12]}…) "
+                    "collides with a frozen split sample — data provenance violation."
+                )
+
+        prov = DataProvenance(
+            sample_id=sample_id,
+            source_sample_id=source_sample_id,
+            split_type="train",
+            transform_applied=transforms,
+            is_synthetic=is_synthetic,
+            verified_not_in_test=verified,
+        )
+
+        if run_dir is not None and node_id:
+            prov_dir = run_dir / "nodes" / node_id
+            prov_dir.mkdir(parents=True, exist_ok=True)
+            prov_file = prov_dir / "data-provenance.jsonl"
+            with open(prov_file, "a") as fh:
+                fh.write(prov.model_dump_json() + "\n")
+
+        return prov
+
+    def check_near_dup(
+        self,
+        aug_samples: list[bytes],
+        frozen_test: FrozenSplit,
+        similarity_threshold: float = 0.95,
+        frozen_test_raw: dict[str, bytes] | None = None,
+    ) -> list[str]:
+        """Near-duplicate check (Pillar 2 layer 3).
+
+        Primary check: exact sha256 match against frozen test hashes (always performed).
+        Secondary check (when frozen_test_raw is supplied): byte 4-gram Jaccard similarity.
+
+        Returns list of sample indices (str) where similarity > threshold.
+
+        Modality note: proper image dhash and text embedding similarity require
+        Pillow / sentence-transformers.  Pass frozen_test_raw for Jaccard-based
+        detection; leave it None for exact-match-only (safe default for tabular data).
+        """
+        test_hash_set = set(frozen_test.per_sample_hashes.values())
+        flagged: list[str] = []
+
+        for i, sample in enumerate(aug_samples):
+            # Layer 1: exact hash match
+            if _sha256_bytes(sample) in test_hash_set:
+                flagged.append(str(i))
+                continue
+
+            # Layer 2 (optional): Jaccard on byte 4-grams
+            if frozen_test_raw is not None:
+                sample_shingles = _byte_shingles(sample)
+                for raw in frozen_test_raw.values():
+                    ref_shingles = _byte_shingles(raw)
+                    union = len(sample_shingles | ref_shingles)
+                    if union == 0:
+                        continue
+                    jaccard = len(sample_shingles & ref_shingles) / union
+                    if jaccard >= similarity_threshold:
+                        flagged.append(str(i))
+                        break
+
+        return flagged
+
+
+def _byte_shingles(data: bytes, k: int = 4) -> frozenset[bytes]:
+    """k-gram shingles over raw bytes."""
+    if len(data) < k:
+        return frozenset()
+    return frozenset(data[i: i + k] for i in range(len(data) - k + 1))

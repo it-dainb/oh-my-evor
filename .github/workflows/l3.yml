@@ -1,0 +1,45 @@
+name: L3 end-to-end
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  l3-e2e:
+    name: L3 e2e proof-on-task
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install Node deps
+        run: npm install
+
+      - name: Install Python deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install pydantic>=2 fastapi "uvicorn[standard]" httpx pytest ruff scikit-learn
+          pip install -e harness/
+
+      - name: L1 + L2 prerequisite check
+        run: |
+          npm run lint:l1
+          npm run typecheck
+          npm test
+          pytest harness/tests/ -v --tb=short
+
+      - name: L3 — end-to-end proof-on-task
+        run: bash scripts/l3-e2e.sh

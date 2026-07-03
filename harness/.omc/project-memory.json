@@ -1,0 +1,182 @@
+{
+  "version": "1.0.0",
+  "lastScanned": 1783094421452,
+  "projectRoot": "/storages_local/research/oh-my-evor/harness",
+  "techStack": {
+    "languages": [
+      {
+        "name": "Python",
+        "version": null,
+        "confidence": "high",
+        "markers": [
+          "pyproject.toml"
+        ]
+      }
+    ],
+    "frameworks": [
+      {
+        "name": "fastapi",
+        "version": null,
+        "category": "backend"
+      }
+    ],
+    "packageManager": null,
+    "runtime": null
+  },
+  "build": {
+    "buildCommand": "cd /storages_local/research/oh-my-evor/mcp && npx tsc --noEmit 2>&1 && echo \"tsc OK\" && npx vitest run 2>&1 | tail -10",
+    "testCommand": "cd /storages_local/research/oh-my-evor && python -m pytest harness/tests/ -v --tb=short 2>&1 | tail -30",
+    "lintCommand": "ruff check",
+    "devCommand": null,
+    "scripts": {}
+  },
+  "conventions": {
+    "namingStyle": null,
+    "importStyle": null,
+    "testPattern": null,
+    "fileOrganization": null
+  },
+  "structure": {
+    "isMonorepo": false,
+    "workspaces": [],
+    "mainDirectories": [
+      "tests"
+    ],
+    "gitBranches": null
+  },
+  "customNotes": [],
+  "directoryMap": {
+    "evor": {
+      "path": "evor",
+      "purpose": null,
+      "fileCount": 16,
+      "lastAccessed": 1783094421449,
+      "keyFiles": [
+        "__init__.py",
+        "__main__.py",
+        "angle_registry.py",
+        "benchmark.py",
+        "contracts.py"
+      ]
+    },
+    "tests": {
+      "path": "tests",
+      "purpose": "Test files",
+      "fileCount": 13,
+      "lastAccessed": 1783094421449,
+      "keyFiles": [
+        "__init__.py",
+        "conftest.py",
+        "test_angle_registry.py",
+        "test_contracts.py",
+        "test_dashboard.py"
+      ]
+    },
+    "tests/fixtures": {
+      "path": "tests/fixtures",
+      "purpose": "Test fixtures",
+      "fileCount": 0,
+      "lastAccessed": 1783094421450,
+      "keyFiles": []
+    }
+  },
+  "hotPaths": [
+    {
+      "path": "tests/test_integration.py",
+      "accessCount": 21,
+      "lastAccessed": 1783095297422,
+      "type": "file"
+    },
+    {
+      "path": "evor/integrity.py",
+      "accessCount": 16,
+      "lastAccessed": 1783095981645,
+      "type": "file"
+    },
+    {
+      "path": "evor/evaluator.py",
+      "accessCount": 13,
+      "lastAccessed": 1783095975224,
+      "type": "file"
+    },
+    {
+      "path": "evor/contracts.py",
+      "accessCount": 12,
+      "lastAccessed": 1783096044079,
+      "type": "file"
+    },
+    {
+      "path": "evor/freeze.py",
+      "accessCount": 8,
+      "lastAccessed": 1783096044399,
+      "type": "file"
+    },
+    {
+      "path": "evor/tree.py",
+      "accessCount": 8,
+      "lastAccessed": 1783096075198,
+      "type": "file"
+    },
+    {
+      "path": "tests/test_integrity.py",
+      "accessCount": 5,
+      "lastAccessed": 1783094671875,
+      "type": "file"
+    },
+    {
+      "path": "tests/test_tick_loop.py",
+      "accessCount": 4,
+      "lastAccessed": 1783095569640,
+      "type": "file"
+    },
+    {
+      "path": "evor/angle_registry.py",
+      "accessCount": 3,
+      "lastAccessed": 1783094697580,
+      "type": "file"
+    },
+    {
+      "path": "evor/store.py",
+      "accessCount": 3,
+      "lastAccessed": 1783095019022,
+      "type": "file"
+    },
+    {
+      "path": "tests/test_contracts.py",
+      "accessCount": 2,
+      "lastAccessed": 1783094580769,
+      "type": "file"
+    },
+    {
+      "path": "evor/wiki.py",
+      "accessCount": 2,
+      "lastAccessed": 1783095091425,
+      "type": "file"
+    },
+    {
+      "path": "tests/test_store.py",
+      "accessCount": 1,
+      "lastAccessed": 1783094606934,
+      "type": "file"
+    },
+    {
+      "path": "tests/test_tree.py",
+      "accessCount": 1,
+      "lastAccessed": 1783094615527,
+      "type": "file"
+    },
+    {
+      "path": "tests/conftest.py",
+      "accessCount": 1,
+      "lastAccessed": 1783094686315,
+      "type": "file"
+    },
+    {
+      "path": "evor/scheduler.py",
+      "accessCount": 1,
+      "lastAccessed": 1783095375084,
+      "type": "file"
+    }
+  ],
+  "userDirectives": []
+}

@@ -1,0 +1,7 @@
+{
+  "tool_name": "Bash",
+  "tool_input_preview": "{\"command\":\"cd /storages_local/research/oh-my-evor/harness && .venv/bin/pytest tests/test_tree.py tests/test_wiki.py tests/test_scheduler.py --ignore=tests/test_contracts.py -q 2>&1\",\"description\":\"Ve...",
+  "error": "Exit code 1\n...................................................FF.                   [100%]\n=================================== FAILURES ===================================\n__________________ test_submit_no_entry_resolves_immediately ___________________\n\nscheduler = <evor.scheduler.ResourceScheduler object at 0x7bf273c37910>\n\n    def test_submit_no_entry_resolves_immediately(scheduler: ResourceScheduler) -> None:\n        \"\"\"submit() with no 'entry' key resolves the Future with exit code 0 (no-op...",
+  "timestamp": "2026-07-03T15:55:06.248Z",
+  "retry_count": 2
+}

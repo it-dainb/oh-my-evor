@@ -1,0 +1,23 @@
+{
+  "name": "@oh-my-evor/mcp",
+  "version": "0.1.0",
+  "description": "MCP server for oh-my-evor",
+  "type": "module",
+  "main": "dist/index.cjs",
+  "scripts": {
+    "build": "node build.mjs",
+    "test": "vitest run --passWithNoTests",
+    "typecheck": "tsc --noEmit",
+    "lint": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "zod": "^3.22.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.3.0",
+    "vitest": "^1.0.0",
+    "@vitest/coverage-v8": "^1.0.0"
+  }
+}

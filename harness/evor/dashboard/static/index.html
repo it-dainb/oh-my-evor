@@ -1,0 +1,748 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Evor Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0f1117; --surface: #1a1d27; --border: #2d3148;
+    --text: #e2e8f0; --muted: #8892a4; --accent: #6366f1;
+    --green: #22c55e; --red: #ef4444; --yellow: #f59e0b; --blue: #3b82f6;
+    --orange: #f97316; --purple: #a855f7; --cyan: #06b6d4;
+    --family-arch: #6366f1; --family-training: #22c55e;
+    --family-data-curation: #f59e0b; --family-data-augmentation: #f97316;
+    --family-data-acquisition: #06b6d4; --family-algo: #a855f7; --family-other: #8892a4;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Inter', system-ui, sans-serif; font-size: 14px; }
+  header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 12px 20px; display: flex; align-items: center; gap: 16px; }
+  header h1 { font-size: 18px; font-weight: 700; color: var(--accent); }
+  header .run-select { background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 6px 10px; border-radius: 6px; font-size: 13px; flex: 1; max-width: 400px; }
+  header .status-badge { font-size: 12px; padding: 3px 8px; border-radius: 4px; background: var(--surface); border: 1px solid var(--border); }
+  header .status-badge.running { border-color: var(--green); color: var(--green); }
+  .tabs { display: flex; gap: 2px; background: var(--surface); border-bottom: 1px solid var(--border); padding: 0 20px; }
+  .tab { padding: 10px 16px; cursor: pointer; border-bottom: 2px solid transparent; font-size: 13px; color: var(--muted); transition: all 0.15s; }
+  .tab.active { color: var(--text); border-bottom-color: var(--accent); }
+  .tab:hover { color: var(--text); }
+  .panel { display: none; padding: 20px; height: calc(100vh - 100px); overflow: auto; }
+  .panel.active { display: flex; flex-direction: column; gap: 16px; }
+  /* Tree panel */
+  #tree-svg { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; width: 100%; flex: 1; min-height: 500px; }
+  .node circle { stroke-width: 2; cursor: pointer; }
+  .node text { font-size: 11px; fill: var(--text); pointer-events: none; }
+  .node.frontier circle { stroke: var(--green); stroke-width: 3; }
+  .node.pruned circle { opacity: 0.4; }
+  .node.running circle { stroke: var(--yellow); stroke-dasharray: 4 2; }
+  .link { fill: none; stroke: var(--border); stroke-width: 1.5; }
+  .eval-badge { font-size: 9px; fill: var(--muted); }
+  /* Sidebar */
+  .split { display: flex; gap: 16px; flex: 1; }
+  .sidebar { width: 320px; flex-shrink: 0; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px; overflow-y: auto; }
+  .sidebar h3 { font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 12px; }
+  .kv-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .kv-table td { padding: 4px 0; vertical-align: top; }
+  .kv-table td:first-child { color: var(--muted); width: 120px; }
+  .family-badge { display: inline-block; padding: 2px 6px; border-radius: 3px; font-size: 11px; font-weight: 600; }
+  .tier-badge { display: inline-block; padding: 2px 6px; border-radius: 3px; font-size: 11px; background: var(--border); }
+  .version-badge { display: inline-block; padding: 2px 6px; border-radius: 3px; font-size: 10px; background: var(--blue); color: #fff; }
+  .domain-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 8px; }
+  .domain-table th { text-align: left; color: var(--muted); font-weight: 600; padding: 4px 6px; border-bottom: 1px solid var(--border); }
+  .domain-table td { padding: 4px 6px; border-bottom: 1px solid var(--border); }
+  /* Frontier */
+  .data-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .data-table th { text-align: left; padding: 10px 12px; background: var(--surface); color: var(--muted); font-weight: 600; font-size: 12px; border-bottom: 1px solid var(--border); position: sticky; top: 0; }
+  .data-table td { padding: 10px 12px; border-bottom: 1px solid var(--border); }
+  .data-table tr:hover td { background: var(--surface); cursor: pointer; }
+  .rank { font-weight: 700; color: var(--accent); }
+  .delta-pos { color: var(--green); }
+  .delta-neg { color: var(--red); }
+  .integrity-pass { color: var(--green); }
+  .integrity-fail { color: var(--red); }
+  /* Telemetry */
+  .chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .chart-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px; }
+  .chart-card h4 { font-size: 12px; color: var(--muted); margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.05em; }
+  .chart-card canvas { max-height: 200px; }
+  .node-picker { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; flex-wrap: wrap; }
+  .node-chip { padding: 4px 10px; border-radius: 20px; font-size: 12px; cursor: pointer; background: var(--surface); border: 1px solid var(--border); color: var(--muted); }
+  .node-chip.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+  /* Domain leaderboard */
+  .filter-bar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .filter-bar label { font-size: 12px; color: var(--muted); }
+  .filter-bar input, .filter-bar select { background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 6px 10px; border-radius: 6px; font-size: 13px; }
+  .filter-bar button { background: var(--accent); border: none; color: #fff; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; }
+  .perf-bar { display: inline-block; height: 8px; background: var(--green); border-radius: 2px; vertical-align: middle; }
+  .sota-line { display: inline-block; width: 2px; height: 8px; background: var(--red); border-radius: 1px; vertical-align: middle; margin-left: 2px; }
+  .cross-version-warn { background: #2d1a00; border: 1px solid var(--yellow); color: var(--yellow); padding: 8px 12px; border-radius: 6px; font-size: 12px; }
+  /* Coverage */
+  .coverage-layout { display: grid; grid-template-columns: 280px 1fr; gap: 20px; }
+  .gauge-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 20px; text-align: center; }
+  .gauge-ring { position: relative; width: 160px; height: 160px; margin: 0 auto 16px; }
+  .gauge-ring svg { width: 160px; height: 160px; transform: rotate(-90deg); }
+  .gauge-bg { fill: none; stroke: var(--border); stroke-width: 16; }
+  .gauge-fill { fill: none; stroke: var(--green); stroke-width: 16; stroke-linecap: round; transition: stroke-dashoffset 0.8s ease; }
+  .gauge-center { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; }
+  .gauge-pct { font-size: 28px; font-weight: 700; }
+  .gauge-label { font-size: 11px; color: var(--muted); }
+  .angle-bars { display: flex; flex-direction: column; gap: 8px; }
+  .angle-row { display: flex; align-items: center; gap: 10px; font-size: 12px; }
+  .angle-name { width: 120px; color: var(--muted); }
+  .angle-bar-wrap { flex: 1; background: var(--bg); border-radius: 4px; height: 20px; position: relative; overflow: hidden; }
+  .angle-bar-fill { height: 100%; border-radius: 4px; transition: width 0.5s ease; }
+  .angle-bar-sota { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--red); opacity: 0.8; }
+  .angle-val { width: 60px; text-align: right; font-weight: 600; }
+  .angle-above { color: var(--green); }
+  .angle-below { color: var(--red); }
+  .risk-badge { font-size: 10px; padding: 1px 5px; border-radius: 3px; }
+  .risk-low { background: #14532d; color: var(--green); }
+  .risk-medium { background: #713f12; color: var(--yellow); }
+  .risk-high { background: #7f1d1d; color: var(--red); }
+  .risk-unknown { background: var(--border); color: var(--muted); }
+  .not-available { color: var(--muted); font-style: italic; padding: 40px; text-align: center; }
+  /* Timeline */
+  .timeline { display: flex; flex-direction: column; gap: 24px; padding: 8px 0; }
+  .timeline-item { display: flex; gap: 16px; align-items: flex-start; }
+  .timeline-dot { width: 36px; height: 36px; border-radius: 50%; background: var(--accent); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 12px; flex-shrink: 0; margin-top: 4px; }
+  .timeline-content { flex: 1; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; }
+  .timeline-header { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .timeline-version { font-weight: 700; }
+  .timeline-date { font-size: 12px; color: var(--muted); }
+  .consent-badge { font-size: 11px; padding: 2px 6px; border-radius: 3px; background: var(--border); }
+  .domain-pills { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .domain-pill { font-size: 11px; padding: 2px 8px; border-radius: 12px; background: var(--bg); border: 1px solid var(--border); }
+  .rescore-badge { font-size: 11px; padding: 2px 6px; border-radius: 3px; }
+  .rescore-complete { background: #14532d; color: var(--green); }
+  .rescore-pending { background: #1e3a5f; color: var(--blue); }
+  .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .empty { color: var(--muted); text-align: center; padding: 40px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>⚡ Evor</h1>
+  <select class="run-select" id="runSelect">
+    <option value="">Loading runs…</option>
+  </select>
+  <span class="status-badge" id="statusBadge">—</span>
+  <span style="color:var(--muted);font-size:12px" id="headerMeta"></span>
+</header>
+
+<div class="tabs">
+  <div class="tab active" data-tab="tree">Tree</div>
+  <div class="tab" data-tab="frontier">Frontier</div>
+  <div class="tab" data-tab="telemetry">Telemetry</div>
+  <div class="tab" data-tab="domains">Domain Leaderboard</div>
+  <div class="tab" data-tab="coverage">Coverage</div>
+  <div class="tab" data-tab="timeline">Benchmark Timeline</div>
+</div>
+
+<!-- TREE PANEL -->
+<div class="panel active" id="panel-tree">
+  <div class="split" style="flex:1;overflow:hidden">
+    <svg id="tree-svg"></svg>
+    <div class="sidebar" id="node-sidebar">
+      <h3>Select a node</h3>
+      <p style="color:var(--muted);font-size:12px">Click any node in the tree to inspect its details, metrics, and per-domain breakdown.</p>
+    </div>
+  </div>
+</div>
+
+<!-- FRONTIER PANEL -->
+<div class="panel" id="panel-frontier">
+  <div style="color:var(--muted);font-size:12px" id="frontierMeta"></div>
+  <div style="overflow:auto;flex:1">
+    <table class="data-table" id="frontierTable">
+      <thead><tr>
+        <th>#</th><th>Node</th><th>Family</th><th>Fitness</th><th>Delta vs Baseline</th>
+        <th>Eval Version</th><th>Integrity</th><th>Tier</th>
+      </tr></thead>
+      <tbody id="frontierBody"></tbody>
+    </table>
+  </div>
+  <div id="frontierDomain" style="margin-top:16px"></div>
+</div>
+
+<!-- TELEMETRY PANEL -->
+<div class="panel" id="panel-telemetry">
+  <div class="node-picker" id="telNodePicker"></div>
+  <div class="chart-grid">
+    <div class="chart-card"><h4>Training Loss</h4><canvas id="chartLoss"></canvas></div>
+    <div class="chart-card"><h4>Validation Metric</h4><canvas id="chartVal"></canvas></div>
+    <div class="chart-card"><h4>Gradient Norm</h4><canvas id="chartGrad"></canvas></div>
+    <div class="chart-card"><h4>Throughput (samples/s)</h4><canvas id="chartThroughput"></canvas></div>
+  </div>
+</div>
+
+<!-- DOMAIN LEADERBOARD PANEL -->
+<div class="panel" id="panel-domains">
+  <div class="filter-bar">
+    <label>Domain</label>
+    <input type="text" id="domainInput" placeholder="scanned" style="width:140px">
+    <label>Metric</label>
+    <input type="text" id="metricInput" placeholder="accuracy" style="width:120px">
+    <label>Eval version</label>
+    <select id="evalVersionSelect"><option value="">current</option></select>
+    <button onclick="loadDomainPivot()">Search</button>
+  </div>
+  <div id="crossVersionWarn" style="display:none" class="cross-version-warn">
+    ⚠ Showing results across multiple eval versions — direct comparison may be misleading.
+  </div>
+  <div style="overflow:auto;flex:1;margin-top:8px">
+    <table class="data-table" id="pivotTable">
+      <thead><tr>
+        <th>#</th><th>Node</th><th>Family</th><th>Value</th><th>Performance</th>
+        <th>Eval Version</th><th>Integrity</th>
+      </tr></thead>
+      <tbody id="pivotBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- COVERAGE PANEL -->
+<div class="panel" id="panel-coverage">
+  <div id="coverageContent"><p class="empty"><span class="spinner"></span></p></div>
+</div>
+
+<!-- BENCHMARK TIMELINE PANEL -->
+<div class="panel" id="panel-timeline">
+  <div id="timelineContent"><p class="empty"><span class="spinner"></span></p></div>
+</div>
+
+<script>
+// ── State ─────────────────────────────────────────────────────────────────────
+let currentMission = null, currentRun = null;
+let allNodes = [], frontierNodes = [];
+let charts = {}, telSource = null;
+const BASE = '';
+
+const FAMILY_COLORS = {
+  'arch': '#6366f1', 'training': '#22c55e', 'data-curation': '#f59e0b',
+  'data-augmentation': '#f97316', 'data-acquisition': '#06b6d4',
+  'algo': '#a855f7', 'other': '#8892a4',
+};
+
+// ── API helpers ───────────────────────────────────────────────────────────────
+async function api(path) {
+  const r = await fetch(BASE + path);
+  if (!r.ok) throw new Error(`${r.status} ${path}`);
+  return r.json();
+}
+async function apiMaybe(path) {
+  const r = await fetch(BASE + path);
+  if (r.status === 404) return null;
+  if (!r.ok) throw new Error(`${r.status} ${path}`);
+  return r.json();
+}
+const runBase = () => `/api/runs/${currentMission}/${currentRun}`;
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+async function init() {
+  const runs = await api('/api/runs');
+  const sel = document.getElementById('runSelect');
+  sel.innerHTML = '';
+  if (!runs.length) {
+    sel.innerHTML = '<option>No runs found</option>';
+    return;
+  }
+  runs.forEach(r => {
+    const opt = document.createElement('option');
+    opt.value = `${r.mission_id}|${r.run_id}`;
+    opt.text = `${r.mission_id} / ${r.run_id}  [tick ${r.tick_count}, best=${r.best_score?.toFixed(4) ?? '—'}]`;
+    sel.appendChild(opt);
+  });
+  sel.onchange = () => selectRun(sel.value);
+  sel.dispatchEvent(new Event('change'));
+}
+
+async function selectRun(val) {
+  if (!val) return;
+  [currentMission, currentRun] = val.split('|');
+  await loadCurrentRun();
+}
+
+async function loadCurrentRun() {
+  const [runs] = await Promise.all([api('/api/runs')]);
+  const run = runs.find(r => r.mission_id === currentMission && r.run_id === currentRun);
+  if (run) {
+    const badge = document.getElementById('statusBadge');
+    badge.textContent = run.status ?? '—';
+    badge.className = 'status-badge' + (run.status === 'running' ? ' running' : '');
+    document.getElementById('headerMeta').textContent =
+      `tick ${run.tick_count}  best=${run.best_score?.toFixed(4) ?? '—'}  frontier=${run.frontier_size}  ${run.current_eval_version ?? ''}`;
+  }
+
+  const activeTab = document.querySelector('.tab.active')?.dataset.tab ?? 'tree';
+  await loadTab(activeTab);
+
+  // Auto-refresh every 10s
+  clearInterval(window._refreshTimer);
+  window._refreshTimer = setInterval(() => loadCurrentRun(), 10000);
+}
+
+// ── Tabs ──────────────────────────────────────────────────────────────────────
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.onclick = () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById(`panel-${tab.dataset.tab}`).classList.add('active');
+    loadTab(tab.dataset.tab);
+  };
+});
+
+async function loadTab(name) {
+  if (!currentMission) return;
+  switch (name) {
+    case 'tree':      await loadTree(); break;
+    case 'frontier':  await loadFrontier(); break;
+    case 'telemetry': await loadTelemetryPicker(); break;
+    case 'domains':   await loadDomainSetup(); break;
+    case 'coverage':  await loadCoverage(); break;
+    case 'timeline':  await loadTimeline(); break;
+  }
+}
+
+// ── Tree panel ────────────────────────────────────────────────────────────────
+async function loadTree() {
+  allNodes = await api(`${runBase()}/tree`);
+  frontierNodes = await api(`${runBase()}/frontier`);
+  renderTree(allNodes, frontierNodes);
+}
+
+function renderTree(nodes, frontier) {
+  const frontierIds = new Set(frontier.map(n => n.id));
+  const svg = d3.select('#tree-svg');
+  svg.selectAll('*').remove();
+  const container = document.getElementById('tree-svg');
+  const W = container.clientWidth || 800, H = container.clientHeight || 500;
+
+  // Build hierarchy from parent_ids (use first parent only for layout)
+  const byId = Object.fromEntries(nodes.map(n => [n.id, n]));
+  const roots = nodes.filter(n => !n.parent_ids.length);
+  if (!roots.length) {
+    svg.append('text').attr('x', W/2).attr('y', H/2)
+       .attr('text-anchor','middle').attr('fill','#8892a4').text('No nodes yet');
+    return;
+  }
+
+  // Build d3 stratify data
+  const data = nodes.map(n => ({
+    id: n.id,
+    parentId: n.parent_ids[0] ?? null,
+    _node: n,
+  }));
+
+  let root;
+  try {
+    root = d3.stratify().id(d => d.id).parentId(d => d.parentId)(data);
+  } catch { return; }
+
+  const margin = { top: 30, right: 80, bottom: 20, left: 80 };
+  const innerW = W - margin.left - margin.right;
+  const innerH = H - margin.top - margin.bottom;
+
+  const treeLayout = d3.tree().size([innerH, innerW]);
+  treeLayout(root);
+
+  const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
+
+  // Links
+  g.selectAll('.link').data(root.links()).enter().append('path').attr('class', 'link')
+   .attr('d', d3.linkHorizontal().x(d => d.y).y(d => d.x));
+
+  // Nodes
+  const nodeG = g.selectAll('.node').data(root.descendants()).enter()
+    .append('g').attr('class', d => {
+      const n = d.data._node;
+      let cls = 'node';
+      if (frontierIds.has(n.id)) cls += ' frontier';
+      if (n.status === 'pruned') cls += ' pruned';
+      if (n.status === 'running') cls += ' running';
+      return cls;
+    })
+    .attr('transform', d => `translate(${d.y},${d.x})`)
+    .style('cursor', 'pointer')
+    .on('click', (ev, d) => showNodeSidebar(d.data._node));
+
+  nodeG.append('circle')
+    .attr('r', d => 6 + Math.min((d.data._node.visit_count || 1) * 1.5, 8))
+    .attr('fill', d => FAMILY_COLORS[d.data._node.approach_family] ?? '#8892a4')
+    .attr('stroke', d => frontierIds.has(d.data._node.id) ? '#22c55e' : 'var(--surface)');
+
+  // Eval version badge
+  nodeG.append('text').attr('class', 'eval-badge')
+    .attr('dx', 0).attr('dy', -14).attr('text-anchor', 'middle')
+    .text(d => d.data._node.eval_version ?? '');
+
+  // Hatch pruned / old-version nodes
+  const currentVersion = frontierNodes[0]?.eval_version ?? null;
+  const defs = svg.append('defs');
+  defs.append('pattern').attr('id','hatch').attr('patternUnits','userSpaceOnUse')
+    .attr('width',4).attr('height',4)
+    .append('path').attr('d','M-1,1 l2,-2 M0,4 l4,-4 M3,5 l2,-2')
+    .attr('stroke','#8892a4').attr('stroke-width',0.8);
+
+  nodeG.filter(d => currentVersion && d.data._node.eval_version !== currentVersion)
+    .append('circle')
+    .attr('r', d => 6 + Math.min((d.data._node.visit_count||1)*1.5, 8))
+    .attr('fill', 'url(#hatch)').attr('opacity', 0.4).attr('pointer-events','none');
+
+  // Add zoom
+  svg.call(d3.zoom().scaleExtent([0.3, 3]).on('zoom', ev => g.attr('transform', ev.transform)));
+}
+
+async function showNodeSidebar(node) {
+  const sidebar = document.getElementById('node-sidebar');
+  sidebar.innerHTML = '<h3>Loading…</h3>';
+  try {
+    const detail = await api(`${runBase()}/nodes/${node.id}`);
+    const n = detail.node, r = detail.result, integ = detail.integrity;
+    const color = FAMILY_COLORS[n.approach_family] ?? '#8892a4';
+
+    let perDomainHtml = '';
+    if (r?.per_domain) {
+      const domains = Object.keys(r.per_domain);
+      perDomainHtml = `
+        <h3 style="margin-top:16px">Per-Domain Breakdown <span class="version-badge">${r.eval_version}</span></h3>
+        <table class="domain-table"><thead><tr><th>Domain</th>${
+          Object.keys(Object.values(r.per_domain)[0]||{}).map(m=>`<th>${m}</th>`).join('')
+        }</tr></thead><tbody>
+        ${domains.map(d => `<tr><td>${d}</td>${
+          Object.values(r.per_domain[d]).map(v => `<td>${v.toFixed(4)}</td>`).join('')
+        }</tr>`).join('')}
+        </tbody></table>`;
+    }
+
+    sidebar.innerHTML = `
+      <h3>Node <code style="font-size:11px">${n.id.slice(0,8)}…</code></h3>
+      <table class="kv-table">
+        <tr><td>Family</td><td><span class="family-badge" style="background:${color}22;color:${color};border:1px solid ${color}44">${n.approach_family}</span></td></tr>
+        <tr><td>Tier</td><td><span class="tier-badge">${n.mutation_tier ?? '—'}</span></td></tr>
+        <tr><td>Status</td><td>${n.status}</td></tr>
+        <tr><td>Depth</td><td>${n.depth}</td></tr>
+        <tr><td>Visits</td><td>${n.visit_count}</td></tr>
+        <tr><td>Eval version</td><td><span class="version-badge">${n.eval_version}</span></td></tr>
+        <tr><td>Integrity</td><td class="${integ?.verdict === 'passed' ? 'integrity-pass' : 'integrity-fail'}">${integ?.verdict ?? '—'}</td></tr>
+        <tr><td>Fitness</td><td><strong>${r?.fitness_value?.toFixed(4) ?? '—'}</strong></td></tr>
+        ${Object.entries(n.metrics||{}).map(([k,v]) => `<tr><td>${k}</td><td>${v.toFixed(4)}</td></tr>`).join('')}
+        <tr><td>Citations</td><td>${n.citations?.length ?? 0}</td></tr>
+        <tr><td>Lessons</td><td>${n.lesson_ids?.length ?? 0}</td></tr>
+      </table>
+      ${perDomainHtml}
+      <div style="margin-top:12px">
+        <button onclick="selectNodeTelemetry('${n.id}')" style="background:var(--accent);border:none;color:#fff;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:12px">
+          View Telemetry
+        </button>
+      </div>`;
+  } catch (e) {
+    sidebar.innerHTML = `<p style="color:var(--red)">Error: ${e.message}</p>`;
+  }
+}
+
+function selectNodeTelemetry(nodeId) {
+  document.querySelector('[data-tab="telemetry"]').click();
+  setTimeout(() => activateTelemetryNode(nodeId), 100);
+}
+
+// ── Frontier panel ────────────────────────────────────────────────────────────
+async function loadFrontier() {
+  const [frontier, runs] = await Promise.all([
+    api(`${runBase()}/frontier`),
+    api('/api/runs'),
+  ]);
+  const run = runs.find(r => r.mission_id === currentMission && r.run_id === currentRun);
+  const baseline = run?.baseline_value ?? 0;
+
+  document.getElementById('frontierMeta').textContent =
+    `${frontier.length} frontier node(s) — baseline: ${baseline}`;
+
+  const tbody = document.getElementById('frontierBody');
+  tbody.innerHTML = '';
+  frontier.forEach((n, i) => {
+    const delta = ((n.fitness_value ?? 0) - baseline);
+    const deltaStr = (delta >= 0 ? '+' : '') + delta.toFixed(4);
+    const deltaClass = delta >= 0 ? 'delta-pos' : 'delta-neg';
+    const color = FAMILY_COLORS[n.approach_family] ?? '#8892a4';
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="rank">${i + 1}</td>
+      <td><code>${n.id.slice(0,12)}…</code></td>
+      <td><span class="family-badge" style="background:${color}22;color:${color}">${n.approach_family}</span></td>
+      <td><strong>${n.fitness_value?.toFixed(4) ?? '—'}</strong></td>
+      <td class="${deltaClass}">${deltaStr}</td>
+      <td><span class="version-badge">${n.eval_version}</span></td>
+      <td class="${n.integrity_status === 'passed' ? 'integrity-pass' : 'integrity-fail'}">${n.integrity_status}</td>
+      <td>${n.mutation_tier ?? '—'}</td>`;
+    tr.onclick = () => {
+      document.querySelector('[data-tab="tree"]').click();
+      setTimeout(() => showNodeSidebar(n), 200);
+    };
+    tbody.appendChild(tr);
+  });
+
+  if (!frontier.length) tbody.innerHTML = '<tr><td colspan="8" class="empty">No frontier nodes yet</td></tr>';
+
+  // Per-domain of best frontier node
+  const domDiv = document.getElementById('frontierDomain');
+  if (frontier.length) {
+    try {
+      const pd = await api(`${runBase()}/nodes/${frontier[0].id}/per-domain`);
+      const domains = Object.keys(pd.per_domain);
+      const metrics = domains.length ? Object.keys(pd.per_domain[domains[0]]) : [];
+      domDiv.innerHTML = `
+        <h4 style="font-size:12px;color:var(--muted);margin-bottom:8px">Best node per-domain breakdown <span class="version-badge">${pd.eval_version}</span></h4>
+        <table class="domain-table"><thead><tr><th>Domain</th>${metrics.map(m=>`<th>${m}</th>`).join('')}</tr></thead>
+        <tbody>${domains.map(d => `<tr><td>${d}</td>${metrics.map(m=>`<td>${pd.per_domain[d][m]?.toFixed(4)??'—'}</td>`).join('')}</tr>`).join('')}
+        </tbody></table>`;
+    } catch { domDiv.innerHTML = ''; }
+  }
+}
+
+// ── Telemetry panel ───────────────────────────────────────────────────────────
+async function loadTelemetryPicker() {
+  allNodes = allNodes.length ? allNodes : await api(`${runBase()}/tree`);
+  const picker = document.getElementById('telNodePicker');
+  picker.innerHTML = '<span style="color:var(--muted);font-size:12px">Select node: </span>';
+  const done = allNodes.filter(n => n.status === 'done' || n.status === 'running');
+  done.slice(0, 12).forEach(n => {
+    const chip = document.createElement('span');
+    chip.className = 'node-chip';
+    chip.textContent = n.id.slice(0, 10);
+    chip.title = `${n.approach_family} — fitness ${n.fitness_value?.toFixed(4)??'—'}`;
+    chip.onclick = () => activateTelemetryNode(n.id);
+    picker.appendChild(chip);
+  });
+  if (done.length) activateTelemetryNode(done[0].id);
+}
+
+const chartConfigs = [
+  { id: 'chartLoss',       field: 'train_loss',  label: 'Loss',        color: '#ef4444' },
+  { id: 'chartVal',        field: 'val_metric',   label: 'Val Metric',  color: '#22c55e' },
+  { id: 'chartGrad',       field: 'grad_norm',    label: 'Grad Norm',   color: '#f59e0b' },
+  { id: 'chartThroughput', field: 'throughput',   label: 'Samples/s',   color: '#6366f1' },
+];
+
+function ensureCharts() {
+  if (charts._ready) return;
+  chartConfigs.forEach(cfg => {
+    const ctx = document.getElementById(cfg.id).getContext('2d');
+    charts[cfg.id] = new Chart(ctx, {
+      type: 'line',
+      data: { labels: [], datasets: [{ label: cfg.label, data: [], borderColor: cfg.color, backgroundColor: cfg.color + '22', borderWidth: 1.5, pointRadius: 0, tension: 0.3, fill: true }] },
+      options: { animation: false, responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { ticks: { color: '#8892a4', maxTicksLimit: 6 }, grid: { color: '#2d3148' } },
+          y: { ticks: { color: '#8892a4' }, grid: { color: '#2d3148' } }
+        }
+      }
+    });
+  });
+  charts._ready = true;
+}
+
+function updateCharts(records) {
+  if (!records.length) return;
+  chartConfigs.forEach(cfg => {
+    const ch = charts[cfg.id];
+    if (!ch) return;
+    ch.data.labels = records.map(r => r.step);
+    ch.data.datasets[0].data = records.map(r => r[cfg.field] ?? null);
+    ch.update('none');
+  });
+}
+
+function activateTelemetryNode(nodeId) {
+  ensureCharts();
+  // Highlight chip
+  document.querySelectorAll('.node-chip').forEach(c => {
+    c.classList.toggle('active', c.textContent === nodeId.slice(0, 10));
+  });
+
+  if (telSource) { telSource.close(); telSource = null; }
+
+  const records = [];
+  const url = `${BASE}/api/telemetry/${currentMission}/${currentRun}/${nodeId}`;
+  telSource = new EventSource(url);
+  telSource.onmessage = ev => {
+    try {
+      const rec = JSON.parse(ev.data);
+      if (!rec.error) {
+        records.push(rec);
+        updateCharts(records);
+      }
+    } catch {}
+  };
+}
+
+// ── Domain leaderboard ────────────────────────────────────────────────────────
+async function loadDomainSetup() {
+  // Populate eval version dropdown from eval-versions endpoint
+  try {
+    const suites = await api(`${runBase()}/eval-versions`);
+    const sel = document.getElementById('evalVersionSelect');
+    sel.innerHTML = '<option value="">current (default)</option>';
+    suites.forEach(s => {
+      const opt = document.createElement('option');
+      opt.value = s.eval_version;
+      opt.text = s.eval_version + (s.domains?.length ? ` (${s.domains.length} domains)` : '');
+      sel.appendChild(opt);
+    });
+    // Default domain/metric from first suite
+    if (suites.length && suites[0].domains?.length) {
+      document.getElementById('domainInput').value = suites[0].domains[0].domain_id;
+      if (suites[0].domains[0].metric_specs?.length) {
+        document.getElementById('metricInput').value = suites[0].domains[0].metric_specs[0].metric_name;
+      }
+    }
+  } catch {}
+  await loadDomainPivot();
+}
+
+async function loadDomainPivot() {
+  const domain = document.getElementById('domainInput').value.trim() || 'scanned';
+  const metric = document.getElementById('metricInput').value.trim() || 'accuracy';
+  const evalVersion = document.getElementById('evalVersionSelect').value;
+
+  const warnEl = document.getElementById('crossVersionWarn');
+  warnEl.style.display = 'none';
+
+  let rows = [];
+  try {
+    const params = new URLSearchParams({ metric, domain });
+    if (evalVersion) params.set('eval_version', evalVersion);
+    rows = await api(`${runBase()}/domain-pivot?${params}`);
+  } catch (e) {
+    document.getElementById('pivotBody').innerHTML = `<tr><td colspan="7" class="empty">No data: ${e.message}</td></tr>`;
+    return;
+  }
+
+  // Check cross-version
+  const versions = [...new Set(rows.map(r => r.eval_version))];
+  if (versions.length > 1) warnEl.style.display = 'block';
+
+  const maxVal = rows.length ? Math.max(...rows.map(r => r.value)) : 1;
+  const tbody = document.getElementById('pivotBody');
+  tbody.innerHTML = '';
+  rows.forEach((row, i) => {
+    const color = FAMILY_COLORS[row.approach_family] ?? '#8892a4';
+    const pct = maxVal > 0 ? (row.value / maxVal * 100).toFixed(1) : 0;
+    tbody.innerHTML += `
+      <tr>
+        <td class="rank">${i+1}</td>
+        <td><code>${row.node_id.slice(0,12)}…</code></td>
+        <td><span class="family-badge" style="background:${color}22;color:${color}">${row.approach_family}</span></td>
+        <td><strong>${row.value.toFixed(4)}</strong></td>
+        <td><span class="perf-bar" style="width:${pct}px;max-width:120px"></span></td>
+        <td><span class="version-badge">${row.eval_version}</span></td>
+        <td class="${row.integrity_status==='passed'?'integrity-pass':'integrity-fail'}">${row.integrity_status??'—'}</td>
+      </tr>`;
+  });
+  if (!rows.length) tbody.innerHTML = `<tr><td colspan="7" class="empty">No nodes with ${domain}/${metric} data</td></tr>`;
+}
+
+// ── Coverage panel ────────────────────────────────────────────────────────────
+async function loadCoverage() {
+  const el = document.getElementById('coverageContent');
+  try {
+    const cov = await apiMaybe(`${runBase()}/coverage`);
+    if (!cov) {
+      el.innerHTML = '<p class="not-available">Coverage gauge is only available for <strong>open_ended</strong> missions. This is a fixed mission.</p>';
+      return;
+    }
+    const pct = (cov.current_coverage * 100).toFixed(1);
+    const targetPct = (cov.coverage_target * 100).toFixed(0);
+    const circ = 2 * Math.PI * 54;
+    const offset = circ * (1 - cov.current_coverage);
+    const maxVal = Math.max(...(cov.per_angle.map(a => Math.max(a.value, a.sota_bar))), 1);
+
+    el.innerHTML = `
+      <div class="coverage-layout">
+        <div class="gauge-card">
+          <h3 style="font-size:13px;color:var(--muted);margin-bottom:16px">SOTA Coverage</h3>
+          <div class="gauge-ring">
+            <svg viewBox="0 0 120 120">
+              <circle class="gauge-bg" cx="60" cy="60" r="54"/>
+              <circle class="gauge-fill" cx="60" cy="60" r="54"
+                stroke-dasharray="${circ}"
+                stroke-dashoffset="${offset}"
+                stroke="${cov.current_coverage >= cov.coverage_target ? '#22c55e' : '#6366f1'}"/>
+            </svg>
+            <div class="gauge-center">
+              <div class="gauge-pct" style="color:${cov.current_coverage >= cov.coverage_target ? '#22c55e' : '#e2e8f0'}">${pct}%</div>
+              <div class="gauge-label">target ${targetPct}%</div>
+            </div>
+          </div>
+          ${cov.worst_angle_id ? `<p style="font-size:12px;color:var(--muted)">Worst angle: <strong>${cov.worst_angle_id}</strong></p>` : ''}
+        </div>
+        <div>
+          <h3 style="font-size:13px;color:var(--muted);margin-bottom:16px">Per-Angle vs SOTA</h3>
+          <div class="angle-bars">
+            ${cov.per_angle.map(a => {
+              const barW = Math.min((a.value / maxVal * 100), 100).toFixed(1);
+              const sotaPos = Math.min((a.sota_bar / maxVal * 100), 100).toFixed(1);
+              const cls = a.above_sota ? 'angle-above' : 'angle-below';
+              return `<div class="angle-row">
+                <span class="angle-name">${a.angle_id}</span>
+                <div class="angle-bar-wrap">
+                  <div class="angle-bar-fill" style="width:${barW}%;background:${a.above_sota?'#22c55e':'#6366f1'}"></div>
+                  <div class="angle-bar-sota" style="left:${sotaPos}%"></div>
+                </div>
+                <span class="angle-val ${cls}">${a.value.toFixed(3)}</span>
+                <span style="font-size:10px;color:var(--muted)">SOTA ${a.sota_bar.toFixed(3)}</span>
+              </div>`;
+            }).join('')}
+          </div>
+        </div>
+      </div>`;
+  } catch (e) {
+    el.innerHTML = `<p style="color:var(--red)">Error loading coverage: ${e.message}</p>`;
+  }
+}
+
+// ── Benchmark timeline ────────────────────────────────────────────────────────
+async function loadTimeline() {
+  const el = document.getElementById('timelineContent');
+  try {
+    const suites = await api(`${runBase()}/eval-versions`);
+    if (!suites.length) {
+      el.innerHTML = '<p class="empty">No eval-version history yet</p>';
+      return;
+    }
+    el.innerHTML = `<div class="timeline">${suites.map((s, i) => {
+      const newDomains = i === 0
+        ? s.domains.map(d => d.domain_id)
+        : s.domains.filter(d => d.added_at_eval_version === s.eval_version).map(d => d.domain_id);
+      const totalDomains = s.domains.length;
+      return `
+        <div class="timeline-item">
+          <div class="timeline-dot">${s.eval_version}</div>
+          <div class="timeline-content">
+            <div class="timeline-header">
+              <span class="timeline-version">${s.eval_version}</span>
+              <span class="consent-badge">created_by: ${s.created_by}</span>
+              <span class="timeline-date">${s.created_at?.slice(0,10) ?? ''}</span>
+              ${s.parent_eval_version ? `<span style="font-size:11px;color:var(--muted)">⊇ ${s.parent_eval_version}</span>` : ''}
+            </div>
+            <div style="font-size:12px;color:var(--muted)">
+              ${totalDomains} domain(s) total${newDomains.length ? ` — ${newDomains.length} added this version` : ''}
+            </div>
+            ${newDomains.length ? `<div class="domain-pills">${newDomains.map(d => `<span class="domain-pill">+ ${d}</span>`).join('')}</div>` : ''}
+          </div>
+        </div>`;
+    }).join('')}</div>`;
+  } catch (e) {
+    el.innerHTML = `<p style="color:var(--red)">Error: ${e.message}</p>`;
+  }
+}
+
+// ── Bootstrap ─────────────────────────────────────────────────────────────────
+init();
+</script>
+</body>
+</html>

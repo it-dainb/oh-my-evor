@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "evor": {
+      "command": "node",
+      "args": ["mcp/dist/index.cjs"]
+    }
+  }
+}

@@ -1,0 +1,822 @@
+"""
+oh-my-evor data contracts — Pydantic v2 strict models.
+
+All 27+ schemas mirroring mcp/src/contracts.ts exactly.
+Field names match the TypeScript interfaces; model_config = ConfigDict(strict=True) on all.
+
+ApproachFamily: 7-tag literal taxonomy per R-12.
+Legacy "augmentation" tag aliased to "data-augmentation" on read (H002/H003).
+"""
+
+from __future__ import annotations
+
+from typing import Any, Literal, Optional, Union
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+# ────────────────────────────────────────────────────────────────────────────
+# Shared type aliases
+# ────────────────────────────────────────────────────────────────────────────
+
+# 7-tag ApproachFamily taxonomy (R-12); legacy "augmentation" aliased on read
+ApproachFamily = Literal[
+    "arch",
+    "training",
+    "data-curation",
+    "data-augmentation",
+    "data-acquisition",
+    "algo",
+    "other",
+]
+
+
+def _alias_approach_family(value: str) -> str:
+    """Normalise legacy 'augmentation' tag to 'data-augmentation'."""
+    if value == "augmentation":
+        return "data-augmentation"
+    return value
+
+
+# ────────────────────────────────────────────────────────────────────────────
+# MetricSpec / MetricRegistry (Pillar 3)
+# ────────────────────────────────────────────────────────────────────────────
+
+
+class MetricSpec(BaseModel):
+    model_config = ConfigDict(strict=True)
+
+    metric_name: str
+    direction: Literal["higher", "lower"]
+    domain_applicability: Union[list[str], Literal["all"]]
+    aggregation_rule: Literal["macro_avg", "weighted_avg", "min", "max"]
+    role: Literal["primary_fitness", "secondary_reported"]
+    sota_bar: Optional[float] = None
+
+
+# MetricRegistry is a dict keyed by metric_name
+MetricRegistry = dict[str, MetricSpec]
+
+
+# ────────────────────────────────────────────────────────────────────────────
+# SotaSource (Pillar 4)
+# ────────────────────────────────────────────────────────────────────────────
+
+
+class SotaSource(BaseModel):
+    model_config = ConfigDict(strict=True)
+
+    source_id: str
+    name: str
+    url: Optional[str] = None
+    retrieval_method: Literal["mcp_search", "web_fetch", "human_provided"]
+    trust_level: Literal["authoritative", "indicative"]
+
+
+# ────────────────────────────────────────────────────────────────────────────
+# ExpansionPolicy (Pillar 4)
+# ────────────────────────────────────────────────────────────────────────────
+
+
+class MaxUpgradesPerNTicks(BaseModel):
+    model_config = ConfigDict(strict=True)
+
+    max_upgrades: int
+    per_ticks: int
+
+
+class ExpansionPolicy(BaseModel):
+    model_config = ConfigDict(strict=True)
+
+    auto_add_within_families: list[str]
+    require_consent_for: list[str]
+    sota_sources: list[SotaSource]
+    max_angles_per_upgrade: int
+    max_upgrades_per_N_ticks: MaxUpgradesPerNTicks
+    """at most max_upgrades BenchmarkUpgrades per per_ticks ticks"""
+    pretraining_canary_threshold_pp: float
+    """ABSOLUTE pp residual threshold; default 5.0 (R-9)"""
+
+
+# ────────────────────────────────────────────────────────────────────────────
+# GoalContract
+# ────────────────────────────────────────────────────────────────────────────
+
+
+class LegacyMetric(BaseModel):
+    model_config = ConfigDict(strict=True)
+
+    name: str
+    direction: Literal["higher", "lower"]
+    primary: bool
+
+
+class StopCondition(BaseModel):
+    model_config = ConfigDict(strict=True)
+
+    type: Literal[
+        "beat-baseline",
+        "beat-sota",
+        "target",
+        "maximize-under-budget",
+        "evolve-n",
+        "evolve-until-plateau",
+        "evolve-until-regression",
+        "worst-angle-plateau",
+        "coverage-target",
+    ]
+    n: Optional[int] = None
+
+
+class Budget(BaseModel):
+    model_config = ConfigDict(strict=True)
+
+    max_iterations: int
+    plateau_window: int
+    circuit_breaker: int
+    max_cost_usd: float
+    max_wall_clock_hours: Optional[float] = None
+    max_gpu_hours: Optional[float] = None
+
+
+class GoalContract(BaseModel):
+    model_config = ConfigDict(strict=True)
+
+    mission_id: str
+    mode: Literal["seed-repo", "from-scratch"]
+    mission_type: Literal["fixed", "open_ended"]
+    task_description: str
+    dataset_ref: str
+    metrics: list[LegacyMetric]
+    """legacy flat metrics; retained for back-compat reading"""
+    metric_specs: list[MetricSpec]
+    fitness_mode: Literal["aggregate", "worst-domain", "weighted"]
+    eval_version: str
+    baseline_value: float
+    target_value: Optional[float] = None
+    coverage_target: Optional[float] = None
+    """open_ended stop: fraction of angles >= SOTA (0.0-1.0)"""
+    stop_condition: StopCondition
+    wildness: float
+    budget: Budget
+    framework: Optional[str] = None
+    seed_repo_path: Optional[str] = None
+    locked_split_hash: str
+    eval_script_hash: str
+    expansion_policy: Optional[ExpansionPolicy] = None
+    allowed_licenses: list[str]
+    """allowlist for data-acquisition provenance (R-3)"""
+    created_at: str
+
+
+# ────────────────────────────────────────────────────────────────────────────
+# Hypothesis
+# ────────────────────────────────────────────────────────────────────────────
+
+
+class Hypothesis(BaseModel):
+    model_config = ConfigDict(strict=True)
+
+    id: str
+    statement: str
+    prediction: str
+    confirmed: Optional[bool] = None
+    evidence: Optional[str] = None
+
+
+# ────────────────────────────────────────────────────────────────────────────
+# MutationLocus (Pillar 1) — discriminated union via field
+# ────────────────────────────────────────────────────────────────────────────
+
+
+class MutationLocusArch(BaseModel):
+    model_config = ConfigDict(strict=True)
+    family: Literal["arch"]
+    path: Literal["model/"]
+
+
+class MutationLocusTraining(BaseModel):
+    model_config = ConfigDict(strict=True)
+    family: Literal["training"]
+    path: Literal["train/"]
+
+
+class MutationLocusDataCuration(BaseModel):
+    model_config = ConfigDict(strict=True)
+    family: Literal["data-curation"]
+    path: Literal["data/builder"]
+
+
+class MutationLocusDataAugmentation(BaseModel):
+    model_config = ConfigDict(strict=True)
+    family: Literal["data-augmentation"]
+    path: Literal["data/aug"]
+
+
+class MutationLocusDataAcquisition(BaseModel):
+    model_config = ConfigDict(strict=True)
+    family: Literal["data-acquisition"]
+    path: Literal["data/acquisition"]
+    acquisition_type: Literal["external", "synthetic"]
+
+
+class MutationLocusAlgo(BaseModel):
+    model_config = ConfigDict(strict=True)
+    family: Literal["algo"]
+    path: str
+    genome_extension: str
+
+
+MutationLocus = Union[
+    MutationLocusArch,
+    MutationLocusTraining,
+    MutationLocusDataCuration,
+    MutationLocusDataAugmentation,
+    MutationLocusDataAcquisition,
+    MutationLocusAlgo,
+]
+
+
+# ────────────────────────────────────────────────────────────────────────────
+# TreeNode
+# ────────────────────────────────────────────────────────────────────────────
+
+
+class TreeNode(BaseModel):
+    model_config = ConfigDict(strict=True)
+
+    id: str
+    parent_ids: list[str]
+    approach_family: ApproachFamily
+    hypothesis_id: str
+    code_ref: str
+    parent_patch_ref: Optional[str] = None
+    genome_ref: str
+    mutation_tier: Optional[Literal["parametric", "structural"]] = None
+    mutation_locus: Optional[MutationLocus] = None
+    data_version_ref: str
+    config: dict[str, Any]
+    weights_ref: Optional[str] = None
+    metrics: dict[str, float]
+    eval_version: str
+    fitness_value: Optional[float] = None
+    telemetry_ref: Optional[str] = None
+    lesson_ids: list[str]
+    citations: list[str]
+    integrity_status: Literal["pending", "passed", "failed"]
+    status: Literal["pending", "running", "done", "pruned"]
+    is_crossover: bool
+    ucb1_score: Optional[float] = None
+    visit_count: int
+    depth: int
+    created_at: str
+    completed_at: Optional[str] = None
+
+    @field_validator("approach_family", mode="before")
+    @classmethod
+    def normalise_approach_family(cls, v: str) -> str:
+        return _alias_approach_family(v)
+
+
+# ────────────────────────────────────────────────────────────────────────────
+# MutationProposal
+# ────────────────────────────────────────────────────────────────────────────
+
+
+class CriticReview(BaseModel):
+    model_config = ConfigDict(strict=True)
+
+    h001_one_hypothesis: Literal["pass", "fail"]
+    h002_family_streak: Literal["pass", "fail"]
+    h003_intra_tick_diversity: Literal["pass", "fail"]
+    integrity_risk: Literal["pass", "fail"]
+    instrumentation_check: Literal["pass", "fail"]
+    schema_valid: Literal["pass", "fail"]
+    verdict: Literal["approved", "rejected"]
+    rejection_reason: Optional[str] = None
+
+
+class MutationProposal(BaseModel):
+    model_config = ConfigDict(strict=True)
+
+    proposal_id: str
+    parent_node_ids: list[str]
+    approach_family: ApproachFamily
+    idea: str
+    hypothesis: Hypothesis
+    citations: list[str]
+    wildness: float
+    critic_approved: bool
+    critic_review: CriticReview
+
+    @field_validator("approach_family", mode="before")
+    @classmethod
+    def normalise_approach_family(cls, v: str) -> str:
+        return _alias_approach_family(v)
+
+
+# ────────────────────────────────────────────────────────────────────────────
+# EvaluationResult
+# ────────────────────────────────────────────────────────────────────────────
+
+
+class TelemetrySummary(BaseModel):
+    model_config = ConfigDict(strict=True)
+
+    final_train_loss: Optional[float] = None
+    best_val_metric: Optional[float] = None
+    grad_norm_median: Optional[float] = None
+    throughput_samples_per_sec: Optional[float] = None
+    total_steps: int
+
+
+class AngleVsSOTAInline(BaseModel):
+    """Inline per-angle result embedded in EvaluationResult.per_angle_vs_sota."""
+    model_config = ConfigDict(strict=True)
+
+    value: float
+    sota_bar: float
+    above_sota: bool
+
+
+class EvaluationResult(BaseModel):
+    model_config = ConfigDict(strict=True)
+
+    node_id: str
+    run_id: str
+    eval_version: str
+    metrics: dict[str, float]
+    per_domain: dict[str, dict[str, float]]
+    fitness_value: float
+    worst_angle_coverage: Optional[float] = None
+    per_angle_vs_sota: Optional[dict[str, AngleVsSOTAInline]] = None
+    telemetry_summary: TelemetrySummary
+    status: Literal["success", "regression", "error", "timeout", "oom"]
+    benchmark_raw: str
+    timestamp: str
+
+
+# ────────────────────────────────────────────────────────────────────────────
+# IntegrityReport
+# ────────────────────────────────────────────────────────────────────────────
+
+
+class IntegrityChecks(BaseModel):
+    model_config = ConfigDict(strict=True)
+
+    split_hash_match: bool
+    frozen_split_read_only: bool
+    no_test_leakage: bool
+    near_dup_leakage: bool
+    data_provenance_valid: bool
+    no_label_contamination: bool
+    no_eval_shift: bool
+    eval_version_consistent: bool
+    telemetry_sane: bool
+    reward_hacking_probe: bool
+    acquisition_contamination_clear: Optional[bool] = None
+    acquired_data_provenance_valid: Optional[bool] = None
+    acquisition_namespace_enforced: Optional[bool] = None
+
+
+class IntegrityReport(BaseModel):
+    model_config = ConfigDict(strict=True)
+
+    node_id: str
+    eval_version: str
+    checks: IntegrityChecks
+    verdict: Literal["passed", "failed"]
+    failure_reason: Optional[str] = None
+    verified_at: str
+
+
+# ────────────────────────────────────────────────────────────────────────────
+# TelemetryRecord
+# ────────────────────────────────────────────────────────────────────────────
+
+
+class TelemetryRecord(BaseModel):
+    model_config = ConfigDict(strict=True)
+
+    step: int
+    epoch: Optional[float] = None
+    train_loss: Optional[float] = None
+    val_metric: Optional[float] = None
+    lr: Optional[float] = None
+    grad_norm: Optional[float] = None
+    param_norm: Optional[float] = None
+    update_ratio: Optional[float] = None
+    throughput: Optional[float] = None
+    gpu_util: Optional[float] = None
+    mem_used_gb: Optional[float] = None
+    mem_total_gb: Optional[float] = None
+    node_id: str
+    run_id: str
+    timestamp: str
+
+
+# ────────────────────────────────────────────────────────────────────────────
+# LessonEntry
+# ────────────────────────────────────────────────────────────────────────────
+
+
+class LessonEntry(BaseModel):
+    model_config = ConfigDict(strict=True)
+
+    lesson_id: str
+    node_id: str
+    run_id: str
+    mission_id: str
+    approach_family: ApproachFamily
+    hypothesis_verdict: Literal["confirmed", "refuted", "inconclusive"]
+    observation: str
+    root_cause: Optional[str] = None
+    actionable_lesson: str
+    citations: list[str]
+    telemetry_evidence: Optional[str] = None
+    tags: list[str]
+    created_at: str
+
+    @field_validator("approach_family", mode="before")
+    @classmethod
+    def normalise_approach_family(cls, v: str) -> str:
+        return _alias_approach_family(v)
+
+
+# ────────────────────────────────────────────────────────────────────────────
+# StrategyState
+# ────────────────────────────────────────────────────────────────────────────
+
+
+class StrategyState(BaseModel):
+    model_config = ConfigDict(strict=True)
+
+    meta_iteration: int
+    selection_policy: Literal["ucb1", "mcts", "beam"]
+    ucb1_c: float
+    beam_width: Optional[int] = None
+    wildness: float
+    family_mix: dict[str, float]
+    winning_families: list[str]
+    wins_by_family: dict[str, int]
+    meta_loop_interval: int
+    post_upgrade_exploration_boost: Optional[float] = None
+    """null = no boost active"""
+    post_upgrade_exploration_ticks: int
+    """ticks remaining for boost; default max(5, frontier_size*2) capped at 15"""
+    rescore_mode: Literal["sync", "async"]
+    """SINGLE source of truth for BenchmarkUpgrade re-score mode (Q1)"""
+    updated_at: str
+
+
+# ────────────────────────────────────────────────────────────────────────────
+# ResourcePlan
+# ────────────────────────────────────────────────────────────────────────────
+
+
+class ResourcePlan(BaseModel):
+    model_config = ConfigDict(strict=True)
+
+    concurrency: int
+    gpu_ids: list[int]
+    cpu_fallback: bool
+    throughput_samples_per_sec: float
+    vram_per_job_gb: float
+    util_target: float
+    last_probed_at: str
+
+
+# ────────────────────────────────────────────────────────────────────────────
+# DecisionLogEntry
+# ────────────────────────────────────────────────────────────────────────────
+
+
+class DecisionLogEntry(BaseModel):
+    model_config = ConfigDict(strict=True)
+
+    timestamp: str
+    tick: int
+    decision_type: Literal[
+        "select",
+        "propose",
+        "critique",
+        "implement",
+        "evaluate",
+        "analyze",
+        "record",
+        "prune",
+        "stop",
+        "meta-evolve",
+    ]
+    rationale: str
+    node_ids: list[str]
+    strategy_delta: Optional[dict[str, Any]] = None
+
+
+# ────────────────────────────────────────────────────────────────────────────
+# GenomeConfig (Pillar 1)
+# ────────────────────────────────────────────────────────────────────────────
+
+
+class GenomeConfig(BaseModel):
+    model_config = ConfigDict(strict=True)
+
+    genome_version: str
+    backbone: Optional[str] = None
+    head: Optional[str] = None
+    neck: Optional[str] = None
+    optimizer: str
+    lr: float
+    lr_schedule: str
+    batch_size: int
+    epochs: int
+    loss: str
+    aug_set: list[str]
+    acquired_datasets: list[str]
+    """acquisition_ids from AcquisitionProvenance; [] = no external/synthetic data"""
+    regularization: dict[str, Any]
+    schema_extensions: list[str]
+    """names of structurally-added keys; empty for gen-1 root"""
+    extra: dict[str, Any]
+
+
+# ────────────────────────────────────────────────────────────────────────────
+# AcquisitionProvenance (data-acquisition)
+# ────────────────────────────────────────────────────────────────────────────
+
+
+class AcquisitionProvenance(BaseModel):
+    model_config = ConfigDict(strict=True)
+
+    acquisition_id: str
+    acquisition_type: Literal["external", "synthetic"]
+    source_name: Optional[str] = None
+    source_url: Optional[str] = None
+    license_identifier: str
+    """SPDX identifier e.g. 'CC-BY-4.0', 'MIT', 'proprietary-restricted' (R-3)"""
+    license_in_allowlist: bool
+    """true iff license_identifier is in GoalContract.allowed_licenses (R-3)"""
+    citation: str
+    generator_config: Optional[dict[str, Any]] = None
+    sample_count: int
+    acquired_at: str
+    ingestion_contamination_cleared: bool
+
+
+# ────────────────────────────────────────────────────────────────────────────
+# FrozenSplit (Pillar 2)
+# ────────────────────────────────────────────────────────────────────────────
+
+
+class FrozenSplit(BaseModel):
+    model_config = ConfigDict(strict=True)
+
+    split_id: str
+    mission_id: str
+    split_type: Literal["test", "val"]
+    split_hash: str
+    per_sample_hashes: dict[str, str]
+    item_count: int
+    frozen_at: str
+    storage_path: str
+    eval_version: str
+
+
+# ────────────────────────────────────────────────────────────────────────────
+# DataProvenance (Pillar 2)
+# ────────────────────────────────────────────────────────────────────────────
+
+
+class DataProvenance(BaseModel):
+    model_config = ConfigDict(strict=True)
+
+    sample_id: str
+    source_sample_id: str
+    split_type: Literal["train"]
+    """DataProvenance only exists for train samples"""
+    transform_applied: list[str]
+    is_synthetic: bool
+    verified_not_in_test: bool
+
+
+# ────────────────────────────────────────────────────────────────────────────
+# Domain (Pillar 3)
+# ────────────────────────────────────────────────────────────────────────────
+
+
+class Domain(BaseModel):
+    model_config = ConfigDict(strict=True)
+
+    domain_id: str
+    description: str
+    metric_specs: list[MetricSpec]
+    sota_source: Optional[SotaSource] = None
+    added_at_eval_version: str
+
+
+# ────────────────────────────────────────────────────────────────────────────
+# EvalSuite / EvalVersion (Pillar 3)
+# ────────────────────────────────────────────────────────────────────────────
+
+
+class EvalSuite(BaseModel):
+    model_config = ConfigDict(strict=True)
+
+    eval_version: str
+    mission_id: str
+    parent_eval_version: Optional[str] = None
+    domains: list[Domain]
+    split_hashes: dict[str, str]
+    """{ domain_id: sha256 } — each domain's frozen held-out split"""
+    created_at: str
+    created_by: Literal["user", "policy"]
+    consent_log_ref: str
+
+
+# EvalVersion is the same schema as EvalSuite
+EvalVersion = EvalSuite
+
+
+# ────────────────────────────────────────────────────────────────────────────
+# BenchmarkUpgrade (Pillar 3 + 4)
+# ────────────────────────────────────────────────────────────────────────────
+
+
+class BenchmarkUpgrade(BaseModel):
+    model_config = ConfigDict(strict=True)
+
+    upgrade_id: str
+    mission_id: str
+    from_eval_version: str
+    to_eval_version: str
+    proposed_by: Literal["user", "probe", "sage", "policy"]
+    proposal_citations: list[str]
+    consent_granted: bool
+    consent_at: Optional[str] = None
+    new_domains_added: list[str]
+    domains_removed: list[str]
+    """DEFENSIVE INVARIANT: MUST always be empty (Q4)"""
+    rescore_status: Literal["pending", "in_progress", "complete", "partial"]
+    rescore_deadline_ticks: int
+    """tick count after which not-yet-rescored nodes are demoted to v{old}-only (R-2)"""
+    decision_log_ref: str
+    created_at: str
+
+
+# ────────────────────────────────────────────────────────────────────────────
+# BenchmarkUpgradeProposal
+# ────────────────────────────────────────────────────────────────────────────
+
+
+class BenchmarkUpgradeProposal(BaseModel):
+    model_config = ConfigDict(strict=True)
+
+    proposed_by: Literal["probe", "sage"]
+    new_domains: list[str]
+    rationale: str
+    citations: list[str]
+
+
+# ────────────────────────────────────────────────────────────────────────────
+# AngleRegistry (Pillar 4)
+# ────────────────────────────────────────────────────────────────────────────
+
+
+class AngleEntry(BaseModel):
+    model_config = ConfigDict(strict=True)
+
+    angle_id: str
+    eval_version_added: str
+    sota_bar: float
+    sota_source_ids: list[str]
+    """>=2 required for authoritative trust_level (R-1)"""
+    sota_quorum_met: bool
+    """true iff >=2 distinct sources with divergence <=5% (R-1)"""
+    baseline_model_score_before_finetune: Optional[float] = None
+    """seed/foundation model score before any fine-tuning; null until evaluated"""
+    sota_retrieved_at: str
+    held_out_split_hash: str
+    is_public_benchmark: bool
+    pretraining_contamination_risk: Literal["low", "medium", "high", "unknown"]
+
+
+class AngleRegistry(BaseModel):
+    model_config = ConfigDict(strict=True)
+
+    mission_id: str
+    angles: list[AngleEntry]
+    updated_at: str
+
+
+# ────────────────────────────────────────────────────────────────────────────
+# CoverageTarget (Pillar 4)
+# ────────────────────────────────────────────────────────────────────────────
+
+
+class CoverageTarget(BaseModel):
+    model_config = ConfigDict(strict=True)
+
+    target_fraction: float
+    current_worst_angle_id: Optional[str] = None
+    current_coverage: float
+
+
+# ────────────────────────────────────────────────────────────────────────────
+# BenchmarkRescore (consensus pass 2, R-6)
+# ────────────────────────────────────────────────────────────────────────────
+
+
+class BenchmarkRescore(BaseModel):
+    model_config = ConfigDict(strict=True)
+
+    upgrade_id: str
+    node_id: str
+    cached_per_domain: dict[str, dict[str, float]]
+    """v_old per_domain scores, carried forward"""
+    new_domains: list[str]
+    merged_eval_version: str
+
+
+# ────────────────────────────────────────────────────────────────────────────
+# AngleVsSOTA (consensus pass 2, R-11)
+# ────────────────────────────────────────────────────────────────────────────
+
+
+class AngleVsSOTA(BaseModel):
+    model_config = ConfigDict(strict=True)
+
+    angle_id: str
+    value: float
+    sota_bar: float
+    """effective bar = max(sota_bar, baseline_model_score_before_finetune) (R-9)"""
+    above_sota: bool
+    """value >= sota_bar (only counts if trust_level='authoritative')"""
+    trust_level: Literal["authoritative", "indicative"]
+
+
+# ────────────────────────────────────────────────────────────────────────────
+# GenomeSeedAdapterReport (Q2 — Pillar 1 seed-repo reproducibility artifact)
+# ────────────────────────────────────────────────────────────────────────────
+
+
+class DetectedSeam(BaseModel):
+    model_config = ConfigDict(strict=True)
+
+    kind: Literal["model_def", "training_loop", "data_pipeline"]
+    file: str
+    symbol: str
+
+
+class GenomeSeedAdapterReport(BaseModel):
+    model_config = ConfigDict(strict=True)
+
+    seed_repo_path: str
+    detected_seams: list[DetectedSeam]
+    genome_mapping: dict[str, str]
+    """genome.yaml gene -> seed-repo symbol it maps to"""
+    unmapped_regions: list[str]
+    """seed-repo files/symbols with no genome counterpart"""
+    created_at: str
+
+
+# ────────────────────────────────────────────────────────────────────────────
+# Schema registry (all models, for validation tooling / test iteration)
+# ────────────────────────────────────────────────────────────────────────────
+
+ALL_MODELS: dict[str, type[BaseModel]] = {
+    # Base 11 (+ Hypothesis)
+    "GoalContract": GoalContract,
+    "TreeNode": TreeNode,
+    "Hypothesis": Hypothesis,
+    "MutationProposal": MutationProposal,
+    "EvaluationResult": EvaluationResult,
+    "IntegrityReport": IntegrityReport,
+    "TelemetryRecord": TelemetryRecord,
+    "LessonEntry": LessonEntry,
+    "StrategyState": StrategyState,
+    "ResourcePlan": ResourcePlan,
+    "DecisionLogEntry": DecisionLogEntry,
+    # Addendum v2
+    "GenomeConfig": GenomeConfig,
+    "MutationLocusArch": MutationLocusArch,
+    "MutationLocusTraining": MutationLocusTraining,
+    "MutationLocusDataCuration": MutationLocusDataCuration,
+    "MutationLocusDataAugmentation": MutationLocusDataAugmentation,
+    "MutationLocusDataAcquisition": MutationLocusDataAcquisition,
+    "MutationLocusAlgo": MutationLocusAlgo,
+    "AcquisitionProvenance": AcquisitionProvenance,
+    "FrozenSplit": FrozenSplit,
+    "DataProvenance": DataProvenance,
+    "EvalSuite": EvalSuite,
+    "Domain": Domain,
+    "MetricSpec": MetricSpec,
+    "BenchmarkUpgrade": BenchmarkUpgrade,
+    "BenchmarkUpgradeProposal": BenchmarkUpgradeProposal,
+    "ExpansionPolicy": ExpansionPolicy,
+    "SotaSource": SotaSource,
+    "AngleRegistry": AngleRegistry,
+    "CoverageTarget": CoverageTarget,
+    # Consensus pass 2
+    "BenchmarkRescore": BenchmarkRescore,
+    "AngleVsSOTA": AngleVsSOTA,
+    # Q2
+    "GenomeSeedAdapterReport": GenomeSeedAdapterReport,
+}
