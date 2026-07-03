@@ -14,3 +14,8 @@ harness/.venv/
 
 # reference repos (read-only, not part of this project)
 refs/
+
+# omc runtime state (not source)
+.omc/state/
+.omc/project-memory.json
+.omc/notepad.md
