@@ -1,0 +1,66 @@
+{
+  "plugin": "oh-my-evor",
+  "in_docker": false,
+  "agentic_enabled": false,
+  "summary": {
+    "required_total": 7,
+    "required_pass": 7,
+    "verdict": "PASS"
+  },
+  "results": [
+    {
+      "name": "manifest_validate",
+      "ok": true,
+      "required": true,
+      "detail": "Validating plugin manifest: /storages_local/research/oh-my-evor/.claude-plugin/plugin.json\n\n✔ Validation passed"
+    },
+    {
+      "name": "mcp_tools_list",
+      "ok": true,
+      "required": true,
+      "detail": "12 tools: evor_record_node, evor_record_eval, evor_tree_read, evor_select, evor_schedule, evor_wiki_add, evor_wiki_query, evor_state_read, evor_state_write, evor_integrity_check, evor_cite, evor_telemetry_ingest"
+    },
+    {
+      "name": "hook_posttooluse_graceful",
+      "ok": true,
+      "required": true,
+      "detail": "exit 0"
+    },
+    {
+      "name": "hook_stop_inert_when_unset",
+      "ok": true,
+      "required": true,
+      "detail": "exit 0"
+    },
+    {
+      "name": "hook_continuation_guard_fires",
+      "ok": false,
+      "required": false,
+      "detail": "exit 0 :: "
+    },
+    {
+      "name": "pytest_harness",
+      "ok": true,
+      "required": true,
+      "detail": "340 passed"
+    },
+    {
+      "name": "vitest_mcp",
+      "ok": true,
+      "required": true,
+      "detail": "162 passed"
+    },
+    {
+      "name": "l3_real_evolution",
+      "ok": true,
+      "required": true,
+      "detail": "winner=mut-b acc=0.6188 cheat_rejected=true"
+    },
+    {
+      "name": "agentic_skill_discovery",
+      "ok": true,
+      "required": false,
+      "detail": "SKIPPED — set ANTHROPIC_API_KEY to enable the real-Claude layer"
+    }
+  ]
+}

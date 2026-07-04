@@ -1,0 +1,12 @@
+# reference repos (huge, embedded git) — never send to build context
+refs/
+# build/vendor artifacts (rebuilt in-image)
+**/node_modules
+**/.venv
+harness/.venv
+mcp/dist
+**/__pycache__
+**/*.pyc
+.git
+.omc/state
+ci/out
