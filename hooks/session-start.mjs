@@ -68,7 +68,7 @@ const output = {
 if (missionId) {
   const wiki = spawnSync(
     process.env.EVOR_PYTHON ?? 'python3',
-    ['-m', 'evor.wiki', 'context', '--mission-id', missionId, '--limit', '5'],
+    ['-m', 'evor.wiki', 'context', '--mission-id', missionId, '--limit', '5', '--evor-root', evorRoot],
     { encoding: 'utf8', timeout: 4000 }
   );
   if (wiki.status === 0 && wiki.stdout?.trim()) {
