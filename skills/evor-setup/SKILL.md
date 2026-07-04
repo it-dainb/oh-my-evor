@@ -342,6 +342,7 @@ After consent:
    ```json
    {
      "status": "draft",
+     "objective": "<task_description from the GoalContract>",
      "current_tick": 0,
      "max_ticks": <budget.max_iterations>,
      "best_score": null,

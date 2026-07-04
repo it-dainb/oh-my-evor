@@ -304,7 +304,7 @@ class SelfHealMonitor:
                     f"Recovery applied: {detail[:200]}"
                 ),
                 scope="mission",
-                confidence=0.6 if not give_up else 0.8,
+                confidence=0.7 if not give_up else 0.8,
             )
             self._gotcha_store.add_gotcha(entry)
         except Exception:

@@ -215,6 +215,7 @@ level: 2
     python -m evor run \
       --node-id <node_id> \
       --run-id <run_id> \
+      --run-dir "$EVOR_RUN_DIR" \
       --worktree .evor/worktrees/<node_id>
     ```
     The harness manages training execution, telemetry flushing, and job completion signaling.
@@ -254,7 +255,7 @@ level: 2
     - evor_record_node: called
 
     ### Harness Invocation
-    - Command: python -m evor run --node-id <id> --run-id <id> --worktree <path>
+    - Command: python -m evor run --node-id <id> --run-id <id> --run-dir <path> --worktree <path>
     - Status: running | completed | oom | error
     ```
   </Output_Format>

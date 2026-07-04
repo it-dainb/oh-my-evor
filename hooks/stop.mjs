@@ -136,18 +136,19 @@ try {
     }
   }
 
-  // (c) tick-state shows current_step < 9 while mission status is "running"
+  // (c) tick-state shows current_step < 9 while the run is "running".
+  // M-2 fix: read status from run-state.json (already loaded as runState) — not
+  // mission-state.json.  The run sets status:"running" in run-state.json;
+  // mission-state.json stays "locked" throughout active runs.
   const tickStatePath = join(runDir, 'tick-state.json');
-  const missionStatePath = join(runDir, 'mission-state.json');
-  if (existsSync(tickStatePath) && existsSync(missionStatePath)) {
+  if (existsSync(tickStatePath)) {
     try {
       const tickState = JSON.parse(readFileSync(tickStatePath, 'utf8'));
-      const missionState = JSON.parse(readFileSync(missionStatePath, 'utf8'));
       const currentStep = typeof tickState?.current_step === 'number' ? tickState.current_step : 9;
-      const missionRunning = missionState?.status === 'running';
+      const missionRunning = runState?.status === 'running';
       if (missionRunning && currentStep < 9) {
         debtReasons.push(
-          `tick-state.json shows current_step=${currentStep} (< 9) while mission status is "running" ` +
+          `tick-state.json shows current_step=${currentStep} (< 9) while run status is "running" ` +
             `— tick ${tickState?.tick ?? '?'} appears mid-flight`
         );
       }

@@ -671,6 +671,141 @@ def test_evor_run_c3_missing_node_returns_error(tmp_path: Path) -> None:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# C-1: --run-dir required for goal-loading + run_dir inference fallbacks
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def test_evor_run_c1_proceeds_past_goal_loading(tmp_path: Path) -> None:
+    """C-1: `python -m evor run --run-dir <dir>` loads GoalContract and proceeds.
+
+    Before the C-1 fix, Forge's harness invocation was missing --run-dir, so
+    _cmd_run got run_dir=None -> goal=None -> 'cannot run without GoalContract'.
+
+    This test proves the happy-path: with --run-dir present the harness loads
+    the GoalContract from the fixture and proceeds past the goal-loading check.
+    The subsequent evaluator call may succeed (stub eval) or fail for unrelated
+    reasons; the critical assertion is the absence of the goal-loading error.
+    """
+    run_dir, _ = _build_fixture_run_dir(tmp_path)
+
+    worktree = tmp_path / f"worktree-c1-{_NODE_A}"
+    worktree.mkdir()
+    _write_stub_evaluate_py(worktree)
+
+    result = _run([
+        "-m", "evor", "run",
+        "--node-id", _NODE_A,
+        "--run-id", _RUN_ID,
+        "--run-dir", str(run_dir),
+        "--worktree", str(worktree),
+        "--eval-script", str(worktree / "evaluate.py"),
+        "--no-selfheal",
+    ])
+
+    # C-1 assertion: must NOT exit with the goal-loading error.
+    assert "cannot run without GoalContract" not in result.stderr, (
+        f"C-1 FAIL: goal-loading failed even with --run-dir present.\n"
+        f"stderr: {result.stderr}\nstdout: {result.stdout}"
+    )
+    assert "cannot run without GoalContract" not in result.stdout, (
+        f"C-1 FAIL: goal-loading error in stdout.\nstdout: {result.stdout}"
+    )
+
+
+def test_evor_run_c1_run_dir_env_var_fallback(tmp_path: Path) -> None:
+    """C-1 robustness: EVOR_RUN_DIR env var is used when --run-dir is omitted.
+
+    session-start.mjs sets EVOR_RUN_DIR; Forge invocations that omit --run-dir
+    should still load the GoalContract via this env fallback.
+    """
+    import os as _os
+    run_dir, _ = _build_fixture_run_dir(tmp_path)
+
+    worktree = tmp_path / f"worktree-c1-env-{_NODE_A}"
+    worktree.mkdir()
+    _write_stub_evaluate_py(worktree)
+
+    env = {**_os.environ, "EVOR_RUN_DIR": str(run_dir)}
+
+    result = subprocess.run(
+        [_PYTHON, "-m", "evor", "run",
+         "--node-id", _NODE_A,
+         "--run-id", _RUN_ID,
+         "--worktree", str(worktree),
+         "--eval-script", str(worktree / "evaluate.py"),
+         "--no-selfheal"],
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+
+    assert "cannot run without GoalContract" not in result.stderr, (
+        f"C-1 FAIL: goal-loading failed via EVOR_RUN_DIR fallback.\n"
+        f"stderr: {result.stderr}\nstdout: {result.stdout}"
+    )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# M-1: evor_root passed to EvaluatorAdapter -> gotcha capture wired
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def _write_oom_evaluate_py(worktree: Path) -> Path:
+    """Write an evaluate.py stub that emits OOM to stderr and exits 1.
+
+    Used to trigger EvaluatorAdapter._capture_oom_gotcha() in tests.
+    """
+    src = (
+        'import sys\n'
+        'print("RuntimeError: out of memory -- eval stub triggered OOM",'
+        ' file=sys.stderr)\n'
+        'sys.exit(1)\n'
+    )
+    p = worktree / "evaluate.py"
+    p.write_text(src)
+    return p
+
+
+def test_cmd_run_m1_evor_root_wires_evaluator_gotcha_store(tmp_path: Path) -> None:
+    """M-1: _cmd_run derives evor_root from run_dir and passes it to EvaluatorAdapter.
+
+    Proof: when the eval script exits with an OOM pattern, EvaluatorAdapter
+    calls _capture_oom_gotcha() which writes to the GotchaStore. This only
+    happens when evor_root is non-None (M-1 fix). A pre-fix run without
+    evor_root would produce no gotcha file.
+    """
+    run_dir, evor_root = _build_fixture_run_dir(tmp_path)
+
+    worktree = tmp_path / f"worktree-m1-{_NODE_A}"
+    worktree.mkdir()
+    _write_oom_evaluate_py(worktree)
+
+    _run([
+        "-m", "evor", "run",
+        "--node-id", _NODE_A,
+        "--run-id", _RUN_ID,
+        "--run-dir", str(run_dir),
+        "--worktree", str(worktree),
+        "--eval-script", str(worktree / "evaluate.py"),
+        "--no-selfheal",
+    ])
+
+    # M-1 assertion: EvaluatorAdapter._capture_oom_gotcha writes scope="mission"
+    # -> run_dir/gotchas/mission.jsonl when evor_root is passed correctly.
+    gotcha_path = run_dir / "gotchas" / "mission.jsonl"
+    assert gotcha_path.exists(), (
+        f"M-1 FAIL: gotcha store not written after OOM eval.\n"
+        f"Expected: {gotcha_path}\n"
+        f"evor_root={evor_root}\n"
+        f"run_dir contents: {list(run_dir.iterdir())}"
+    )
+    entries = [json.loads(line) for line in gotcha_path.read_text().splitlines() if line.strip()]
+    assert any(e.get("signature") == "eval-oom" for e in entries), (
+        f"M-1 FAIL: expected 'eval-oom' gotcha in store.\nEntries: {entries}"
+    )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # P2: validate CLI
 # ─────────────────────────────────────────────────────────────────────────────
 

@@ -38,6 +38,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -161,6 +162,22 @@ def _cmd_run(args: argparse.Namespace) -> int:
     )
     run_dir: Path | None = args.run_dir.resolve() if args.run_dir else None
 
+    # ── C-1 fix: infer run_dir when --run-dir is absent ───────────────
+    # Forge's evor-forge.md invocation block includes --run-dir, but older
+    # invocations may omit it.  Fall back to EVOR_RUN_DIR (set by
+    # session-start.mjs) and then try treating --run-id as a filesystem path
+    # (mirrors how _cmd_validate resolves run_dir = Path(args.run_id)).
+    if run_dir is None:
+        _env_run_dir = os.environ.get("EVOR_RUN_DIR")
+        if _env_run_dir:
+            _candidate = Path(_env_run_dir).resolve()
+            if _candidate.exists():
+                run_dir = _candidate
+        if run_dir is None:
+            _run_id_path = Path(args.run_id)
+            if _run_id_path.is_dir():
+                run_dir = _run_id_path.resolve()
+
     # ── Phase-2 lock guard ────────────────────────────────────────────
     # If mission-state.json exists and status != "locked", block execution.
     # Fail-open when mission-state.json is absent (pre-phase-2 or legacy run).
@@ -272,13 +289,19 @@ def _cmd_run(args: argparse.Namespace) -> int:
     from evor.evaluator import EvaluatorAdapter
     from evor.monitor import SelfHealMonitor
 
+    # M-1 fix: derive evor_root so gotcha capture fires in real runs.
+    # Pattern mirrors _cmd_preflight: run_dir is .evor/runs/<mission>/<run_id>/,
+    # so evor_root = run_dir.parent.parent.parent = .evor/
+    evor_root: Path | None = run_dir.parent.parent.parent if run_dir else None
+
     monitor = SelfHealMonitor(
         node_id=args.node_id,
         run_dir=run_dir or Path("."),
         job_spec=job_spec,
+        evor_root=evor_root,
     ) if not args.no_selfheal else None
 
-    evaluator = EvaluatorAdapter(run_dir=run_dir)
+    evaluator = EvaluatorAdapter(run_dir=run_dir, evor_root=evor_root)
 
     env: dict[str, str] = {
         "EVOR_NODE_ID": args.node_id,

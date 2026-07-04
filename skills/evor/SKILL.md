@@ -162,6 +162,46 @@ if result:
 ```
 This prevents re-proposing dead-end families and provides Mutagen with the `next_tick_seed` hint.
 
+**Tick Start — Inbox Drain (before Step 1)**
+After reading the tick handoff and before executing Step 1, drain the remember-inbox so
+`<evor-remember>` tags written by any agent this tick reach the wiki and gotcha store:
+```python
+import json
+from pathlib import Path
+
+inbox_path = Path(run_dir) / "remember-inbox.jsonl"
+if inbox_path.exists():
+    for line in inbox_path.read_text().splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            entry = json.loads(line)
+        except Exception:
+            continue
+        if entry.get("type") == "gotcha":
+            # Route to GotchaStore — use the MCP tool or direct Python API
+            # python -m evor.gotchas add  (or GotchaStore.add_gotcha() directly)
+            from evor.gotchas import GotchaStore, make_gotcha
+            store = GotchaStore(evor_root, run_dir)
+            store.add_gotcha(make_gotcha(
+                kind="runtime-failure",
+                signature=entry.get("signature", "inbox-gotcha"),
+                context=entry,
+                resolution=entry.get("text", ""),
+                avoidance=entry.get("text", ""),
+                scope="mission",
+                confidence=0.7,
+            ))
+        else:
+            # Default: route to CompoundingWiki via evor_wiki_add
+            evor_wiki_add(run_id, {"lesson": entry.get("text", ""), "source": "inbox"})
+    # Truncate inbox after draining — entries are now in wiki/gotcha store
+    inbox_path.write_text("")
+```
+This is the step that makes `<evor-remember>` durable-fact tagging write-and-read rather
+than write-only. The PostToolUse hook appends entries; this step consumes them each tick.
+
 **Before Each Step N (1–9): Write tick-state.json**
 Write `<run_dir>/tick-state.json` to mark the step in-progress before executing it:
 ```json

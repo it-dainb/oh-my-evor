@@ -614,11 +614,15 @@ describe("stop hook — drift-guard (Phase 2)", () => {
     expect(result.stdout).toMatch(/telemetry/i);
   });
 
-  it("exits 2 when tick-state current_step < 9 and mission is running", () => {
+  it("exits 2 when tick-state current_step < 9 and run-state status is running (M-2 fix)", () => {
+    // M-2 fix: check (c) reads runState.status (run-state.json) NOT mission-state.json.
+    // Proof: mission-state.json is seeded with status="locked" (not "running").
+    // The guard must still fire because run-state.json has status="running".
     const runId = "run-drift-004";
     const runDir = join(tmpDir, "runs", runId);
     mkdirSync(join(runDir, "evaluations"), { recursive: true });
 
+    // run-state.json has status="running" — this drives check (c)
     writeFileSync(
       join(runDir, "run-state.json"),
       JSON.stringify({ tick_count: 4, pending_node_ids: [], status: "running" })
@@ -633,10 +637,10 @@ describe("stop hook — drift-guard (Phase 2)", () => {
       join(runDir, "tick-state.json"),
       JSON.stringify({ tick: 4, current_step: 5, updated_at: new Date().toISOString() })
     );
-    // mission-state: running
+    // mission-state is "locked" (NOT "running") — proves code uses run-state, not mission-state
     writeFileSync(
       join(runDir, "mission-state.json"),
-      JSON.stringify({ status: "running", current_tick: 4 })
+      JSON.stringify({ status: "locked", current_tick: 4 })
     );
 
     const result = runHook(STOP, {
@@ -646,6 +650,35 @@ describe("stop hook — drift-guard (Phase 2)", () => {
     expect(result.status).toBe(2);
     expect(result.stdout).toMatch(/EVOR DRIFT GUARD/);
     expect(result.stdout).toMatch(/tick.*mid-flight|current_step.*5/i);
+  });
+
+  it("exits 2 (check c) even without mission-state.json when run-state is running", () => {
+    // M-2 fix: check (c) only needs tick-state.json + run-state.json (already loaded).
+    // mission-state.json need not exist for the guard to fire.
+    const runId = "run-drift-004b";
+    const runDir = join(tmpDir, "runs", runId);
+    mkdirSync(join(runDir, "evaluations"), { recursive: true });
+
+    writeFileSync(
+      join(runDir, "run-state.json"),
+      JSON.stringify({ tick_count: 3, pending_node_ids: [], status: "running" })
+    );
+    writeFileSync(
+      join(runDir, "tree.json"),
+      JSON.stringify({ nodes: {}, updated_at: new Date().toISOString() })
+    );
+    writeFileSync(
+      join(runDir, "tick-state.json"),
+      JSON.stringify({ tick: 3, current_step: 2, updated_at: new Date().toISOString() })
+    );
+    // mission-state.json intentionally absent
+
+    const result = runHook(STOP, {
+      EVOR_ACTIVE_RUN_ID: runId,
+      EVOR_ROOT: tmpDir,
+    });
+    expect(result.status).toBe(2);
+    expect(result.stdout).toMatch(/EVOR DRIFT GUARD/);
   });
 
   it("exits 0 when tick-state current_step = 9 (tick completed)", () => {
