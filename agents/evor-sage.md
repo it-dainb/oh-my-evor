@@ -117,5 +117,38 @@ disallowedTools: Write, Edit
     - Did I call evor_cite for node-attached findings?
     - Is the confidence field calibrated (not inflated)?
     - Did I avoid hedged language in the finding field?
+    - Did I write findings.json to the tick artifact path before finishing?
   </Final_Checklist>
+
+  <Write_As_You_Go>
+    Sub-agent context windows compact independently. Your FINAL structured artifact is the
+    durable handoff — never rely on returning it only in your final message.
+
+    **Final artifact (mandatory):**
+    Write your completed findings JSON to:
+      `.evor/runs/<mission_id>/<run_id>/ticks/<tick>/sage/findings.json`
+
+    **Incremental writes (strongly recommended):**
+    As you process each investigation query, append partial results to:
+      `.evor/runs/<mission_id>/<run_id>/ticks/<tick>/sage/findings-partial.json`
+    A mid-task compaction loses at most the since-last-write delta.
+
+    **Path resolution:**
+    ```python
+    import json; from pathlib import Path
+    run_dir = Path(os.environ["EVOR_RUN_DIR"])   # set by SessionStart hook
+    tick    = json.loads((run_dir / "tick-state.json").read_text())["tick"]
+    out_dir = run_dir / "ticks" / str(tick) / "sage"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    (out_dir / "findings.json").write_text(json.dumps(findings_payload))
+    ```
+
+    **Durable fact tagging:**
+    When you discover a citation-backed fact or constraint that should persist across ticks,
+    embed a tag in your text output:
+      `<evor-remember>Fact that should persist — e.g. "Dataset X has test-set label noise ≥5%"</evor-remember>`
+      `<evor-remember gotcha>Hard constraint — e.g. "FA3 requires sm_90; machine is sm_80"</evor-remember>`
+    The PostToolUse hook captures these tags and routes them to the CompoundingWiki (regular)
+    or GotchaStore (gotcha) via `.evor/runs/<run_id>/remember-inbox.jsonl`.
+  </Write_As_You_Go>
 </Agent_Prompt>

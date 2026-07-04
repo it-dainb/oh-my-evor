@@ -294,6 +294,60 @@ This pattern mirrors the malformed-tool detection pattern in `refs/ml-intern/age
 - python_repl — meta-evolution, benchmark upgrade, preflight checks
 </Tool_Usage>
 
+<Compaction_Survival>
+Context windows compact independently for the main orchestrator AND each sub-agent.
+The governing principle: the context window is a cache; `.evor/` is the source of truth.
+
+**Hooks (automatically wired in hooks/hooks.json):**
+- `PreCompact` → `hooks/pre-compact.mjs`: flushes a checkpoint to
+  `.evor/runs/<m>/<r>/checkpoints/precompact-<iso>.json` and injects an `<evor-restore>`
+  summary into the compacted context (objective + tick/step + best-so-far + recovery hint).
+- `SessionStart` → `hooks/session-start.mjs`: re-hydrates env vars AND injects an
+  `<evor-restore>` block into the session context when an active run exists on disk.
+- `SubagentStop` → `hooks/subagent-stop.mjs`: advisory check that the stopping sub-agent
+  wrote its expected final artifact; emits `[EVOR SUBAGENT WARNING]` if missing.
+
+**Sub-agent write-as-you-go contract:**
+Each roster agent writes its final structured artifact to a well-known tick path before
+finishing. There is NO PreCompact hook for sub-agents — their only compaction protection
+is writing to disk as they go.
+
+| Agent    | Final artifact path (under runDir)                      |
+|----------|---------------------------------------------------------|
+| Sage     | `ticks/<tick>/sage/findings.json`                       |
+| Mutagen  | `ticks/<tick>/mutagen/proposals.json`                   |
+| Probe    | `ticks/<tick>/probe/findings.json`                      |
+| Forge    | `ticks/<tick>/forge/forge-report.json`                  |
+| Selector | `ticks/<tick>/selector/verdict.json`                    |
+
+Each agent also writes incremental partial outputs (e.g. `findings-partial.json`) so a
+mid-task compaction loses at most the since-last-write delta.
+
+**`<evor-remember>` durable-fact tagging:**
+Any agent or the orchestrator can mark a durable fact with XML tags in their text output:
+
+```
+<evor-remember>Fact that should persist across ticks</evor-remember>
+<evor-remember gotcha>Hard constraint or failure that blocks a class of proposals</evor-remember>
+```
+
+The `PostToolUse` hook (`hooks/post-tool-use.mjs`) scans tool inputs and responses for
+these tags and appends matches to `.evor/runs/<run_id>/remember-inbox.jsonl`:
+- `type: "wiki"` entries → route to `evor_wiki_add` (CompoundingWiki)
+- `type: "gotcha"` entries → route to `evor_gotchas add` (GotchaStore)
+
+The orchestrator processes the inbox at the start of each tick (after reading the tick
+handoff). Call `evor_wiki_add` / python `GotchaStore.add()` for each inbox entry, then
+truncate the inbox. This keeps the wiki and gotcha store current without requiring
+sub-agents to call those tools directly.
+
+**Resume after compaction:**
+When Evor resumes after compaction, the `<evor-restore>` block in context provides:
+objective + current tick/step + best score/node + recovery hint. Always re-read
+`tick-state.json` and `run-state.json` from disk before acting — the restore block
+is a navigation aid, not the authoritative state.
+</Compaction_Survival>
+
 <Execution_Policy>
 - Evor (orchestrator) idles via Monitor during compute-bound Forge phases — do not poll.
 - Wake on `job_complete` signal from harness or `self_heal_event` from SelfHealMonitor.

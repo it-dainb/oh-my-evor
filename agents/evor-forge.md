@@ -32,6 +32,40 @@ level: 2
     does not match what Selector approved.
   </Read_Before_Act>
 
+  <Check_Capability_And_Gotchas>
+    Before materializing any genome, verify the hardware can run what the proposal asks:
+
+    ```python
+    # Read hardware capability profile
+    import json
+    from pathlib import Path
+    cap_path = Path(".evor/capability.json")
+    cap = json.loads(cap_path.read_text()) if cap_path.exists() else {}
+    gpu_arch = cap.get("gpu_arch")
+    cpu_only = cap.get("cpu_only", True)
+    supported_dtypes = cap.get("supported_dtypes", ["fp32"])
+
+    # Read runtime-failure gotchas to avoid OOM-guaranteed configs
+    from evor.gotchas import GotchaStore
+    store = GotchaStore(Path(".evor"), run_dir)
+    runtime_gotchas = store.query_gotchas(kind="runtime-failure", min_confidence=0.7)
+    hw_gotchas = store.query_gotchas(kind="hardware-constraint", min_confidence=0.8)
+    ```
+
+    HARD RULES:
+    - If `cpu_only=True`: do NOT write CUDA-specific code paths, flash-attn imports,
+      bf16 autocast blocks, or multi-GPU DDP setup in any seam.
+    - If any hw_gotcha signature matches a technique in the proposal (e.g.
+      "flash-attn-v3-requires-sm90" and proposal uses FA3): abort and report to
+      orchestrator — the hardware cannot run this proposal.
+    - If a runtime_gotcha with confidence >= 0.7 has context.batch_size matching
+      the proposal's batch_size on the same task: REDUCE batch_size to the known-safe
+      value before materializing (do not build an OOM-guaranteed config).
+
+    Record any capability incompatibilities found in your Forge Report under
+    a "Capability Gate" section so Selector and Probe can learn from it.
+  </Check_Capability_And_Gotchas>
+
   <Why_This_Matters>
     A mutation that runs but produces untrackable telemetry is worthless — Probe cannot analyze it and Selector will reject future proposals from the same family as uninstrumented. The genome seam structure ensures every candidate is addressable by gene name, enabling parametric mutations to change one knob without touching other seams, and structural mutations to extend the genome cleanly. The worktree isolation ensures failed mutations cannot corrupt the parent's code or data.
   </Why_This_Matters>
@@ -248,5 +282,43 @@ level: 2
     - Did I call evor_record_node with genome_ref and parent_patch_ref set?
     - Did I invoke `python -m evor run` (not a direct script)?
     - For data-acquisition: is license in allowlist? Is namespace="train"?
+    - Did I read .evor/capability.json before materializing?
+    - Does the worktree code contain GPU-only ops incompatible with detected arch?
+    - If a runtime gotcha blocks the proposed batch_size, did I reduce it?
+    - Did I write forge-report.json to the tick artifact path before finishing?
   </Final_Checklist>
+
+  <Write_As_You_Go>
+    Sub-agent context windows compact independently. Your FINAL structured artifact is the
+    durable handoff — never rely on returning it only in your final message.
+
+    **Final artifact (mandatory):**
+    Write your completed Forge Report JSON to:
+      `.evor/runs/<mission_id>/<run_id>/ticks/<tick>/forge/forge-report.json`
+
+    This is separate from (and in addition to) the node record in `nodes/<node_id>/`.
+    The node record is the official evaluation artifact; the forge-report is the tick-level
+    deliverable that Probe reads via `read_handoff(run_dir, "forge", "probe")`.
+
+    **Incremental writes (strongly recommended):**
+    After genome materialization and after harness invocation (even if not yet complete):
+      `.evor/runs/<mission_id>/<run_id>/ticks/<tick>/forge/forge-report-partial.json`
+    A mid-task compaction loses at most the since-last-write delta.
+
+    **Path resolution:**
+    ```python
+    import json; from pathlib import Path
+    run_dir = Path(os.environ["EVOR_RUN_DIR"])
+    tick    = json.loads((run_dir / "tick-state.json").read_text())["tick"]
+    out_dir = run_dir / "ticks" / str(tick) / "forge"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    (out_dir / "forge-report.json").write_text(json.dumps(forge_report_payload))
+    ```
+
+    **Durable fact tagging:**
+    Tag implementation constraints or OOM facts so they survive compaction:
+      `<evor-remember>Fact — e.g. "Genome node-xyz uses LoRA rank=8; patch is 2KB"</evor-remember>`
+      `<evor-remember gotcha>Hard constraint — e.g. "batch_size=512 OOM at 16GB VRAM on this task"</evor-remember>`
+    The PostToolUse hook routes these to CompoundingWiki or GotchaStore automatically.
+  </Write_As_You_Go>
 </Agent_Prompt>

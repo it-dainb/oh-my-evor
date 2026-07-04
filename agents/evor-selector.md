@@ -124,6 +124,28 @@ disallowedTools: Write, Edit
     - Pass condition: all sub-checks pass (structure_ok=True) OR candidate_dir not yet available
       (gate deferred; Forge's materialization mandate is the upstream enforcement layer).
     - This gate is reversible: passing candidate_dir=None to IntegrityGate.check() skips it (structure_ok=None).
+
+    **Gate — Gotcha Avoidance (hardware-constraint + high-confidence runtime-failure):**
+    - Query the GotchaStore before passing any proposal to Forge:
+      ```python
+      from evor.gotchas import GotchaStore
+      from pathlib import Path
+      store = GotchaStore(Path(".evor"), run_dir)
+      hw_blocks  = store.query_gotchas(kind="hardware-constraint", min_confidence=0.8)
+      rt_blocks  = store.query_gotchas(kind="runtime-failure",     min_confidence=0.8)
+      ```
+    - Fail condition (hardware-constraint): any hw_block signature matches a technique
+      in the proposal's idea, mutation_locus, or any code stub. Examples:
+        - proposal uses flash-attn v3 AND "flash-attn-v3-requires-sm90" gotcha is present → REJECT
+        - proposal uses bf16 AND "bf16-requires-sm80" gotcha is present → REJECT
+        - "no-gpu-cpu-only" gotcha is present AND proposal requires CUDA → REJECT
+    - Fail condition (runtime-failure): a runtime-failure gotcha with confidence >= 0.8
+      has a matching signature AND the proposal's job_spec/genome reproduces the same
+      triggering configuration (e.g. same batch_size on the same task). → REJECT
+    - Pass condition: no hw_block matches the proposal's techniques, AND no rt_block
+      with confidence >= 0.8 matches the triggering configuration.
+    - This gate fires BEFORE Forge runs — burning a training run to rediscover a
+      known-failure is strictly worse than a false rejection.
   </Six_Gate_Checklist>
 
   <Output_Format>
@@ -140,6 +162,7 @@ disallowedTools: Write, Edit
         "instrumentation_check": "pass | fail",
         "schema_valid": "pass | fail",
         "acquisition_contamination": "pass | fail | null",
+        "gotcha_avoidance": "pass | fail | null",
         "verdict": "approved | rejected",
         "rejection_reason": null
       }
@@ -152,6 +175,8 @@ disallowedTools: Write, Edit
     - "instrumentation_check fail: code stub present but contains no TelemetryCallback import"
     - "schema_valid fail: wildness field missing"
     - "ingestion_contamination fail: license_identifier='CC-BY-NC-4.0' not in GoalContract.allowed_licenses"
+    - "gotcha_avoidance fail: hardware-constraint gotcha 'flash-attn-v3-requires-sm90' (confidence=1.0) — this machine is sm_80, proposal requires sm_90"
+    - "gotcha_avoidance fail: runtime-failure gotcha 'cuda-oom' (confidence=0.85) — proposal batch_size=256 previously caused OOM on this task"
   </Output_Format>
 
   <Failure_Modes_To_Avoid>
@@ -177,5 +202,38 @@ disallowedTools: Write, Edit
     - For data-acquisition: did I apply the ingestion contamination gate?
     - Is rejection_reason specific (gate name + violation details)?
     - Is verdict="approved" only when ALL gates returned "pass"?
+    - Did I query the GotchaStore for hardware-constraint and runtime-failure gotchas?
+    - Does the proposal violate any gotcha with confidence >= 0.8? If yes, reject with gotcha_avoidance fail.
+    - Did I write verdict.json to the tick artifact path before finishing?
   </Final_Checklist>
+
+  <Write_As_You_Go>
+    Sub-agent context windows compact independently. Your FINAL structured artifact is the
+    durable handoff — never rely on returning it only in your final message.
+
+    **Final artifact (mandatory):**
+    Write your completed gate-evaluation verdict JSON to:
+      `.evor/runs/<mission_id>/<run_id>/ticks/<tick>/selector/verdict.json`
+
+    **Incremental writes (strongly recommended):**
+    After evaluating each proposal (not waiting for the full set):
+      `.evor/runs/<mission_id>/<run_id>/ticks/<tick>/selector/verdict-partial.json`
+    A mid-task compaction loses at most the since-last-write delta.
+
+    **Path resolution:**
+    ```python
+    import json; from pathlib import Path
+    run_dir = Path(os.environ["EVOR_RUN_DIR"])
+    tick    = json.loads((run_dir / "tick-state.json").read_text())["tick"]
+    out_dir = run_dir / "ticks" / str(tick) / "selector"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    (out_dir / "verdict.json").write_text(json.dumps(verdict_payload))
+    ```
+
+    **Durable fact tagging:**
+    Tag rejection patterns or persistent gate failures that should inform future ticks:
+      `<evor-remember>Fact — e.g. "H002 family-streak: arch family rejected 3 consecutive ticks"</evor-remember>`
+      `<evor-remember gotcha>Hard block — e.g. "H001 always fails when wildness<0.3 with no quantified prediction"</evor-remember>`
+    The PostToolUse hook routes these to CompoundingWiki or GotchaStore automatically.
+  </Write_As_You_Go>
 </Agent_Prompt>

@@ -13,7 +13,8 @@
     "./skills/evor-dashboard/",
     "./skills/evor-report/",
     "./skills/evor-validate/",
-    "./skills/evor-doctor/"
+    "./skills/evor-doctor/",
+    "./skills/evor-gotchas/"
   ],
   "agents": [
     "./agents/evor-sage.md",

@@ -844,6 +844,76 @@ class GenomeSeedAdapterReport(BaseModel):
 
 
 # ────────────────────────────────────────────────────────────────────────────
+# GotchaEntry + CapabilityProfile (Gotcha knowledge layer)
+# ────────────────────────────────────────────────────────────────────────────
+
+
+class GotchaEntry(BaseModel):
+    """A single recorded failure/constraint that future agents should avoid.
+
+    Stored under .evor/wiki/gotchas/ (global scope) or per run-dir (mission
+    scope) so they survive across missions on the same machine.
+
+    ``signature`` is the dedup key \u2014 e.g. ``"cuda-oom"``, ``"flash-attn-v3-sm90"``.
+    Duplicate add() calls with the same (signature, scope) increment
+    ``occurrences``, bump ``last_seen``, and raise ``confidence`` toward 1.0.
+    """
+
+    model_config = ConfigDict(strict=True)
+
+    gotcha_id: str
+    """Unique ID \u2014 typically ``<kind>-<signature>-<hash>``."""
+    kind: Literal["runtime-failure", "hardware-constraint", "approach-deadend"]
+    """Broad category of gotcha."""
+    signature: str
+    """Dedup key used to detect repeat occurrences (e.g. 'cuda-oom', 'nan-loss-lr')."""
+    context: dict[str, Any]
+    """Free-form context: gpu_arch, vram_gb, task, batch, mutation_family, etc."""
+    resolution: str
+    """What was done to recover (e.g. 'batch 256->128 + grad-accum')."""
+    avoidance: str
+    """Actionable advice for future agents to AVOID this gotcha."""
+    scope: Literal["mission", "global"]
+    """'global' gotchas persist cross-mission; 'mission' are run-scoped."""
+    confidence: float
+    """0.0\u20131.0; raised toward 1.0 on each repeated occurrence."""
+    occurrences: int
+    """How many times this gotcha has been recorded."""
+    first_seen: str
+    """ISO 8601 timestamp of first occurrence."""
+    last_seen: str
+    """ISO 8601 timestamp of most recent occurrence."""
+
+
+class CapabilityProfile(BaseModel):
+    """Hardware capability profile probed at preflight time.
+
+    Written to ``.evor/capability.json`` (global) so all agents can read it.
+    When no GPU is available, ``cpu_only=True`` and GPU fields are None.
+    """
+
+    model_config = ConfigDict(strict=True)
+
+    gpu_arch: Optional[str] = None
+    """CUDA capability string, e.g. 'sm_80', 'sm_90'. None on CPU-only box."""
+    gpu_name: Optional[str] = None
+    """GPU device name, e.g. 'NVIDIA A100 80GB PCIe'."""
+    vram_gb: Optional[float] = None
+    """Total VRAM in GB. None on CPU-only box."""
+    supported_dtypes: list[str]
+    """Confirmed supported dtypes, e.g. ['fp32', 'fp16', 'bf16']."""
+    available_libs: list[str]
+    """Confirmed importable GPU-acceleration libs, e.g. ['flash-attn', 'xformers']."""
+    cuda_version: Optional[str] = None
+    """CUDA runtime version string, e.g. '12.1'. None if CUDA unavailable."""
+    cpu_only: bool
+    """True when no CUDA GPU was detected. Agents must downgrade or skip GPU ops."""
+    probed_at: str
+    """ISO 8601 timestamp of when this profile was last probed."""
+
+
+
+# ────────────────────────────────────────────────────────────────────────────
 # Schema registry (all models, for validation tooling / test iteration)
 # ────────────────────────────────────────────────────────────────────────────
 
@@ -885,4 +955,7 @@ ALL_MODELS: dict[str, type[BaseModel]] = {
     "AngleVsSOTA": AngleVsSOTA,
     # Q2
     "GenomeSeedAdapterReport": GenomeSeedAdapterReport,
+    # Gotcha knowledge layer
+    "GotchaEntry": GotchaEntry,
+    "CapabilityProfile": CapabilityProfile,
 }

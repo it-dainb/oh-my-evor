@@ -21,6 +21,46 @@ import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { spawnSync } from 'child_process';
 
+/**
+ * Build an <evor-restore> summary from on-disk state files.
+ * Returns null if there is no meaningful state yet.
+ * Any individual read failure is swallowed — always safe to call.
+ *
+ * @param {string} rDir      Absolute path to .evor/runs/<m>/<r>/
+ * @param {string} rId       run_id
+ * @param {string} mId       mission_id (may be '')
+ * @returns {string|null}
+ */
+function buildEvorRestore(rDir, rId, mId) {
+  function safeRead(p) {
+    try { return JSON.parse(readFileSync(p, 'utf8')); } catch { return {}; }
+  }
+  const missionState = safeRead(join(rDir, 'mission-state.json'));
+  const tickState    = safeRead(join(rDir, 'tick-state.json'));
+  const runState     = safeRead(join(rDir, 'run-state.json'));
+
+  const objective   = (missionState?.objective ?? missionState?.goal ?? '').slice(0, 100);
+  const currentTick = tickState?.tick ?? runState?.tick_count ?? 0;
+  const currentStep = tickState?.current_step ?? 0;
+  const bestScore   = runState?.best_score ?? missionState?.best_score ?? null;
+  const bestNodeId  = runState?.best_node_id ?? missionState?.best_node_id ?? null;
+
+  if (!objective && currentTick === 0 && bestScore === null) return null;
+
+  const scoreStr = bestScore !== null ? String(bestScore).slice(0, 8) : 'unknown';
+  const nodeStr  = bestNodeId ? bestNodeId.slice(0, 16) : 'none';
+  const runPath  = mId ? `runs/${mId}/${rId}` : `runs/${rId}`;
+
+  const lines = [
+    `Run: ${rId.slice(0, 20)}${mId ? ` | Mission: ${mId.slice(0, 20)}` : ''}`,
+  ];
+  if (objective) lines.push(`Objective: ${objective}`);
+  lines.push(`Tick ${currentTick} step ${currentStep} | Best: ${scoreStr} (${nodeStr})`);
+  lines.push(`Resume from .evor/${runPath}/; prioritise the user's newest request.`);
+
+  return `<evor-restore>\n${lines.join('\n')}\n</evor-restore>`;
+}
+
 // ── Kill switches ─────────────────────────────────────────────────────────────
 if (process.env.DISABLE_EVOR) process.exit(0);
 
@@ -85,6 +125,13 @@ if (missionId) {
   if (wiki.status === 0 && wiki.stdout?.trim()) {
     output.message += `\n\nRecent wiki lessons:\n${wiki.stdout.trim()}`;
   }
+}
+
+// Inject <evor-restore> block so a fresh/compacted session re-hydrates from disk.
+// Advisory: rebuilds objective + tick/step + best-so-far for context continuity.
+const restoreBlock = buildEvorRestore(runDir, runId, missionId);
+if (restoreBlock) {
+  output.message += `\n\n${restoreBlock}`;
 }
 
 process.stdout.write(JSON.stringify(output) + '\n');

@@ -167,5 +167,36 @@ disallowedTools: Write, Edit
     - Did I verify telemetry_sane before reporting loss/grad metrics?
     - Is the LessonEntry actionable_lesson useful to Mutagen for next-tick generation?
     - Did I submit BenchmarkUpgradeProposal only if both saturation AND new-angle conditions are met?
+    - Did I write findings.json to the tick artifact path before finishing?
   </Final_Checklist>
+
+  <Write_As_You_Go>
+    Sub-agent context windows compact independently. Your FINAL structured artifact is the
+    durable handoff — never rely on returning it only in your final message.
+
+    **Final artifact (mandatory):**
+    Write your completed EDA + verdict JSON to:
+      `.evor/runs/<mission_id>/<run_id>/ticks/<tick>/probe/findings.json`
+
+    **Incremental writes (strongly recommended):**
+    After each EDA check (1–5), append a partial result:
+      `.evor/runs/<mission_id>/<run_id>/ticks/<tick>/probe/findings-partial.json`
+    A mid-task compaction loses at most the since-last-write delta.
+
+    **Path resolution:**
+    ```python
+    import json; from pathlib import Path
+    run_dir = Path(os.environ["EVOR_RUN_DIR"])
+    tick    = json.loads((run_dir / "tick-state.json").read_text())["tick"]
+    out_dir = run_dir / "ticks" / str(tick) / "probe"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    (out_dir / "findings.json").write_text(json.dumps(eda_output_payload))
+    ```
+
+    **Durable fact tagging:**
+    Tag mechanistic findings that should persist across ticks:
+      `<evor-remember>Fact — e.g. "Node node-abc showed grad explosion at epoch 30 with lr=1e-3"</evor-remember>`
+      `<evor-remember gotcha>Hard constraint — e.g. "batch_size=256 causes OOM on this machine"</evor-remember>`
+    The PostToolUse hook routes these to CompoundingWiki or GotchaStore automatically.
+  </Write_As_You_Go>
 </Agent_Prompt>

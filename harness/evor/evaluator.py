@@ -58,6 +58,13 @@ try:
 except ImportError:
     _TREE_ENGINE_AVAILABLE = False
 
+# GotchaStore for hardware-constraint capture — graceful fallback
+try:
+    from evor.gotchas import GotchaStore, make_gotcha
+    _GOTCHA_AVAILABLE = True
+except ImportError:
+    _GOTCHA_AVAILABLE = False
+
 _DEFAULT_TIMEOUT_SEC = 3600  # 1 hour
 
 
@@ -236,8 +243,18 @@ class EvaluatorAdapter:
                  Optional; required for open_ended angle scoring.
     """
 
-    def __init__(self, run_dir: Path | None = None) -> None:
+    def __init__(
+        self,
+        run_dir: Path | None = None,
+        evor_root: Path | None = None,
+    ) -> None:
         self._run_dir = run_dir
+        self._evor_root = evor_root
+        self._gotcha_store: "GotchaStore | None" = (
+            GotchaStore(evor_root, run_dir)
+            if _GOTCHA_AVAILABLE and evor_root is not None
+            else None
+        )
 
     def run(
         self,
@@ -311,6 +328,8 @@ class EvaluatorAdapter:
 
         # ── Parse stdout → EvaluationResult ──────────────────────────────
         if exit_status in ("timeout", "oom"):
+            if exit_status == "oom":
+                self._capture_oom_gotcha(stderr_text, goal, node)
             return self._error_result(
                 node=node,
                 goal=goal,
@@ -392,6 +411,42 @@ class EvaluatorAdapter:
     # ------------------------------------------------------------------
     # Private helpers
     # ------------------------------------------------------------------
+
+    def _capture_oom_gotcha(
+        self,
+        stderr_text: str,
+        goal: GoalContract,
+        node: TreeNode,
+    ) -> None:
+        """Capture OOM from evaluator subprocess as a hardware-constraint gotcha.
+
+        Fires when the eval script exits with an OOM pattern in stderr.
+        Signature 'eval-oom' is stable for dedup; confidence starts at 0.65.
+        """
+        if not _GOTCHA_AVAILABLE or self._gotcha_store is None:
+            return
+        try:
+            entry = make_gotcha(
+                kind="runtime-failure",
+                signature="eval-oom",
+                context={
+                    "mission_id": goal.mission_id,
+                    "node_id": node.id,
+                    "eval_version": goal.eval_version,
+                    "stderr_snippet": stderr_text[:300],
+                },
+                resolution="Evaluator subprocess OOM; candidate was rejected.",
+                avoidance=(
+                    "Candidate caused OOM during evaluation. "
+                    "Reduce model size, batch size, or enable gradient checkpointing "
+                    "before proposing similar configurations."
+                ),
+                scope="mission",
+                confidence=0.65,
+            )
+            self._gotcha_store.add_gotcha(entry)
+        except Exception:
+            pass  # non-fatal
 
     def _error_result(
         self,

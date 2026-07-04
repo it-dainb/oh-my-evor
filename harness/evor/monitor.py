@@ -26,7 +26,14 @@ import sys
 import threading
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, Optional
+
+# GotchaStore import — optional; monitor works without it for backward compat
+try:
+    from evor.gotchas import GotchaStore, make_gotcha
+    _GOTCHA_STORE_AVAILABLE = True
+except ImportError:
+    _GOTCHA_STORE_AVAILABLE = False
 
 _MAX_RETRIES = 3
 
@@ -118,13 +125,19 @@ class SelfHealMonitor:
         run_dir: Path,
         job_spec: dict[str, Any],
         on_event: Callable[[dict[str, Any]], None] | None = None,
+        gotcha_store: "Optional[GotchaStore]" = None,
+        evor_root: Path | None = None,
     ) -> None:
         """
         Args:
-            node_id:  Node being trained (for logging).
-            run_dir:  Run directory root (for decision-log.md).
-            job_spec: Training job specification (mutated by playbook).
-            on_event: Optional callback invoked on each recovery event.
+            node_id:     Node being trained (for logging).
+            run_dir:     Run directory root (for decision-log.md).
+            job_spec:    Training job specification (mutated by playbook).
+            on_event:    Optional callback invoked on each recovery event.
+            gotcha_store: Optional GotchaStore; when provided, auto-captures
+                          OOM/NaN/dep/checkpoint failures as runtime-failure gotchas.
+            evor_root:   .evor/ root; used to construct a GotchaStore when
+                         gotcha_store is None but evor_root is provided.
         """
         self._node_id = node_id
         self._run_dir = run_dir
@@ -132,6 +145,11 @@ class SelfHealMonitor:
         self._on_event = on_event
         self._retry_count = 0
         self._events: list[dict[str, Any]] = []
+
+        # Gotcha auto-capture: use provided store, or build one from evor_root
+        self._gotcha_store: "Optional[GotchaStore]" = gotcha_store
+        if self._gotcha_store is None and evor_root is not None and _GOTCHA_STORE_AVAILABLE:
+            self._gotcha_store = GotchaStore(evor_root, run_dir)
 
     @property
     def events(self) -> list[dict[str, Any]]:
@@ -239,7 +257,58 @@ class SelfHealMonitor:
         _log_decision(self._run_dir, self._node_id, action, detail)
         if self._on_event is not None:
             self._on_event(event)
+        self._capture_gotcha(action, failure_type, detail)
         return event
+
+    def _capture_gotcha(self, action: str, failure_type: str, detail: str) -> None:
+        """Auto-capture a runtime-failure gotcha for OOM/NaN/dep/ckpt recoveries.
+
+        Signatures are stable so repeated occurrences dedup correctly:
+          oom          -> 'cuda-oom'
+          nan_loss     -> 'nan-loss'
+          module_not_found -> 'module-not-found'
+          missing_ckpt -> 'missing-checkpoint'
+          give_up      -> 'give-up-<failure_type>'
+        """
+        if self._gotcha_store is None or not _GOTCHA_STORE_AVAILABLE:
+            return
+
+        _SIG_MAP = {
+            "oom":           ("cuda-oom",         "batch_size in job_spec"),
+            "nan_loss":      ("nan-loss",          "lr in job_spec"),
+            "module_not_found": ("module-not-found", "missing_modules in job_spec"),
+            "missing_ckpt":  ("missing-checkpoint", "start_epoch in job_spec"),
+        }
+        give_up = action == "give_up"
+        sig_key = f"give-up-{failure_type}" if give_up else _SIG_MAP.get(failure_type, (failure_type,))[0]
+
+        context: dict = {
+            "node_id": self._node_id,
+            "failure_type": failure_type,
+            "action": action,
+            "retry_count": self._retry_count,
+        }
+        # Add relevant job_spec fields to context
+        for key in ("batch_size", "gradient_accumulation_steps", "lr", "worktree"):
+            if key in self._job_spec:
+                context[key] = self._job_spec[key]
+
+        try:
+            entry = make_gotcha(
+                kind="runtime-failure",
+                signature=sig_key,
+                context=context,
+                resolution=detail,
+                avoidance=(
+                    f"Avoid configurations that trigger {failure_type}. "
+                    f"Recovery applied: {detail[:200]}"
+                ),
+                scope="mission",
+                confidence=0.6 if not give_up else 0.8,
+            )
+            self._gotcha_store.add_gotcha(entry)
+        except Exception:
+            pass  # non-fatal: gotcha capture must never disrupt the monitor
 
     def _pip_install(self, module: str) -> None:
         """Install missing module into the worktree venv (best-effort).

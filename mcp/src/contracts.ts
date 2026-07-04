@@ -641,6 +641,38 @@ export const GenomeSeedAdapterReportSchema = z.object({
 });
 export type GenomeSeedAdapterReport = z.infer<typeof GenomeSeedAdapterReportSchema>;
 
+
+// ────────────────────────────────────────────────────────────────────────────
+// GotchaEntry + CapabilityProfile (Gotcha knowledge layer)
+// ────────────────────────────────────────────────────────────────────────────
+
+export const GotchaEntrySchema = z.object({
+  gotcha_id: z.string(),
+  kind: z.enum(["runtime-failure", "hardware-constraint", "approach-deadend"]),
+  signature: z.string(),
+  context: z.record(z.string(), z.unknown()),
+  resolution: z.string(),
+  avoidance: z.string(),
+  scope: z.enum(["mission", "global"]),
+  confidence: z.number().min(0).max(1),
+  occurrences: z.number().int().min(1),
+  first_seen: ISODate,
+  last_seen: ISODate,
+});
+export type GotchaEntry = z.infer<typeof GotchaEntrySchema>;
+
+export const CapabilityProfileSchema = z.object({
+  gpu_arch: z.string().nullable().optional(),
+  gpu_name: z.string().nullable().optional(),
+  vram_gb: z.number().nullable().optional(),
+  supported_dtypes: z.array(z.string()),
+  available_libs: z.array(z.string()),
+  cuda_version: z.string().nullable().optional(),
+  cpu_only: z.boolean(),
+  probed_at: ISODate,
+});
+export type CapabilityProfile = z.infer<typeof CapabilityProfileSchema>;
+
 // ────────────────────────────────────────────────────────────────────────────
 // Schema registry (all 27 schemas, for validation tooling)
 // ────────────────────────────────────────────────────────────────────────────
@@ -680,4 +712,7 @@ export const ALL_SCHEMAS = {
   AngleVsSOTA: AngleVsSOTASchema,
   // Q2
   GenomeSeedAdapterReport: GenomeSeedAdapterReportSchema,
+  // Gotcha knowledge layer
+  GotchaEntry: GotchaEntrySchema,
+  CapabilityProfile: CapabilityProfileSchema,
 } as const;

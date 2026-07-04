@@ -102,8 +102,36 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Path to .evor/runs/<mission>/<run-id>/.",
     )
     pre_p.add_argument(
+        "--evor-root", type=Path, default=None,
+        help="Path to .evor/ root. Defaults to .evor/ in cwd.",
+    )
+    pre_p.add_argument(
         "--no-gpu-check", action="store_true",
         help="Skip GPU utilisation check (for CPU-only environments).",
+    )
+
+    # gotchas subcommand
+    got_p = sub.add_parser("gotchas", help="List accumulated gotchas and capability profile")
+    got_p.add_argument(
+        "--kind", default=None,
+        choices=["runtime-failure", "hardware-constraint", "approach-deadend"],
+        help="Filter by gotcha kind.",
+    )
+    got_p.add_argument(
+        "--scope", default=None, choices=["global", "mission"],
+        help="Filter by scope.",
+    )
+    got_p.add_argument(
+        "--min-confidence", type=float, default=0.0,
+        help="Minimum confidence threshold (0.0–1.0).",
+    )
+    got_p.add_argument(
+        "--evor-root", type=Path, default=None,
+        help="Path to .evor/ root. Defaults to .evor/ in cwd.",
+    )
+    got_p.add_argument(
+        "--run-dir", type=Path, default=None,
+        help="Path to run directory for mission-scoped gotchas.",
     )
 
     return parser
@@ -311,7 +339,23 @@ def _cmd_preflight(args: argparse.Namespace) -> int:
     from evor.scheduler import ResourceScheduler
 
     run_dir: Path | None = args.run_dir.resolve() if args.run_dir else None
+    evor_root: Path = (
+        args.evor_root.resolve() if args.evor_root
+        else (run_dir.parent.parent.parent if run_dir else Path(".evor"))
+    )
     scheduler = ResourceScheduler(run_dir=run_dir)
+
+    # Probe + persist hardware capability profile
+    try:
+        from evor.capability import probe_capability
+        cap = probe_capability(evor_root, run_dir)
+        print(
+            f"[evor preflight] Capability profile written to {evor_root / 'capability.json'} "
+            f"(cpu_only={cap.cpu_only}, gpu_arch={cap.gpu_arch!r})",
+            file=sys.stderr,
+        )
+    except Exception as cap_exc:
+        print(f"[evor preflight] WARNING: capability probe failed: {cap_exc}", file=sys.stderr)
 
     report: dict = {"run_id": args.run_id, "checks": {}, "passed": False}
 
@@ -422,6 +466,46 @@ def _cmd_doctor(args: argparse.Namespace) -> int:
 # Entry point
 # ─────────────────────────────────────────────────────────────────────────────
 
+def _cmd_gotchas(args: argparse.Namespace) -> int:
+    """Execute the gotchas subcommand.
+
+    Lists accumulated gotchas and the capability profile in a readable table.
+    Reads from .evor/wiki/gotchas/global.jsonl and optionally the run-scoped
+    mission.jsonl.
+
+    Exit 0 always (informational).
+    """
+    from evor.capability import read_capability
+    from evor.gotchas import GotchaStore
+
+    evor_root: Path = (
+        args.evor_root.resolve() if args.evor_root else Path(".evor")
+    )
+    run_dir: Path | None = args.run_dir.resolve() if args.run_dir else None
+
+    store = GotchaStore(evor_root, run_dir)
+    gotchas = store.query_gotchas(
+        kind=args.kind,
+        scope=args.scope,
+        min_confidence=args.min_confidence,
+    )
+
+    cap = read_capability(evor_root)
+
+    report = {
+        "capability_profile": cap.model_dump() if cap else None,
+        "gotchas": [g.model_dump() for g in gotchas],
+        "total": len(gotchas),
+    }
+    print(json.dumps(report, indent=2))
+    print(
+        f"\n[evor gotchas] {len(gotchas)} gotcha(s) found "
+        f"(kind={args.kind!r}, scope={args.scope!r}, min_confidence={args.min_confidence})",
+        file=sys.stderr,
+    )
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = _build_parser()
     args = parser.parse_args(argv)
@@ -434,6 +518,8 @@ def main(argv: list[str] | None = None) -> int:
         return _cmd_validate(args)
     if args.subcommand == "doctor":
         return _cmd_doctor(args)
+    if args.subcommand == "gotchas":
+        return _cmd_gotchas(args)
 
     parser.print_help()
     return 1

@@ -23,7 +23,7 @@
  * Guard is inert (immediate exit 0) when EVOR_ACTIVE_RUN_ID is unset.
  */
 
-import { existsSync, statSync } from 'fs';
+import { existsSync, statSync, appendFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
 
 // ── Kill switches ─────────────────────────────────────────────────────────────
@@ -108,6 +108,55 @@ if (toolName === 'evor_record_node') {
 
 if (warnings.length > 0) {
   process.stdout.write(warnings.map((w) => `[EVOR WARNING] ${w}`).join('\n') + '\n');
+}
+
+// ── <evor-remember> tag capture ───────────────────────────────────────────────
+// Agents mark durable facts with <evor-remember>…</evor-remember> and hard
+// constraints/failures with <evor-remember gotcha>…</evor-remember>.
+// We scan text surfaces in the hook input and write matches to an inbox file
+// (.evor/runs/<run-id>/remember-inbox.jsonl) for the orchestrator to process.
+//
+// Surfaces scanned:
+//   - tool_input.content  (Write tool file body)
+//   - tool_response       (string tool output, if present)
+//
+// Best-effort: any failure is swallowed — never block on this path.
+try {
+  const REMEMBER_RE = /<evor-remember(\s+gotcha)?>([\s\S]*?)<\/evor-remember>/gi;
+
+  const surfaces = [];
+  if (typeof toolInput?.content === 'string') surfaces.push(toolInput.content);
+  const toolResponse = input?.tool_response;
+  if (typeof toolResponse === 'string') surfaces.push(toolResponse);
+
+  const entries = [];
+  for (const text of surfaces) {
+    let m;
+    REMEMBER_RE.lastIndex = 0;
+    while ((m = REMEMBER_RE.exec(text)) !== null) {
+      const isGotcha = !!m[1];
+      const content = m[2].trim();
+      if (content) {
+        entries.push({
+          type: isGotcha ? 'gotcha' : 'wiki',
+          content,
+          run_id: activeRunId,
+          mission_id: missionId || null,
+          tool_name: toolName,
+          created_at: new Date().toISOString(),
+        });
+      }
+    }
+  }
+
+  if (entries.length > 0) {
+    const inboxDir = runDir(activeRunId);
+    mkdirSync(inboxDir, { recursive: true });
+    const inboxPath = join(inboxDir, 'remember-inbox.jsonl');
+    appendFileSync(inboxPath, entries.map(e => JSON.stringify(e)).join('\n') + '\n', 'utf8');
+  }
+} catch {
+  // Fail-open — evor-remember capture is advisory, never blocks
 }
 
 process.exit(0);

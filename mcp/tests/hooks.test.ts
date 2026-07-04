@@ -26,7 +26,7 @@
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { spawnSync } from "child_process";
-import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from "fs";
+import { mkdtempSync, rmSync, writeFileSync, mkdirSync, readdirSync, readFileSync } from "fs";
 import { join, resolve } from "path";
 import { tmpdir } from "os";
 
@@ -753,5 +753,364 @@ describe("stop hook — drift-guard (Phase 2)", () => {
       EVOR_ROOT: tmpDir,
     });
     expect(result.status).toBe(0);
+  });
+});
+
+// ─── pre-compact.mjs ──────────────────────────────────────────────────────────
+
+const PRE_COMPACT = join(HOOKS_DIR, "pre-compact.mjs");
+const SUBAGENT_STOP = join(HOOKS_DIR, "subagent-stop.mjs");
+
+describe("pre-compact hook", () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = mkdtempSync(join(tmpdir(), "evor-precompact-test-"));
+  });
+
+  afterEach(() => {
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it("exits 0 silently when no active run exists", () => {
+    const result = runHook(PRE_COMPACT, { EVOR_ROOT: tmpDir });
+    expect(result.status).toBe(0);
+    // No active-run.json → no output, no error
+    expect(result.stderr).toBe("");
+  });
+
+  it("exits 0 when EVOR_ACTIVE_RUN_ID is set but run dir has no state files", () => {
+    // Run dir doesn't need to exist — hook should fail-open
+    const result = runHook(PRE_COMPACT, {
+      EVOR_ROOT: tmpDir,
+      EVOR_ACTIVE_RUN_ID: "run-precompact-001",
+    });
+    expect(result.status).toBe(0);
+  });
+
+  it("emits systemMessage with <evor-restore> when active run + state files exist", () => {
+    const runId = "run-pc-001";
+    const missionId = "mission-pc-001";
+    const runDir = join(tmpDir, "runs", missionId, runId);
+    mkdirSync(runDir, { recursive: true });
+
+    writeFileSync(
+      join(tmpDir, "active-run.json"),
+      JSON.stringify({ run_id: runId, mission_id: missionId })
+    );
+    writeFileSync(
+      join(runDir, "mission-state.json"),
+      JSON.stringify({ objective: "maximise val_acc on CIFAR-10", status: "running" })
+    );
+    writeFileSync(
+      join(runDir, "tick-state.json"),
+      JSON.stringify({ tick: 3, current_step: 5, step_status: "running" })
+    );
+    writeFileSync(
+      join(runDir, "run-state.json"),
+      JSON.stringify({ tick_count: 3, best_score: 0.87, best_node_id: "node-abc", pending_node_ids: [] })
+    );
+
+    const result = runHook(PRE_COMPACT, {
+      EVOR_ROOT: tmpDir,
+      EVOR_ACTIVE_RUN_ID: runId,
+      EVOR_MISSION_ID: missionId,
+    });
+    expect(result.status).toBe(0);
+
+    const output = JSON.parse(result.stdout.trim());
+    expect(output.continue).toBe(true);
+    expect(output.systemMessage).toContain("<evor-restore>");
+    expect(output.systemMessage).toContain("</evor-restore>");
+    expect(output.systemMessage).toContain(runId.slice(0, 20));
+    expect(output.systemMessage).toContain("Tick 3");
+    // systemMessage must be ≤ 500 chars
+    expect(output.systemMessage.length).toBeLessThanOrEqual(500);
+  });
+
+  it("writes a checkpoint file to checkpoints/ directory", () => {
+    const runId = "run-pc-002";
+    const runDir = join(tmpDir, "runs", runId);
+    mkdirSync(runDir, { recursive: true });
+
+    writeFileSync(
+      join(tmpDir, "active-run.json"),
+      JSON.stringify({ run_id: runId })
+    );
+    writeFileSync(
+      join(runDir, "run-state.json"),
+      JSON.stringify({ tick_count: 2, best_score: 0.75, best_node_id: "node-xyz", pending_node_ids: [] })
+    );
+
+    const result = runHook(PRE_COMPACT, {
+      EVOR_ROOT: tmpDir,
+      EVOR_ACTIVE_RUN_ID: runId,
+    });
+    expect(result.status).toBe(0);
+
+    // Checkpoint file should exist in checkpoints/
+    const checkpointsDir = join(runDir, "checkpoints");
+    const files = readdirSync(checkpointsDir);
+    expect(files.length).toBeGreaterThan(0);
+    expect(files[0]).toMatch(/^precompact-.*\.json$/);
+
+    // Checkpoint must contain required fields
+    const checkpoint = JSON.parse(
+      readFileSync(join(checkpointsDir, files[0]), "utf8")
+    );
+    expect(checkpoint).toHaveProperty("current_tick");
+    expect(checkpoint).toHaveProperty("best_score");
+    expect(checkpoint).toHaveProperty("flushed_at");
+    expect(checkpoint).toHaveProperty("run_id", runId);
+  });
+
+  it("honors DISABLE_EVOR kill switch", () => {
+    writeFileSync(
+      join(tmpDir, "active-run.json"),
+      JSON.stringify({ run_id: "run-pc-ks", mission_id: "m-ks" })
+    );
+    const result = runHook(PRE_COMPACT, {
+      EVOR_ROOT: tmpDir,
+      DISABLE_EVOR: "1",
+    });
+    expect(result.status).toBe(0);
+    expect(result.stdout.trim()).toBe("");
+  });
+
+  it("honors EVOR_SKIP_HOOKS=pre-compact kill switch", () => {
+    writeFileSync(
+      join(tmpDir, "active-run.json"),
+      JSON.stringify({ run_id: "run-pc-skip" })
+    );
+    const result = runHook(PRE_COMPACT, {
+      EVOR_ROOT: tmpDir,
+      EVOR_SKIP_HOOKS: "pre-compact",
+    });
+    expect(result.status).toBe(0);
+    expect(result.stdout.trim()).toBe("");
+  });
+
+  it("exits 0 (fail-open) when mission-state.json is corrupt", () => {
+    const runId = "run-pc-corrupt";
+    const runDir = join(tmpDir, "runs", runId);
+    mkdirSync(runDir, { recursive: true });
+
+    writeFileSync(join(tmpDir, "active-run.json"), JSON.stringify({ run_id: runId }));
+    writeFileSync(join(runDir, "mission-state.json"), "NOT VALID JSON{{");
+
+    const result = runHook(PRE_COMPACT, {
+      EVOR_ROOT: tmpDir,
+      EVOR_ACTIVE_RUN_ID: runId,
+    });
+    expect(result.status).toBe(0);
+  });
+});
+
+// ─── subagent-stop.mjs ────────────────────────────────────────────────────────
+
+describe("subagent-stop hook", () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = mkdtempSync(join(tmpdir(), "evor-subagent-test-"));
+  });
+
+  afterEach(() => {
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it("exits 0 silently when EVOR_ACTIVE_RUN_ID is unset", () => {
+    const result = runHook(SUBAGENT_STOP, { EVOR_ROOT: tmpDir });
+    expect(result.status).toBe(0);
+    expect(result.stdout.trim()).toBe("");
+  });
+
+  it("exits 0 silently when EVOR_AGENT_ROLE is unset", () => {
+    const result = runHook(SUBAGENT_STOP, {
+      EVOR_ROOT: tmpDir,
+      EVOR_ACTIVE_RUN_ID: "run-sa-001",
+    });
+    expect(result.status).toBe(0);
+    expect(result.stdout.trim()).toBe("");
+  });
+
+  it("emits warning when artifact is missing for sage role", () => {
+    const runId = "run-sa-002";
+    const runDir = join(tmpDir, "runs", runId);
+    mkdirSync(runDir, { recursive: true });
+
+    writeFileSync(
+      join(runDir, "tick-state.json"),
+      JSON.stringify({ tick: 4, current_step: 2 })
+    );
+
+    const result = runHook(SUBAGENT_STOP, {
+      EVOR_ROOT: tmpDir,
+      EVOR_ACTIVE_RUN_ID: runId,
+      EVOR_AGENT_ROLE: "sage",
+    });
+    expect(result.status).toBe(0); // advisory — never blocks
+    expect(result.stdout).toContain("[EVOR SUBAGENT WARNING]");
+    expect(result.stdout).toContain("sage");
+    expect(result.stdout).toContain("findings.json");
+  });
+
+  it("exits 0 silently when artifact is present and non-trivially sized", () => {
+    const runId = "run-sa-003";
+    const tick = 2;
+    const runDir = join(tmpDir, "runs", runId);
+    const artifactDir = join(runDir, "ticks", String(tick), "mutagen");
+    mkdirSync(artifactDir, { recursive: true });
+
+    writeFileSync(
+      join(runDir, "tick-state.json"),
+      JSON.stringify({ tick, current_step: 3 })
+    );
+    // Write a non-trivially-sized artifact (> 10 bytes)
+    writeFileSync(
+      join(artifactDir, "proposals.json"),
+      JSON.stringify({ proposals: [{ id: "p1" }] })
+    );
+
+    const result = runHook(SUBAGENT_STOP, {
+      EVOR_ROOT: tmpDir,
+      EVOR_ACTIVE_RUN_ID: runId,
+      EVOR_AGENT_ROLE: "mutagen",
+    });
+    expect(result.status).toBe(0);
+    expect(result.stdout.trim()).toBe("");
+  });
+
+  it("emits warning when artifact is trivially small (stub)", () => {
+    const runId = "run-sa-004";
+    const tick = 1;
+    const runDir = join(tmpDir, "runs", runId);
+    const artifactDir = join(runDir, "ticks", String(tick), "probe");
+    mkdirSync(artifactDir, { recursive: true });
+
+    writeFileSync(
+      join(runDir, "tick-state.json"),
+      JSON.stringify({ tick, current_step: 7 })
+    );
+    // Trivially small — 5 bytes (less than MIN_ARTIFACT_BYTES=10)
+    writeFileSync(join(artifactDir, "findings.json"), "{}");
+
+    const result = runHook(SUBAGENT_STOP, {
+      EVOR_ROOT: tmpDir,
+      EVOR_ACTIVE_RUN_ID: runId,
+      EVOR_AGENT_ROLE: "probe",
+    });
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain("[EVOR SUBAGENT WARNING]");
+  });
+
+  it("honors DISABLE_EVOR kill switch", () => {
+    const result = runHook(SUBAGENT_STOP, {
+      EVOR_ROOT: tmpDir,
+      EVOR_ACTIVE_RUN_ID: "run-sa-ks",
+      EVOR_AGENT_ROLE: "sage",
+      DISABLE_EVOR: "1",
+    });
+    expect(result.status).toBe(0);
+    expect(result.stdout.trim()).toBe("");
+  });
+
+  it("honors EVOR_SKIP_HOOKS=subagent-stop kill switch", () => {
+    const result = runHook(SUBAGENT_STOP, {
+      EVOR_ROOT: tmpDir,
+      EVOR_ACTIVE_RUN_ID: "run-sa-skip",
+      EVOR_AGENT_ROLE: "forge",
+      EVOR_SKIP_HOOKS: "subagent-stop",
+    });
+    expect(result.status).toBe(0);
+    expect(result.stdout.trim()).toBe("");
+  });
+
+  it("uses EVOR_CURRENT_TICK env var when tick-state.json is absent", () => {
+    const runId = "run-sa-005";
+    const tick = 7;
+    const runDir = join(tmpDir, "runs", runId);
+    const artifactDir = join(runDir, "ticks", String(tick), "selector");
+    mkdirSync(artifactDir, { recursive: true });
+    // No tick-state.json — role+tick from env
+    writeFileSync(
+      join(artifactDir, "verdict.json"),
+      JSON.stringify({ approved: ["prop-1"], rejected: [] })
+    );
+
+    const result = runHook(SUBAGENT_STOP, {
+      EVOR_ROOT: tmpDir,
+      EVOR_ACTIVE_RUN_ID: runId,
+      EVOR_AGENT_ROLE: "selector",
+      EVOR_CURRENT_TICK: String(tick),
+    });
+    expect(result.status).toBe(0);
+    expect(result.stdout.trim()).toBe("");
+  });
+});
+
+// ─── session-start evor-restore injection ────────────────────────────────────
+
+describe("session-start hook — evor-restore injection", () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = mkdtempSync(join(tmpdir(), "evor-restore-test-"));
+  });
+
+  afterEach(() => {
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it("injects <evor-restore> block in message when state files exist", () => {
+    const runId = "run-restore-001";
+    const missionId = "mission-restore-001";
+    const runDir = join(tmpDir, "runs", missionId, runId);
+    mkdirSync(runDir, { recursive: true });
+
+    writeFileSync(
+      join(tmpDir, "active-run.json"),
+      JSON.stringify({ run_id: runId, mission_id: missionId })
+    );
+    writeFileSync(
+      join(runDir, "mission-state.json"),
+      JSON.stringify({ objective: "beat baseline on MNIST", status: "running" })
+    );
+    writeFileSync(
+      join(runDir, "tick-state.json"),
+      JSON.stringify({ tick: 5, current_step: 3, step_status: "running" })
+    );
+    writeFileSync(
+      join(runDir, "run-state.json"),
+      JSON.stringify({ tick_count: 5, best_score: 0.92, best_node_id: "node-best", pending_node_ids: [] })
+    );
+
+    const result = runHook(SESSION_START, { EVOR_ROOT: tmpDir });
+    expect(result.status).toBe(0);
+
+    const output = JSON.parse(result.stdout.trim());
+    expect(output.message).toContain("<evor-restore>");
+    expect(output.message).toContain("</evor-restore>");
+    expect(output.message).toContain("beat baseline on MNIST");
+    expect(output.message).toContain("Tick 5");
+  });
+
+  it("does not inject evor-restore when no state files exist (new run)", () => {
+    const runId = "run-restore-002";
+    const runDir = join(tmpDir, "runs", runId);
+    mkdirSync(runDir, { recursive: true });
+
+    // active-run.json exists but no state files
+    writeFileSync(
+      join(tmpDir, "active-run.json"),
+      JSON.stringify({ run_id: runId })
+    );
+
+    const result = runHook(SESSION_START, { EVOR_ROOT: tmpDir });
+    expect(result.status).toBe(0);
+
+    const output = JSON.parse(result.stdout.trim());
+    // message may or may not include evor-restore; just must not error
+    expect(output.env.EVOR_ACTIVE_RUN_ID).toBe(runId);
   });
 });
