@@ -2,7 +2,7 @@
   "mcpServers": {
     "evor": {
       "command": "node",
-      "args": ["mcp/dist/index.cjs"]
+      "args": ["${CLAUDE_PLUGIN_ROOT}/mcp/dist/index.cjs"]
     }
   }
 }
