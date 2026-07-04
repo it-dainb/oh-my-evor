@@ -148,6 +148,99 @@ If rescore_mode="async": schedule re-scoring jobs via evor_schedule without bloc
 
 </Steps>
 
+<Tick_Lifecycle>
+Every tick follows this mandatory lifecycle wrapping all 9 steps.
+
+**Tick Start — Read Prior Tick Handoff**
+If `tick_count > 0`, read the prior tick's handoff before beginning Step 1:
+```python
+from evor.handoff import latest_tick_handoff
+result = latest_tick_handoff(run_dir)
+if result:
+    prior_tick, handoff_text = result
+    # incorporate handoff_text (lessons, dominant_family, next_tick_seed) into orchestrator context
+```
+This prevents re-proposing dead-end families and provides Mutagen with the `next_tick_seed` hint.
+
+**Before Each Step N (1–9): Write tick-state.json**
+Write `<run_dir>/tick-state.json` to mark the step in-progress before executing it:
+```json
+{
+  "tick": <current_tick_number>,
+  "current_step": <N>,
+  "step_status": "running",
+  "step_outputs": {},
+  "updated_at": "<ISO 8601>"
+}
+```
+Use `evor_state_write` or write directly. This enables step-level resumability: if the loop
+is interrupted mid-tick, `evor-resume` reads `current_step` and restarts from that step.
+
+**After Each Step N: Update step_status**
+Update `tick-state.json` to mark the step done with a brief output summary:
+```json
+{
+  "tick": <current_tick_number>,
+  "current_step": <N>,
+  "step_status": "done",
+  "step_outputs": { "<key>": "<brief summary of step output>" },
+  "updated_at": "<ISO 8601>"
+}
+```
+
+**Tick End — Write Tick Handoff**
+After Step 9 (before the stop-check / next-tick loop decision), write the tick handoff:
+```python
+from evor.handoff import write_tick_handoff
+write_tick_handoff(run_dir, tick=current_tick_number, data={
+    "tick": current_tick_number,
+    "best_score": run_state["best_score"],
+    "best_node_id": run_state.get("best_node_id"),
+    "frontier_size": len(run_state.get("frontier_ids", [])),
+    "nodes_this_tick": [n["node_id"] for n in nodes_this_tick],
+    "lessons": [le["lesson_id"] for le in lessons_this_tick],
+    "dominant_family": dominant_approach_family_this_tick,
+    "next_tick_seed": "<brief hint for Mutagen: what to explore next based on Probe's lessons>",
+    "strategy_state": {
+        "wildness": strategy["wildness"],
+        "selection_policy": strategy["selection_policy"],
+        "meta_iteration": strategy["meta_iteration"]
+    }
+})
+```
+This handoff is read at the start of the next tick (above) and by Mutagen before proposing.
+
+**Step-Level Resume Detection**
+When the tick loop starts a new tick (or when `/evor-resume` invokes this skill), check
+`tick-state.json` for an interrupted tick before executing Step 1:
+```python
+import json; from pathlib import Path
+ts_path = Path(run_dir) / "tick-state.json"
+if ts_path.exists():
+    ts = json.loads(ts_path.read_text())
+    resume_tick = ts.get("tick")
+    resume_step = ts.get("current_step", 0)
+    resume_status = ts.get("step_status", "done")
+    current_tick = run_state.get("tick_count", 0)
+    if resume_tick == current_tick and resume_status == "running" and resume_step < 9:
+        # interrupted mid-tick — skip steps 1 through resume_step-1
+        print(f"[evor] Resuming tick {resume_tick} from step {resume_step} (interrupted mid-tick)")
+        start_step = resume_step  # re-run the interrupted step from the top
+    else:
+        start_step = 1  # fresh tick
+else:
+    start_step = 1
+```
+Re-run the interrupted step from its beginning (write tick-state with status="running" again).
+Steps 1 through `start_step - 1` are treated as already completed for this tick.
+
+**Why This Matters**
+tick-state.json makes every tick resumable at the step level — an interrupted tick at step 5
+restarts from step 5, not step 1. Tick handoffs compound learning across ticks: Mutagen reads
+the prior handoff and avoids families proven ineffective; Probe's lessons accumulate across ticks
+rather than being siloed to the current tick's context.
+</Tick_Lifecycle>
+
 <Meta_Evolution>
 Every `strategy.json.meta_loop_interval` ticks (default 5), run:
 ```bash

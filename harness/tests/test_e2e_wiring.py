@@ -548,3 +548,154 @@ def test_wiki_context_cli(tmp_path: Path) -> None:
     )
     # Empty index → empty output (no crash)
     assert result.stdout.strip() == "" or result.stdout.strip() is not None
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# P2: evor run — DICT-format node lookup (C3 runtime path, Phase 2)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _write_stub_evaluate_py(worktree: Path) -> Path:
+    """Write a minimal stub evaluate.py that outputs a valid EvaluationResult JSON.
+
+    The stub produces deterministic output without torch / GPU so the test runs
+    in any environment.  The harness reads stdout for the result JSON.
+    """
+    eval_src = '''\
+import json, sys, os
+from datetime import datetime, timezone
+
+# Minimal EvaluationResult-shaped output expected by EvaluatorAdapter
+result = {
+    "node_id": os.environ.get("EVOR_NODE_ID", "stub-node"),
+    "run_id":  os.environ.get("EVOR_RUN_ID",  "stub-run"),
+    "eval_version": "v1",
+    "metrics": {"accuracy": 0.851},
+    "per_domain": {"primary": {"accuracy": 0.851}},
+    "fitness_value": 0.851,
+    "worst_angle_coverage": None,
+    "per_angle_vs_sota": None,
+    "telemetry_summary": {
+        "final_train_loss": 0.18,
+        "best_val_metric": 0.851,
+        "grad_norm_median": 2.1,
+        "throughput_samples_per_sec": 512.0,
+        "total_steps": 5,
+    },
+    "status": "success",
+    "benchmark_raw": "test_accuracy=0.851",
+    "timestamp": datetime.now(timezone.utc).isoformat(),
+}
+print(json.dumps(result))
+'''
+    p = worktree / "evaluate.py"
+    p.write_text(eval_src)
+    return p
+
+
+def test_evor_run_c3_dict_format_node_found(tmp_path: Path) -> None:
+    """P2/C3: `python -m evor run` must find a node in DICT-format tree.json.
+
+    This test exercises the C3 runtime code path:
+      __main__._cmd_run() → tree.json DICT lookup → TreeNode.model_validate()
+
+    The test succeeds as long as the node lookup succeeds (the subsequent
+    evaluator step may error on this CPU-only environment — that is expected
+    and acceptable).  The critical assertion is that stderr does NOT contain
+    the 'not found in tree.json' message that would indicate the DICT format
+    lookup failed.
+    """
+    run_dir, _ = _build_fixture_run_dir(tmp_path)
+
+    # Create an isolated stub worktree with a no-GPU evaluate.py
+    worktree = tmp_path / f"worktree-{_NODE_A}"
+    worktree.mkdir()
+    _write_stub_evaluate_py(worktree)
+
+    result = _run([
+        "-m", "evor", "run",
+        "--node-id", _NODE_A,
+        "--run-id", _RUN_ID,
+        "--worktree", str(worktree),
+        "--run-dir", str(run_dir),
+        "--eval-script", str(worktree / "evaluate.py"),
+        "--no-selfheal",
+    ])
+
+    # C3 assertion: node MUST be found in the DICT-format tree.json.
+    assert "not found in tree.json" not in result.stderr, (
+        f"C3 FAIL: node {_NODE_A!r} was not found in DICT tree.json.\n"
+        f"This means the DICT-format lookup failed.\n"
+        f"stderr: {result.stderr}\nstdout: {result.stdout}"
+    )
+
+    # No Pydantic ValidationError from DICT parsing
+    assert "ValidationError" not in result.stderr, (
+        f"ValidationError present — DICT-format TreeNode parsing failed:\n{result.stderr}"
+    )
+
+    # Phase-2 lock guard should warn (not hard-block) when mission-state.json
+    # is absent (pre-phase-2 fixture).
+    if "mission-state.json not found" in result.stderr:
+        pass  # expected — fixture is pre-phase-2
+
+    # Exit code must NOT be 1 due to node-lookup failure specifically;
+    # evaluator / scheduler failures return 1 which is acceptable here.
+    # The node-not-found path returns 1 WITH the specific message above,
+    # so if the message is absent the lookup succeeded.
+
+
+def test_evor_run_c3_missing_node_returns_error(tmp_path: Path) -> None:
+    """C3: requesting a node ID that does not exist in the DICT tree exits 1."""
+    run_dir, _ = _build_fixture_run_dir(tmp_path)
+
+    worktree = tmp_path / "worktree-nonexistent"
+    worktree.mkdir()
+    _write_stub_evaluate_py(worktree)
+
+    result = _run([
+        "-m", "evor", "run",
+        "--node-id", "node-does-not-exist-0000",
+        "--run-id", _RUN_ID,
+        "--worktree", str(worktree),
+        "--run-dir", str(run_dir),
+        "--eval-script", str(worktree / "evaluate.py"),
+        "--no-selfheal",
+    ])
+
+    assert result.returncode == 1, (
+        f"Missing node should exit 1. Got {result.returncode}."
+    )
+    assert "not found in tree.json" in result.stderr, (
+        f"Expected 'not found in tree.json' in stderr.\nstderr: {result.stderr}"
+    )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# P2: validate CLI
+# ─────────────────────────────────────────────────────────────────────────────
+
+def test_validate_cli_passes_on_valid_fixture(tmp_path: Path) -> None:
+    """P2: `python -m evor validate --run-id <dir>` exits 0 on valid fixture."""
+    run_dir, _ = _build_fixture_run_dir(tmp_path)
+
+    result = _run(["-m", "evor", "validate", "--run-id", str(run_dir)])
+
+    assert result.returncode == 0, (
+        f"validate should pass on the wiring-test fixture.\n"
+        f"stderr: {result.stderr}\nstdout: {result.stdout}"
+    )
+    data = json.loads(result.stdout)
+    assert data["ok"] is True, f"ValidationReport.ok should be True: {data}"
+
+
+def test_validate_cli_help_resolves(tmp_path: Path) -> None:
+    """P2: `python -m evor validate --help` must resolve without error."""
+    result = _run(["-m", "evor", "validate", "--help"])
+    assert result.returncode == 0
+    assert "run-id" in result.stdout.lower()
+
+
+def test_doctor_cli_help_resolves(tmp_path: Path) -> None:
+    """P2: `python -m evor doctor --help` must resolve without error."""
+    result = _run(["-m", "evor", "doctor", "--help"])
+    assert result.returncode == 0

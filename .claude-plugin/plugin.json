@@ -11,7 +11,9 @@
     "./skills/evor-setup/",
     "./skills/evor-run/",
     "./skills/evor-dashboard/",
-    "./skills/evor-report/"
+    "./skills/evor-report/",
+    "./skills/evor-validate/",
+    "./skills/evor-doctor/"
   ],
   "agents": [
     "./agents/evor-sage.md",

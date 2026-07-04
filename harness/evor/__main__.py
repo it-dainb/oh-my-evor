@@ -1,5 +1,5 @@
 """
-evor harness CLI — `run` and `preflight` subcommands (M6).
+evor harness CLI — `run`, `preflight`, `validate`, and `doctor` subcommands.
 
 Entry point: python -m evor <subcommand> [options]
 
@@ -8,18 +8,30 @@ Subcommands:
                Loads GoalContract, injects TelemetryCallback, submits job via
                ResourceScheduler, supervises via SelfHealMonitor, runs
                EvaluatorAdapter on completion, writes EvaluationResult.
+               Requires mission-state.json status=="locked" (Phase-2 gate).
 
   preflight  — 5-step micro-train smoke-test (spec R3 / §evor-setup).
                Verifies environment: imports, loss decreasing, GPU active.
                Exit 0 on pass; non-zero on failure (prompts user to confirm/override).
 
+  validate   — Contract and state validator (Phase 2). Checks goal-contract.json
+               schema, MetricSpec gameability guards (two-layer), frozen-splits,
+               tree.json DICT format, and run-state.json. Exit 0 = VALID.
+               Prints a JSON ValidationReport to stdout.
+
+  doctor     — Environment and .evor integrity doctor (Phase 2). Checks Python,
+               torch, Node.js, env vars, tree.json format, mission-state,
+               orphan pending nodes, and frozen-split hash integrity.
+               Use --repair to auto-convert list-format tree.json to DICT.
+
 Exit codes:
-  0 — success / preflight passed
-  1 — error (eval failure, import error, unrecoverable)
+  0 — success / preflight passed / validate VALID / doctor OK
+  1 — error (eval failure, import error, unrecoverable, INVALID contract)
   2 — timeout
   3 — OOM
   4 — regression
   5 — preflight failed (loss not decreasing or GPU inactive)
+  6 — mission not locked (run attempted before contract was validated+locked)
 """
 
 from __future__ import annotations
@@ -40,6 +52,24 @@ def _build_parser() -> argparse.ArgumentParser:
         description="oh-my-evor harness CLI",
     )
     sub = parser.add_subparsers(dest="subcommand", required=True)
+
+    # validate subcommand
+    val_p = sub.add_parser("validate", help="Validate goal-contract and run state")
+    val_p.add_argument(
+        "--run-id", required=True, metavar="RUN_DIR",
+        help="Path to the run directory (.evor/runs/<mission>/<run-id>/) to validate",
+    )
+
+    # doctor subcommand
+    doc_p = sub.add_parser("doctor", help="Check environment and .evor integrity")
+    doc_p.add_argument(
+        "--run-id", default=None, metavar="RUN_DIR",
+        help="Path to the run directory to inspect (optional; omit for env-only check)",
+    )
+    doc_p.add_argument(
+        "--repair", action="store_true",
+        help="Attempt to repair obvious issues (e.g. rewrite list-format tree.json to DICT)",
+    )
 
     # run subcommand
     run_p = sub.add_parser("run", help="Run evaluation for a candidate node")
@@ -102,6 +132,38 @@ def _cmd_run(args: argparse.Namespace) -> int:
         else worktree / "evaluate.py"
     )
     run_dir: Path | None = args.run_dir.resolve() if args.run_dir else None
+
+    # ── Phase-2 lock guard ────────────────────────────────────────────
+    # If mission-state.json exists and status != "locked", block execution.
+    # Fail-open when mission-state.json is absent (pre-phase-2 or legacy run).
+    if run_dir:
+        ms_path = run_dir / "mission-state.json"
+        if ms_path.exists():
+            try:
+                ms = json.loads(ms_path.read_text())
+                ms_status = ms.get("status", "")
+                if ms_status != "locked":
+                    print(
+                        f"[evor run] ERROR: mission-state.status={ms_status!r}. "
+                        "Contract must be locked before running. "
+                        "Re-run /evor-setup to complete contract validation and lock the mission.",
+                        file=sys.stderr,
+                    )
+                    return 6
+            except Exception as exc:
+                print(
+                    f"[evor run] WARNING: could not read mission-state.json: {exc}. "
+                    "Proceeding (fail-open for infra errors).",
+                    file=sys.stderr,
+                )
+        # else: mission-state.json absent = pre-phase-2 run; warn but continue
+        else:
+            print(
+                "[evor run] WARNING: mission-state.json not found — "
+                "run was set up before Phase-2 enforcement. "
+                "Run /evor-setup to create a locked contract for new missions.",
+                file=sys.stderr,
+            )
 
     # ── Load GoalContract ──────────────────────────────────────────────
     goal_path = run_dir / "goal-contract.json" if run_dir else None
@@ -301,6 +363,62 @@ def _cmd_preflight(args: argparse.Namespace) -> int:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# `validate` subcommand
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _cmd_validate(args: argparse.Namespace) -> int:
+    """Execute the validate subcommand (Phase 2).
+
+    Validates goal-contract.json schema + gameability guards (two layers),
+    frozen-splits, tree.json DICT format, and run-state.json.
+
+    Exit 0 = VALID; exit 1 = INVALID.
+    Prints a JSON ValidationReport to stdout.
+    """
+    from evor.validate import validate_run
+
+    run_dir = Path(args.run_id)
+    report = validate_run(run_dir)
+    print(json.dumps(report.to_dict(), indent=2))
+
+    if not report.ok:
+        print(f"\n[evor validate] {report.verdict}", file=sys.stderr)
+        return 1
+
+    print(f"\n[evor validate] {report.verdict}", file=sys.stderr)
+    return 0
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# `doctor` subcommand
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _cmd_doctor(args: argparse.Namespace) -> int:
+    """Execute the doctor subcommand (Phase 2).
+
+    Checks environment (Python, torch, Node.js, env vars, patch) and
+    .evor integrity (tree.json format, mission-state, orphan pending nodes,
+    frozen-split hash).  With --repair: auto-converts list-format tree.json
+    to DICT format.
+
+    Exit 0 = OK (no errors); exit 1 = errors found.
+    Prints a JSON DoctorReport to stdout.
+    """
+    from evor.doctor import run_doctor
+
+    run_dir = Path(args.run_id) if args.run_id else None
+    report = run_doctor(run_dir=run_dir, repair=args.repair)
+    print(json.dumps(report.to_dict(), indent=2))
+
+    if not report.ok:
+        print(f"\n[evor doctor] {report.verdict}", file=sys.stderr)
+        return 1
+
+    print(f"\n[evor doctor] {report.verdict}", file=sys.stderr)
+    return 0
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Entry point
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -312,6 +430,10 @@ def main(argv: list[str] | None = None) -> int:
         return _cmd_run(args)
     if args.subcommand == "preflight":
         return _cmd_preflight(args)
+    if args.subcommand == "validate":
+        return _cmd_validate(args)
+    if args.subcommand == "doctor":
+        return _cmd_doctor(args)
 
     parser.print_help()
     return 1

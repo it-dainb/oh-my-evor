@@ -1,6 +1,10 @@
 #!/usr/bin/env node
 /**
- * oh-my-evor PostToolUse hook — full implementation (M7a)
+ * oh-my-evor PostToolUse hook — full implementation (M7a) + Phase-2 kill switches
+ *
+ * Kill switches (checked FIRST, before any other logic):
+ *   DISABLE_EVOR=1             → exit 0 immediately
+ *   EVOR_SKIP_HOOKS=post-tool-use → exit 0 immediately
  *
  * Validates that recording tool calls left the expected artifacts on disk.
  * Emits [EVOR WARNING] lines to stdout (non-blocking, exit 0) when files are
@@ -22,6 +26,13 @@
 import { existsSync, statSync } from 'fs';
 import { join } from 'path';
 
+// ── Kill switches ─────────────────────────────────────────────────────────────
+if (process.env.DISABLE_EVOR) process.exit(0);
+
+const skipHooks = (process.env.EVOR_SKIP_HOOKS ?? '').split(',').map(s => s.trim());
+if (skipHooks.includes('post-tool-use')) process.exit(0);
+
+// ── Active run guard ──────────────────────────────────────────────────────────
 const activeRunId = process.env.EVOR_ACTIVE_RUN_ID ?? '';
 if (!activeRunId) process.exit(0); // No active evor run — nothing to validate
 

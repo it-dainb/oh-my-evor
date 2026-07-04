@@ -42,6 +42,25 @@ Validate:
 - `allowed_licenses` is non-empty.
 - If validation fails: print the specific missing/invalid fields and redirect to `/evor-setup`.
 
+## Step 2.5 — Phase-2 Lock Guard
+
+Read `mission-state.json` in the resolved run directory:
+
+```bash
+cat .evor/runs/<mission-slug>/<run-id>/mission-state.json 2>/dev/null
+```
+
+- **File absent**: print `WARNING: mission-state.json not found — pre-Phase-2 run, proceeding without lock guard.` and continue. This is fail-open for legacy runs that predate Phase-2.
+- **File present, `status != "locked"`**: print the error below and **stop immediately**. Do not proceed to Step 3.
+  ```
+  ERROR: mission-state.status=<status> — mission is not locked.
+  The contract has not passed the Phase-2 validation gate.
+  Run /evor-validate to validate and lock it, or /evor-setup to reinitialize.
+  ```
+- **File present, `status == "locked"`**: continue to Step 3.
+
+`python -m evor run` enforces the same guard at the CLI level and exits with code 6 if the mission is not locked.
+
 ## Step 3 — Check for Resume Path
 
 Check `.evor/runs/<mission-slug>/<run-id>/run-state.json`:

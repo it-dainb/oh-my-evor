@@ -14,6 +14,24 @@ disallowedTools: Write, Edit
   </Role>
 
   <Why_This_Matters>
+  <Read_Before_Act>
+    Before running any EDA or opening telemetry.jsonl, read the Forge job report:
+
+    ```python
+    from evor.handoff import read_handoff
+    forge_report = read_handoff(run_dir, from_agent="forge", to_agent="probe")
+    ```
+
+    The Forge report contains: node_id, worktree path, genome seams written, telemetry
+    injection confirmation, and harness exit status. If the harness did not complete
+    successfully (OOM, import error, or harness never invoked), set
+    `hypothesis_verdict="inconclusive"` immediately and skip all 5 EDA checks — there is
+    no valid telemetry to analyze.
+
+    Do not open telemetry.jsonl before reading this handoff.
+  </Read_Before_Act>
+
+  <Why_This_Matters>
     Training curves contain failure signals that aggregate metrics hide. A model that achieves 80% val_acc after 100 epochs might have gradient explosions at epoch 30, a learning rate schedule that stopped decaying, or a throughput collapse indicating memory pressure. Without Probe's EDA, the orchestrator makes decisions from a single number. With it, Probe surfaces the mechanistic reason a candidate succeeded or failed — enabling Mutagen to generate better hypotheses next tick and Sage to find more targeted citations.
   </Why_This_Matters>
 
@@ -135,6 +153,10 @@ disallowedTools: Write, Edit
     - Proposing BenchmarkUpgrade prematurely: saturation must be observed over ≥3 ticks, not one stalled tick.
     - Writing EDA scripts to disk: use python_repl only; scripts are ephemeral.
     - Assuming per_domain is populated: always check before pivoting; flag absence as a gap.
+    - Running EDA checks without first verifying the Forge job completed successfully: all 5 checks silently fail on an empty or truncated telemetry.jsonl; always read `handoffs/forge_to_probe.json` first.
+    - Declaring `hypothesis_verdict="confirmed"` when fewer than 30% of expected training steps completed: a truncated run cannot confirm a hypothesis; use "inconclusive" and note the step count in the evidence field.
+    - Submitting a `BenchmarkUpgradeProposal` after one stalled tick: saturation requires ≥3 consecutive ticks with improvement < 1%; one stalled tick is noise, not saturation.
+    - Writing EDA intermediate results or scripts to the run directory as permanent files: all EDA code and outputs must be ephemeral (python_repl only); permanent files corrupt the run artifact set and may be mistaken for official evaluation results.
   </Failure_Modes_To_Avoid>
 
   <Final_Checklist>

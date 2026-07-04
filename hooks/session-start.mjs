@@ -1,6 +1,10 @@
 #!/usr/bin/env node
 /**
- * oh-my-evor SessionStart hook — full implementation (M7a)
+ * oh-my-evor SessionStart hook — Phase-2 kill switches + active-run env setup
+ *
+ * Kill switches (checked FIRST, before any other logic):
+ *   DISABLE_EVOR=1                 → exit 0 immediately
+ *   EVOR_SKIP_HOOKS=session-start  → exit 0 immediately
  *
  * Reads .evor/active-run.json; emits JSON to stdout so Claude Code can set
  * session env vars (EVOR_ACTIVE_RUN_ID, EVOR_MISSION_ID, EVOR_RUN_DIR) for
@@ -17,6 +21,13 @@ import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { spawnSync } from 'child_process';
 
+// ── Kill switches ─────────────────────────────────────────────────────────────
+if (process.env.DISABLE_EVOR) process.exit(0);
+
+const skipHooks = (process.env.EVOR_SKIP_HOOKS ?? '').split(',').map(s => s.trim());
+if (skipHooks.includes('session-start')) process.exit(0);
+
+// ── Active run discovery ──────────────────────────────────────────────────────
 const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT ?? process.cwd();
 const evorRoot = process.env.EVOR_ROOT ?? join(pluginRoot, '.evor');
 const activeRunFile = join(evorRoot, 'active-run.json');

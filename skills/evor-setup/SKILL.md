@@ -338,9 +338,59 @@ After consent:
 8. Initialize empty `tree.json`: `{"nodes": {}, "updated_at": "<ISO 8601>"}`.
    (M2 fix: matches the DICT format written by mcp/src/tree-store.ts::writeTree())
 9. Initialize `decision-log.md` with a header entry recording this setup session.
+10. Write `mission-state.json` (Phase-2 gate — status starts as "draft", locked only after validate passes):
+   ```json
+   {
+     "status": "draft",
+     "current_tick": 0,
+     "max_ticks": <budget.max_iterations>,
+     "best_score": null,
+     "best_node_id": null,
+     "started_at": null,
+     "updated_at": "<ISO 8601>"
+   }
+   ```
 
-Print: "Mission initialized. Run ID: <run_id>. Start the tick loop with /evor-run."
+Print: "Mission initialized. Run ID: <run_id>. Running Phase-2 validation gate..."
+Then proceed to Validate_And_Lock.
 </Run_Initialization>
+
+<Validate_And_Lock>
+Run the Phase-2 enforcement gate and lock the contract before `/evor-run` is possible.
+
+```bash
+python -m evor validate --run-id <run_dir>
+```
+
+**On pass (exit 0):**
+Flip `mission-state.json` status `"draft"` → `"locked"`:
+```bash
+python -c "
+import json; from pathlib import Path; from datetime import datetime, timezone
+p = Path('<run_dir>/mission-state.json')
+d = json.loads(p.read_text()); d['status'] = 'locked'
+d['updated_at'] = datetime.now(timezone.utc).isoformat()
+p.write_text(json.dumps(d, indent=2))
+print('Mission locked.')
+"
+```
+Print: "Phase-2 validation PASSED. Mission locked. Run ID: <run_id>. Start the tick loop with /evor-run."
+
+**On fail (exit 1):**
+Do NOT flip status. The mission stays at `"draft"` and cannot be started with `/evor-run`.
+Print the failed check details from the validator JSON report (each `ok: false` check with its detail).
+Print: "Phase-2 validation FAILED. Mission is NOT locked. Resolve the issues above, then re-run /evor-setup."
+
+Remediation by failure type:
+- `metric_gameability_*` failures → revise metric config (return to Q4a and pick a guarded metric)
+- `goal_contract_schema` / `goal_contract_required_fields` → revisit the relevant interview question
+- `frozen_splits_*` failures → re-run the Frozen_Split_Setup step
+- `tree_json_*` failures → re-initialize tree.json with the DICT skeleton above
+- `run_state_*` failures → re-initialize run-state.json above
+
+Setup CANNOT complete with a draft/invalid contract. `/evor-run` will refuse to start until
+`mission-state.status == "locked"`.
+</Validate_And_Lock>
 
 <Tool_Usage>
 - python_repl — run freeze.py, benchmark init, preflight

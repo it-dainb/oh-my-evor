@@ -25,7 +25,7 @@
   },
   "build": {
     "buildCommand": "cd /storages_local/research/oh-my-evor/mcp && npx tsc --noEmit 2>&1 && echo \"tsc OK\" && npx vitest run 2>&1 | tail -10",
-    "testCommand": "cd /storages_local/research/oh-my-evor && python -m pytest harness/tests/ -v --tb=short 2>&1 | tail -30",
+    "testCommand": "cd /storages_local/research/oh-my-evor/mcp && npx vitest run tests/hooks.test.ts 2>&1 | tail -8",
     "lintCommand": "ruff check",
     "devCommand": null,
     "scripts": {}
@@ -124,6 +124,12 @@
       "type": "file"
     },
     {
+      "path": "evor/__main__.py",
+      "accessCount": 5,
+      "lastAccessed": 1783164517009,
+      "type": "file"
+    },
+    {
       "path": "tests/test_tick_loop.py",
       "accessCount": 4,
       "lastAccessed": 1783095569640,
@@ -154,6 +160,18 @@
       "type": "file"
     },
     {
+      "path": "tests/test_e2e_wiring.py",
+      "accessCount": 2,
+      "lastAccessed": 1783164834680,
+      "type": "file"
+    },
+    {
+      "path": "tests/test_validate.py",
+      "accessCount": 2,
+      "lastAccessed": 1783165065429,
+      "type": "file"
+    },
+    {
       "path": "tests/test_store.py",
       "accessCount": 1,
       "lastAccessed": 1783094606934,
@@ -175,6 +193,30 @@
       "path": "evor/scheduler.py",
       "accessCount": 1,
       "lastAccessed": 1783095375084,
+      "type": "file"
+    },
+    {
+      "path": "evor/validate.py",
+      "accessCount": 1,
+      "lastAccessed": 1783164379275,
+      "type": "file"
+    },
+    {
+      "path": "evor/handoff.py",
+      "accessCount": 1,
+      "lastAccessed": 1783164410274,
+      "type": "file"
+    },
+    {
+      "path": "evor/doctor.py",
+      "accessCount": 1,
+      "lastAccessed": 1783164460712,
+      "type": "file"
+    },
+    {
+      "path": "tests/test_handoff.py",
+      "accessCount": 1,
+      "lastAccessed": 1783164766383,
       "type": "file"
     }
   ],

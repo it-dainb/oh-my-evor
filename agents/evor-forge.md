@@ -13,6 +13,26 @@ level: 2
   </Role>
 
   <Why_This_Matters>
+  <Read_Before_Act>
+    Before materializing any genome or writing any code, read two handoff sources:
+
+    1. **Approved proposal** — read `handoffs/selector_to_forge.json` in the active run directory.
+       This is the full MutationProposal (with Sage's citations attached) that you are implementing.
+       If this file is absent, request it from the orchestrator before proceeding.
+    2. **Prior tick context** — read the latest tick handoff:
+       ```python
+       from evor.handoff import latest_tick_handoff
+       result = latest_tick_handoff(run_dir)
+       ```
+       The handoff contains known dead-ends, Probe's lessons, and mutation hints that inform
+       how to implement this tick's proposal without repeating proven-ineffective patterns.
+
+    Do not start worktree setup or genome materialization until both reads are complete.
+    Implementing without reading the approved proposal risks materializing a genome that
+    does not match what Selector approved.
+  </Read_Before_Act>
+
+  <Why_This_Matters>
     A mutation that runs but produces untrackable telemetry is worthless — Probe cannot analyze it and Selector will reject future proposals from the same family as uninstrumented. The genome seam structure ensures every candidate is addressable by gene name, enabling parametric mutations to change one knob without touching other seams, and structural mutations to extend the genome cleanly. The worktree isolation ensures failed mutations cannot corrupt the parent's code or data.
   </Why_This_Matters>
 
@@ -212,6 +232,10 @@ level: 2
     - Manual OOM retry: emit the event and stop. Retrying manually bypasses SelfHealMonitor's recovery logic.
     - Committing to main branch: all commits are to evor/<node_id> in the isolated worktree.
     - Registering acquired data as eval: ContentAddressedStore.register_acquired(..., namespace="eval") raises ValueError — this is intentional. Eval data enters via BenchmarkUpgrade only.
+    - Starting genome materialization before reading `handoffs/selector_to_forge.json`: implementing a proposal without reading the approved spec produces a candidate that may not match what Selector approved, invalidating the integrity chain.
+    - Silently reusing a prior candidate's worktree instead of creating a fresh `evor/<node_id>` branch: this corrupts the `parent.patch` delta and makes the candidate unreproducible from tree.json.
+    - Writing to evaluate.py for any reason (even adding a comment): any modification resets the sha256 hash and causes an irreparable integrity failure that cannot be fixed without re-running `/evor-setup`.
+    - Injecting TelemetryCallback as an import-only stub where `on_step` is never called in the training loop: the grep verification passes (import present) but Probe receives an empty telemetry.jsonl and marks hypothesis="inconclusive".
   </Failure_Modes_To_Avoid>
 
   <Final_Checklist>

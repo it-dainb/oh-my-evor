@@ -1,0 +1,6 @@
+{"tool":"Edit","filePath":"src/hooks/bridge.ts","decision":"warned","reason":"source_file","enforcementLevel":"warn","sessionId":"prereq-pretool-session","timestamp":"2026-07-04T11:38:52.525Z"}
+{"tool":"Edit","filePath":"src/hooks/bridge.ts","decision":"warned","reason":"source_file","enforcementLevel":"warn","sessionId":"prereq-pretool-session","timestamp":"2026-07-04T11:38:53.216Z"}
+{"tool":"Write","filePath":"/test/file.ts","decision":"warned","reason":"source_file","enforcementLevel":"warn","sessionId":"test-session","timestamp":"2026-07-04T11:39:22.830Z"}
+{"tool":"Edit","filePath":"src/hooks/bridge.ts","decision":"warned","reason":"source_file","enforcementLevel":"warn","sessionId":"prereq-pretool-session","timestamp":"2026-07-04T11:44:26.536Z"}
+{"tool":"Edit","filePath":"src/hooks/bridge.ts","decision":"warned","reason":"source_file","enforcementLevel":"warn","sessionId":"prereq-pretool-session","timestamp":"2026-07-04T11:44:27.328Z"}
+{"tool":"Write","filePath":"/test/file.ts","decision":"warned","reason":"source_file","enforcementLevel":"warn","sessionId":"test-session","timestamp":"2026-07-04T11:44:50.324Z"}
