@@ -200,9 +200,16 @@ class ContentAddressedStore:
         # make writable so patch can edit it in place
         reconstructed.chmod(stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IROTH)
 
-        # Use the absolute path to GNU patch so nvm's `patch` shim (which is a
-        # Node.js CLI tool) does not shadow it when nvm is on PATH.
-        _patch_bin = "/usr/bin/patch" if Path("/usr/bin/patch").exists() else "patch"
+        # Prefer the absolute path to GNU patch so nvm's `patch` shim (a Node.js
+        # CLI tool) does not shadow it when nvm is on PATH; else resolve via PATH.
+        # If the POSIX `patch` utility is genuinely absent, fail with a clear
+        # message rather than a cryptic FileNotFoundError.
+        _patch_bin = "/usr/bin/patch" if Path("/usr/bin/patch").exists() else shutil.which("patch")
+        if not _patch_bin:
+            raise RuntimeError(
+                "apply_delta requires the POSIX `patch` utility, which was not found "
+                "(checked /usr/bin/patch and PATH). Install it (e.g. `apt-get install patch`)."
+            )
         result = subprocess.run(
             [_patch_bin, "-u", str(reconstructed), str(patch_path)],
             capture_output=True,

@@ -1,18 +1,18 @@
 {
   "plugin": "oh-my-evor",
-  "in_docker": false,
+  "in_docker": true,
   "agentic_enabled": false,
   "summary": {
     "required_total": 7,
-    "required_pass": 7,
-    "verdict": "PASS"
+    "required_pass": 6,
+    "verdict": "FAIL"
   },
   "results": [
     {
       "name": "manifest_validate",
       "ok": true,
       "required": true,
-      "detail": "Validating plugin manifest: /storages_local/research/oh-my-evor/.claude-plugin/plugin.json\n\n✔ Validation passed"
+      "detail": "Validating plugin manifest: /plugin/.claude-plugin/plugin.json\n\n✔ Validation passed"
     },
     {
       "name": "mcp_tools_list",
@@ -40,9 +40,9 @@
     },
     {
       "name": "pytest_harness",
-      "ok": true,
+      "ok": false,
       "required": true,
-      "detail": "340 passed"
+      "detail": "338 passed"
     },
     {
       "name": "vitest_mcp",

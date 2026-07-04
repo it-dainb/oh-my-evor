@@ -115,8 +115,11 @@ function checkL3() {
 
 // ── 7. AGENTIC (optional): headless Claude discovers the plugin's skills ──
 function checkAgentic() {
-  if (!process.env.ANTHROPIC_API_KEY) {
-    record('agentic_skill_discovery', true, 'SKIPPED — set ANTHROPIC_API_KEY to enable the real-Claude layer', { required: false });
+  const hasAuth = !!(process.env.CLAUDE_CODE_OAUTH_TOKEN || process.env.ANTHROPIC_API_KEY);
+  if (!hasAuth) {
+    record('agentic_skill_discovery', true,
+      'SKIPPED — pass CLAUDE_CODE_OAUTH_TOKEN (subscription, from `claude setup-token`) or ANTHROPIC_API_KEY to enable the real-Claude layer',
+      { required: false });
     return;
   }
   const r = sh('claude', ['--plugin-dir', '.', '-p', 'List the slash commands/skills provided by the oh-my-evor plugin. Answer with their names only.',
