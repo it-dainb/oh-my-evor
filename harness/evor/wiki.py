@@ -156,6 +156,35 @@ class CompoundingWiki:
         matched.sort(key=lambda x: x[0], reverse=True)
         return [e for _, e in matched[:limit]]
 
+    def summarize(
+        self,
+        confirmed_only: bool = False,
+        limit: int = 100,
+    ) -> dict:
+        """Return a summary dict grouping lessons by approach_family and hypothesis_verdict."""
+        all_entries = self.query("", confirmed_only=confirmed_only, limit=limit)
+        by_family: dict[str, list[str]] = {}
+        confirmed = 0
+        refuted = 0
+        inconclusive = 0
+        for entry in all_entries:
+            fam = entry.approach_family or "unknown"
+            by_family.setdefault(fam, []).append(
+                f"[{entry.lesson_id}] {entry.actionable_lesson[:80]} ({entry.hypothesis_verdict})"
+            )
+            if entry.hypothesis_verdict == "confirmed":
+                confirmed += 1
+            elif entry.hypothesis_verdict == "refuted":
+                refuted += 1
+            else:
+                inconclusive += 1
+        return {
+            "confirmed": confirmed,
+            "refuted": refuted,
+            "inconclusive": inconclusive,
+            "by_family": by_family,
+        }
+
     # ── Internal helpers ───────────────────────────────────────────────────────
 
     def _render_lesson(self, entry: LessonEntry) -> str:
@@ -196,3 +225,111 @@ class CompoundingWiki:
             lines += [f"**Tags:** {', '.join(entry.tags)}", ""]
 
         return "\n".join(lines)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# CLI entry point — `python -m evor.wiki`
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def _cli() -> None:
+    """CLI for CompoundingWiki.
+
+    Subcommands
+    -----------
+    query
+        Keyword search over the cross-run index.
+
+        python -m evor.wiki query \\
+            --query-text "batch size" \\
+            [--family arch] [--confirmed-only] [--limit 10] \\
+            [--evor-root .evor]
+
+    summarize
+        Summarise all lessons grouped by family/verdict.
+
+        python -m evor.wiki summarize \\
+            --run-id <id> --run-dir <dir> \\
+            [--confirmed-only false] [--evor-root .evor]
+
+    context
+        Return top-N lessons for a mission (used by session-start hook).
+
+        python -m evor.wiki context \\
+            --mission-id <id> [--limit 5] [--evor-root .evor]
+    """
+    import argparse
+    import json as _json
+    import os as _os
+    import sys as _sys
+
+    _evor_root_kwargs = dict(
+        default=None,
+        help="Path to .evor/ root. Defaults to $EVOR_ROOT env var or '.evor'.",
+    )
+
+    parser = argparse.ArgumentParser(prog="python -m evor.wiki")
+    sub = parser.add_subparsers(dest="cmd", required=True)
+
+    # query subcommand
+    q_p = sub.add_parser("query", help="Keyword search over the cross-run index.")
+    q_p.add_argument("--query-text", default="", help="Keywords to search for")
+    q_p.add_argument("--family", default=None, help="Filter by approach_family")
+    q_p.add_argument("--confirmed-only", action="store_true", help="Only confirmed hypotheses")
+    q_p.add_argument("--limit", type=int, default=10)
+    q_p.add_argument("--evor-root", **_evor_root_kwargs)
+
+    # summarize subcommand
+    s_p = sub.add_parser("summarize", help="Summarise lessons by family/verdict.")
+    s_p.add_argument("--run-id", default=None)
+    s_p.add_argument("--run-dir", default=None)
+    s_p.add_argument("--confirmed-only", default="false",
+                     help="'true' or 'false' (default false)")
+    s_p.add_argument("--limit", type=int, default=100)
+    s_p.add_argument("--evor-root", **_evor_root_kwargs)
+
+    # context subcommand
+    c_p = sub.add_parser("context", help="Return top-N lessons for a mission.")
+    c_p.add_argument("--mission-id", required=True)
+    c_p.add_argument("--limit", type=int, default=5)
+    c_p.add_argument("--evor-root", **_evor_root_kwargs)
+
+    args = parser.parse_args()
+
+    evor_root = Path(
+        args.evor_root
+        or _os.environ.get("EVOR_ROOT", "")
+        or ".evor"
+    )
+
+    wiki = CompoundingWiki(evor_root)
+
+    if args.cmd == "query":
+        family = args.family  # already a string or None
+        results = wiki.query(
+            args.query_text,
+            family=family,
+            confirmed_only=args.confirmed_only,
+            limit=args.limit,
+        )
+        print(_json.dumps([e.model_dump() for e in results], indent=2))
+
+    elif args.cmd == "summarize":
+        confirmed_only_flag = (
+            args.confirmed_only.lower() not in ("false", "0", "no")
+            if isinstance(args.confirmed_only, str)
+            else bool(args.confirmed_only)
+        )
+        summary = wiki.summarize(confirmed_only=confirmed_only_flag, limit=args.limit)
+        print(_json.dumps(summary, indent=2))
+
+    elif args.cmd == "context":
+        lessons = wiki.load_context(args.mission_id, limit=args.limit)
+        for lesson in lessons:
+            print(f"[{lesson.lesson_id}] {lesson.actionable_lesson}")
+
+    _sys.exit(0)
+
+
+if __name__ == "__main__":
+    _cli()

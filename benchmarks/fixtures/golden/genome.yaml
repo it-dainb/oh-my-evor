@@ -1,0 +1,18 @@
+genome_version: "1.0.0"
+model_family: "cnn"
+backbone: "tinycnn"
+head: "linear"
+neck: "identity"
+optimizer: "adamw"
+lr: 0.001
+lr_schedule: "cosine"
+batch_size: 32
+epochs: 2
+loss: "cross_entropy"
+aug_set:
+  - random_flip
+acquired_datasets: []
+regularization:
+  weight_decay: 0.01
+schema_extensions: []
+extra: {}

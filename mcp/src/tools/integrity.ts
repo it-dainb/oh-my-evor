@@ -42,7 +42,7 @@ export function integrityCheck(
 export function registerIntegrityTools(server: McpServer): void {
   server.tool(
     "evor_integrity_check",
-    "Run all 13 IntegrityGate checks via `python integrity_bridge.py --run-id <id> --node-id <nid>`; write IntegrityReport to evaluations/<node-id>.json.",
+    "Run all 13 IntegrityGate checks via the MCP subprocess bridge (integrity_bridge.py); write IntegrityReport to evaluations/<node-id>.json.",
     {
       run_id: z.string().describe("Active run identifier"),
       node_id: z.string().describe("Node to check"),

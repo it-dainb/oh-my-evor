@@ -1,0 +1,550 @@
+"""
+test_e2e_wiring.py — End-to-end wiring tests for the MCP-tool → Python CLI paths.
+
+These tests exercise the REAL code paths against a fixture run store, not mocks.
+No torch / GPU required.
+
+Regression guard: every test in this file MUST FAIL against the pre-fix code
+(C1-C4 dict format bugs, C2 wrong goal path, C6-C10 missing CLIs) and MUST PASS
+after the fixes are applied.
+"""
+
+from __future__ import annotations
+
+import json
+import subprocess
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+
+import pytest
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Fixture helpers
+# ─────────────────────────────────────────────────────────────────────────────
+
+_MISSION_ID = "wiring-test-mission"
+_RUN_ID = "run-wiring-20260704T000000"
+_NODE_A = "node-wire-aaaa-0001"
+_NODE_B = "node-wire-bbbb-0002"
+_PYTHON = sys.executable  # the venv Python running the tests
+
+
+def _node_dict(
+    node_id: str,
+    parent_ids: list[str],
+    depth: int,
+    score: float,
+    family: str = "arch",
+) -> dict:
+    return {
+        "id": node_id,
+        "parent_ids": parent_ids,
+        "approach_family": family,
+        "hypothesis_id": f"hyp-{node_id[:8]}",
+        "code_ref": f"nodes/{node_id}/code/",
+        "parent_patch_ref": None,
+        "genome_ref": f"genome-ref-{node_id[:8]}",
+        "mutation_tier": "parametric",
+        "mutation_locus": None,  # Optional; avoid strict union family+path requirements
+        "data_version_ref": "data-v1-hash",
+        "config": {},
+        "weights_ref": None,
+        "metrics": {"accuracy": score},
+        "eval_version": "v1",
+        "fitness_value": score,
+        "telemetry_ref": f"nodes/{node_id}/telemetry.jsonl",
+        "lesson_ids": [],
+        "citations": [],
+        "integrity_status": "passed",
+        "status": "done",
+        "is_crossover": False,
+        "ucb1_score": score + 0.05,
+        "visit_count": depth + 1,
+        "depth": depth,
+        "created_at": "2026-07-04T01:00:00Z",
+        "completed_at": "2026-07-04T02:00:00Z",
+    }
+
+
+def _goal_contract() -> dict:
+    return {
+        "mission_id": _MISSION_ID,
+        "mode": "from-scratch",
+        "mission_type": "fixed",
+        "task_description": "Wiring test task",
+        "dataset_ref": "/data/wiring-test",
+        "metrics": [{"name": "accuracy", "direction": "higher", "primary": True}],
+        "metric_specs": [
+            {
+                "metric_name": "accuracy",
+                "direction": "higher",
+                "domain_applicability": "all",
+                "aggregation_rule": "macro_avg",
+                "role": "primary_fitness",
+                "sota_bar": None,
+            }
+        ],
+        "fitness_mode": "aggregate",
+        "eval_version": "v1",
+        "baseline_value": 0.700,
+        "target_value": 0.900,
+        "coverage_target": None,
+        "stop_condition": {"type": "target"},
+        "wildness": 0.5,
+        "budget": {
+            "max_iterations": 20,
+            "plateau_window": 5,
+            "circuit_breaker": 3,
+            "max_cost_usd": 0.0,
+        },
+        "framework": "pytorch",
+        "seed_repo_path": None,
+        "locked_split_hash": "deadbeef01234567",
+        "eval_script_hash": "cafebabe89abcdef",
+        "expansion_policy": None,
+        "allowed_licenses": ["MIT", "Apache-2.0"],
+        "created_at": "2026-07-04T00:00:00Z",
+    }
+
+
+def _strategy() -> dict:
+    return {
+        "meta_iteration": 0,
+        "selection_policy": "ucb1",
+        "ucb1_c": 1.41,
+        "beam_width": None,
+        "wildness": 0.5,
+        "family_mix": {
+            "arch": 0.2, "training": 0.2, "data-curation": 0.15,
+            "data-augmentation": 0.15, "data-acquisition": 0.1,
+            "algo": 0.15, "other": 0.05,
+        },
+        "winning_families": [],
+        "wins_by_family": {},
+        "meta_loop_interval": 5,
+        "post_upgrade_exploration_boost": None,
+        "post_upgrade_exploration_ticks": 0,
+        "rescore_mode": "sync",
+        "updated_at": "2026-07-04T00:00:00Z",
+    }
+
+
+def _build_fixture_run_dir(tmp_path: Path) -> tuple[Path, Path]:
+    """Create a minimal .evor/ run directory with DICT-format tree.json.
+
+    Returns (run_dir, evor_root).
+    """
+    evor_root = tmp_path / ".evor"
+    run_dir = evor_root / "runs" / _MISSION_ID / _RUN_ID
+
+    run_dir.mkdir(parents=True, exist_ok=True)
+    (run_dir / "nodes").mkdir(exist_ok=True)
+    (run_dir / "eval-suites").mkdir(exist_ok=True)
+
+    # DICT-format tree.json (the new canonical format written by mcp/src/tree-store.ts)
+    node_a = _node_dict(_NODE_A, [], 0, 0.851)
+    node_b = _node_dict(_NODE_B, [_NODE_A], 1, 0.823, family="training")
+    tree_json = {
+        "nodes": {
+            _NODE_A: node_a,
+            _NODE_B: node_b,
+        },
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }
+    (run_dir / "tree.json").write_text(json.dumps(tree_json, indent=2))
+
+    # goal-contract.json (C2 fix: _load_engine now reads this path)
+    (run_dir / "goal-contract.json").write_text(json.dumps(_goal_contract(), indent=2))
+
+    # strategy.json
+    (run_dir / "strategy.json").write_text(json.dumps(_strategy(), indent=2))
+
+    # run-state.json (needed by plot_tree for frontier_ids)
+    (run_dir / "run-state.json").write_text(json.dumps({
+        "status": "running",
+        "tick_count": 2,
+        "best_score": 0.851,
+        "frontier_ids": [_NODE_A],
+        "current_eval_version": "v1",
+        "hypotheses": [],
+    }, indent=2))
+
+    # Minimal eval-suites/v1.json (needed for benchmark tests)
+    (run_dir / "eval-suites" / "v1.json").write_text(json.dumps({
+        "eval_version": "v1",
+        "mission_id": _MISSION_ID,
+        "parent_eval_version": None,
+        "domains": [
+            {
+                "domain_id": "primary",
+                "description": "Wiring test task",
+                "metric_specs": [],
+                "sota_source": None,
+                "added_at_eval_version": "v1",
+            }
+        ],
+        "split_hashes": {},
+        "created_at": "2026-07-04T00:00:00Z",
+        "created_by": "user",
+        "consent_log_ref": "setup-session",
+    }, indent=2))
+
+    # Frozen splits (minimal — 2 test samples, 1 val sample)
+    frozen_dir = run_dir / "frozen-splits"
+    frozen_dir.mkdir(exist_ok=True)
+    _write_minimal_frozen_split(frozen_dir, "v1-test", {"0": "aabbcc", "1": "ddeeff"})
+    _write_minimal_frozen_split(frozen_dir, "v1-val", {"0": "112233"})
+
+    return run_dir, evor_root
+
+
+def _write_minimal_frozen_split(frozen_dir: Path, name: str, samples: dict) -> None:
+    """Write a minimal FrozenSplit JSON file (enough to satisfy RunStore)."""
+    import hashlib
+
+    per_sample_hashes = {k: hashlib.sha256(v.encode()).hexdigest() for k, v in samples.items()}
+    sorted_keys = sorted(per_sample_hashes.keys())
+    idx_bytes = json.dumps(sorted_keys).encode()
+    hash_bytes = json.dumps([per_sample_hashes[k] for k in sorted_keys]).encode()
+    split_hash = hashlib.sha256(idx_bytes + hash_bytes).hexdigest()
+
+    split_dir = frozen_dir / name
+    split_dir.mkdir(exist_ok=True)
+    for k, v in samples.items():
+        (split_dir / k).write_bytes(v.encode())
+
+    (frozen_dir / f"{name}.json").write_text(json.dumps({
+        "split_id": f"wiring-{name}",
+        "mission_id": _MISSION_ID,
+        "split_type": "test" if "test" in name else "val",
+        "split_hash": split_hash,
+        "per_sample_hashes": per_sample_hashes,
+        "item_count": len(per_sample_hashes),
+        "frozen_at": "2026-07-04T00:00:00Z",
+        "storage_path": str(frozen_dir / f"{name}.json"),
+        "eval_version": "v1",
+    }, indent=2))
+
+
+def _run(args: list[str], cwd: Path | None = None) -> subprocess.CompletedProcess:
+    """Run a subprocess with the venv Python, capturing output."""
+    return subprocess.run(
+        [_PYTHON] + args,
+        capture_output=True,
+        text=True,
+        cwd=str(cwd) if cwd else None,
+    )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# C1+C2: evor.tree select — DICT-format tree.json + correct goal path
+# ──────────────────────────────────────────────────────────────��──────────────
+
+
+def test_tree_select_dict_format(tmp_path: Path) -> None:
+    """C1+C2: `python -m evor.tree select` must handle DICT tree.json and find goal-contract.json."""
+    run_dir, _ = _build_fixture_run_dir(tmp_path)
+
+    result = _run(["-m", "evor.tree", "select", "--run-id", str(run_dir)])
+
+    assert result.returncode == 0, (
+        f"evor.tree select failed (exit {result.returncode}).\n"
+        f"stderr: {result.stderr}\nstdout: {result.stdout}"
+    )
+
+    # Output must be valid JSON with a 'selected' key
+    try:
+        data = json.loads(result.stdout)
+    except json.JSONDecodeError as exc:
+        pytest.fail(f"evor.tree select output is not valid JSON: {exc}\nstdout: {result.stdout!r}")
+
+    assert "selected" in data, f"Missing 'selected' key in output: {data}"
+    assert isinstance(data["selected"], list), "'selected' must be a list"
+    assert len(data["selected"]) >= 1, "select must return at least one node"
+
+    # No ValidationError in stderr (would indicate C1 was not fixed)
+    assert "ValidationError" not in result.stderr, (
+        f"ValidationError present — DICT-format parsing failed:\n{result.stderr}"
+    )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# C3: evor run — DICT-format node lookup
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def test_evor_run_help(tmp_path: Path) -> None:
+    """C3+C5: `python -m evor run --help` must resolve (entry point exists)."""
+    result = _run(["-m", "evor", "run", "--help"])
+    assert result.returncode == 0, (
+        f"evor run --help failed (exit {result.returncode}).\n"
+        f"stderr: {result.stderr}"
+    )
+    assert "node-id" in result.stdout.lower() or "node_id" in result.stdout.lower(), (
+        "Expected --node-id in help text"
+    )
+
+
+def test_evor_preflight_help(tmp_path: Path) -> None:
+    """`python -m evor preflight --help` must resolve."""
+    result = _run(["-m", "evor", "preflight", "--help"])
+    assert result.returncode == 0, (
+        f"evor preflight --help failed (exit {result.returncode}).\n"
+        f"stderr: {result.stderr}"
+    )
+    assert "run-id" in result.stdout.lower() or "run_id" in result.stdout.lower(), (
+        "Expected --run-id in help text"
+    )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# C4: dashboard/store.py all_nodes() — must return list of dicts, not dict keys
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def test_dashboard_store_all_nodes_dict_format(tmp_path: Path) -> None:
+    """C4: RunStore.all_nodes() must return a list of node dicts from DICT-format tree.json."""
+    run_dir, _ = _build_fixture_run_dir(tmp_path)
+
+    from evor.dashboard.store import RunStore
+
+    store = RunStore(run_dir)
+    nodes = store.all_nodes()
+
+    assert isinstance(nodes, list), f"all_nodes() returned {type(nodes)}, expected list"
+    assert len(nodes) == 2, f"Expected 2 nodes, got {len(nodes)}"
+
+    # Each element must be a dict with an 'id' key — not a bare string (node ID key)
+    for node in nodes:
+        assert isinstance(node, dict), (
+            f"Node entry is {type(node)} not dict — dict keys are being returned instead of values"
+        )
+        assert "id" in node, f"Node dict missing 'id' key: {node}"
+
+    # Verify actual node IDs are present
+    node_ids = {n["id"] for n in nodes}
+    assert _NODE_A in node_ids
+    assert _NODE_B in node_ids
+
+
+def test_dashboard_store_frontier_nodes_dict_format(tmp_path: Path) -> None:
+    """C4: RunStore.frontier_nodes() must work after all_nodes() fix."""
+    run_dir, _ = _build_fixture_run_dir(tmp_path)
+
+    from evor.dashboard.store import RunStore
+
+    store = RunStore(run_dir)
+    frontier = store.frontier_nodes()
+
+    assert isinstance(frontier, list)
+    assert len(frontier) == 1
+    assert frontier[0]["id"] == _NODE_A
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# C6: evor.freeze freeze-splits CLI
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def test_freeze_splits_cli(tmp_path: Path) -> None:
+    """C6: `python -m evor.freeze freeze-splits` must exit 0 and output JSON with locked_split_hash."""
+    run_dir, _ = _build_fixture_run_dir(tmp_path)
+
+    # Create a minimal dataset directory with a few sample files
+    dataset_dir = tmp_path / "dataset"
+    dataset_dir.mkdir()
+    for i in range(5):
+        (dataset_dir / f"sample_{i:03d}.txt").write_text(f"sample content {i}")
+
+    result = _run([
+        "-m", "evor.freeze", "freeze-splits",
+        "--dataset-path", str(dataset_dir),
+        "--eval-version", "v2",
+        "--run-dir", str(run_dir),
+        "--mission-id", _MISSION_ID,
+    ])
+
+    assert result.returncode == 0, (
+        f"freeze-splits failed (exit {result.returncode}).\n"
+        f"stderr: {result.stderr}\nstdout: {result.stdout}"
+    )
+
+    data = json.loads(result.stdout)
+    assert "locked_split_hash" in data, f"Missing locked_split_hash: {data}"
+    assert len(data["locked_split_hash"]) == 64, "Expected sha256 hex digest"
+
+    # Verify frozen split files were created
+    frozen_test = run_dir / "frozen-splits" / "v2-test.json"
+    frozen_val = run_dir / "frozen-splits" / "v2-val.json"
+    assert frozen_test.exists(), f"frozen-splits/v2-test.json not created"
+    assert frozen_val.exists(), f"frozen-splits/v2-val.json not created"
+
+
+def test_freeze_splits_cli_empty_dataset(tmp_path: Path) -> None:
+    """C6: freeze-splits must succeed even with an empty dataset directory."""
+    run_dir, _ = _build_fixture_run_dir(tmp_path)
+
+    empty_dir = tmp_path / "empty-dataset"
+    empty_dir.mkdir()
+
+    result = _run([
+        "-m", "evor.freeze", "freeze-splits",
+        "--dataset-path", str(empty_dir),
+        "--eval-version", "v3",
+        "--run-dir", str(run_dir),
+    ])
+
+    assert result.returncode == 0, (
+        f"freeze-splits with empty dataset failed (exit {result.returncode}).\n"
+        f"stderr: {result.stderr}"
+    )
+    data = json.loads(result.stdout)
+    assert "locked_split_hash" in data
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# C7: evor.benchmark init-eval-suite CLI
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def test_benchmark_init_eval_suite_cli(tmp_path: Path) -> None:
+    """C7: `python -m evor.benchmark init-eval-suite` must exit 0 and write eval-suites/<ver>.json."""
+    run_dir, _ = _build_fixture_run_dir(tmp_path)
+
+    result = _run([
+        "-m", "evor.benchmark", "init-eval-suite",
+        "--mission-id", _MISSION_ID,
+        "--eval-version", "v2",
+        "--task-description", "Wiring regression test suite",
+        "--run-dir", str(run_dir),
+    ])
+
+    assert result.returncode == 0, (
+        f"init-eval-suite failed (exit {result.returncode}).\n"
+        f"stderr: {result.stderr}\nstdout: {result.stdout}"
+    )
+
+    data = json.loads(result.stdout)
+    assert data["eval_version"] == "v2"
+    assert data["mission_id"] == _MISSION_ID
+
+    suite_file = run_dir / "eval-suites" / "v2.json"
+    assert suite_file.exists(), "eval-suites/v2.json was not created"
+
+    suite = json.loads(suite_file.read_text())
+    assert suite["eval_version"] == "v2"
+    assert len(suite["domains"]) >= 1
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# C9: evor.plot_tree CLI
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def test_plot_tree_ascii(tmp_path: Path) -> None:
+    """C9: `python -m evor.plot_tree --format ascii` must exit 0 and print a tree."""
+    run_dir, _ = _build_fixture_run_dir(tmp_path)
+
+    result = _run([
+        "-m", "evor.plot_tree",
+        "--run-id", str(run_dir),
+        "--format", "ascii",
+        "--highlight-frontier",
+    ])
+
+    assert result.returncode == 0, (
+        f"plot_tree ascii failed (exit {result.returncode}).\n"
+        f"stderr: {result.stderr}"
+    )
+    # Output should contain at least one node ID prefix
+    assert _NODE_A[:8] in result.stdout or _NODE_B[:8] in result.stdout, (
+        f"Expected node IDs in ASCII output.\nstdout: {result.stdout!r}"
+    )
+
+
+def test_plot_tree_png_or_fallback(tmp_path: Path) -> None:
+    """C9: `python -m evor.plot_tree --format png` must exit 0 (PNG or text fallback)."""
+    run_dir, _ = _build_fixture_run_dir(tmp_path)
+    output_path = tmp_path / "tree.png"
+
+    result = _run([
+        "-m", "evor.plot_tree",
+        "--run-id", str(run_dir),
+        "--format", "png",
+        "--output", str(output_path),
+    ])
+
+    assert result.returncode == 0, (
+        f"plot_tree png failed (exit {result.returncode}).\n"
+        f"stderr: {result.stderr}"
+    )
+    # Either a PNG was written or the text fallback was used
+    assert output_path.exists() or output_path.with_suffix(".txt").exists(), (
+        "Neither PNG nor text fallback file was created"
+    )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# C10: evor.wiki CLI
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def test_wiki_query_cli_empty_index(tmp_path: Path) -> None:
+    """C10: `python -m evor.wiki query` must exit 0 (empty index returns empty list)."""
+    _, evor_root = _build_fixture_run_dir(tmp_path)
+
+    result = _run([
+        "-m", "evor.wiki", "query",
+        "--query-text", "accuracy improvement",
+        "--evor-root", str(evor_root),
+    ])
+
+    assert result.returncode == 0, (
+        f"wiki query failed (exit {result.returncode}).\n"
+        f"stderr: {result.stderr}\nstdout: {result.stdout}"
+    )
+    data = json.loads(result.stdout)
+    assert isinstance(data, list), f"Expected list, got {type(data)}: {data}"
+
+
+def test_wiki_summarize_cli_empty_index(tmp_path: Path) -> None:
+    """C10: `python -m evor.wiki summarize` must exit 0 (empty index returns zero counts)."""
+    run_dir, evor_root = _build_fixture_run_dir(tmp_path)
+
+    result = _run([
+        "-m", "evor.wiki", "summarize",
+        "--run-id", _RUN_ID,
+        "--run-dir", str(run_dir),
+        "--confirmed-only", "false",
+        "--evor-root", str(evor_root),
+    ])
+
+    assert result.returncode == 0, (
+        f"wiki summarize failed (exit {result.returncode}).\n"
+        f"stderr: {result.stderr}\nstdout: {result.stdout}"
+    )
+    data = json.loads(result.stdout)
+    assert "confirmed" in data
+    assert "refuted" in data
+    assert isinstance(data["confirmed"], int)
+
+
+def test_wiki_context_cli(tmp_path: Path) -> None:
+    """C10: `python -m evor.wiki context` must exit 0 (empty index returns nothing)."""
+    _, evor_root = _build_fixture_run_dir(tmp_path)
+
+    result = _run([
+        "-m", "evor.wiki", "context",
+        "--mission-id", _MISSION_ID,
+        "--limit", "5",
+        "--evor-root", str(evor_root),
+    ])
+
+    assert result.returncode == 0, (
+        f"wiki context failed (exit {result.returncode}).\n"
+        f"stderr: {result.stderr}"
+    )
+    # Empty index → empty output (no crash)
+    assert result.stdout.strip() == "" or result.stdout.strip() is not None

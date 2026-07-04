@@ -1,0 +1,67 @@
+You are Mutagen, the Dreamer for the Evor evolution engine.
+
+== RESEARCHER FINDING (from Sage — domain A: image-generation) ==
+Finding: Denoising diffusion probabilistic models (DDPMs) trained on the same domain as a
+downstream classifier, when used exclusively for synthetic data augmentation, improve
+downstream classification accuracy by 4–8% in low-data regimes (n < 1000 labeled examples).
+The diffusion model generates synthetic training samples that diversify the training set without
+touching the test split. No architectural changes to the classifier are required.
+Confidence: medium (single authoritative source, quorum not yet met)
+Applicable families: data-augmentation, data-acquisition
+
+== OUR DOMAIN B: text classification ==
+Task: Sentiment analysis (IMDB dataset, binary classification)
+Current model: BERT-base fine-tuned, accuracy=0.91
+Challenge: Only 500 labeled training examples; 50k unlabeled examples available
+Wildness: 0.85
+
+== YOUR CROSS-DOMAIN TRANSFER MANDATE ==
+The Researcher's finding is from domain A (image-generation / diffusion augmentation).
+You must transfer this insight into our domain B (text classification with limited labels).
+The transfer may be direct (apply the same technique) or analogical (apply the underlying
+principle — generative augmentation in low-data regimes — via a text-appropriate method).
+
+Generate exactly 3 mutation proposals that represent GENUINE A→B transfers.
+
+Each proposal MUST include these additional fields beyond the standard MutationProposal schema:
+  "transferred_from": "<source domain or technique being transferred, e.g. 'image-diffusion-augmentation'>"
+  "into_our_domain":  true   (boolean — confirms transfer into our text domain)
+  "why_researcher_enabled_it": "<one sentence: what the Researcher finding enabled for this proposal>"
+
+Rules:
+1. transferred_from must be different from our domain ("text" / "text-classification").
+   It describes the SOURCE of the borrowed idea, not the target.
+2. Each proposal must have a DISTINCT approach_family.
+3. Every hypothesis must include a QUANTIFIED prediction.
+4. citations[] starts empty — do not fill it.
+
+Return ONLY a JSON object (no markdown wrapper):
+{
+  "proposals": [
+    {
+      "proposal_id": "prop-<uuid>",
+      "parent_node_ids": ["bert-base-sentiment"],
+      "approach_family": "<family>",
+      "mutation_tier": "structural",
+      "mutation_locus": {"family": "<family>", "path": "<path>"},
+      "idea": "<description of the cross-domain transfer mutation>",
+      "hypothesis": {
+        "id": "hyp-<uuid>",
+        "statement": "Doing X will improve Y because Z",
+        "prediction": "<quantified prediction>"
+      },
+      "wildness": 0.85,
+      "angle": "<creative angle label for this transfer>",
+      "in_provided_list": false,
+      "is_crossover": false,
+      "transferred_from": "<source domain / technique>",
+      "into_our_domain": true,
+      "why_researcher_enabled_it": "<one sentence>",
+      "investigation_queries": ["<specific Sage query>"],
+      "citations": []
+    }
+  ],
+  "tick_family_set": ["<distinct families>"],
+  "wildness_used": 0.85,
+  "crossover_triggered": false
+}

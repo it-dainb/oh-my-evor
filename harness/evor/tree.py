@@ -19,6 +19,7 @@ import argparse
 import json
 import math
 import os
+import re
 import sys
 import uuid
 from dataclasses import dataclass
@@ -34,6 +35,7 @@ from evor.contracts import (
     GenomeConfig,
     GoalContract,
     Hypothesis,
+    MetricSpec,
     MutationProposal,
     StrategyState,
     TreeNode,
@@ -52,6 +54,58 @@ _FAMILY_MIX_REDUCTION: float = 0.3  # reduce by 30% when H002 triggers
 
 # Default crossover loci: take head + training genes from b; preserve backbone in a
 _DEFAULT_CROSSOVER_LOCI = ["head", "optimizer", "lr", "lr_schedule", "loss", "aug_set"]
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Fitness formula / constraint helpers
+# ─────────────────────────────────────────────────────────────────────────────
+
+_SAFE_FORMULA_CHARS: frozenset[str] = frozenset("0123456789. +-*/()e\t")
+_TOKEN_RE = re.compile(r"[a-zA-Z_]\w*")
+
+
+def _eval_fitness_formula(formula: str, metrics: dict[str, float]) -> float:
+    """Safely evaluate a fitness formula string over a metrics dict.
+
+    Substitutes metric names with their values and evaluates arithmetic.
+    Only identifiers, numbers, and basic operators (+, -, *, /) are allowed
+    after substitution.
+
+    Args:
+        formula: e.g. ``"0.7*recall+0.3*precision"``
+        metrics: dict from EvaluationResult.metrics
+
+    Returns:
+        float result of the formula evaluation.
+
+    Raises:
+        ValueError: if unsafe characters remain after substitution.
+    """
+    # Replace metric names with their float values (longest first to avoid partials)
+    tokens = sorted(set(_TOKEN_RE.findall(formula)), key=len, reverse=True)
+    subst = formula
+    for name in tokens:
+        subst = subst.replace(name, str(metrics.get(name, 0.0)))
+    if not all(c in _SAFE_FORMULA_CHARS for c in subst):
+        raise ValueError(
+            f"Unsafe characters in fitness formula after substitution: {subst!r}"
+        )
+    return float(eval(subst))  # noqa: S307 — validated above
+
+
+def _check_metric_constraint(value: float, op: str, threshold: float) -> bool:
+    """Evaluate a single MetricConstraint; return False if violated."""
+    if math.isnan(value):
+        return False  # missing metric → constraint violated
+    ops = {
+        ">=": lambda a, b: a >= b,
+        "<=": lambda a, b: a <= b,
+        ">":  lambda a, b: a > b,
+        "<":  lambda a, b: a < b,
+        "==": lambda a, b: abs(a - b) < 1e-9,
+    }
+    fn = ops.get(op)
+    return fn(value, threshold) if fn is not None else False
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -349,13 +403,46 @@ class TreeEngine:
         aggregate:  primary metric, normalized to [0,1] with baseline/target.
         worst-domain: min per_domain primary metric (robustness-aware).
         weighted:   equal-weight average of per_domain primary metric values.
+
+        Formula mode (MetricSpec.fitness_formula set):
+          Evaluates the weighted formula over result.metrics instead of using
+          the scalar metric_name value.  Applies before per-domain modes.
+
+        Constraint guards (MetricSpec.constraints non-empty):
+          Any violated constraint pins fitness to 0.0 — prevents gameable
+          solutions (e.g. predict-all-positive to maximize recall).
         """
         primary = self._primary_metric_name()
+        primary_spec: MetricSpec | None = next(
+            (s for s in goal.metric_specs if s.role == "primary_fitness"),
+            None,
+        )
 
-        # Open-ended override
+        # Open-ended override (evaluated before constraints/formula)
         if goal.mission_type == "open_ended" and result.worst_angle_coverage is not None:
             return result.worst_angle_coverage
 
+        # Hard constraint guards — any violation → penalized fitness 0.0
+        if primary_spec is not None:
+            for constraint in primary_spec.constraints:
+                cv = result.metrics.get(constraint.metric, float("nan"))
+                if not _check_metric_constraint(cv, constraint.op, constraint.threshold):
+                    return 0.0  # constraint violated
+
+        # Fitness formula overrides per-domain modes when set
+        if primary_spec is not None and primary_spec.fitness_formula:
+            try:
+                value = _eval_fitness_formula(primary_spec.fitness_formula, result.metrics)
+            except (ValueError, ZeroDivisionError):
+                value = 0.0
+            if goal.target_value is not None:
+                return max(0.0, min(1.0,
+                    (value - goal.baseline_value)
+                    / (goal.target_value - goal.baseline_value + 1e-6)
+                ))
+            return value
+
+        # Standard per-mode computation
         if goal.fitness_mode == "worst-domain":
             if not result.per_domain:
                 return result.metrics.get(primary, 0.0)
@@ -544,14 +631,17 @@ def _load_engine(run_dir: Path, strategy_override: dict | None = None) -> TreeEn
     """Reconstruct a TreeEngine from on-disk tree.json and strategy.json."""
     tree_path = run_dir / "tree.json"
     strategy_path = run_dir / "strategy.json"
-    goal_path = run_dir.parent.parent / "goal.json"
+    goal_path = run_dir / "goal-contract.json"  # C2 fix: was run_dir.parent.parent / "goal.json"
 
     if not tree_path.exists():
         sys.exit(f"tree.json not found at {run_dir}")
 
     with open(tree_path) as fh:
-        raw_nodes = json.load(fh)
-    nodes = [TreeNode.model_validate(n) for n in raw_nodes]
+        tree_data = json.load(fh)
+    # C1 fix: handle DICT format {"nodes": {"id": {...}}, "updated_at": "..."}
+    # written by mcp/src/tree-store.ts::writeTree(); also accept legacy LIST format.
+    nodes_dict = tree_data.get("nodes", {})
+    nodes = [TreeNode.model_validate(v) for v in (nodes_dict.values() if isinstance(nodes_dict, dict) else nodes_dict)]
 
     with open(strategy_path) as fh:
         raw_strategy = json.load(fh)

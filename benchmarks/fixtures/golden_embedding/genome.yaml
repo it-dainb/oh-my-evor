@@ -1,0 +1,14 @@
+genome_version: "1.0.0"
+model_family: "embedding"
+encoder: "tiny"
+pooling: "mean"
+optimizer: "adamw"
+lr: 0.001
+lr_schedule: "cosine"
+batch_size: 32
+epochs: 2
+loss: "cosine_embedding"
+aug_set: []
+acquired_datasets: []
+schema_extensions: []
+extra: {}

@@ -5,7 +5,7 @@ relies on the caller's working directory.  The store never writes.
 
 On-disk layout under ``run_dir`` (== ``.evor/runs/<mission>/<run-id>/``)::
 
-    tree.json                          # {"nodes": [...], "root_ids": [...], "version": 1}
+    tree.json                          # {"nodes": {"<id>": {...TreeNode...}}, "updated_at": "<ISO>"}
     run-state.json                     # status, tick_count, best_score, frontier_ids, ...
     strategy.json                      # StrategyState
     goal-contract.json                 # GoalContract
@@ -57,11 +57,18 @@ class RunStore:
     # ── Tree ──────────────────────────────────────────────────────────────────
 
     def all_nodes(self) -> list[dict[str, Any]]:
-        """All TreeNode dicts from tree.json."""
+        """All TreeNode dicts from tree.json.
+
+        Handles the DICT format written by mcp/src/tree-store.ts::writeTree():
+          {"nodes": {"<id>": {...TreeNode...}}, "updated_at": "<ISO>"}
+        and the legacy LIST format for backward compatibility.
+        """
         data = _read_json(self.run_dir / "tree.json")
         if not data:
             return []
-        return data.get("nodes", [])
+        nodes_val = data.get("nodes", {})
+        # C4 fix: TS writeTree() stores nodes as a dict keyed by node ID.
+        return list(nodes_val.values()) if isinstance(nodes_val, dict) else nodes_val
 
     def frontier_nodes(self) -> list[dict[str, Any]]:
         """Nodes whose IDs appear in run-state.frontier_ids, in order."""

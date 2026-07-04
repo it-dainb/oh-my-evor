@@ -4,8 +4,8 @@
   "agentic_enabled": false,
   "summary": {
     "required_total": 7,
-    "required_pass": 6,
-    "verdict": "FAIL"
+    "required_pass": 7,
+    "verdict": "PASS"
   },
   "results": [
     {
@@ -40,9 +40,9 @@
     },
     {
       "name": "pytest_harness",
-      "ok": false,
+      "ok": true,
       "required": true,
-      "detail": "338 passed"
+      "detail": "340 passed"
     },
     {
       "name": "vitest_mcp",
@@ -60,7 +60,7 @@
       "name": "agentic_skill_discovery",
       "ok": true,
       "required": false,
-      "detail": "SKIPPED — set ANTHROPIC_API_KEY to enable the real-Claude layer"
+      "detail": "SKIPPED — pass CLAUDE_CODE_OAUTH_TOKEN (subscription, from `claude setup-token`) or ANTHROPIC_API_KEY to enable the real-Claude layer"
     }
   ]
 }

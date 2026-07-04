@@ -124,11 +124,16 @@ def _cmd_run(args: argparse.Namespace) -> int:
             try:
                 from evor.contracts import TreeNode
                 tree_data = json.loads(tree_path.read_text())
-                nodes_list = tree_data.get("nodes", [])
-                node_data = next(
-                    (n for n in nodes_list if n.get("id") == args.node_id),
-                    None,
-                )
+                # C3 fix: handle DICT format {"nodes": {"id": {...}}} from TS writeTree()
+                # Fall back to list scan for legacy LIST format.
+                nodes_val = tree_data.get("nodes", {})
+                if isinstance(nodes_val, dict):
+                    node_data = nodes_val.get(args.node_id)
+                else:
+                    node_data = next(
+                        (n for n in nodes_val if n.get("id") == args.node_id),
+                        None,
+                    )
                 if node_data:
                     node = TreeNode.model_validate(node_data)
             except Exception as exc:

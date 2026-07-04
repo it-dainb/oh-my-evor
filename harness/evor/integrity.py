@@ -152,12 +152,15 @@ class IntegrityGate:
         store: "ContentAddressedStore | None" = None,
         # ALL frozen splits across all eval_versions for cross-version scan (check 11)
         all_frozen_splits: list[FrozenSplit] | None = None,
+        # ForgeStructureGate pre-merge check (check 14; optional)
+        candidate_dir: Path | None = None,
     ) -> IntegrityReport:
-        """Run all 13 integrity checks; return IntegrityReport.
+        """Run all 13 integrity checks + optional ForgeStructureGate; return IntegrityReport.
 
         Alias resolution is performed first (R-7b).
         Short-circuit: if check-1 fails, checks 2–3 are set to False.
         Checks 11–13 run only for data-acquisition nodes.
+        Check 14 (structure_ok) runs only when candidate_dir is provided.
         """
         # ── Alias resolution (R-7b) ───────────────────────────────────────
         raw_family = ""
@@ -312,6 +315,23 @@ class IntegrityGate:
                     "exclusively in the train namespace"
                 )
 
+        # ── Check 14: ForgeStructureGate (pre-merge code-quality gate) ──────
+        # Runs only when candidate_dir is provided; None = not evaluated.
+        structure_ok: bool | None = None
+        if candidate_dir is not None:
+            try:
+                from evor.quality_gate import ForgeStructureGate  # lazy import
+                sg = ForgeStructureGate(locked_eval_hash=goal.eval_script_hash)
+                sg_report = sg.check(candidate_dir)
+                structure_ok = sg_report.passed
+                if not structure_ok:
+                    failures.append(
+                        "structure_ok: ForgeStructureGate rejected candidate — "
+                        + "; ".join(sg_report.failure_reasons)
+                    )
+            except ImportError:
+                pass  # quality_gate unavailable; skip without failing
+
         # ── Verdict ───────────────────────────────────────────────────────
         verdict: str = "passed" if not failures else "failed"
 
@@ -332,6 +352,7 @@ class IntegrityGate:
                 acquisition_contamination_clear=acquisition_contamination_clear,
                 acquired_data_provenance_valid=acquired_data_provenance_valid,
                 acquisition_namespace_enforced=acquisition_namespace_enforced,
+                structure_ok=structure_ok,
             ),
             verdict=verdict,  # type: ignore[arg-type]
             failure_reason="; ".join(failures) if failures else None,

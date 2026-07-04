@@ -67,7 +67,7 @@ const output = {
 // Prime session with recent wiki lessons (graceful — skip if evor.wiki not installed yet)
 if (missionId) {
   const wiki = spawnSync(
-    'python',
+    process.env.EVOR_PYTHON ?? 'python3',
     ['-m', 'evor.wiki', 'context', '--mission-id', missionId, '--limit', '5'],
     { encoding: 'utf8', timeout: 4000 }
   );

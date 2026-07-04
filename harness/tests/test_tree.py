@@ -40,6 +40,7 @@ from evor.contracts import (
     GoalContract,
     Hypothesis,
     LegacyMetric,
+    MetricConstraint,
     MetricSpec,
     MutationProposal,
     StopCondition,
@@ -700,3 +701,124 @@ def test_meta_evolve_increments_iteration(tmp_path: Path) -> None:
     engine = TreeEngine(nodes=[], goal=_make_goal(), strategy=strategy, run_dir=tmp_path)
     updated = engine.meta_evolve([])
     assert updated.meta_iteration == strategy.meta_iteration + 1
+
+
+# ── Tests: compute_fitness() with formula / constraints ────────────────────────
+
+
+def _make_goal_with_formula(
+    formula: str,
+    constraints: list[MetricConstraint] | None = None,
+    baseline: float = 0.0,
+    target: float | None = None,
+) -> GoalContract:
+    """Build a GoalContract whose primary MetricSpec uses a fitness_formula."""
+    return GoalContract(
+        mission_id="test-formula",
+        mode="from-scratch",
+        mission_type="fixed",
+        task_description="Formula test",
+        dataset_ref="/data/test",
+        metrics=[LegacyMetric(name="recall", direction="higher", primary=True)],
+        metric_specs=[
+            MetricSpec(
+                metric_name="recall",
+                direction="higher",
+                domain_applicability="all",
+                aggregation_rule="macro_avg",
+                role="primary_fitness",
+                sota_bar=None,
+                fitness_formula=formula,
+                constraints=constraints or [],
+            )
+        ],
+        fitness_mode="aggregate",
+        eval_version="v1",
+        baseline_value=baseline,
+        target_value=target,
+        stop_condition=StopCondition(type="target"),
+        wildness=0.5,
+        budget=Budget(
+            max_iterations=50,
+            plateau_window=8,
+            circuit_breaker=5,
+            max_cost_usd=0.0,
+        ),
+        locked_split_hash="abc123",
+        eval_script_hash="def456",
+        allowed_licenses=["MIT"],
+        created_at="2026-07-04T00:00:00Z",
+    )
+
+
+def _make_eval_with_metrics(extra_metrics: dict[str, float], score: float = 0.80) -> EvaluationResult:
+    """Build an EvaluationResult with both standard and extra metrics."""
+    all_metrics = {"accuracy": score, **extra_metrics}
+    return EvaluationResult(
+        node_id="n1",
+        run_id="run1",
+        eval_version="v1",
+        metrics=all_metrics,
+        per_domain={"default": {"accuracy": score}},
+        fitness_value=score,
+        worst_angle_coverage=None,
+        per_angle_vs_sota=None,
+        telemetry_summary=TelemetrySummary(total_steps=100),
+        status="success",
+        benchmark_raw="",
+        timestamp="2026-07-04T00:00:00Z",
+    )
+
+
+def test_fitness_formula_weighted(tmp_path: Path) -> None:
+    """fitness_formula='0.7*recall+0.3*precision' computes weighted combination."""
+    goal = _make_goal_with_formula("0.7*recall+0.3*precision")
+    result = _make_eval_with_metrics({"recall": 0.80, "precision": 0.60})
+    engine = TreeEngine(nodes=[], goal=goal, strategy=_make_strategy(), run_dir=tmp_path)
+    fitness = engine.compute_fitness(result, goal)
+    expected = 0.7 * 0.80 + 0.3 * 0.60  # 0.74
+    assert abs(fitness - expected) < 1e-6, f"Expected {expected}, got {fitness}"
+
+
+def test_fitness_formula_single_metric(tmp_path: Path) -> None:
+    """fitness_formula='recall' (trivially) returns the recall value."""
+    goal = _make_goal_with_formula("recall")
+    result = _make_eval_with_metrics({"recall": 0.75})
+    engine = TreeEngine(nodes=[], goal=goal, strategy=_make_strategy(), run_dir=tmp_path)
+    fitness = engine.compute_fitness(result, goal)
+    assert abs(fitness - 0.75) < 1e-6
+
+
+def test_fitness_constraint_violated_returns_zero(tmp_path: Path) -> None:
+    """Violated precision constraint pins fitness to 0.0 (gamability guard)."""
+    constraints = [MetricConstraint(metric="precision", op=">=", threshold=0.5)]
+    goal = _make_goal_with_formula("recall", constraints=constraints)
+    # recall=0.95 looks great, but precision=0.3 violates the constraint
+    result = _make_eval_with_metrics({"recall": 0.95, "precision": 0.30})
+    engine = TreeEngine(nodes=[], goal=goal, strategy=_make_strategy(), run_dir=tmp_path)
+    fitness = engine.compute_fitness(result, goal)
+    assert fitness == pytest.approx(0.0), (
+        "Constraint violated (precision=0.3 < 0.5): fitness must be 0.0"
+    )
+
+
+def test_fitness_constraint_satisfied_uses_formula(tmp_path: Path) -> None:
+    """Satisfied constraint: fitness computed normally via formula."""
+    constraints = [MetricConstraint(metric="precision", op=">=", threshold=0.5)]
+    goal = _make_goal_with_formula("recall", constraints=constraints)
+    # precision=0.7 satisfies >= 0.5
+    result = _make_eval_with_metrics({"recall": 0.80, "precision": 0.70})
+    engine = TreeEngine(nodes=[], goal=goal, strategy=_make_strategy(), run_dir=tmp_path)
+    fitness = engine.compute_fitness(result, goal)
+    assert abs(fitness - 0.80) < 1e-6, f"Expected 0.80 (recall), got {fitness}"
+
+
+def test_fitness_constraint_missing_metric_violates(tmp_path: Path) -> None:
+    """Missing constrained metric (NaN) is treated as a constraint violation."""
+    constraints = [MetricConstraint(metric="f1", op=">=", threshold=0.4)]
+    goal = _make_goal_with_formula("recall", constraints=constraints)
+    # f1 is not in metrics → treated as NaN → constraint violated
+    result = _make_eval_with_metrics({"recall": 0.90})
+    engine = TreeEngine(nodes=[], goal=goal, strategy=_make_strategy(), run_dir=tmp_path)
+    fitness = engine.compute_fitness(result, goal)
+    assert fitness == pytest.approx(0.0), "Missing metric should count as constraint violation"

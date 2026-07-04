@@ -92,6 +92,22 @@ disallowedTools: Write, Edit
       - acquisition_type set ("external" or "synthetic")
     - Fail condition: license_identifier is absent, is "proprietary-restricted" with license_in_allowlist=false, or citation is empty.
     - Pass condition: all provenance fields are present and license is in the allowlist.
+
+    **Gate — Structural Code-Quality (pre-merge, post-Forge; ForgeStructureGate):**
+    - Runs after Forge has materialized the candidate worktree, before any tree promotion or merge.
+    - Implemented in harness/evor/quality_gate.py::ForgeStructureGate, wired into IntegrityGate.check()
+      via candidate_dir parameter; result recorded in IntegrityChecks.structure_ok.
+    - Checks (all six must pass):
+      1. genome_yaml:   genome.yaml present and parses; required GenomeConfig fields present
+      2. model_seams:   model/ has build_model() AND backbone.py AND head.py (neck.py optional)
+      3. train_ops:     train/ contains torch.optim + loss (CrossEntropyLoss/criterion) + DataLoader (AST)
+      4. forward_pass:  build_model()() forward on dummy (1,3,32,32) tensor succeeds (subprocess-isolated)
+      5. eval_locked:   evaluate.py sha256 == GoalContract.eval_script_hash (byte-identical to locked reference)
+      6. telemetry:     TelemetryCallback / evor.telemetry import present in train/ or candidate root
+    - Fail condition: any sub-check returns False; structure_ok=False causes IntegrityGate verdict=failed.
+    - Pass condition: all sub-checks pass (structure_ok=True) OR candidate_dir not yet available
+      (gate deferred; Forge's materialization mandate is the upstream enforcement layer).
+    - This gate is reversible: passing candidate_dir=None to IntegrityGate.check() skips it (structure_ok=None).
   </Six_Gate_Checklist>
 
   <Output_Format>

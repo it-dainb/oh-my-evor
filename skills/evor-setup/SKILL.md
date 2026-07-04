@@ -6,7 +6,7 @@ level: 3
 ---
 
 <Purpose>
-evor-setup conducts a 13-question Socratic interview to elicit all GoalContract fields, discovers the local compute environment, initializes the frozen data splits (Pillar 2), creates the initial EvalSuite v1 (Pillar 3), runs a preflight smoke-train, and gates launch on explicit user consent. The output is a valid GoalContract written to `.evor/runs/<mission-slug>/<run-id>/` that the `evor` tick loop can consume.
+evor-setup conducts a 14-question Socratic interview to elicit all GoalContract fields, discovers the local compute environment, initializes the frozen data splits (Pillar 2), creates the initial EvalSuite v1 (Pillar 3), runs a preflight smoke-train, and gates launch on explicit user consent. ALL task-specific settings (metrics, constraints, budget, licenses, wildness) are asked and LOCKED during this interview — they cannot be changed after the mission starts without a full re-setup. The output is a valid GoalContract written to `.evor/runs/<mission-slug>/<run-id>/` that the `evor` tick loop can consume.
 </Purpose>
 
 <Use_When>
@@ -22,9 +22,9 @@ evor-setup conducts a 13-question Socratic interview to elicit all GoalContract 
 </Do_Not_Use_When>
 
 <Interview>
-Conduct the following 13 questions in order. Ask Q1–Q8 sequentially. Ask Q9 after Q8. Ask Q10–Q11 only if mission_type=open_ended. Always ask Q12. Ask Q13 only if mission_type=open_ended.
+Conduct the following 14 questions in order. Ask Q1–Q8 sequentially (Q4a is always asked after Q4). Ask Q9 after Q8. Ask Q10–Q11 only if mission_type=open_ended. Always ask Q12. Ask Q13 only if mission_type=open_ended.
 
-Display a progress indicator: "Question N/13" at the start of each question.
+Display a progress indicator: "Question N/14" at the start of each question.
 
 ---
 
@@ -49,6 +49,41 @@ Display a progress indicator: "Question N/13" at the start of each question.
 → Populate `metrics[]` (primary: true for the primary, false for secondaries).
 → Populate initial `metric_specs[]` with domain_applicability="all" for each metric.
 → Set `fitness_mode`: "aggregate" by default; offer "worst-domain" and "weighted" as alternatives if the user mentions domain-level concerns.
+
+**Q4a — Metric Scouting** (always ask after Q4)
+"Let me scout the right metrics for your task before we lock the goal. One moment."
+
+→ Sage researches candidate metrics for the stated task and model_family:
+  1. Proposes ≥3 metric options with citations, covering where applicable:
+     - **Single metric** — e.g., accuracy, AUC, BLEU (simple; document gameability risk)
+     - **Composite-weighted** — e.g., `fitness_formula = "0.7*recall + 0.3*precision"` (harder to game)
+     - **Preference with constraint** — maximize primary metric, hard floor on secondary (e.g., precision ≥ 0.5); violated constraint → fitness = 0.0
+     - **F-beta** — `fbeta = 2.0` for F2 (recall-weighted), `fbeta = 0.5` for F0.5 (precision-weighted)
+     - **Fully custom** — user-defined formula string over metric names
+  2. FLAGS gameable/degenerate metrics and proposes guards:
+     - recall-only → predict-all-positive gives recall=1 → guard: `constraints: [{metric: "precision", op: ">=", threshold: 0.5}]`
+     - accuracy on imbalanced data → guard: switch to F1 or add per-class recall floor
+     - loss-only → model can overfit silently → guard: add val accuracy as secondary metric
+  3. Presents guards as `MetricConstraint` options — a violated constraint yields fitness=0.0.
+
+Present options to the user:
+```
+Metric options for your task:
+  [A] Single:     accuracy  (warning: gameable on imbalanced datasets)
+  [B] Composite:  0.7*f1 + 0.3*accuracy  (balanced; cite: Sokolova & Lapalme 2009)
+  [C] Preference: maximize recall, constraint: precision >= 0.50  (anti-false-positive guard)
+  [D] F-beta:     F2 (fbeta=2.0) — recall-weighted harmonic mean of precision/recall
+  [E] Custom:     enter your own formula over metric names
+
+  Gameability flags:
+    [A] with recall primary: predict-all-positive gives recall=1
+  Recommended guard: if using recall, add precision >= 0.50 constraint
+```
+
+→ User picks or customizes.
+→ Populate `MetricSpec.fitness_formula`, `MetricSpec.fbeta`, `MetricSpec.constraints[]`, and `MetricSpec.custom_metrics[]` as appropriate from the user's choice.
+→ If a formula or constraint is specified, update `fitness_mode` accordingly.
+→ **LOCK NOTE:** These metric settings are finalized here. They cannot be changed after the mission starts without a full re-setup (see Lock Policy below).
 
 **Q5 — Baseline and target**
 "What is your current baseline score on the primary metric? Do you have a specific target value, or should Evor maximize under budget?"
@@ -120,6 +155,22 @@ If you decline, the mission will not start. You can re-run evor-setup with a sma
 → If "no" or any decline: abort setup. Print: "Mission not started. Re-run /evor-setup with adjusted budget parameters."
 
 </Interview>
+
+<Lock_Policy>
+ALL task-specific settings collected during the interview are LOCKED at setup time. This means:
+
+- **Metrics and constraints** (Q4 + Q4a): `metric_specs[]`, `fitness_formula`, `fbeta`, `constraints[]`, `custom_metrics[]`, `fitness_mode` — immutable after GoalContract is written.
+- **Dataset and splits** (Q2): `dataset_ref`, `locked_split_hash`, `eval_script_hash` — immutable; the frozen splits enforce this at the filesystem level (chmod 444).
+- **Budget** (Q6): `budget.*` — cannot be expanded mid-run; requires re-setup to increase.
+- **Wildness** (Q8): changing wildness mid-run invalidates the strategy baseline; locked.
+- **License allowlist** (Q12): data acquired under a rejected license is blocked by the Ingestion Contamination Gate; the gate uses the locked list.
+- **Mission type** (Q9): fixed vs. open_ended cannot be changed mid-run.
+- **Coverage target** (Q11, open_ended only): locked into the stop condition.
+
+**Rationale:** Evor's fitness comparisons are only valid when the evaluation contract is constant. Changing metrics or data splits mid-run would make candidate scores incomparable, invalidating the evolution tree.
+
+**Override path:** If a setting must change, create a new mission with `/evor-setup`. The old run directory is preserved for reference.
+</Lock_Policy>
 
 <Environment_Discovery>
 After the interview is complete, run environment discovery:
@@ -196,7 +247,7 @@ Set `GoalContract.eval_version = "v1"`.
 Run a 5-step smoke-train to verify the environment is functional:
 
 ```bash
-python -m evor.preflight --run-id <run_id> --mission-id <mission_id>
+python -m evor preflight --run-id <run_id>
 ```
 
 The preflight runs a micro-train (10 random samples, 2-layer MLP, 5 steps) and verifies:
@@ -284,7 +335,8 @@ After consent:
    ```
 6. Write `.evor/active-run.json`: `{"mission_id": "<id>", "run_id": "<id>", "run_dir": "<path>"}`.
 7. Set environment variable `EVOR_ACTIVE_RUN_ID=<run_id>`.
-8. Initialize empty `tree.json`: `{"nodes": [], "root_ids": [], "version": 1}`.
+8. Initialize empty `tree.json`: `{"nodes": {}, "updated_at": "<ISO 8601>"}`.
+   (M2 fix: matches the DICT format written by mcp/src/tree-store.ts::writeTree())
 9. Initialize `decision-log.md` with a header entry recording this setup session.
 
 Print: "Mission initialized. Run ID: <run_id>. Start the tick loop with /evor-run."

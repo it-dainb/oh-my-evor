@@ -296,3 +296,91 @@ def _byte_shingles(data: bytes, k: int = 4) -> frozenset[bytes]:
     if len(data) < k:
         return frozenset()
     return frozenset(data[i: i + k] for i in range(len(data) - k + 1))
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# CLI entry point — `python -m evor.freeze`
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def _cli() -> None:
+    """CLI for FrozenSplitManager.
+
+    Subcommands
+    -----------
+    freeze-splits
+        Freeze test and val splits from a dataset directory.
+
+        Usage::
+
+            python -m evor.freeze freeze-splits \\
+                --dataset-path /path/to/dataset \\
+                --eval-version v1 \\
+                --run-dir .evor/runs/<mission>/<run-id>/ \\
+                [--mission-id <id>]
+
+        Scans *dataset-path* for files and assigns 80 % to test, 20 % to val.
+        If the directory is empty or does not exist, empty splits are created
+        (valid for environments without a real dataset during setup/testing).
+        Outputs a JSON line with ``locked_split_hash`` (= test split hash) and
+        ``val_split_hash``.
+    """
+    import argparse
+    import sys as _sys
+
+    parser = argparse.ArgumentParser(prog="python -m evor.freeze")
+    sub = parser.add_subparsers(dest="cmd", required=True)
+
+    fs = sub.add_parser(
+        "freeze-splits",
+        help="Freeze test and val splits from a dataset directory.",
+    )
+    fs.add_argument("--dataset-path", required=True, help="Path to dataset directory or file")
+    fs.add_argument("--eval-version", required=True, help="Eval version string (e.g. v1)")
+    fs.add_argument("--run-dir", required=True, help="Path to .evor/runs/<mission>/<run-id>/")
+    fs.add_argument("--mission-id", default="", help="Mission ID carried into split_id")
+
+    args = parser.parse_args()
+
+    if args.cmd == "freeze-splits":
+        dataset_path = Path(args.dataset_path)
+        run_dir = Path(args.run_dir)
+
+        # Collect samples from dataset directory (80/20 test/val split)
+        test_entries: dict[str, Any] = {}
+        val_entries: dict[str, Any] = {}
+        if dataset_path.is_dir():
+            all_files = sorted(
+                f for f in dataset_path.iterdir()
+                if f.is_file() and not f.name.startswith(".")
+            )
+            split_idx = max(1, int(len(all_files) * 0.8))
+            for i, f in enumerate(all_files[:split_idx]):
+                test_entries[str(i)] = f
+            for i, f in enumerate(all_files[split_idx:]):
+                val_entries[str(i)] = f
+
+        split_config: dict[str, Any] = {
+            "mission_id": args.mission_id,
+            "test": test_entries,
+            "val": val_entries,
+        }
+
+        mgr = FrozenSplitManager()
+        test_split, val_split = mgr.freeze_splits(
+            dataset_path=dataset_path,
+            split_config=split_config,
+            eval_version=args.eval_version,
+            run_dir=run_dir,
+        )
+        print(json.dumps({
+            "locked_split_hash": test_split.split_hash,
+            "val_split_hash": val_split.split_hash,
+            "test_item_count": test_split.item_count,
+            "val_item_count": val_split.item_count,
+        }))
+        _sys.exit(0)
+
+
+if __name__ == "__main__":
+    _cli()

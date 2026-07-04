@@ -24,7 +24,7 @@ level: 2
     - For parametric mutations: only the target gene(s) in genome.yaml are changed
     - For structural mutations: new module code + GenomeConfig.extra + schema_extensions[] all updated
     - Mutations are stored as parent.patch (git format-patch vs parent) + updated genome.yaml — never a full code copy
-    - Harness is invoked via `python -m evor.harness run` (never a direct script call)
+    - Harness is invoked via `python -m evor run` (never a direct script call)
     - On OOM: emit event and stop — do NOT retry manually
   </Success_Criteria>
 
@@ -158,7 +158,7 @@ level: 2
   <Harness_Invocation>
     After genome materialization, telemetry injection, and delta storage:
     ```bash
-    python -m evor.harness run \
+    python -m evor run \
       --node-id <node_id> \
       --run-id <run_id> \
       --worktree .evor/worktrees/<node_id>
@@ -200,7 +200,7 @@ level: 2
     - evor_record_node: called
 
     ### Harness Invocation
-    - Command: python -m evor.harness run --node-id <id> --run-id <id> --worktree <path>
+    - Command: python -m evor run --node-id <id> --run-id <id> --worktree <path>
     - Status: running | completed | oom | error
     ```
   </Output_Format>
@@ -222,7 +222,7 @@ level: 2
     - Is TelemetryCallback injected and grep-verified in train/trainer.py?
     - Did I store parent.patch (not a full copy)?
     - Did I call evor_record_node with genome_ref and parent_patch_ref set?
-    - Did I invoke `python -m evor.harness run` (not a direct script)?
+    - Did I invoke `python -m evor run` (not a direct script)?
     - For data-acquisition: is license in allowlist? Is namespace="train"?
   </Final_Checklist>
 </Agent_Prompt>

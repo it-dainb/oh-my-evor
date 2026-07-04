@@ -7,7 +7,7 @@
 // gates CI directly. Run from the plugin root:
 //   node ci/run-checks.mjs
 import { spawn, spawnSync } from 'node:child_process';
-import { mkdirSync, writeFileSync, mkdtempSync } from 'node:fs';
+import { mkdirSync, writeFileSync, mkdtempSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -115,10 +115,11 @@ function checkL3() {
 
 // ── 7. AGENTIC (optional): headless Claude discovers the plugin's skills ──
 function checkAgentic() {
-  const hasAuth = !!(process.env.CLAUDE_CODE_OAUTH_TOKEN || process.env.ANTHROPIC_API_KEY);
+  const credsFile = `${process.env.HOME || '/root'}/.claude/.credentials.json`;
+  const hasAuth = !!(process.env.CLAUDE_CODE_OAUTH_TOKEN || process.env.ANTHROPIC_API_KEY || existsSync(credsFile));
   if (!hasAuth) {
     record('agentic_skill_discovery', true,
-      'SKIPPED — pass CLAUDE_CODE_OAUTH_TOKEN (subscription, from `claude setup-token`) or ANTHROPIC_API_KEY to enable the real-Claude layer',
+      'SKIPPED — mount ~/.claude/.credentials.json (subscription) or pass CLAUDE_CODE_OAUTH_TOKEN / ANTHROPIC_API_KEY to enable the real-Claude layer',
       { required: false });
     return;
   }

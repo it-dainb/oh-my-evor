@@ -228,3 +228,113 @@ class BenchmarkManager:
         if not suites_dir.exists():
             return []
         return sorted(p.stem for p in suites_dir.glob("*.json"))
+
+    def create_initial_suite(
+        self,
+        mission_id: str,
+        eval_version: str,
+        task_description: str,
+        run_dir: Path,
+    ) -> EvalSuite:
+        """Create the first EvalSuite from scratch (no parent required).
+
+        Derives a single 'primary' domain from *task_description*.
+        Writes ``eval-suites/<eval_version>.json`` and
+        ``angle-registry.json`` (empty angles list for open-ended readiness).
+
+        Called by ``python -m evor.benchmark init-eval-suite`` during setup.
+        """
+        primary_domain = Domain(
+            domain_id="primary",
+            description=task_description,
+            metric_specs=[],
+            sota_source=None,
+            added_at_eval_version=eval_version,
+        )
+
+        suite = EvalSuite(
+            eval_version=eval_version,
+            mission_id=mission_id,
+            parent_eval_version=None,
+            domains=[primary_domain],
+            split_hashes={},
+            created_at=datetime.now(timezone.utc).isoformat(),
+            created_by="user",
+            consent_log_ref="setup-session",
+        )
+
+        suite_path = self._suite_path(eval_version)
+        tmp_path = suite_path.with_suffix(".json.tmp")
+        tmp_path.write_text(suite.model_dump_json(indent=2))
+        os.replace(tmp_path, suite_path)
+
+        # Initialise an empty angle-registry for open_ended readiness
+        angle_registry_path = run_dir / "angle-registry.json"
+        if not angle_registry_path.exists():
+            angle_registry_path.write_text(json.dumps({
+                "mission_id": mission_id,
+                "angles": [],
+                "updated_at": suite.created_at,
+            }, indent=2))
+
+        return suite
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# CLI entry point — `python -m evor.benchmark`
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def _cli() -> None:
+    """CLI for BenchmarkManager.
+
+    Subcommands
+    -----------
+    init-eval-suite
+        Create the initial EvalSuite v1 for a new mission.
+
+        Usage::
+
+            python -m evor.benchmark init-eval-suite \\
+                --mission-id <mission_id> \\
+                --eval-version v1 \\
+                --task-description "<description>" \\
+                --run-dir .evor/runs/<mission>/<run-id>/
+    """
+    import argparse
+    import sys as _sys
+
+    parser = argparse.ArgumentParser(prog="python -m evor.benchmark")
+    sub = parser.add_subparsers(dest="cmd", required=True)
+
+    ie = sub.add_parser(
+        "init-eval-suite",
+        help="Create the initial EvalSuite for a new mission.",
+    )
+    ie.add_argument("--mission-id", required=True, help="Mission identifier")
+    ie.add_argument("--eval-version", required=True, help="Eval version string (e.g. v1)")
+    ie.add_argument("--task-description", required=True, help="Task description for domain derivation")
+    ie.add_argument("--run-dir", required=True, help="Path to .evor/runs/<mission>/<run-id>/")
+
+    args = parser.parse_args()
+
+    if args.cmd == "init-eval-suite":
+        run_dir = Path(args.run_dir)
+        mgr = BenchmarkManager(run_dir)
+        suite = mgr.create_initial_suite(
+            mission_id=args.mission_id,
+            eval_version=args.eval_version,
+            task_description=args.task_description,
+            run_dir=run_dir,
+        )
+        print(json.dumps({
+            "eval_version": suite.eval_version,
+            "mission_id": suite.mission_id,
+            "domains": [d.domain_id for d in suite.domains],
+            "created_at": suite.created_at,
+        }))
+        _sys.exit(0)
+
+
+if __name__ == "__main__":
+    _cli()

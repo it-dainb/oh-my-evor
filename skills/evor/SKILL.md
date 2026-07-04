@@ -93,7 +93,7 @@ For each approved proposal, invoke Forge:
 For each completed Forge job:
 1. Harness writes EvaluationResult to nodes/<id>/results.json.
 2. Call `evor_record_eval(run_id, node_id, result)` — this auto-triggers `evor_integrity_check`.
-3. `evor_integrity_check` runs `python -m evor.integrity check` and writes IntegrityReport to evaluations/<node-id>.json.
+3. `evor_integrity_check` calls `integrity_bridge.py` via the MCP subprocess bridge and writes IntegrityReport to evaluations/<node-id>.json.
 4. If IntegrityReport.verdict="failed": mark the node integrity_status="failed", skip promotion. Log failure_reason.
 5. If passed: set node integrity_status="passed".
 

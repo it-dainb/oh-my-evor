@@ -41,7 +41,41 @@ def _alias_approach_family(value: str) -> str:
 # ────────────────────────────────────────────────────────────────────────────
 
 
+class MetricConstraint(BaseModel):
+    """Hard constraint on a secondary metric used as a gamability guard.
+
+    A candidate violating ANY constraint on the primary MetricSpec receives
+    penalized fitness = 0.0 regardless of its formula score. This prevents
+    degenerate solutions such as predicting all-positive to maximize recall
+    while ignoring precision.
+
+    Example: ``{"metric": "precision", "op": ">=", "threshold": 0.5}``
+    prevents recall-gaming when recall is the primary metric.
+    """
+
+    model_config = ConfigDict(strict=True)
+
+    metric: str
+    """Name of the metric to constrain (must appear in EvaluationResult.metrics)."""
+    op: Literal[">=", "<=", "==", ">", "<"]
+    """Comparison operator applied as: metric_value op threshold."""
+    threshold: float
+    """Threshold value for the constraint."""
+
+
 class MetricSpec(BaseModel):
+    """Specification for a single tracked metric.
+
+    Supports scalar, composite-weighted, F-beta, preference-with-constraint,
+    and fully-custom metric modes:
+
+    * Scalar:          metric_name="accuracy", no formula/fbeta/constraints
+    * Composite:       fitness_formula="0.7*recall+0.3*precision"
+    * F-beta:          metric_name="fbeta", fbeta=2.0  (F2 score)
+    * Constrained:     fitness_formula + constraints guard degenerate solutions
+    * Custom:          custom_metrics=["my_ndcg"] instructs the evaluator to emit it
+    """
+
     model_config = ConfigDict(strict=True)
 
     metric_name: str
@@ -50,6 +84,32 @@ class MetricSpec(BaseModel):
     aggregation_rule: Literal["macro_avg", "weighted_avg", "min", "max"]
     role: Literal["primary_fitness", "secondary_reported"]
     sota_bar: Optional[float] = None
+
+    # ── Composite / constraint / custom extensions ────────────────────────────
+
+    fitness_formula: Optional[str] = None
+    """Weighted fitness formula evaluated over EvaluationResult.metrics.
+    Example: "0.7*recall+0.3*precision"
+    Uses metric names as variable names; only identifiers, numbers, and
+    basic arithmetic (+, -, *, /) are permitted.
+    None = use metric_name as the scalar fitness value.
+    """
+
+    fbeta: Optional[float] = None
+    """Beta for F-beta score (e.g. 2.0 → F2, recall-weighted).
+    Only active when metric_name="fbeta". None = not applicable.
+    """
+
+    constraints: list[MetricConstraint] = Field(default_factory=list)
+    """Hard constraint guards on secondary metrics.
+    Any violated constraint pins fitness to 0.0 regardless of the formula.
+    Typical use: precision floor to prevent recall-gaming.
+    """
+
+    custom_metrics: list[str] = Field(default_factory=list)
+    """Names of additional metrics the evaluator will emit (informational).
+    Must appear in EvaluationResult.metrics for constraint checks to function.
+    """
 
 
 # MetricRegistry is a dict keyed by metric_name
@@ -375,6 +435,9 @@ class IntegrityChecks(BaseModel):
     acquisition_contamination_clear: Optional[bool] = None
     acquired_data_provenance_valid: Optional[bool] = None
     acquisition_namespace_enforced: Optional[bool] = None
+    structure_ok: Optional[bool] = None
+    """ForgeStructureGate passed: genome seams + forward pass + telemetry + eval lock.
+    None = gate not run (candidate_dir not provided to IntegrityGate.check())."""
 
 
 class IntegrityReport(BaseModel):
@@ -520,6 +583,9 @@ class GenomeConfig(BaseModel):
     model_config = ConfigDict(strict=True)
 
     genome_version: str
+    model_family: Optional[str] = None
+    """Architecture family for ForgeStructureGate seam check: cnn, embedding, graph, vlm.
+    None = universal-only invariants (no family-specific seam files required)."""
     backbone: Optional[str] = None
     head: Optional[str] = None
     neck: Optional[str] = None
