@@ -1,231 +1,182 @@
-# oh-my-evor
+<div align="center">
 
-Autonomous ML research evolution engine for Claude Code.
+# 🧬 oh-my-evor
 
-oh-my-evor is a Claude Code plugin that orchestrates a team of specialist AI agents
-to automatically improve a machine learning model — or co-evolve both the model and
-its evaluation benchmark — through an iterative mutation tree search. Each tick
-proposes, critiques, implements, trains, and evaluates a candidate; the integrity gate
-ensures every reported gain is real and reproducible; the live dashboard lets you
-watch the frontier evolve in real time.
+### Autonomous ML-research evolution engine for Claude Code — *that proves its own results are real.*
 
----
+[![Claude Code Plugin](https://img.shields.io/badge/Claude_Code-plugin-8A2BE2)](https://code.claude.com)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
+[![Tests](https://img.shields.io/badge/tests-842_passing-brightgreen)](#-proof-it-works)
+[![MCP tools](https://img.shields.io/badge/MCP_tools-14-blue)](#architecture)
+[![Agents](https://img.shields.io/badge/agents-11-orange)](#the-agent-roster)
+[![Python](https://img.shields.io/badge/python-3.10+-blue)](#requirements)
+[![Node](https://img.shields.io/badge/node-18+-green)](#requirements)
 
-## Agent Roster
+<img src="ci/out/evor-tree.png" alt="An evolution tree produced by oh-my-evor" width="620" />
 
-The orchestrator (Evor) runs as the main Claude Code session on Opus. Five Sonnet
-specialists handle bounded work in each tick.
+<sub>*A real evolution tree from a run — each node is a candidate model (approach family + score), and every score shown has already survived the integrity gate. Rendered by `evor tree render`.*</sub>
 
-| Agent | Role | Description |
-|---|---|---|
-| **Evor** | Orchestrator | Runs the 9-step tick loop, manages meta-evolution, detects doom loops, coordinates all sub-agents. Opus. |
-| **Sage** | Researcher | Produces citation-backed SOTA findings anchored to papers, leaderboards, or experiments. Every claim must have a source URL. |
-| **Mutagen** | Dreamer | Generates creative mutation proposals across the `arch / training / data-curation / data-augmentation / data-acquisition / algo` family space, driven by a wildness dial (0.0–1.0). |
-| **Probe** | EDA/Analyst | Reads `telemetry.jsonl`, runs 5 structured checks (loss curve, gradient health, LR sensitivity, error clustering, telemetry sanity), and confirms or refutes the registered hypothesis. |
-| **Forge** | Implementer | Materializes the genome scaffold in an isolated git worktree, injects `TelemetryCallback`, stores the parent delta as `parent.patch`, and invokes the harness. Never touches `evaluate.py` or frozen splits. |
-| **Selector** | Critic | Runs 6 hard gates on every proposal before Forge sees it. One failure rejects the proposal. False approvals cost a full training run; false rejections cost one re-proposal. Errs toward rejection. |
+</div>
 
 ---
 
-## Install
+oh-my-evor turns Claude Code into a team of specialist AI agents that **autonomously evolve a machine-learning model** — proposing, critiquing, implementing, training, and evaluating candidates through an iterative mutation **tree search**. After a single setup conversation, it runs to your goal with **zero human-in-the-loop**.
 
-oh-my-evor is installed as a **Claude Code plugin** via the `.claude-plugin` manifest.
+But autonomy is cheap. The hard part is *trust*. So oh-my-evor is built around one non-negotiable idea:
+
+> **Every reported gain must be provably real.** No test-set leakage. No reward-hacking. No irreproducible flukes. No moving the goalposts.
+
+---
+
+## ⭐ Why oh-my-evor?
+
+Most "AI improves your model" tools hand you a number and ask you to trust it. An autonomous agent optimizing a metric will happily — and invisibly — **cheat**: peek at the test set, overfit the validation split, silently swap the eval, or report a lucky seed. oh-my-evor is engineered so it *structurally cannot*:
+
+| The trap | How oh-my-evor closes it |
+|---|---|
+| 🕵️ **Test-set leakage** | Frozen splits are `chmod 444`; a 13-check **integrity gate** flags near-perfect scores and per-step val spikes as leakage signatures |
+| 🎰 **Reward hacking** | Direction-aware anti-gaming checks (works for higher- *and* lower-is-better metrics); the gate may never auto-weaken its own fraud detection |
+| 🔒 **Agents editing the referee** | A **hook-enforced capability governor** makes it impossible for any agent to write the evaluator, touch frozen splits, or run training out of turn — enforced at the tool-call layer, not by prompt politeness |
+| 📉 **Comparability drift** | Eval-version is pinned; changing the benchmark requires explicit consent, never a silent swap |
+| 📎 **Hand-wavy research** | Every SOTA claim the research agent makes is **anchored to a source URL** — no citation, no claim |
+
+The result is an engine you can point at a real dataset and *leave alone* — and still defend the number it gives you.
+
+---
+
+## 🚀 Quick Start
+
+**Install in two commands** (verified end-to-end in a clean container — see [Proof](#-proof-it-works)):
+
+```text
+/plugin marketplace add https://github.com/it-dainb/oh-my-evor
+/plugin install oh-my-evor
+```
+
+The MCP server ships **prebuilt**, so there's no Node build step on your machine. The Python harness needs its deps once (Claude Code can't `pip install` for you):
 
 ```bash
-# From the repo root — Claude Code loads the plugin automatically on next start
-git clone <repo-url> oh-my-evor
-cd oh-my-evor
-npm install          # MCP server (TypeScript)
-cd harness && uv sync  # Python compute harness
+# one time, on the target machine — or run ./install.sh which does this for you
+pip install -e <plugin>/harness       # pydantic, pyyaml, fastapi, …
 ```
 
-Claude Code discovers the plugin through `.claude-plugin/plugin.json`, which declares
-the skills, agents, MCP servers, and command aliases. No separate registration step
-is required once the directory is on Claude Code's plugin path.
+> If the deps are missing, oh-my-evor tells you exactly what to run on your next session — it never fails cryptically.
 
-**Dependencies:**
-- Claude Code (any recent version)
-- Node.js ≥ 18 (MCP server)
-- Python ≥ 3.10 with `uv` (compute harness + dashboard)
-- GPU optional — see [Compute Model](#compute-model) and [KNOWN_GAPS.md](KNOWN_GAPS.md)
-
----
-
-## Mission Flow
-
-```
-/evor-setup
-    │  13-question interview → GoalContract
-    │  Environment discovery → ResourcePlan
-    │  Freeze data splits (chmod 444, locked_split_hash)
-    │  Init EvalSuite v1
-    │  Preflight smoke-train (5 steps)
-    │  Consent checkpoint — type "start" to proceed
-    ▼
-.evor/runs/<mission-slug>/<run-id>/
-    goal-contract.json  run-state.json  strategy.json  tree.json
-
-/evor-run  (or  /evor-resume  to restore a paused run)
-    │  Validates GoalContract, sets EVOR_ACTIVE_RUN_ID
-    ▼
-Tick loop  ──────────────────────────────────────────────────────────
- 1. Select        UCB1 node selection from the frontier tree
- 2. Ideate        Mutagen proposes mutations; Sage grounds them in citations (parallel)
- 3. Register      Each approved proposal gets a hypothesis_id in run-state.json
- 4. Critique      Selector runs 6 gates; doom-loop detector monitors for 3× all-reject
- 5. Implement     Forge materializes genome → injects TelemetryCallback → trains
- 6. Evaluate      Harness writes EvaluationResult; IntegrityGate runs 13 checks
- 7. Analyze       Probe runs EDA; lesson persisted to CompoundingWiki
- 8. Record        tree.json / run-state.json / decision-log.md updated
- 9. Prune/Promote Frontier updated; stop condition checked
- 9.5 (conditional) BenchmarkUpgrade re-scoring when eval_version bumped
-   └─ every 5 ticks: meta-evolution updates strategy.json (UCB1 c, wildness, family_mix)
-   └─ stop condition met → /evor-report called automatically
-─────────────────────────────────────────────────────────────────────
-
-/evor-dashboard   (runs concurrently — does not block the tick loop)
-    FastAPI + SSE at http://localhost:8756
-    D3 evolution tree · Chart.js telemetry · domain leaderboard · coverage gauge
-
-/evor-report
-    ASCII + graphviz tree · frontier table · lesson summary · static HTML export
-```
-
----
-
-## Mission Types
-
-### Fixed
-
-One frozen test suite throughout the mission. Evor evolves the model against a
-single, immutable evaluation benchmark. The stop condition is typically
-`beat-baseline`, `target`, or `maximize-under-budget`.
-
-This is the default and the simpler path. All integrity checks apply from tick 1.
-
-### Open-Ended (Generality Ratchet)
-
-Evor can discover new evaluation angles and expand the benchmark as the model
-improves. When Probe detects saturation (< 1% improvement on the primary metric
-for 3 consecutive ticks) or discovers a genuinely new angle, it submits a
-`BenchmarkUpgradeProposal`. With user consent (or via `auto_add_within_families`
-policy), the EvalSuite version is bumped, frontier nodes are re-scored under the
-expanded benchmark, and the exploration wildness is temporarily boosted to prevent
-premature convergence post-upgrade.
-
-The stop condition for open-ended missions is `coverage-target`: Evor stops when
-a configurable fraction of discovered angles (e.g., 90%) each meet or exceed their
-SOTA bar. The live dashboard shows a coverage gauge for open-ended runs.
-
-SOTA bars are retrieved by Sage from configurable sources (Papers With Code, arXiv,
-human-provided, custom URL) and must meet a quorum of ≥ 2 independent sources
-within 5% divergence before being marked "authoritative."
-
----
-
-## Integrity Model
-
-Every candidate's gain must be earned against the same frozen test set, evaluated
-by the same locked script. Three mechanisms enforce this:
-
-**Frozen splits.** At setup, `evor-setup` calls `python -m evor.freeze` to hash
-every sample in the test and validation splits, copy them to
-`frozen-splits/v{n}-test/`, and set `chmod 444` on all files. The resulting
-`locked_split_hash` and `eval_script_hash` are embedded in `GoalContract`.
-
-**13-check IntegrityGate.** Before any node is promoted to the frontier, the gate
-verifies: split hash matches, frozen split is still read-only, no test leakage, no
-near-duplicate leakage, data provenance valid, no label contamination, no eval shift,
-eval version consistent, telemetry sane, reward hacking probe clear. A verdict of
-`failed` marks the node and permanently excludes it from the frontier —
-`failed` nodes are never deleted from `tree.json`, only marked.
-
-**Ingestion contamination gate.** For nodes in the `data-acquisition` family: before
-any acquired external data enters training, the gate verifies it shares no samples
-with the frozen eval split. Failure immediately rejects the node.
-
-The operating principle: a single "no shift" rule. If the test distribution can
-drift between candidates, reported improvements are meaningless. oh-my-evor makes
-drift structurally impossible rather than relying on discipline.
-
----
-
-## Compute Model
-
-oh-my-evor is **infra-agnostic by design**. The harness launches training via
-`python -m evor.harness run` — a subprocess boundary that works equally well on
-a local CPU, a local GPU, or a cloud machine with GPUs. No CUDA assumption is
-baked into the orchestration layer.
-
-**GPU-gated operations.** Several harness calls require a GPU to execute the actual
-training step. The surrounding machinery (subprocess launch, isolation, parsing,
-resource plan, flow wiring) is real and tested against fixture data. Only the
-model-weight operations are gated. See [KNOWN_GAPS.md](KNOWN_GAPS.md) for the
-full table (G1–G3).
-
-The `evor-setup` preflight runs a 5-step smoke-train to detect environment issues
-before committing to a full run. If no GPU is available, the mission proceeds with
-`cpu_fallback=true` and concurrency=1.
-
-Parallelism is controlled by `ResourcePlan.concurrency`. When
-`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` is set, multiple Forge agents run
-concurrently (one per approved proposal, up to the concurrency limit). Without it,
-Forge agents run sequentially.
-
----
-
-## Release Gate
-
-| Layer | Tool | What it checks | Status |
-|---|---|---|---|
-| **L1** | `node scripts/l1-check.mjs` | File presence, schema structure, manifest validity, no bare TODO/FIXME in core | Built |
-| **L2** | `npm test` + `uv run pytest` | Unit tests for all contracts (Zod + Pydantic), MCP tool stubs, dashboard endpoints, store logic | Built |
-| **L3** | `scripts/l3-e2e.sh` | End-to-end training run on the release-gate benchmark | Placeholder — GPU + full engine required (see KNOWN_GAPS.md#L3) |
-
-CI runs L1 + L2 on every push. L3 is a manual gate run on GPU-equipped hardware
-before a version tag.
-
----
-
-## State Directory Layout
-
-```
-.evor/
-  active-run.json                  points to the current mission + run
-  runs/
-    <mission-slug>/
-      <run-id>/
-        goal-contract.json         GoalContract — the mission spec (immutable after setup)
-        run-state.json             live: tick_count, best_score, frontier_ids, eval_version
-        strategy.json              UCB1 params, wildness, family_mix — updated by meta-evolution
-        tree.json                  all TreeNodes (never deleted, only status-changed)
-        decision-log.md            unforgettable append-only human-readable log
-        frozen-splits/             chmod 444 — never modified after setup
-        eval-suites/               v1.json, v2.json … — benchmark upgrade snapshots
-        angle-registry.json        open_ended only — per-angle SOTA bars and coverage
-        nodes/
-          <node-id>/
-            results.json           EvaluationResult
-            telemetry.jsonl        live-tailed by the dashboard SSE endpoint
-        evaluations/
-          <node-id>.json           IntegrityReport
-        artifacts/                 content-addressed (sha256) blobs — hardlinked
-```
-
----
-
-## Key Commands
+Then start a mission — **one setup conversation** locks the goal, metrics, and benchmark; after that it runs autonomously:
 
 | Command | What it does |
 |---|---|
-| `/evor-setup` | Start a new mission: 13-question interview → GoalContract → frozen splits → consent |
-| `/evor-run` | Launch or resume the tick loop for the active (or specified) mission |
-| `/evor-resume` | Restore a specific run by run-id and resume the tick loop |
-| `/evor-dashboard` | Open the live FastAPI + SSE dashboard at http://localhost:8756 |
-| `/evor-report` | Generate the final report (tree, frontier table, lessons, static HTML) |
+| `/oh-my-evor:evor-setup` | New mission: interview → GoalContract → freeze splits → consent. **The only human-in-the-loop step.** |
+| `/oh-my-evor:evor-run` | Launch (or resume) the autonomous tick loop toward the goal |
+| `/oh-my-evor:evor-resume` | Restore a specific paused run by id and continue |
+| `/oh-my-evor:evor-dashboard` | Live **FastAPI + SSE dashboard** — D3 evolution tree, telemetry charts, coverage gauge |
+| `/oh-my-evor:evor-report` | Final report: tree, frontier table, lessons, static HTML export |
+
+---
+
+## How it works
+
+Each **tick** of the outer loop runs a disciplined pipeline, and the loop repeats until the goal is met:
+
+```
+   research → dream → gate → implement → train → evaluate → integrity → select → learn
+   (Sage)   (Mutagen)(Selector)(Forge)         (harness)   (gate)    (Selector) (wiki)
+      └──────────────────────────── repeat until goal reached ───────────────────────┘
+```
+
+- **Tree search**, not greedy hill-climbing — candidates branch, cross over, and get pruned via UCB1 scoring, so the engine explores the frontier instead of chasing one lucky lineage.
+- **Signals** flow to every agent: OOM, slow-training, class-confusion and other pain-points are captured, deduped, and routed through a shared bus so the next proposal *reacts* to what actually happened.
+- **Compaction-survival**: state is flushed before context compaction and re-hydrated after, so long autonomous runs don't lose their thread.
+- **A live dashboard** streams the evolving tree and telemetry over SSE while the loop runs — watch the frontier move in real time.
+
+### The Agent Roster
+
+The orchestrator (**Evor**) runs as the main Claude Code session. It spawns specialist leads — and those leads spawn their *own* sub-teams (a real hierarchy, not one agent role-playing six):
+
+| Agent | Role | What it does |
+|---|---|---|
+| **Evor** | Orchestrator | Runs the tick loop, meta-evolution, doom-loop detection; spawns leads. Opus. |
+| **Sage** → *Sage-juniors* | Research lead | Citation-backed SOTA findings; fans out research by angle. Every claim carries a source URL. |
+| **Mutagen** | Dreamer | Mutation proposals across `arch / training / data-* / algo`, driven by a wildness dial. |
+| **Probe** | EDA / Analyst | Structured telemetry checks (loss curve, gradient health, LR sensitivity, error clustering) to confirm or refute the hypothesis. |
+| **Forge** → *architect / junior / critic / analyst* | Implementation lead | A dev-team that scaffolds the genome in an isolated git worktree and runs the harness. **Only the junior writes code.** |
+| **Selector** | Critic | Hard gates on every proposal before a training run is spent. Errs toward rejection. |
+| **Acquirer** | Data | Fetches enrichment/hardening data under strict no-leakage rules. |
+
+*Children are spawnable **only** by their parent — enforced by the governor hook.*
+
+---
+
+## 🛡️ The Integrity Gate — the part that makes it trustworthy
+
+This is the heart of the project. Before any candidate's result is allowed to count, it passes a **13-check integrity gate** in the Python harness. A few of the checks:
+
+- **Leakage detection** — near-ceiling scores on a hard task, or a sudden per-step validation spike, are flagged as test-leakage signatures.
+- **Reward-hacking, direction-aware** — a legitimate jump from a weak baseline is *allowed*; a near-perfect leak is *rejected* — and the check knows whether higher or lower is better.
+- **Frozen-split & eval-version** — the test split hash and eval script are locked; results only compare within the same evaluation contract.
+- **Ingestion contamination** — for `data-acquisition` candidates, acquired data must share zero samples with the frozen eval split or the node is rejected.
+- **Reproducibility & structure** — outputs must match the declared shape and re-derive.
+
+A `failed` verdict marks the node and permanently excludes it from the frontier — `failed` nodes are never deleted from `tree.json`, only marked. Paired with the **capability governor** (a `PreToolUse` hook that denies out-of-scope writes/tools per agent) and a **monotonic-honesty invariant** (the engine may never weaken its own fraud detection), the gate is what lets oh-my-evor be *aggressive and autonomous* without becoming *untrustworthy*.
+
+---
+
+## 🔬 Proof it works
+
+We hold ourselves to the same standard we hold the agents to — **claims are backed by evidence you can reproduce**:
+
+**✅ 842 automated tests pass** — the safety-critical logic is covered, not asserted.
+```bash
+cd mcp && npx vitest run          # 304 passing  (MCP server, tools, hooks, governor, locks)
+python -m pytest harness/tests -q # 538 passing  (integrity gate, signals, tree search, evaluator)
+```
+
+**✅ Verified installable in a clean container.** In a fresh environment with no repo mounted, the two-command marketplace install produced a working plugin: `plugin:oh-my-evor:evor · ✔ connected · 14 tools`, 11 agents, 6 hooks — and the Node→Python bridge round-tripped with **no `pip install` of `evor` itself** (the server injects the harness onto `PYTHONPATH`).
+
+**✅ Real evolution artifacts.** The tree at the top of this page is not a mock-up — it's a rendered run where candidates were scored and integrity-gated, and the best emerged from a genuine branching search.
+
+**✅ Adversarially audited.** The codebase was put through a multi-agent audit that found and root-cause-fixed 25 real defects (silent data loss, a dead signal pipeline, dead circuit-breakers, leakage-check false-negatives) — each fix locked in by a proving test.
+
+---
+
+## Architecture
+
+| Layer | What | Detail |
+|---|---|---|
+| **Orchestration** | Skills + agents | `/oh-my-evor:*` skills, 11 hierarchical agents, Autonomy Charter (never-halt, monotonic-honesty) |
+| **MCP server** | 14 tools (TypeScript, prebuilt bundle) | `record_node`, `record_eval`, `integrity_check`, `select`, `signal_emit/query`, `state_*`, `tree_read`, `cite`, `wiki_*`, … |
+| **Compute harness** | Python | Integrity gate (13 checks), tree engine (UCB1 + crossover + prune), SignalBus, evaluator, telemetry, live dashboard |
+| **Enforcement** | 6 hooks | `PreToolUse` capability governor, signal capture, compaction flush/rehydrate, stop-guards |
+| **Bridge** | Node ↔ Python | Per-call subprocess JSON; harness auto-resolved onto `PYTHONPATH` so it works after a bare install |
+
+State for every mission lives under `.evor/runs/<mission>/<run-id>/` — `goal-contract.json` (immutable spec), `tree.json` (all candidates, never deleted), `run-state.json`, `decision-log.md`, `frozen-splits/`, and content-addressed `artifacts/`.
+
+---
+
+## Requirements
+
+- **Claude Code** (the plugin host)
+- **Node ≥ 18** — runs the MCP server + hooks (ships prebuilt; no build needed)
+- **Python ≥ 3.10** — the compute harness (`pip install -e harness` once)
+- For real training missions: your own compute stack (e.g. `torch`, `torchvision`); GPU optional (CPU fallback supported)
+
+---
+
+## References
+
+oh-my-evor's search and integrity machinery build on established work:
+
+1. Auer, Cesa-Bianchi & Fischer. *Finite-time Analysis of the Multiarmed Bandit Problem.* Machine Learning, 2002. — the UCB1 scoring behind node selection.
+2. Kocsis & Szepesvári. *Bandit Based Monte-Carlo Planning.* ECML, 2006. — the UCT / Monte-Carlo tree-search framing of the evolution tree.
+
+The research agent (**Sage**) additionally anchors every in-run SOTA claim to a live source URL — citation is a hard requirement of the pipeline, not a nicety.
 
 ---
 
 ## License
 
-MIT.
+MIT — see [LICENSE](LICENSE).
+
+<div align="center">
+<sub>Built for <a href="https://code.claude.com">Claude Code</a>. Autonomous research you can actually trust.</sub>
+</div>
