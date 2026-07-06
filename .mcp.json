@@ -6,11 +6,17 @@
     },
     "semantic-scholar": {
       "command": "uvx",
-      "args": ["semantic-scholar-mcp"]
+      "args": ["semantic-scholar-mcp"],
+      "env": {
+        "PATH": "${HOME}/.local/bin:${HOME}/.cargo/bin:/opt/homebrew/bin:/usr/local/bin:${PATH}"
+      }
     },
     "arxiv": {
       "command": "uvx",
-      "args": ["arxiv-mcp-server"]
+      "args": ["arxiv-mcp-server"],
+      "env": {
+        "PATH": "${HOME}/.local/bin:${HOME}/.cargo/bin:/opt/homebrew/bin:/usr/local/bin:${PATH}"
+      }
     },
     "hf-mcp": {
       "type": "http",

@@ -114,7 +114,13 @@ function checkUv(eRoot) {
   try {
     const sentinel = join(eRoot, '.uv-ok');
     if (existsSync(sentinel)) return '';
-    const res = spawnSync('uv', ['--version'], { encoding: 'utf8', timeout: 3000 });
+    // Check `uv` with the SAME PATH the .mcp.json servers inject, so this verdict
+    // matches what the MCP spawner will actually see (uv usually lands in ~/.local/bin,
+    // which is often absent from a GUI/minimal spawn PATH → the "uvx ENOENT" failure).
+    const home = process.env.HOME ?? '';
+    const uvPath = [`${home}/.local/bin`, `${home}/.cargo/bin`, '/opt/homebrew/bin', '/usr/local/bin', process.env.PATH ?? '']
+      .filter(Boolean).join(':');
+    const res = spawnSync('uv', ['--version'], { encoding: 'utf8', timeout: 3000, env: { ...process.env, PATH: uvPath } });
     if (res.status === 0) {
       try { mkdirSync(dirname(sentinel), { recursive: true }); writeFileSync(sentinel, new Date().toISOString()); } catch { /* read-only — re-check next session */ }
       return '';

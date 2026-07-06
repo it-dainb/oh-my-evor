@@ -1,6 +1,6 @@
 {
   "name": "oh-my-evor",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "Autonomous ML research evolution engine for Claude Code",
   "type": "module",
   "scripts": {
