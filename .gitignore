@@ -18,6 +18,9 @@ harness/.venv/
 # reference repos (read-only, not part of this project)
 refs/
 
+# evor runtime sentinels (not source)
+.evor/.deps-ok
+
 # omc runtime state (not source)
 .omc/state/
 .omc/project-memory.json

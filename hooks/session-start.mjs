@@ -17,8 +17,8 @@
  *   - Python wiki unavailable   → skip priming, still emit env JSON
  */
 
-import { existsSync, readFileSync } from 'fs';
-import { join } from 'path';
+import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
+import { join, dirname, delimiter } from 'path';
 import { spawnSync } from 'child_process';
 
 /**
@@ -61,6 +61,47 @@ function buildEvorRestore(rDir, rId, mId) {
   return `<evor-restore>\n${lines.join('\n')}\n</evor-restore>`;
 }
 
+/**
+ * One-time check that the Python harness + its deps are importable. After a
+ * bare `/plugin install` the plugin files land but pip deps (pydantic, pyyaml)
+ * and `evor` on the path are NOT guaranteed — the MCP tools that shell out to
+ * Python would fail cryptically. This surfaces a clear one-line fix instead.
+ *
+ * Non-intrusive: never installs anything, never throws, caches success so a
+ * healthy install spawns Python at most once. Returns a warning string, or ''.
+ *
+ * @param {string} pRoot  CLAUDE_PLUGIN_ROOT
+ * @param {string} eRoot  resolved .evor root (writable at runtime)
+ * @returns {string}
+ */
+function checkHarnessDeps(pRoot, eRoot) {
+  try {
+    const harness = process.env.EVOR_HARNESS_DIR ?? join(pRoot, 'harness');
+    if (!existsSync(harness)) return '';            // not our layout — say nothing
+    const sentinel = join(eRoot, '.deps-ok');
+    if (existsSync(sentinel)) return '';            // already verified this install
+    const py = process.env.EVOR_PYTHON ?? 'python3';
+    const env = {
+      ...process.env,
+      PYTHONPATH: process.env.PYTHONPATH ? `${harness}${delimiter}${process.env.PYTHONPATH}` : harness,
+    };
+    // evor.contracts imports pydantic; also probe pyyaml — covers path + both deps.
+    const res = spawnSync(py, ['-c', 'import evor.contracts, yaml'], { encoding: 'utf8', timeout: 3000, env });
+    if (res.status === 0) {
+      try { mkdirSync(dirname(sentinel), { recursive: true }); writeFileSync(sentinel, new Date().toISOString()); } catch { /* read-only .evor — fine, we just re-check next time */ }
+      return '';
+    }
+    const missing = (res.stderr ?? '').split('\n').find(l => l.includes('ModuleNotFoundError')) ?? '';
+    return [
+      `[oh-my-evor] Python harness is not importable${missing ? ` (${missing.trim()})` : ''} — the MCP tools that call Python will fail until deps are installed once:`,
+      `  pip install -e "${harness}"      # or run the plugin's ./install.sh`,
+      `(Python: ${py}. Override with EVOR_PYTHON / EVOR_HARNESS_DIR.)`,
+    ].join('\n');
+  } catch {
+    return '';                                       // never break session start
+  }
+}
+
 // ── Kill switches ─────────────────────────────────────────────────────────────
 if (process.env.DISABLE_EVOR) process.exit(0);
 
@@ -72,12 +113,16 @@ const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT ?? process.cwd();
 const evorRoot = process.env.EVOR_ROOT ?? join(pluginRoot, '.evor');
 const activeRunFile = join(evorRoot, 'active-run.json');
 
+// One-time harness/deps health check (surfaces a clear fix on incomplete installs).
+const depWarning = checkHarnessDeps(pluginRoot, evorRoot);
+
 /** Emit clear-env JSON and exit 0 gracefully. */
 function clearEnvAndExit(reason) {
   if (reason) process.stderr.write(`[evor:session-start] ${reason}\n`);
   process.stdout.write(
     JSON.stringify({
       env: { EVOR_ACTIVE_RUN_ID: '', EVOR_MISSION_ID: '', EVOR_RUN_DIR: '' },
+      ...(depWarning ? { message: depWarning } : {}),
     }) + '\n'
   );
   process.exit(0);
@@ -85,6 +130,7 @@ function clearEnvAndExit(reason) {
 
 // No active run — normal state when no mission is in flight
 if (!existsSync(activeRunFile)) {
+  if (depWarning) process.stdout.write(JSON.stringify({ message: depWarning }) + '\n');
   process.exit(0);
 }
 
@@ -133,6 +179,9 @@ const restoreBlock = buildEvorRestore(runDir, runId, missionId);
 if (restoreBlock) {
   output.message += `\n\n${restoreBlock}`;
 }
+
+// Surface any harness/deps warning first so an incomplete install is obvious.
+if (depWarning) output.message = `${depWarning}\n\n${output.message}`;
 
 process.stdout.write(JSON.stringify(output) + '\n');
 process.exit(0);
