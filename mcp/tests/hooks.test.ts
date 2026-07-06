@@ -88,6 +88,7 @@ describe("session-start hook", () => {
 
   it("exports EVOR_PLUGIN_ROOT (but no active-run env) when active-run.json is absent", () => {
     writeFileSync(join(tmpDir, ".deps-ok"), "cached"); // skip the env-dependent dep-check
+    writeFileSync(join(tmpDir, ".uv-ok"), "cached");   // skip the env-dependent uv-check
     // Pre-seed workspace-class cache so the scan never touches the OS temp parent,
     // keeping this test deterministic regardless of what sits above tmpDir.
     writeFileSync(join(tmpDir, ".workspace-class"), JSON.stringify({ class: "greenfield", counts: { models: 0, datasets: 0, configs: 0, logs: 0 } }));
@@ -2174,8 +2175,9 @@ describe("session-start hook — workspace classification (distill nudge)", () =
     workspaceDir = mkdtempSync(join(tmpdir(), "evor-ws-test-"));
     evorRootDir  = join(workspaceDir, ".evor");
     mkdirSync(evorRootDir, { recursive: true });
-    // Skip dep-check so only workspace classification logic is exercised.
+    // Skip dep-check and uv-check so only workspace classification logic is exercised.
     writeFileSync(join(evorRootDir, ".deps-ok"), "cached");
+    writeFileSync(join(evorRootDir, ".uv-ok"), "cached");
     // No active-run.json → hook takes the no-active-run / classification path.
   });
 

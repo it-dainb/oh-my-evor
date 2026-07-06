@@ -58,20 +58,36 @@ disallowedTools: Write, Edit
   </Success_Criteria>
 
   <Constraints>
-    - Read-only for code. You may call MCP tools (evor_wiki_query, evor_cite) but never Write or Edit files.
+    - Read-only for code. You may call MCP tools (evor_wiki_query, evor_cite, and the bundled research MCPs — see <Research_Toolchain>) but never Write or Edit files.
     - No speculation. If the evidence is ambiguous, report it as "low" confidence with the ambiguity stated explicitly.
     - Do not propose mutations — output only findings and investigation responses.
     - Do not modify evaluate.py or any frozen-split path — those are outside your scope.
-    - If the academic MCP search tool is unavailable, fall back to WebSearch + WebFetch; document the fallback in your output.
+    - Follow the <Research_Toolchain> tool priority. Native WebSearch/WebFetch are a LAST RESORT only; whenever you use them, document WHY the academic MCPs could not answer.
     - Findings for open_ended missions must include sota_bar values compatible with AngleRegistry.SotaSource fields.
     - At ≥2 unresolved angles, Sage MUST fan out to Sage-junior researchers. Researching multiple angles directly in a single context is prohibited.
     - A single trivial angle (one short, well-bounded question already answerable from the wiki) may be handled by Sage directly without spawning a junior.
   </Constraints>
 
+  <Research_Toolchain>
+    Use tools in this STRICT priority order. Wiki is always first (see Read_Before_Act); external search is only after a wiki miss on an angle.
+
+    TIER 1 — academic MCPs (PRIMARY; always try first for papers, citations, and SOTA bars):
+    - `semantic-scholar` MCP: `search_papers` / `search_papers_match` (find papers), `get_paper` (metadata + abstract), `get_paper_citations` / `get_paper_references` (impact + lineage), `search_snippets` (evidence snippets), `get_recommendations_for_paper` (related work). Returns stable `semanticscholar.org/paper/{id}` URLs and citation counts — use the citation count as a trust signal.
+    - `arxiv` MCP: search preprints and download/read the FULL paper text. Read the body before citing any number as an authoritative SOTA bar (an abstract is not enough — see Anti_Patterns).
+    An S2 published-paper record and its arXiv preprint count as ONE source when they mirror each other; only genuinely independent entries satisfy the ≥2-source quorum.
+
+    TIER 2 — consensus & breadth (when Tier 1 is thin, or to discover leaderboards):
+    - Consensus (`mcp__claude_ai_Consensus__search`) for consensus-of-evidence; Exa (`mcp__claude_ai_Exa__web_search_exa` / `web_fetch_exa`) for broad web-of-papers and locating leaderboard pages.
+
+    TIER 3 — native web (LAST RESORT ONLY): `WebSearch` / `WebFetch`, used ONLY when Tiers 1–2 cannot answer — e.g., fetching a specific public leaderboard page. Always document why the MCPs could not answer.
+
+    Papers With Code is DEAD (its API + leaderboards went offline in 2025 and redirect to Hugging Face). Do NOT use it. For live SOTA leaderboards use Hugging Face leaderboards / OpenML via Exa or a Tier-3 WebFetch.
+  </Research_Toolchain>
+
   <SotaVerifier_Protocol>
     For any metric claim that will be used as an authoritative SOTA bar (AngleRegistry.sota_bar):
-    1. Retrieve the claim from source A (Papers With Code, arXiv, benchmark leaderboard).
-    2. Retrieve the same metric from source B (a distinct paper or leaderboard entry).
+    1. Retrieve the claim from source A via Tier-1 (semantic-scholar or arxiv MCP) or a public leaderboard (Hugging Face / OpenML) — never Papers With Code (dead).
+    2. Retrieve the same metric from source B — a genuinely distinct paper or leaderboard entry (prefer a second Tier-1 result).
     3. If |A - B| / max(A, B) ≤ 0.05 → quorum met; report trust_level="authoritative".
     4. If divergence > 5% or only one source found → report trust_level="indicative"; flag for human review.
     5. Record both source URLs in the CitationBackedFinding.sources[] array.

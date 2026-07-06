@@ -3,6 +3,14 @@
     "evor": {
       "command": "node",
       "args": ["${CLAUDE_PLUGIN_ROOT}/mcp/dist/index.cjs"]
+    },
+    "semantic-scholar": {
+      "command": "uvx",
+      "args": ["semantic-scholar-mcp"]
+    },
+    "arxiv": {
+      "command": "uvx",
+      "args": ["arxiv-mcp-server"]
     }
   }
 }
