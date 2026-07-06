@@ -9,14 +9,24 @@ auto-repairs repairable issues such as legacy list-format tree.json.
 
 ## Dispatch
 
-1. Read the full bundled skill instructions from `skills/evor-doctor/SKILL.md`.
+1. Read the bundled skill instructions with one deterministic read:
+   ```bash
+   cat "$CLAUDE_PLUGIN_ROOT/skills/evor-doctor/SKILL.md"
+   ```
+   Claude Code sets `CLAUDE_PLUGIN_ROOT` to this plugin's install directory, so this resolves no matter what your current working directory is.
 2. Follow that SKILL.md exactly, treating the user's arguments as:
 
 ```text
 $ARGUMENTS
 ```
 
-If the file is not directly readable from the current working directory, locate it under the active plugin root, then continue.
+If `$CLAUDE_PLUGIN_ROOT` happens to be unset, fall back to a **bounded** lookup only:
+
+```bash
+find "$HOME/.claude/plugins" -path "*oh-my-evor*/skills/evor-doctor/SKILL.md" 2>/dev/null | head -1
+```
+
+**Never run `find /` or scan the whole filesystem.** The skill lives inside this plugin's own directory; a full-disk search is unnecessary and will hang the session.
 
 ## Quick Reference
 

@@ -8,7 +8,11 @@ This command resumes a paused or interrupted Evor mission by restoring run state
 
 ## Dispatch
 
-1. Read the full bundled skill instructions from `skills/evor-run/SKILL.md`.
+1. Read the bundled skill instructions with one deterministic read:
+   ```bash
+   cat "$CLAUDE_PLUGIN_ROOT/skills/evor-run/SKILL.md"
+   ```
+   Claude Code sets `CLAUDE_PLUGIN_ROOT` to this plugin's install directory, so this resolves no matter what your current working directory is.
 2. Follow that SKILL.md exactly with the resume flag active, treating the user's arguments as:
 
 ```text
@@ -17,7 +21,13 @@ $ARGUMENTS
 
 The `evor-run` skill handles resume detection: if `run-state.json` shows `tick_count > 0` and `status != "completed"`, it enters resume mode automatically.
 
-If the file is not directly readable from the current working directory, locate it under the active plugin root, then continue.
+If `$CLAUDE_PLUGIN_ROOT` happens to be unset, fall back to a **bounded** lookup only:
+
+```bash
+find "$HOME/.claude/plugins" -path "*oh-my-evor*/skills/evor-run/SKILL.md" 2>/dev/null | head -1
+```
+
+**Never run `find /` or scan the whole filesystem.** The skill lives inside this plugin's own directory; a full-disk search is unnecessary and will hang the session.
 
 ## Quick Reference
 
