@@ -3,10 +3,15 @@ name: evor-setup
 description: Mission interview workflow that produces a GoalContract and initializes run state for an Evor evolution mission
 argument-hint: "[mission description]"
 level: 3
+skills: [oh-my-evor:evor-mcp]
 ---
 
 <Purpose>
-evor-setup conducts a 14-question Socratic interview to elicit all GoalContract fields, discovers the local compute environment, initializes the frozen data splits (Pillar 2), creates the initial EvalSuite v1 (Pillar 3), runs a preflight smoke-train, and gates launch on explicit user consent. ALL task-specific settings (metrics, constraints, budget, licenses, wildness) are asked and LOCKED during this interview — they cannot be changed after the mission starts without a full re-setup. The output is a valid GoalContract written to `.evor/runs/<mission-slug>/<run-id>/` that the `evor` tick loop can consume.
+evor-setup conducts a structured interview to elicit all GoalContract fields, discovers the local compute environment, initializes the frozen data splits (Pillar 2), creates the initial EvalSuite v1 (Pillar 3), runs a preflight smoke-train, and gates launch on explicit user consent. ALL task-specific settings (metrics, constraints, budget, licenses, wildness) are asked and LOCKED during this interview — they cannot be changed after the mission starts without a full re-setup. The output is a valid GoalContract written to `.evor/runs/<mission-slug>/<run-id>/` that the `evor` tick loop can consume.
+
+Use `AskUserQuestion` to present each question to the user with structured multiple-choice options where applicable. This ensures clear, parseable responses rather than freeform input.
+
+If `pyright` is not installed, the LSP pre-flight in Forge-junior operates in best-effort mode. Install it with `npm install -g pyright` for full LSP coverage.
 </Purpose>
 
 <Use_When>
@@ -32,15 +37,13 @@ Determine evorRoot: use `$EVOR_ROOT` if set, else `<cwd>/.evor`.
 **Case B — No starting-point.json, but workspace looks brownfield** (any `*.pt`, `*.pth`,
 `*.ckpt`, or `*.safetensors` file found, OR a `data/` or `datasets/` directory exists, OR
 `train.py` / `trainer.py` is present in the working tree):
-  Offer the user a choice before continuing:
+  Use `AskUserQuestion` to offer:
   ```
   This workspace has existing ML artifacts. Run /oh-my-evor:evor-distill first for a
-  detailed scan, or type 'skip' to continue the interview without pre-filling.
+  detailed scan, or choose 'skip' to continue the interview without pre-filling.
   ```
-  - If the user agrees to distill: read and execute the evor-distill skill (equivalent to
-    running `/evor-distill`), then read the resulting `starting-point.json`. Proceed to
-    "Pre-fill" below.
-  - If the user types 'skip': proceed directly to the interview with no pre-fill.
+  - If the user agrees to distill: read and execute the evor-distill skill, then read the resulting `starting-point.json`. Proceed to "Pre-fill" below.
+  - If the user chooses 'skip': proceed directly to the interview with no pre-fill.
 
 **Case C — `<evorRoot>/active-run.json` exists** (workspace_class = evor-active):
   Stop. Print:
@@ -65,7 +68,7 @@ Pre-filled from starting-point.json — confirm each answer or type a new value:
   Q3a Seed path:   <root>
   Q2  Dataset:     <datasets[0].path>  [<datasets[0].kind>]
   Q7  Framework:   <framework or "unknown">
-  Q5  Baseline:    <baseline_candidate.metric_name>=<baseline_candidate.claimed_value>
+  Q5  Baseline:    <metric_name>=<claimed_value>
                    ** UNVERIFIED — scraped from repo; EVOR will re-measure on frozen split **
   Hint — Model:    <models[0].arch_guess> (<models[0].format>)  (if detected; not locked here)
 ```
@@ -97,7 +100,7 @@ measured value that becomes `GoalContract.baseline_value`.
 </Phase_0_Distillation>
 
 <Interview>
-Conduct the following 14 questions in order. Ask Q1–Q8 sequentially (Q4a is always asked after Q4). Ask Q9 after Q8. Ask Q10–Q11 only if mission_type=open_ended. Always ask Q12. Ask Q13 only if mission_type=open_ended.
+Conduct the following 14 questions in order using `AskUserQuestion` for each. Ask Q1–Q8 sequentially (Q4a is always asked after Q4). Ask Q9 after Q8. Ask Q10–Q11 only if mission_type=open_ended. Always ask Q12. Ask Q13 only if mission_type=open_ended.
 
 Display a progress indicator: "Question N/14" at the start of each question.
 
@@ -111,10 +114,13 @@ Display a progress indicator: "Question N/14" at the start of each question.
 **Q2 — Dataset**
 "Where is your dataset? Provide a filesystem path or URI. Is it already split into train/val/test?"
 → Set `dataset_ref`.
-→ Note whether splits are pre-defined or need to be created by freeze.py.
+→ Note whether splits are pre-defined or need to be created by the freeze step.
 
 **Q3 — Mode: from-scratch or seed-repo**
-"Do you have an existing codebase (seed-repo mode) or are we starting from a blank PyTorch skeleton (from-scratch mode)?"
+Use `AskUserQuestion` with options:
+- A) seed-repo (existing codebase)
+- B) from-scratch (blank PyTorch skeleton)
+
 → Set `mode`: "seed-repo" | "from-scratch".
 → If seed-repo: ask for `seed_repo_path`.
 → If seed-repo: note that Forge will audit existing seams and produce a GenomeSeedAdapterReport.
@@ -141,7 +147,7 @@ Display a progress indicator: "Question N/14" at the start of each question.
      - loss-only → model can overfit silently → guard: add val accuracy as secondary metric
   3. Presents guards as `MetricConstraint` options — a violated constraint yields fitness=0.0.
 
-Present options to the user:
+Use `AskUserQuestion` to present options:
 ```
 Metric options for your task:
   [A] Single:     accuracy  (warning: gameable on imbalanced datasets)
@@ -179,18 +185,27 @@ Metric options for your task:
 → Set `framework` (default "pytorch").
 
 **Q8 — Wildness dial**
-"How adventurous should Evor be in proposing mutations? 0.0 = conservative tweaks only, 0.5 = balanced exploration (default), 1.0 = paradigm-shifting proposals."
+Use `AskUserQuestion` with a slider description:
+"How adventurous should Evor be in proposing mutations?
+  [A] 0.0 — conservative tweaks only
+  [B] 0.5 — balanced exploration (default)
+  [C] 1.0 — paradigm-shifting proposals
+  [D] Custom value (0.0–1.0)"
 → Set `wildness` (default 0.5).
 
 ---
 
 **Q9 — Mission type: fixed or open-ended** (always ask after Q8)
-"Is this a **fixed** mission (one frozen test suite throughout) or an **open-ended** mission (Evor can discover new evaluation angles and expand the benchmark as it evolves)?"
+Use `AskUserQuestion` with options:
+- A) fixed (one frozen test suite throughout)
+- B) open-ended (Evor can discover new evaluation angles and expand the benchmark)
+
 → Set `mission_type`: "fixed" | "open_ended".
 → If fixed: proceed to Q12.
 → If open_ended: proceed to Q10.
 
 **Q10 — SOTA sources and expansion policy** (only if open_ended)
+Use `AskUserQuestion` to present sources as checkboxes:
 "Which SOTA sources should count as authoritative for setting benchmark bars?
   (a) Papers With Code — leaderboard data, auto-retrieved
   (b) arXiv — paper-reported numbers, retrieved by Sage
@@ -210,24 +225,29 @@ Should new evaluation angles be auto-added within a domain family, or require yo
 → Set `stop_condition.type`: "coverage-target".
 
 **Q12 — License allowlist** (always ask)
+Use `AskUserQuestion`:
 "Which data licenses are acceptable for external dataset acquisition or synthetic data generation?
 
 Default allowlist: MIT, Apache-2.0, BSD-2-Clause, BSD-3-Clause, CC-BY-4.0, CC0-1.0.
 
-Type 'confirm' to accept defaults, or provide your custom list (SPDX identifiers, comma-separated). Any acquired data with a license outside this list will be rejected by the Ingestion Contamination Gate."
-→ Set `GoalContract.allowed_licenses` (default list if confirmed, custom list if provided).
+  [A] Confirm defaults
+  [B] Provide a custom list (SPDX identifiers, comma-separated)"
+
+Any acquired data with a license outside this list will be rejected by the Ingestion Contamination Gate.
+→ Set `GoalContract.allowed_licenses` (default list if A, custom list if B).
 
 **Q13 — Compute budget confirmation** (only if open_ended; MUST be asked before consent checkpoint)
+Use `AskUserQuestion`:
 "Compute budget review:
   - Coverage target: [coverage_target from Q11]
   - Estimated ticks to coverage: [estimated = coverage_target / expected_ticks_per_angle_gain (use 0.05 per tick as default estimate)]
   - Estimated total cost: [GPU-hours × GPU rate if cloud; 'local — no direct cost' if local-only]
 
-Do you confirm this budget is acceptable before the mission starts? (yes/no)
+Do you confirm this budget is acceptable before the mission starts?
+  [A] Yes — proceed
+  [B] No — abort (re-run /evor-setup with adjusted parameters)"
 
-If you decline, the mission will not start. You can re-run evor-setup with a smaller coverage_target or fewer max_iterations."
-→ Requires explicit "yes" to proceed.
-→ If "no" or any decline: abort setup. Print: "Mission not started. Re-run /evor-setup with adjusted budget parameters."
+→ If B or any decline: abort setup. Print: "Mission not started. Re-run /evor-setup with adjusted budget parameters."
 
 </Interview>
 
@@ -273,14 +293,16 @@ Environment discovered:
 </Environment_Discovery>
 
 <Frozen_Split_Setup>
-After environment discovery, initialize frozen data splits (Addendum v2 Pillar 2):
+After environment discovery, initialize frozen data splits (Addendum v2 Pillar 2).
 
-```python
-# Call via python_repl or subprocess:
-PYTHONPATH="${EVOR_PLUGIN_ROOT:-$CLAUDE_PLUGIN_ROOT}/harness${PYTHONPATH:+:$PYTHONPATH}" python -m evor.freeze freeze-splits \
-  --dataset-path <dataset_ref> \
-  --eval-version v1 \
-  --run-dir .evor/runs/<mission-slug>/<run-id>/
+Call `evor_freeze_splits` with the dataset path, eval version, and run directory:
+
+```
+evor_freeze_splits({
+  dataset_path: "<dataset_ref>",
+  eval_version: "v1",
+  run_dir: ".evor/runs/<mission-slug>/<run-id>/"
+})
 ```
 
 This:
@@ -305,7 +327,7 @@ This step produces the real cryptographic anchors written into the GoalContract.
 
 **locked_split_hash — real sha256 of the frozen test split:**
 
-If `python -m evor.freeze freeze-splits` ran successfully it already returns this value — use it.
+If `evor_freeze_splits` ran successfully it already returns this value — use it.
 If the freeze module is unavailable or splits are baked into cached features/index arrays rather than files, compute from the sorted index list:
 
 ```bash
@@ -333,7 +355,7 @@ Set `GoalContract.eval_script_hash` to the 64-hex-char result.
 
 **Frozen-split manifests — must carry real hashes, not empty fields:**
 
-After `freeze-splits`, verify:
+After `evor_freeze_splits`, verify:
 - `frozen-splits/v1-test.json` exists and its `split_hash` field is a 64-hex-char string.
 - `eval-suites/v1.json` will be written by EvalSuite_Initialization immediately after this section.
 
@@ -364,14 +386,17 @@ Setup halts with a clear error if either field contains a label, a version strin
 </Materialize_Anchors>
 
 <EvalSuite_Initialization>
-Create the initial EvalSuite v1 (Addendum v2 Pillar 3):
+Create the initial EvalSuite v1 (Addendum v2 Pillar 3).
 
-```python
-PYTHONPATH="${EVOR_PLUGIN_ROOT:-$CLAUDE_PLUGIN_ROOT}/harness${PYTHONPATH:+:$PYTHONPATH}" python -m evor.benchmark init-eval-suite \
-  --mission-id <mission_id> \
-  --eval-version v1 \
-  --task-description "<task_description>" \
-  --run-dir .evor/runs/<mission-slug>/<run-id>/
+Call `evor_init_eval_suite` with the mission details and run directory:
+
+```
+evor_init_eval_suite({
+  mission_id: "<mission_id>",
+  eval_version: "v1",
+  task_description: "<task_description>",
+  run_dir: ".evor/runs/<mission-slug>/<run-id>/"
+})
 ```
 
 This:
@@ -384,27 +409,27 @@ Set `GoalContract.eval_version = "v1"`.
 </EvalSuite_Initialization>
 
 <Preflight_Smoke_Train>
-Run a 5-step smoke-train to verify the environment is functional:
+Run a 5-step smoke-train to verify the environment is functional.
 
-```bash
-PYTHONPATH="${EVOR_PLUGIN_ROOT:-$CLAUDE_PLUGIN_ROOT}/harness${PYTHONPATH:+:$PYTHONPATH}" python -m evor preflight --run-id <run_id>
-```
+Call `evor_preflight({ run_id: "<run_id>" })`.
 
 The preflight runs a micro-train (10 random samples, 2-layer MLP, 5 steps) and verifies:
 1. Loss at step 5 < loss at step 1 (training is working).
 2. GPU util > 0% if GPU detected (GPU is accessible).
 3. No OOM or import errors.
 
-**On failure:** Print the full environment discovery report and prompt:
-"Preflight failed: <error>. Do you want to override and proceed anyway? (yes/no)"
-→ If "no": abort setup.
-→ If "yes": note the override in the GoalContract metadata and proceed.
+**On failure:** Use `AskUserQuestion`:
+"Preflight failed: <error>. Do you want to override and proceed anyway?
+  [A] Yes — note override and proceed
+  [B] No — abort setup"
+→ If B: abort setup.
+→ If A: note the override in the GoalContract metadata and proceed.
 
 **On success:** Print: "Preflight passed. Training pipeline verified."
 </Preflight_Smoke_Train>
 
 <Launch_Consent_Checkpoint>
-Before writing the final GoalContract and initializing the run, display a summary and require explicit consent. This checkpoint CANNOT be skipped.
+Before writing the final GoalContract and initializing the run, display a summary and require explicit consent via `AskUserQuestion`. This checkpoint CANNOT be skipped.
 
 ```
 === Evor Mission Setup Summary ===
@@ -434,9 +459,12 @@ Expansion policy:   auto-add within [<families>], consent required for [<familie
 Estimated ticks:    ~<estimate>
 ```
 
-Print: "Type 'start' to launch the mission, or 'abort' to cancel."
-→ "start": proceed to Run_Initialization.
-→ Any other response: abort. Print "Mission not started."
+Use `AskUserQuestion`:
+"Type 'start' to launch the mission, or 'abort' to cancel.
+  [A] start
+  [B] abort"
+→ A: proceed to Run_Initialization.
+→ B or any other response: abort. Print "Mission not started."
 </Launch_Consent_Checkpoint>
 
 <Run_Initialization>
@@ -497,37 +525,27 @@ After consent:
 
    Print: "Mission will run FULLY AUTONOMOUS to the goal — the monotonic-honesty invariant auto-decides every mid-run choice with no human questions."
 
-3. Call `evor_init_run` to write all run artifacts atomically.
+3. Call `evor_init_run` to write all run artifacts atomically:
 
-   **Preferred — MCP tool:**
    ```
-   evor_init_run({ "answers": <answers object>, "run_id": "<run_id>", "mission_id": "<mission_id>" })
-   ```
-
-   **Shell fallback** (if calling via subprocess instead of MCP):
-   ```bash
-   PYTHONPATH="${EVOR_PLUGIN_ROOT:-$CLAUDE_PLUGIN_ROOT}/harness${PYTHONPATH:+:$PYTHONPATH}" \
-     python -m evor init-run \
-       --answers answers.json \
-       --run-dir .evor/runs/<mission-slug>/<run-id> \
-       --run-id <run_id>
+   evor_init_run({ answers: <answers object>, run_id: "<run_id>", mission_id: "<mission_id>" })
    ```
 
    This ONE call writes — atomically — all seven run artifacts into `<run_dir>` (and `active-run.json` at `<evor_root>`):
 
    | Artifact | Notes |
    |---|---|
-   | `goal-contract.json` | Pydantic-validated; exits non-zero with `{"error":"..."}` on any field violation |
+   | `goal-contract.json` | Pydantic-validated; returns `{"error":"..."}` on any field violation |
    | `run-state.json` | status: "initialized", tick_count: 0 |
    | `strategy.json` | UCB1 defaults, wildness from contract |
-   | `tree.json` | empty nodes dict (matches mcp/src/tree-store.ts::writeTree() DICT format) |
+   | `tree.json` | empty nodes dict (DICT format) |
    | `mission-state.json` | status: "draft" — locked only after validate passes |
    | `decision-log.md` | header with timestamp + mission_id + run_id + objective |
    | `<evor_root>/active-run.json` | {mission_id, run_id, run_dir} |
 
-   **Do NOT hand-write any of these files.** The tool constructs them from the validated GoalContract; manual writes will produce schema drift. On success the tool prints `{"ok": true, "mission_id": "...", "run_id": "...", "run_dir": "...", "goal_contract_path": "..."}` — surface any error to the user if it exits non-zero.
+   **Do NOT hand-write any of these files.** The tool constructs them from the validated GoalContract; manual writes produce schema drift. Surface any `{error}` result to the user.
 
-4. Set environment variable `EVOR_ACTIVE_RUN_ID=<run_id>`.
+4. Call `evor_state_write({ mission_status: "initialized", active_run: { mission_id, run_id, run_dir, status: "initialized" } })` to set the active run state.
 
 Print: "Mission initialized. Run ID: <run_id>. Running Phase-2 validation gate..."
 Then proceed to Validate_And_Lock.
@@ -536,27 +554,15 @@ Then proceed to Validate_And_Lock.
 <Validate_And_Lock>
 Run the Phase-2 enforcement gate and lock the contract before `/evor-run` is possible.
 
-```bash
-PYTHONPATH="${EVOR_PLUGIN_ROOT:-$CLAUDE_PLUGIN_ROOT}/harness${PYTHONPATH:+:$PYTHONPATH}" python -m evor validate --run-id <run_dir>
-```
+Call `evor_validate({ run_id: "<run_dir>" })`.
 
-**On pass (exit 0):**
-Flip `mission-state.json` status `"draft"` → `"locked"`:
-```bash
-python -c "
-import json; from pathlib import Path; from datetime import datetime, timezone
-p = Path('<run_dir>/mission-state.json')
-d = json.loads(p.read_text()); d['status'] = 'locked'
-d['updated_at'] = datetime.now(timezone.utc).isoformat()
-p.write_text(json.dumps(d, indent=2))
-print('Mission locked.')
-"
-```
+**On pass:**
+Call `evor_state_write({ mission_status: "locked" })` to flip mission-state.json from `"draft"` to `"locked"`.
 Print: "Phase-2 validation PASSED. Mission locked. Run ID: <run_id>. Start the tick loop with /evor-run."
 
-**On fail (exit 1):**
+**On fail:**
 Do NOT flip status. The mission stays at `"draft"` and cannot be started with `/evor-run`.
-Print the failed check details from the validator JSON report (each `ok: false` check with its detail).
+Print the failed check details from the validator report (each `ok: false` check with its detail).
 Print: "Phase-2 validation FAILED. Mission is NOT locked. Resolve the issues above, then re-run /evor-setup."
 
 Remediation by failure type:
@@ -571,8 +577,13 @@ Setup CANNOT complete with a draft/invalid contract. `/evor-run` will refuse to 
 </Validate_And_Lock>
 
 <Tool_Usage>
-- python_repl — run freeze.py, benchmark init, preflight
-- Bash — nvidia-smi, free, df, sha256sum
-- evor_init_run (MCP) — atomically write goal-contract.json + all six run artifacts (preferred); shell fallback: `python -m evor init-run`
-- evor_state_write — update run state after initialization
+- `AskUserQuestion` — drive the interview with structured multiple-choice questions (Q3, Q4a, Q8, Q9, Q12, Q13, preflight override, consent checkpoint)
+- `Bash` — nvidia-smi, free, df, sha256sum (environment discovery + hash computation)
+- `evor_freeze_splits` — freeze test and val splits; returns locked_split_hash
+- `evor_init_eval_suite` — create initial EvalSuite v1 and angle-registry.json
+- `evor_preflight` — 5-step smoke-train to verify training pipeline
+- `evor_init_run` — atomically write goal-contract.json + all six run artifacts (the ONLY path to create run state)
+- `evor_validate` — Phase-2 enforcement gate (schema + gameability + splits + tree + run-state)
+- `evor_state_write` — set mission_status="locked" on pass; set active_run after init
+- `evor_state_read` — read active-run.json for run resolution
 </Tool_Usage>

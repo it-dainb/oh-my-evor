@@ -158,14 +158,26 @@ def _build_env(
     node: TreeNode,
     extra_env: dict[str, str],
     worktree: Path,
+    run_dir: Path | None = None,
 ) -> dict[str, str]:
-    """Build the subprocess environment."""
+    """Build the subprocess environment.
+
+    Sets EVOR_NODE_ID, EVOR_RUN_ID, EVOR_WORKTREE, EVOR_MISSION_TYPE, and
+    EVOR_EVAL_VERSION for the eval subprocess.  When run_dir is provided also
+    exports EVOR_TELEMETRY_PATH = run_dir/nodes/<node_id>/telemetry.jsonl so
+    that the candidate training code can append telemetry records using only
+    stdlib os+json — no evor import required (§19 clean).
+    """
     env = {**os.environ, **extra_env}
     env["EVOR_EVAL_VERSION"] = goal.eval_version
     env["EVOR_NODE_ID"] = node.id
     env["EVOR_RUN_ID"] = node.id  # run_id not on TreeNode; callers override via extra_env
     env["EVOR_WORKTREE"] = str(worktree)
     env["EVOR_MISSION_TYPE"] = goal.mission_type
+    if run_dir is not None:
+        tel_path = run_dir / "nodes" / node.id / "telemetry.jsonl"
+        tel_path.parent.mkdir(parents=True, exist_ok=True)
+        env["EVOR_TELEMETRY_PATH"] = str(tel_path)
     return env
 
 
@@ -303,7 +315,7 @@ class EvaluatorAdapter:
             eval_domains = rescore_context.new_domains
 
         cmd = _build_cmd(eval_script, worktree, eval_domains)
-        proc_env = _build_env(goal, node, env, worktree)
+        proc_env = _build_env(goal, node, env, worktree, run_dir=self._run_dir)
 
         # ── Run subprocess; STDOUT only carries the result ─────────────────
         stdout_text = ""

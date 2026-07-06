@@ -4,12 +4,12 @@ BROKEN: fails ForgeStructureGate.train_ops because no DataLoader is imported
 or referenced. The optimizer (AdamW) and loss (CrossEntropyLoss) are present
 so those sub-checks pass; only the DataLoader requirement fails.
 """
+import json
 import os
+from datetime import datetime, timezone
 
 import torch
 import torch.optim as optim
-
-from evor.telemetry import TelemetryCallback
 
 
 def train(model, data: list, epochs: int = 1) -> None:
@@ -21,10 +21,10 @@ def train(model, data: list, epochs: int = 1) -> None:
     """
     node_id = os.environ.get("EVOR_NODE_ID", "fixture-node")
     run_id = os.environ.get("EVOR_RUN_ID", "fixture-run")
+    tel_path = os.environ.get("EVOR_TELEMETRY_PATH")
 
     optimizer = optim.AdamW(model.parameters(), lr=0.001)
     criterion = torch.nn.CrossEntropyLoss()
-    telemetry = TelemetryCallback(node_id=node_id, run_id=run_id)
 
     model.train()
     for step, (x, y) in enumerate(data):   # plain list, not a DataLoader
@@ -32,4 +32,14 @@ def train(model, data: list, epochs: int = 1) -> None:
         loss = criterion(model(x), y)
         loss.backward()
         optimizer.step()
-        telemetry.log(step=step, train_loss=loss.item())
+
+        if tel_path:
+            record = {
+                "step": step,
+                "node_id": node_id,
+                "run_id": run_id,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "train_loss": loss.item(),
+            }
+            with open(tel_path, "a") as f:
+                f.write(json.dumps(record) + "\n")

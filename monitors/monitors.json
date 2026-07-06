@@ -1,0 +1,8 @@
+[
+  {
+    "name": "evor-run-watcher",
+    "description": "Streams active EVOR training-run progress and failure signals",
+    "command": "node \"${CLAUDE_PLUGIN_ROOT}/monitors/run-watcher.mjs\"",
+    "when": "on-skill-invoke:evor-run"
+  }
+]

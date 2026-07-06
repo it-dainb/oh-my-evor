@@ -4,6 +4,7 @@
     "PreToolUse": [
       {
         "matcher": "*",
+        "if": "Write|Edit|Bash|Task|Agent|mcp__plugin_oh-my-evor_evor__*",
         "hooks": [
           {
             "type": "command",
@@ -20,6 +21,30 @@
           {
             "type": "command",
             "command": "node \"$CLAUDE_PLUGIN_ROOT\"/hooks/post-tool-use.mjs",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PostToolUseFailure": [
+      {
+        "matcher": "mcp__plugin_oh-my-evor_evor__*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PLUGIN_ROOT\"/hooks/post-tool-use-failure.mjs",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PostToolBatch": [
+      {
+        "matcher": "^oh-my-evor:evor-forge$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PLUGIN_ROOT\"/hooks/post-tool-batch.mjs",
             "timeout": 5
           }
         ]
@@ -49,6 +74,42 @@
         ]
       }
     ],
+    "SessionEnd": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PLUGIN_ROOT\"/hooks/session-end.mjs",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "matcher": "^oh-my-evor:evor-.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PLUGIN_ROOT\"/hooks/subagent-start.mjs",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "matcher": "^oh-my-evor:evor-(sage|mutagen|probe|forge|selector|acquirer)$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PLUGIN_ROOT\"/hooks/subagent-stop.mjs",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
     "PreCompact": [
       {
         "matcher": "*",
@@ -61,13 +122,50 @@
         ]
       }
     ],
-    "SubagentStop": [
+    "PostCompact": [
       {
         "matcher": "*",
         "hooks": [
           {
             "type": "command",
-            "command": "node \"$CLAUDE_PLUGIN_ROOT\"/hooks/subagent-stop.mjs",
+            "command": "node \"$CLAUDE_PLUGIN_ROOT\"/hooks/post-compact.mjs",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "FileChanged": [
+      {
+        "matcher": "status.json",
+        "asyncRewake": true,
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PLUGIN_ROOT\"/hooks/job-status-watcher.mjs",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PermissionDenied": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PLUGIN_ROOT\"/hooks/permission-denied.mjs",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PLUGIN_ROOT\"/hooks/user-prompt-submit.mjs",
             "timeout": 5
           }
         ]

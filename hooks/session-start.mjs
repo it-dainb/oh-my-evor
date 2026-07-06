@@ -319,12 +319,78 @@ if (missionId) {
   }
 }
 
-// Inject <evor-restore> block so a fresh/compacted session re-hydrates from disk.
-// Advisory: rebuilds objective + tick/step + best-so-far for context continuity.
+// Inject <evor-restore> block so a fresh session re-hydrates from disk.
+// (PostCompact handles the re-inject after context compaction — this covers new sessions only.)
 const restoreBlock = buildEvorRestore(runDir, runId, missionId);
 if (restoreBlock) {
   output.message += `\n\n${restoreBlock}`;
 }
+
+// ── Compact Law primer (≤4 lines) — every session with an active run ─────────
+// Keeps the core contract visible without repeating the full SubagentStart block.
+const LAW_PRIMER =
+  `[EVOR LAW] Use evor_* MCP tools to change evor state — never write .evor/ directly.\n` +
+  `[READ-FIRST] Read the upstream artifact (evor_read_artifact) before acting on it.\n` +
+  `[TOOLS] ToolSearch("select:evor_record_node,evor_record_eval,evor_run_start,evor_state_read") for hot-path tools.`;
+output.message += `\n\n${LAW_PRIMER}`;
+
+// ── Next-action hint: resume at the right step ────────────────────────────────
+try {
+  const tsPath = join(runDir, 'tick-state.json');
+  const rsPath = join(runDir, 'run-state.json');
+
+  const ts = existsSync(tsPath) ? JSON.parse(readFileSync(tsPath, 'utf8')) : {};
+  const rs = existsSync(rsPath) ? JSON.parse(readFileSync(rsPath, 'utf8')) : {};
+
+  const tick = ts?.tick ?? rs?.tick_count ?? 0;
+  const step = ts?.current_step ?? 0;
+
+  let nextAction = '';
+  if (step === 0 || step >= 9) {
+    nextAction = `Tick ${tick + (step >= 9 ? 1 : 0)}: start with evor_state_read + evor_tree_read(frontier), then spawn evor-sage.`;
+  } else if (step < 3) {
+    nextAction = `Tick ${tick} step ${step}: Sage/research phase — check evor_read_artifact(agent="sage") for existing findings.`;
+  } else if (step < 6) {
+    nextAction = `Tick ${tick} step ${step}: Selector/Forge phase — evor_read_artifact(agent="mutagen") then spawn evor-selector if verdict missing.`;
+  } else {
+    nextAction = `Tick ${tick} step ${step}: Evaluation phase — evor_record_eval → evor_integrity_check → evor_state_write.`;
+  }
+
+  if (nextAction) {
+    output.message += `\n\n[NEXT] ${nextAction}`;
+  }
+} catch { /* next-action hint is advisory — never block session start */ }
+
+// ── watchPaths: register active job's status.json for FileChanged watcher ─────
+// §17D: FileChanged matcher is a literal watch-list. We register the path here
+// so the job-status-watcher.mjs hook fires when the job completes/fails.
+try {
+  // Find the active job's status.json (check common job directories)
+  const watchPaths = [];
+
+  // Look in jobs/ directory for a running job's status.json
+  const jobsDir = join(runDir, 'jobs');
+  if (existsSync(jobsDir)) {
+    const jobDirs = readdirSync(jobsDir, { withFileTypes: true })
+      .filter(e => e.isDirectory())
+      .map(e => join(jobsDir, e.name, 'status.json'))
+      .filter(p => existsSync(p));
+    watchPaths.push(...jobDirs);
+  }
+
+  // Also check active-run.json for a job_id field (written by evor_run_start)
+  try {
+    const arData = JSON.parse(readFileSync(join(evorRoot, 'active-run.json'), 'utf8'));
+    if (arData?.job_id && arData?.run_dir) {
+      const statusPath = join(String(arData.run_dir), 'jobs', String(arData.job_id), 'status.json');
+      if (!watchPaths.includes(statusPath)) watchPaths.push(statusPath);
+    }
+  } catch { /* no active-run.json job info — fine */ }
+
+  if (watchPaths.length > 0) {
+    output.watchPaths = watchPaths;
+  }
+} catch { /* watchPaths registration is advisory */ }
 
 // Surface any harness/deps warning first so an incomplete install is obvious.
 const prefixWarnings = [depWarning].filter(Boolean).join('\n\n');

@@ -542,7 +542,17 @@ class ForgeStructureGate:
         return SubCheck("eval_locked", True, "evaluate.py sha256 matches locked reference")
 
     def _check_telemetry(self, candidate_dir: Path) -> SubCheck:
-        """Check for TelemetryCallback or evor.telemetry import in train/ and candidate root."""
+        """Check for telemetry instrumentation in train/ and candidate root.
+
+        Preferred pattern (§19 clean): candidate appends JSON-lines to
+        $EVOR_TELEMETRY_PATH using stdlib open + write — detected by the
+        co-presence of the string ``EVOR_TELEMETRY_PATH`` and ``open(`` in
+        the same source file.
+
+        Legacy pattern (back-compat): ``TelemetryCallback`` or
+        ``evor.telemetry`` import present in the candidate.  Accepted so that
+        pre-§19 worktrees are not suddenly rejected by this gate.
+        """
         search_dirs = [candidate_dir / "train", candidate_dir]
         for search_dir in search_dirs:
             if not search_dir.is_dir():
@@ -550,12 +560,20 @@ class ForgeStructureGate:
             for py_file in search_dir.glob("*.py"):
                 try:
                     source = py_file.read_text()
-                    if "TelemetryCallback" in source or "evor.telemetry" in source:
-                        rel = py_file.relative_to(candidate_dir)
+                    rel = py_file.relative_to(candidate_dir)
+                    # Preferred: env-path write pattern
+                    if "EVOR_TELEMETRY_PATH" in source and "open(" in source:
                         return SubCheck(
                             "telemetry",
                             True,
-                            f"TelemetryCallback/evor.telemetry found in {rel}",
+                            f"EVOR_TELEMETRY_PATH append found in {rel}",
+                        )
+                    # Legacy: TelemetryCallback class (back-compat)
+                    if "TelemetryCallback" in source or "evor.telemetry" in source:
+                        return SubCheck(
+                            "telemetry",
+                            True,
+                            f"TelemetryCallback/evor.telemetry found in {rel} (legacy pattern)",
                         )
                 except OSError:
                     pass
@@ -563,7 +581,8 @@ class ForgeStructureGate:
         return SubCheck(
             "telemetry",
             False,
-            "TelemetryCallback / evor.telemetry not found in train/ or candidate root",
+            "telemetry instrumentation not found in train/ or candidate root "
+            "(expected EVOR_TELEMETRY_PATH + open() write, or TelemetryCallback import)",
         )
 
 

@@ -248,4 +248,359 @@ try {
   // Fail-open — evor-remember / evor-signal capture is advisory, never blocks
 }
 
+// ── §9 Reflex advisor — workflow nudges after key evor tool calls ─────────────
+// FIRST: REFLEX_TOOLS early-exit — skip ~95% of tool calls with zero work.
+// Only tools in this set ever produce a nudge. (§15E perf note)
+const REFLEX_TOOLS = new Set([
+  // Canonical MCP tool names (full prefix)
+  'mcp__plugin_oh-my-evor_evor__run_start',
+  'mcp__plugin_oh-my-evor_evor__run_status',
+  'mcp__plugin_oh-my-evor_evor__record_node',
+  'mcp__plugin_oh-my-evor_evor__record_eval',
+  'mcp__plugin_oh-my-evor_evor__integrity_check',
+  'mcp__plugin_oh-my-evor_evor__init_run',
+  'mcp__plugin_oh-my-evor_evor__write_artifact',
+  'mcp__plugin_oh-my-evor_evor__read_artifact',
+  'mcp__plugin_oh-my-evor_evor__select',
+  'mcp__plugin_oh-my-evor_evor__cite',
+  // Short-form fallback (tool name without MCP prefix, used in tests + dev)
+  'evor_run_start', 'evor_run_status', 'evor_record_node', 'evor_record_eval',
+  'evor_integrity_check', 'evor_init_run', 'evor_write_artifact',
+  'evor_read_artifact', 'evor_select', 'evor_cite',
+]);
+
+if (!REFLEX_TOOLS.has(toolName)) process.exit(0); // fast path — no nudge for this tool
+
+try {
+  // ── Throttle: per (agent_type, bare_tool, nudgeKey, tick) ──────────────────
+  // Each (role, tool, nudge, tick) fires at most once — high signal, no spam.
+  const { join: pathJoin, dirname: pathDirname } = await import('path');
+  const { existsSync: fsExists, readFileSync: fsRead, writeFileSync: fsWrite,
+          mkdirSync: fsMkdir, renameSync: fsRename } = await import('fs');
+  const { randomBytes: rndBytes } = await import('crypto');
+
+  const agentTypeR = String(input?.agent_type ?? '').replace(/^oh-my-evor:/, '');
+  const bareToolR  = toolName.replace(/^mcp__plugin_oh-my-evor_evor__/, '').replace(/^evor_/, '');
+  const toolResp   = input?.tool_response ?? {};
+  const toolInpR   = input?.tool_input ?? {};
+
+  // Resolve current tick: env → tick-state.json → fallback 0
+  let currentTick = 0;
+  const envTick = process.env.EVOR_CURRENT_TICK;
+  if (envTick && !isNaN(parseInt(envTick, 10))) {
+    currentTick = parseInt(envTick, 10);
+  } else {
+    try {
+      const tsPath = pathJoin(runDir(activeRunId), 'tick-state.json');
+      if (fsExists(tsPath)) {
+        const ts = JSON.parse(fsRead(tsPath, 'utf8'));
+        if (typeof ts?.tick === 'number') currentTick = ts.tick;
+      }
+    } catch { /* fallback to 0 */ }
+  }
+
+  // Throttle file is stored in the run dir (session+run scoped)
+  const throttleDir = runDir(activeRunId);
+  const throttlePath = pathJoin(throttleDir, 'post-advisory-throttle.json');
+
+  function isThrottled(nudgeKey) {
+    try {
+      const data = JSON.parse(fsRead(throttlePath, 'utf8'));
+      const key = `${agentTypeR}:${bareToolR}:${nudgeKey}:tick${currentTick}`;
+      return !!data.entries?.[key];
+    } catch { return false; }
+  }
+
+  function markThrottled(nudgeKey) {
+    try {
+      let data = { version: 1, entries: {} };
+      try { data = JSON.parse(fsRead(throttlePath, 'utf8')); } catch {}
+      data.entries = data.entries ?? {};
+      const key = `${agentTypeR}:${bareToolR}:${nudgeKey}:tick${currentTick}`;
+      data.entries[key] = { last_ms: Date.now() };
+      // Prune stale entries (> 48 h) to keep file bounded
+      const cutoff = Date.now() - 48 * 60 * 60 * 1000;
+      for (const k of Object.keys(data.entries)) {
+        if ((data.entries[k].last_ms ?? 0) < cutoff) delete data.entries[k];
+      }
+      data.updated_at = new Date().toISOString();
+      fsMkdir(throttleDir, { recursive: true });
+      const tmp = throttlePath + '.tmp.' + rndBytes(4).toString('hex');
+      fsWrite(tmp, JSON.stringify(data, null, 2));
+      fsRename(tmp, throttlePath);
+    } catch { /* throttle write failure is non-fatal */ }
+  }
+
+  // ── Extract tool response state ───────────────────────────────────────────
+  // Handles both object responses and raw string responses
+  function respStr() {
+    if (typeof toolResp === 'string') return toolResp;
+    return JSON.stringify(toolResp ?? '{}');
+  }
+
+  const respState = String(
+    toolResp?.state ?? toolResp?.status ?? toolResp?.verdict ?? ''
+  ).toLowerCase();
+
+  // ── evor_write_artifact — validate landed file + role-continuity nudge ────
+  if (bareToolR === 'write_artifact') {
+    const agentSlot = String(toolInpR?.agent ?? '');
+    const runId2    = String(toolInpR?.run_id ?? activeRunId);
+    const tick2     = typeof toolInpR?.tick === 'number' ? toolInpR.tick : currentTick;
+
+    // Validate the artifact landed on disk (mirror record_eval/node validation)
+    const SLOT_PATHS = {
+      mutagen:          `ticks/${tick2}/mutagen/proposals.json`,
+      selector:         `ticks/${tick2}/selector/verdict.json`,
+      probe:            `ticks/${tick2}/probe/findings.json`,
+      sage:             `ticks/${tick2}/sage/findings.json`,
+      forge:            `ticks/${tick2}/forge/forge-report.json`,
+      'forge-architect': `ticks/${tick2}/forge/architect.json`,
+      'forge-critic':    `ticks/${tick2}/forge/critic.json`,
+      'forge-analyst':   `ticks/${tick2}/forge/analyst.json`,
+    };
+    const relPath = SLOT_PATHS[agentSlot];
+    if (relPath) {
+      const artPath = pathJoin(runDir(runId2), relPath);
+      if (!fsExists(artPath)) {
+        process.stdout.write(
+          `[EVOR WARNING] evor_write_artifact(agent="${agentSlot}") did not land at ${relPath} — ` +
+          `the artifact may not have been written correctly.\n`
+        );
+      }
+    }
+
+    // Role-continuity nudge (once per tick per role)
+    const ROLE_NEXT = {
+      mutagen:  { key: 'write_artifact:mutagen:return', msg: 'Proposals recorded. Return — the orchestrator routes to evor-selector for verdict.' },
+      selector: { key: 'write_artifact:selector:return', msg: 'Verdict recorded. Return — the orchestrator routes to evor-forge for the winning proposal.' },
+      sage:     { key: 'write_artifact:sage:wiki', msg: 'Findings recorded. Call evor_wiki_add to persist durable lessons before returning.' },
+      probe:    { key: 'write_artifact:probe:return', msg: 'Probe findings recorded. Return — the orchestrator evaluates them.' },
+    };
+    const roleNext = ROLE_NEXT[agentSlot];
+    if (roleNext && !isThrottled(roleNext.key)) {
+      markThrottled(roleNext.key);
+      process.stdout.write(
+        JSON.stringify({
+          hookSpecificOutput: { hookEventName: 'PostToolUse', additionalContext: `[EVOR REFLEX] ${roleNext.msg}` },
+        }) + '\n'
+      );
+    }
+    process.exit(0);
+  }
+
+  // ── evor_read_artifact — not-found safety rail ────────────────────────────
+  if (bareToolR === 'read_artifact') {
+    const isNotFound =
+      toolResp?.error === 'not found' ||
+      respStr().includes('"not found"') ||
+      respStr().includes('not found');
+    if (isNotFound && !isThrottled('read_artifact:not_found')) {
+      markThrottled('read_artifact:not_found');
+      const upstreamAgent = String(toolInpR?.agent ?? 'upstream');
+      process.stdout.write(
+        JSON.stringify({
+          hookSpecificOutput: {
+            hookEventName: 'PostToolUse',
+            additionalContext:
+              `[EVOR REFLEX] evor_read_artifact returned "not found" for agent="${upstreamAgent}". ` +
+              `That step has not produced output — do NOT fabricate or proceed on assumptions. ` +
+              `Surface the dependency gap to the orchestrator.`,
+          },
+        }) + '\n'
+      );
+    }
+    process.exit(0);
+  }
+
+  // ── evor_run_start — FLAGSHIP nudge ───────────────────────────────────────
+  if (bareToolR === 'run_start') {
+    if (!isThrottled('run_start:launched')) {
+      markThrottled('run_start:launched');
+      const jobId   = String(toolResp?.job_id ?? '');
+      const logPath = String(toolResp?.log_path ?? '');
+      const logCmd  = logPath
+        ? `tail -f "${logPath}" | grep -E --line-buffered "val_|elapsed|Traceback|Error|OOM|Killed|FAILED"`
+        : 'tail -f <log_path> | grep -E --line-buffered "val_|elapsed|Traceback|Error|OOM|Killed|FAILED"';
+      const nudge =
+        `[EVOR REFLEX] Training launched${jobId ? ` (job ${jobId})` : ''}. ` +
+        `Do NOT block or tight-loop poll. Watch it with the native Monitor tool: ` +
+        `Monitor(command: "${logCmd}"). ` +
+        `When the run succeeds → call evor_record_eval; when it fails → call evor_signal_emit(kind="runtime-failure") + PushNotification.`;
+      process.stdout.write(
+        JSON.stringify({
+          hookSpecificOutput: { hookEventName: 'PostToolUse', additionalContext: nudge },
+        }) + '\n'
+      );
+    }
+    process.exit(0);
+  }
+
+  // ── evor_run_status ───────────────────────────────────────────────────────
+  if (bareToolR === 'run_status') {
+    if (respState === 'succeeded' || respState === 'success' || respState === 'completed') {
+      if (!isThrottled('run_status:succeeded')) {
+        markThrottled('run_status:succeeded');
+        const nodeId2 = String(toolResp?.node_id ?? toolInpR?.node_id ?? '');
+        const score   = toolResp?.metrics?.val_score ?? toolResp?.metrics?.score ?? null;
+        const scoreHint = score !== null ? ` (score: ${String(score).slice(0, 8)})` : '';
+        const nudge =
+          `[EVOR REFLEX] Run succeeded${scoreHint}. ` +
+          `Call evor_record_eval(${nodeId2 ? `node_id="${nodeId2}"` : 'node_id=...'}) ` +
+          `then evor_integrity_check to verify before propagating the score. ` +
+          `If best_score improved, call PushNotification to alert the user of the breakthrough.`;
+        process.stdout.write(
+          JSON.stringify({
+            hookSpecificOutput: { hookEventName: 'PostToolUse', additionalContext: nudge },
+          }) + '\n'
+        );
+      }
+    } else if (respState === 'failed' || respState === 'error' || respState === 'crashed') {
+      if (!isThrottled('run_status:failed')) {
+        markThrottled('run_status:failed');
+        const errorReason = String(toolResp?.error ?? toolResp?.reason ?? '').slice(0, 150);
+        const isOom = /oom|out.of.mem|killed/i.test(errorReason);
+        const nudge =
+          `[EVOR REFLEX] Run failed${errorReason ? `: ${errorReason}` : ''}. ` +
+          `Call evor_signal_emit(kind="${isOom ? 'oom' : 'runtime-failure'}", severity="high") with the error. ` +
+          `If this blocks the mission, call PushNotification to alert the user.`;
+        process.stdout.write(
+          JSON.stringify({
+            hookSpecificOutput: { hookEventName: 'PostToolUse', additionalContext: nudge },
+          }) + '\n'
+        );
+      }
+    }
+    // running: stay silent (watcher/Monitor handles it)
+    process.exit(0);
+  }
+
+  // ── evor_record_node ─────────────────────────────────────────────────────
+  if (bareToolR === 'record_node') {
+    if (!isThrottled('record_node:run_start')) {
+      markThrottled('record_node:run_start');
+      const nodeId3   = String(toolResp?.node_id ?? toolInpR?.node_id ?? '');
+      const worktree  = String(toolInpR?.worktree ?? '');
+      const nudge =
+        `[EVOR REFLEX] Node recorded${nodeId3 ? ` (${nodeId3})` : ''}. ` +
+        `Launch its evaluation: call evor_run_start(node_id="${nodeId3 || '<node_id>'}"` +
+        `${worktree ? `, worktree="${worktree}"` : ''}).`;
+      process.stdout.write(
+        JSON.stringify({
+          hookSpecificOutput: { hookEventName: 'PostToolUse', additionalContext: nudge },
+        }) + '\n'
+      );
+    }
+    process.exit(0);
+  }
+
+  // ── evor_record_eval ──────────────────────────────────────────────────────
+  if (bareToolR === 'record_eval') {
+    if (!isThrottled('record_eval:integrity')) {
+      markThrottled('record_eval:integrity');
+      const nodeId4 = String(toolResp?.node_id ?? toolInpR?.node_id ?? '');
+      const prevBest = toolResp?.previous_best_score ?? null;
+      const newScore = toolResp?.score ?? toolResp?.best_score ?? null;
+      const improved = prevBest !== null && newScore !== null && newScore > prevBest;
+      const nudge =
+        `[EVOR REFLEX] Eval recorded${nodeId4 ? ` for ${nodeId4}` : ''}. ` +
+        `Verify with evor_integrity_check(${nodeId4 ? `node_id="${nodeId4}"` : 'node_id=...'}) ` +
+        `before propagating the score.` +
+        (improved
+          ? ` New best score ${String(newScore).slice(0, 8)} > ${String(prevBest).slice(0, 8)} — ` +
+            `call PushNotification to alert the user of the breakthrough.`
+          : '');
+      process.stdout.write(
+        JSON.stringify({
+          hookSpecificOutput: { hookEventName: 'PostToolUse', additionalContext: nudge },
+        }) + '\n'
+      );
+    }
+    process.exit(0);
+  }
+
+  // ── evor_integrity_check ──────────────────────────────────────────────────
+  if (bareToolR === 'integrity_check') {
+    const integrityPassed =
+      respState === 'passed' ||
+      toolResp?.verified === true ||
+      respStr().includes('"passed"');
+    if (!integrityPassed && !isThrottled('integrity_check:failed')) {
+      markThrottled('integrity_check:failed');
+      const nodeId5 = String(toolInpR?.node_id ?? toolResp?.node_id ?? '');
+      const nudge =
+        `[EVOR REFLEX] Integrity check failed${nodeId5 ? ` for ${nodeId5}` : ''}. ` +
+        `Do NOT propagate this score — mark the node and call evor_signal_emit(kind="integrity-violation", severity="critical").`;
+      process.stdout.write(
+        JSON.stringify({
+          hookSpecificOutput: { hookEventName: 'PostToolUse', additionalContext: nudge },
+        }) + '\n'
+      );
+    } else if (integrityPassed && !isThrottled('integrity_check:passed')) {
+      markThrottled('integrity_check:passed');
+      const nudge =
+        `[EVOR REFLEX] Integrity verified. ` +
+        `Record the lesson: evor_wiki_add. Then update the frontier: evor_state_write.`;
+      process.stdout.write(
+        JSON.stringify({
+          hookSpecificOutput: { hookEventName: 'PostToolUse', additionalContext: nudge },
+        }) + '\n'
+      );
+    }
+    process.exit(0);
+  }
+
+  // ── evor_init_run ─────────────────────────────────────────────────────────
+  if (bareToolR === 'init_run') {
+    if (!isThrottled('init_run:validate')) {
+      markThrottled('init_run:validate');
+      const nudge =
+        `[EVOR REFLEX] Run initialized. Lock the mission: ` +
+        `call evor_validate to check the config, then evor_state_write(mission_status="locked"). ` +
+        `If any goal field was ambiguous, use AskUserQuestion to confirm before locking.`;
+      process.stdout.write(
+        JSON.stringify({
+          hookSpecificOutput: { hookEventName: 'PostToolUse', additionalContext: nudge },
+        }) + '\n'
+      );
+    }
+    process.exit(0);
+  }
+
+  // ── evor_select ───────────────────────────────────────────────────────────
+  if (bareToolR === 'select') {
+    if (!isThrottled('select:spawn_forge')) {
+      markThrottled('select:spawn_forge');
+      const winnerHint = String(toolResp?.winner ?? toolResp?.selected_id ?? '');
+      const nudge =
+        `[EVOR REFLEX] Selector verdict recorded${winnerHint ? ` (winner: ${winnerHint})` : ''}. ` +
+        `Spawn Forge for the winning proposal: Task(subagent_type="oh-my-evor:evor-forge").`;
+      process.stdout.write(
+        JSON.stringify({
+          hookSpecificOutput: { hookEventName: 'PostToolUse', additionalContext: nudge },
+        }) + '\n'
+      );
+    }
+    process.exit(0);
+  }
+
+  // ── evor_cite ─────────────────────────────────────────────────────────────
+  if (bareToolR === 'cite') {
+    if (!isThrottled('cite:capture_spec')) {
+      markThrottled('cite:capture_spec');
+      const nudge =
+        `[EVOR REFLEX] Citation captured. ` +
+        `Include the implementation_spec from this citation in your findings via evor_write_artifact.`;
+      process.stdout.write(
+        JSON.stringify({
+          hookSpecificOutput: { hookEventName: 'PostToolUse', additionalContext: nudge },
+        }) + '\n'
+      );
+    }
+    process.exit(0);
+  }
+} catch {
+  // Fail-open — reflex advisor errors must never crash the session
+}
+
 process.exit(0);

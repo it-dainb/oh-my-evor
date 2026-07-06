@@ -1,6 +1,7 @@
 {
   "name": "oh-my-evor",
-  "version": "0.5.0",
+  "displayName": "oh-my-evor",
+  "version": "0.6.0",
   "description": "Autonomous ML research evolution engine for Claude Code",
   "author": {
     "name": "oh-my-evor contributors"
@@ -26,7 +27,9 @@
     "./skills/evor-doctor/",
     "./skills/evor-gotchas/",
     "./skills/evor-distill/",
-    "./skills/evor-mcp-setup/"
+    "./skills/evor-mcp-setup/",
+    "./skills/evor-mcp/",
+    "./skills/evor-schedule/"
   ],
   "agents": [
     "./agents/evor-sage.md",
@@ -42,5 +45,17 @@
     "./agents/evor-acquirer.md"
   ],
   "mcpServers": "./.mcp.json",
-  "commands": "./commands/"
+  "commands": "./commands/",
+  "experimental": {
+    "monitors": "./monitors/monitors.json"
+  },
+  "userConfig": {
+    "hf_token": {
+      "type": "string",
+      "title": "Hugging Face Token",
+      "description": "Read-only HF token for Papers Search, Dataset Search, and Hub Repository details via the Hugging Face MCP. Generate at https://huggingface.co/settings/tokens (read scope suffices). Leave blank for anonymous access to public resources at lower rate limits.",
+      "sensitive": true,
+      "required": false
+    }
+  }
 }

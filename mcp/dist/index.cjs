@@ -1299,21 +1299,21 @@ var require_errors = __commonJS({
     function extendErrors({ gen, keyword, schemaValue, data, errsCount, it }) {
       if (errsCount === void 0)
         throw new Error("ajv implementation error");
-      const err = gen.name("err");
+      const err2 = gen.name("err");
       gen.forRange("i", errsCount, names_1.default.errors, (i) => {
-        gen.const(err, (0, codegen_1._)`${names_1.default.vErrors}[${i}]`);
-        gen.if((0, codegen_1._)`${err}.instancePath === undefined`, () => gen.assign((0, codegen_1._)`${err}.instancePath`, (0, codegen_1.strConcat)(names_1.default.instancePath, it.errorPath)));
-        gen.assign((0, codegen_1._)`${err}.schemaPath`, (0, codegen_1.str)`${it.errSchemaPath}/${keyword}`);
+        gen.const(err2, (0, codegen_1._)`${names_1.default.vErrors}[${i}]`);
+        gen.if((0, codegen_1._)`${err2}.instancePath === undefined`, () => gen.assign((0, codegen_1._)`${err2}.instancePath`, (0, codegen_1.strConcat)(names_1.default.instancePath, it.errorPath)));
+        gen.assign((0, codegen_1._)`${err2}.schemaPath`, (0, codegen_1.str)`${it.errSchemaPath}/${keyword}`);
         if (it.opts.verbose) {
-          gen.assign((0, codegen_1._)`${err}.schema`, schemaValue);
-          gen.assign((0, codegen_1._)`${err}.data`, data);
+          gen.assign((0, codegen_1._)`${err2}.schema`, schemaValue);
+          gen.assign((0, codegen_1._)`${err2}.data`, data);
         }
       });
     }
     exports2.extendErrors = extendErrors;
     function addError(gen, errObj) {
-      const err = gen.const("err", errObj);
-      gen.if((0, codegen_1._)`${names_1.default.vErrors} === null`, () => gen.assign(names_1.default.vErrors, (0, codegen_1._)`[${err}]`), (0, codegen_1._)`${names_1.default.vErrors}.push(${err})`);
+      const err2 = gen.const("err", errObj);
+      gen.if((0, codegen_1._)`${names_1.default.vErrors} === null`, () => gen.assign(names_1.default.vErrors, (0, codegen_1._)`[${err2}]`), (0, codegen_1._)`${names_1.default.vErrors}.push(${err2})`);
       gen.code((0, codegen_1._)`${names_1.default.errors}++`);
     }
     function returnErrors(it, errs) {
@@ -7537,8 +7537,8 @@ var ZodType = class {
         } : {
           issues: ctx.common.issues
         };
-      } catch (err) {
-        if (err?.message?.toLowerCase()?.includes("encountered")) {
+      } catch (err2) {
+        if (err2?.message?.toLowerCase()?.includes("encountered")) {
           this["~standard"].async = true;
         }
         ctx.common = {
@@ -21611,6 +21611,9 @@ function ensureRunDirs(runId, missionId) {
   }
   return paths;
 }
+function getActiveRunPath() {
+  return (0, import_path.join)(getEvorRoot(), "active-run.json");
+}
 
 // src/lock.ts
 var import_fs2 = require("fs");
@@ -21673,8 +21676,8 @@ function readTree(runId, missionId) {
   try {
     const parsed = TreeFileSchema.parse(JSON.parse(raw));
     return parsed.nodes;
-  } catch (err) {
-    throw new Error(`readTree: tree.json is corrupt at ${treePath}: ${err}`);
+  } catch (err2) {
+    throw new Error(`readTree: tree.json is corrupt at ${treePath}: ${err2}`);
   }
 }
 function writeTree(runId, nodes, missionId) {
@@ -21993,7 +21996,7 @@ function treeSelect(runId, strategy, count, missionId) {
     return {
       selected: [],
       scores: {},
-      error: pyResult.error ?? "python -m evor.tree select failed"
+      error: pyResult.error ?? "evor_select failed"
     };
   }
   const data = pyResult.data;
@@ -22032,7 +22035,7 @@ function registerTreeTools(server) {
   );
   server.tool(
     "evor_select",
-    "Run UCB1 (or current strategy) selection: exec `python -m evor.tree select` and return ranked parent node IDs.",
+    "Select the next parent node(s) to expand by the active policy (UCB1 by default); returns ranked parent node IDs.",
     {
       run_id: external_exports.string().describe("Active run identifier"),
       strategy: StrategyStateSchema.partial().optional().describe("Strategy overrides for this selection"),
@@ -22273,6 +22276,14 @@ function registerWikiTools(server) {
 
 // src/tools/state.ts
 var import_fs6 = require("fs");
+var import_path7 = require("path");
+var TickStateSchema = external_exports.object({
+  tick: external_exports.number().int().min(0).describe("Current tick number"),
+  current_step: external_exports.number().int().min(0).describe("Step within the tick (0-indexed)"),
+  step_status: external_exports.enum(["pending", "running", "done", "failed"]).describe("Status of current_step"),
+  step_outputs: external_exports.record(external_exports.string(), external_exports.unknown()).optional().describe("Keyed outputs produced by completed steps"),
+  updated_at: external_exports.string().optional().describe("ISO 8601 timestamp of last update")
+});
 var RunStatePatchSchema = external_exports.object({
   status: external_exports.enum(["initialized", "running", "paused", "completed", "failed"]).optional().describe("Run lifecycle status"),
   tick_count: external_exports.number().int().min(0).optional().describe("Number of completed ticks"),
@@ -22280,16 +22291,44 @@ var RunStatePatchSchema = external_exports.object({
   frontier_ids: external_exports.array(external_exports.string()).optional().describe("Node IDs currently on the frontier"),
   current_eval_version: external_exports.string().optional().describe("Active EvalSuite version"),
   pending_node_ids: external_exports.array(external_exports.string()).optional().describe("Node IDs started in this tick but not yet written to tree.json"),
-  strategy: StrategyStateSchema.partial().optional().describe("Strategy delta to merge into strategy.json")
+  strategy: StrategyStateSchema.partial().optional().describe("Strategy delta to merge into strategy.json"),
+  // ── Extended fields (spec §1 evor_state_write extension) ─────────────────
+  mission_status: external_exports.enum(["draft", "locked", "running", "paused", "completed", "failed"]).optional().describe("If set, patches mission-state.json .status (gate: draft\u2192locked requires contract validation)"),
+  active_run: external_exports.object({
+    mission_id: external_exports.string(),
+    run_id: external_exports.string(),
+    run_dir: external_exports.string(),
+    job_id: external_exports.string().optional().describe("Job identifier from evor_run_start; enables monitor lookup"),
+    status: external_exports.string().optional(),
+    started_at: external_exports.string().optional()
+  }).optional().describe("If set, writes <evor_root>/active-run.json atomically"),
+  // ── Tick-state extension (spec §15B) ──────────────────────────────────────
+  tick_state: TickStateSchema.optional().describe(
+    "If set, atomically writes tick-state.json in the run directory; read by all agents to determine current tick and step progress"
+  )
 });
 function stateRead(runId, missionId) {
   const paths = resolveRunPaths(runId, missionId);
-  return readRunState(paths.runStatePath, runId);
+  const state = readRunState(paths.runStatePath, runId);
+  const tickStatePath = (0, import_path7.join)(paths.runDir, "tick-state.json");
+  if ((0, import_fs6.existsSync)(tickStatePath)) {
+    try {
+      state.tick_state = JSON.parse((0, import_fs6.readFileSync)(tickStatePath, "utf8"));
+    } catch {
+    }
+  }
+  return state;
 }
 function stateWrite(runId, patch, missionId) {
   const paths = ensureRunDirs(runId, missionId);
+  const {
+    strategy: strategyDelta,
+    mission_status: missionStatus,
+    active_run: activeRun,
+    tick_state: tickState,
+    ...statePatch
+  } = patch;
   const current = readRunState(paths.runStatePath, runId);
-  const { strategy: strategyDelta, ...statePatch } = patch;
   const updated = { ...current };
   for (const [k, v] of Object.entries(statePatch)) {
     if (v !== void 0) {
@@ -22310,12 +22349,72 @@ function stateWrite(runId, patch, missionId) {
     (0, import_fs6.writeFileSync)(strategyTmpPath, JSON.stringify(updatedStrategy, null, 2), "utf8");
     (0, import_fs6.renameSync)(strategyTmpPath, paths.strategyPath);
   }
+  if (missionStatus !== void 0) {
+    const missionStatePath = (0, import_path7.join)(paths.runDir, "mission-state.json");
+    let ms = {};
+    if ((0, import_fs6.existsSync)(missionStatePath)) {
+      try {
+        ms = JSON.parse((0, import_fs6.readFileSync)(missionStatePath, "utf8"));
+      } catch {
+      }
+    }
+    ms.status = missionStatus;
+    ms.updated_at = (/* @__PURE__ */ new Date()).toISOString();
+    const msTmp = `${missionStatePath}.tmp`;
+    (0, import_fs6.writeFileSync)(msTmp, JSON.stringify(ms, null, 2), "utf8");
+    (0, import_fs6.renameSync)(msTmp, missionStatePath);
+  }
+  if (activeRun !== void 0) {
+    const evorRoot = getEvorRoot();
+    (0, import_fs6.mkdirSync)(evorRoot, { recursive: true });
+    const arPath = getActiveRunPath();
+    const arTmp = `${arPath}.tmp`;
+    (0, import_fs6.writeFileSync)(arTmp, JSON.stringify(activeRun, null, 2), "utf8");
+    (0, import_fs6.renameSync)(arTmp, arPath);
+  }
+  if (tickState !== void 0) {
+    const tickStatePath = (0, import_path7.join)(paths.runDir, "tick-state.json");
+    const tsData = {
+      ...tickState,
+      updated_at: tickState.updated_at ?? (/* @__PURE__ */ new Date()).toISOString()
+    };
+    const tsTmp = `${tickStatePath}.tmp`;
+    (0, import_fs6.writeFileSync)(tsTmp, JSON.stringify(tsData, null, 2), "utf8");
+    (0, import_fs6.renameSync)(tsTmp, tickStatePath);
+  }
   return updated;
+}
+function readGoalContract(runId, missionId) {
+  const paths = resolveRunPaths(runId, missionId);
+  const contractPath = (0, import_path7.join)(paths.runDir, "goal-contract.json");
+  if (!(0, import_fs6.existsSync)(contractPath)) {
+    return {
+      ok: false,
+      error: `goal-contract.json not found at ${contractPath}`
+    };
+  }
+  let raw;
+  try {
+    raw = JSON.parse((0, import_fs6.readFileSync)(contractPath, "utf8"));
+  } catch (err2) {
+    return {
+      ok: false,
+      error: `failed to parse goal-contract.json: ${err2.message}`
+    };
+  }
+  const parsed = GoalContractSchema.safeParse(raw);
+  if (!parsed.success) {
+    return {
+      ok: false,
+      error: `goal-contract.json validation failed: ${parsed.error.message}`
+    };
+  }
+  return { ok: true, contract: parsed.data };
 }
 function registerStateTools(server) {
   server.tool(
     "evor_state_read",
-    "Read .evor/runs/<mission>/<run-id>/run-state.json and return the current RunState.",
+    "Read run-state.json (+ tick-state.json when present) and return the current RunState. tick_state is merged into the response when tick-state.json exists.",
     {
       run_id: external_exports.string().describe("Active run identifier")
     },
@@ -22334,7 +22433,7 @@ function registerStateTools(server) {
   );
   server.tool(
     "evor_state_write",
-    "Merge-patch run-state.json with the given fields; if strategy is provided, merge it into strategy.json.",
+    "Merge-patch run-state.json with the given fields. Optional side-effects: strategy\u2192strategy.json, mission_status\u2192mission-state.json, active_run\u2192active-run.json (include job_id to enable monitor lookup), tick_state\u2192tick-state.json (atomic; 10 read sites per tick).",
     {
       run_id: external_exports.string().describe("Active run identifier"),
       patch: RunStatePatchSchema.describe("Fields to merge into run-state.json")
@@ -22347,6 +22446,27 @@ function registerStateTools(server) {
           {
             type: "text",
             text: JSON.stringify({ ok: true, run_id, state: updated })
+          }
+        ]
+      };
+    }
+  );
+  server.tool(
+    "evor_read_goal_contract",
+    "Read and validate goal-contract.json from the run directory. Returns the parsed GoalContract or {error:'...'} when missing or invalid. The contract is validated against the GoalContractSchema (Zod).",
+    {
+      run_id: external_exports.string().describe("Active run identifier")
+    },
+    async ({ run_id }) => {
+      const missionId = process.env.EVOR_MISSION_ID;
+      const result = readGoalContract(run_id, missionId);
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(
+              result.ok ? { ok: true, run_id, contract: result.contract } : { error: result.error }
+            )
           }
         ]
       };
@@ -22433,14 +22553,14 @@ function registerCiteTools(server) {
 
 // src/tools/telemetry.ts
 var import_fs7 = require("fs");
-var import_path7 = require("path");
+var import_path8 = require("path");
 function telemetryIngest(runId, nodeId, records, missionId) {
   const paths = resolveRunPaths(runId, missionId);
-  const nodeDir = (0, import_path7.join)(paths.nodesDir, nodeId);
+  const nodeDir = (0, import_path8.join)(paths.nodesDir, nodeId);
   if (!(0, import_fs7.existsSync)(nodeDir)) {
     (0, import_fs7.mkdirSync)(nodeDir, { recursive: true });
   }
-  const telemetryPath = (0, import_path7.join)(nodeDir, "telemetry.jsonl");
+  const telemetryPath = (0, import_path8.join)(nodeDir, "telemetry.jsonl");
   const lines = records.map((r) => JSON.stringify(r)).join("\n") + "\n";
   (0, import_fs7.appendFileSync)(telemetryPath, lines, "utf8");
   return { telemetryPath, count: records.length };
@@ -22472,7 +22592,7 @@ function registerTelemetryTools(server) {
 // src/tools/signals.ts
 var import_crypto = require("crypto");
 var import_fs8 = require("fs");
-var import_path8 = require("path");
+var import_path9 = require("path");
 var SEVERITY_ORDER = {
   low: 0,
   medium: 1,
@@ -22500,11 +22620,62 @@ function loadSignals(signalsPath) {
   return out;
 }
 function atomicWriteJsonl(signalsPath, records) {
-  const dir = (0, import_path8.dirname)(signalsPath);
+  const dir = (0, import_path9.dirname)(signalsPath);
   if (!(0, import_fs8.existsSync)(dir)) (0, import_fs8.mkdirSync)(dir, { recursive: true });
   const tmpPath = `${signalsPath}.tmp`;
   (0, import_fs8.writeFileSync)(tmpPath, records.map((r) => JSON.stringify(r)).join("\n") + "\n", "utf8");
   (0, import_fs8.renameSync)(tmpPath, signalsPath);
+}
+function drainSignalsInbox(runDir, runId, missionId) {
+  const inboxPath = (0, import_path9.join)(runDir, "signals-inbox.jsonl");
+  if (!(0, import_fs8.existsSync)(inboxPath)) return;
+  const tmpPath = `${inboxPath}.drain-tmp`;
+  if ((0, import_fs8.existsSync)(tmpPath)) {
+    try {
+      (0, import_fs8.unlinkSync)(tmpPath);
+    } catch {
+    }
+  }
+  try {
+    (0, import_fs8.renameSync)(inboxPath, tmpPath);
+  } catch {
+    return;
+  }
+  let lines;
+  try {
+    lines = (0, import_fs8.readFileSync)(tmpPath, "utf8").split("\n");
+  } catch {
+    return;
+  } finally {
+    try {
+      (0, import_fs8.unlinkSync)(tmpPath);
+    } catch {
+    }
+  }
+  for (const line of lines) {
+    const t = line.trim();
+    if (!t) continue;
+    try {
+      const entry = JSON.parse(t);
+      emitSignal(
+        runId,
+        {
+          kind: String(entry.kind ?? ""),
+          signature: String(entry.signature ?? ""),
+          shapes: Array.isArray(entry.shapes) ? entry.shapes : [],
+          axes: Array.isArray(entry.axes) ? entry.axes : [],
+          severity: String(entry.severity ?? "medium"),
+          evidence: entry.evidence ?? {},
+          source: String(entry.source ?? "hook:unknown"),
+          tick: typeof entry.tick === "number" ? entry.tick : null,
+          node_id: typeof entry.node_id === "string" ? entry.node_id : null,
+          confidence: typeof entry.confidence === "number" ? entry.confidence : 0.5
+        },
+        missionId
+      );
+    } catch {
+    }
+  }
 }
 function emitSignal(runId, input, missionId) {
   const paths = resolveRunPaths(runId, missionId);
@@ -22550,7 +22721,7 @@ function emitSignal(runId, input, missionId) {
           source: input.source,
           tick: input.tick ?? void 0,
           node_id: input.node_id ?? void 0,
-          confidence: 0.5,
+          confidence: input.confidence ?? 0.5,
           occurrences: 1,
           first_seen: now,
           last_seen: now
@@ -22566,12 +22737,13 @@ function emitSignal(runId, input, missionId) {
       }
     }
     throw new Error(
-      `emitSignal: signal "${input.signature}" failed to persist in signals.jsonl after ${MAX_ATTEMPTS} attempts (concurrent clobber detected)`
+      `emitSignal: signal "${input.signature}" failed to persist in signals.jsonl after 3 attempts (concurrent clobber detected)`
     );
   });
 }
 function querySignals(runId, params, missionId) {
   const paths = resolveRunPaths(runId, missionId);
+  drainSignalsInbox(paths.runDir, runId, missionId);
   const floor = SEVERITY_ORDER[params.min_severity ?? "low"] ?? 0;
   const out = loadSignals(paths.signalsPath).filter((s) => {
     if (SEVERITY_ORDER[s.severity] < floor) return false;
@@ -22594,6 +22766,25 @@ function querySignals(runId, params, missionId) {
   });
   return out;
 }
+function digestSignals(runId, params, missionId) {
+  const rows = querySignals(
+    runId,
+    {
+      shapes: params.shapes,
+      axes: params.axes,
+      min_severity: params.min_severity ?? "medium"
+    },
+    missionId
+  ).slice(0, params.max_items ?? 8);
+  return rows.map((s) => ({
+    kind: s.kind,
+    shapes: s.shapes,
+    axes: s.axes,
+    severity: s.severity,
+    occurrences: s.occurrences,
+    evidence: s.evidence
+  }));
+}
 function registerSignalTools(server) {
   server.tool(
     "evor_signal_emit",
@@ -22609,13 +22800,14 @@ function registerSignalTools(server) {
       evidence: external_exports.record(external_exports.string(), external_exports.unknown()).describe("Structured evidence dict"),
       source: external_exports.string().describe("Emitting role (e.g. 'evor-forge-analyst')"),
       tick: external_exports.number().int().optional().describe("Optional evolution tick"),
-      node_id: external_exports.string().optional().describe("Optional associated node id")
+      node_id: external_exports.string().optional().describe("Optional associated node id"),
+      confidence: external_exports.number().min(0).max(1).optional().describe("Initial confidence for new signals (0.0\u20131.0). Default 0.5. Ignored on dedup-aggregate.")
     },
-    async ({ run_id, mission_id, kind, signature, shapes, axes, severity, evidence, source, tick, node_id }) => {
+    async ({ run_id, mission_id, kind, signature, shapes, axes, severity, evidence, source, tick, node_id, confidence }) => {
       const missionId = mission_id ?? process.env.EVOR_MISSION_ID;
       const signal = emitSignal(
         run_id,
-        { kind, signature, shapes, axes, severity, evidence, source, tick, node_id },
+        { kind, signature, shapes, axes, severity, evidence, source, tick, node_id, confidence },
         missionId
       );
       return {
@@ -22625,7 +22817,7 @@ function registerSignalTools(server) {
   );
   server.tool(
     "evor_signal_query",
-    "Pull signals from the run's signal bus filtered by facet lens (ANY-overlap), severity floor, optional kind, and optional since_tick. Returns list sorted by (severity, confidence, last_seen) descending.",
+    "Pull signals from the run's signal bus filtered by facet lens (ANY-overlap), severity floor, optional kind, and optional since_tick. Drains signals-inbox.jsonl first so hook-captured signals are always visible. Returns list sorted by (severity, confidence, last_seen) descending.",
     {
       run_id: external_exports.string().describe("Active run identifier"),
       mission_id: external_exports.string().optional().describe("Mission identifier (resolved automatically when omitted)"),
@@ -22647,15 +22839,36 @@ function registerSignalTools(server) {
       };
     }
   );
+  server.tool(
+    "evor_signal_digest",
+    "Return a compact top-slice of the signal bus for spawn-prompt injection. Defaults to severity>=medium so low-noise signals never flood a digest. Equivalent to Python SignalBus.digest(). Drains inbox first.",
+    {
+      run_id: external_exports.string().describe("Active run identifier"),
+      mission_id: external_exports.string().optional().describe("Mission identifier (resolved automatically when omitted)"),
+      shapes: external_exports.array(SignalShapeSchema).optional().describe("ANY-overlap shape filter; omit to match all shapes"),
+      axes: external_exports.array(SignalAxisSchema).optional().describe("ANY-overlap axis filter; omit to match all axes"),
+      min_severity: SignalSeveritySchema.default("medium").describe(
+        "Severity floor (inclusive). Default: medium (low kept out of digests by default)"
+      ),
+      max_items: external_exports.number().int().min(1).max(50).default(8).describe("Maximum signals to return (default 8)")
+    },
+    async ({ run_id, mission_id, shapes, axes, min_severity, max_items }) => {
+      const missionId = mission_id ?? process.env.EVOR_MISSION_ID;
+      const digest = digestSignals(run_id, { shapes, axes, min_severity, max_items }, missionId);
+      return {
+        content: [{ type: "text", text: JSON.stringify({ run_id, digest }) }]
+      };
+    }
+  );
 }
 
 // src/tools/init.ts
 var import_fs9 = require("fs");
-var import_path9 = require("path");
+var import_path10 = require("path");
 var import_os = require("os");
 var import_crypto2 = require("crypto");
 function initRun(answers, opts) {
-  const tmpFile = (0, import_path9.join)((0, import_os.tmpdir)(), `evor-init-answers-${(0, import_crypto2.randomUUID)()}.json`);
+  const tmpFile = (0, import_path10.join)((0, import_os.tmpdir)(), `evor-init-answers-${(0, import_crypto2.randomUUID)()}.json`);
   try {
     (0, import_fs9.writeFileSync)(tmpFile, JSON.stringify(answers), "utf8");
     const args = ["init-run", "--answers", tmpFile];
@@ -22709,12 +22922,1150 @@ function registerInitTools(server) {
   );
 }
 
+// src/tools/artifact.ts
+var import_fs10 = require("fs");
+var import_path11 = require("path");
+var import_os2 = require("os");
+var VALID_AGENTS = [
+  "mutagen",
+  "selector",
+  "probe",
+  "sage",
+  "sage-junior",
+  "forge",
+  "forge-architect",
+  "forge-critic",
+  "forge-analyst",
+  "acquirer"
+];
+function writeArtifact(runId, tick, agent, payload, kind, partial2, missionId) {
+  const paths = resolveRunPaths(runId, missionId);
+  let tmpDir = null;
+  let payloadFile = null;
+  try {
+    tmpDir = (0, import_fs10.mkdtempSync)((0, import_path11.join)((0, import_os2.tmpdir)(), "evor-artifact-"));
+    payloadFile = (0, import_path11.join)(tmpDir, "payload.json");
+    (0, import_fs10.writeFileSync)(payloadFile, JSON.stringify(payload), "utf8");
+  } catch (err2) {
+    return {
+      ok: false,
+      error: `failed to write temp payload: ${err2.message}`
+    };
+  }
+  const bridgeArgs = [
+    "--run-dir",
+    paths.runDir,
+    "--tick",
+    String(tick),
+    "--agent",
+    agent,
+    "--payload-file",
+    payloadFile,
+    ...kind ? ["--kind", kind] : [],
+    ...partial2 ? ["--partial"] : []
+  ];
+  let result;
+  try {
+    result = callBridge("artifact_bridge.py", bridgeArgs);
+  } finally {
+    try {
+      if (payloadFile) (0, import_fs10.unlinkSync)(payloadFile);
+    } catch {
+    }
+    try {
+      if (tmpDir) (0, import_fs10.rmdirSync)(tmpDir);
+    } catch {
+    }
+  }
+  if (!result.ok) {
+    const structuredError = result.data && typeof result.data === "object" && "error" in result.data ? String(result.data.error) : result.error ?? "artifact_bridge failed";
+    return { ok: false, error: structuredError };
+  }
+  const data = result.data;
+  if (data?.ok === true) {
+    return { ok: true, path: String(data.path) };
+  }
+  return {
+    ok: false,
+    error: String(data?.error ?? "unknown error from artifact_bridge")
+  };
+}
+function readArtifact(runId, tick, agent, kind, partial2, missionId) {
+  const paths = resolveRunPaths(runId, missionId);
+  const bridgeArgs = [
+    "--run-dir",
+    paths.runDir,
+    "--tick",
+    String(tick),
+    "--agent",
+    agent,
+    ...kind ? ["--kind", kind] : [],
+    ...partial2 ? ["--partial"] : []
+  ];
+  const result = callBridge("read_artifact_bridge.py", bridgeArgs);
+  if (!result.ok) {
+    const structuredError = result.data && typeof result.data === "object" && "error" in result.data ? String(result.data.error) : result.error ?? "read_artifact_bridge failed";
+    return { ok: false, error: structuredError };
+  }
+  const data = result.data;
+  if (data?.ok === true) {
+    return { ok: true, payload: data.payload, path: String(data.path) };
+  }
+  return {
+    ok: false,
+    error: String(data?.error ?? "unknown error from read_artifact_bridge")
+  };
+}
+function registerArtifactTools(server) {
+  server.tool(
+    "evor_write_artifact",
+    [
+      "Validate and atomically write a tick artifact for the given agent kind.",
+      "The path is derived from the agent and tick per the spec \xA71 mapping.",
+      "Payload is validated against Pydantic contracts where one exists;",
+      "unknown/loose agents pass through as plain JSON."
+    ].join(" "),
+    {
+      run_id: external_exports.string().describe("Active run identifier"),
+      tick: external_exports.number().int().min(0).describe("Current tick number"),
+      agent: external_exports.enum(VALID_AGENTS).describe("Agent writing the artifact (determines path and validation schema)"),
+      kind: external_exports.string().optional().describe(
+        "Kind slug: required for sage-junior (finding kind) and acquirer (source slug)"
+      ),
+      payload: external_exports.record(external_exports.unknown()).describe("Artifact payload object to write"),
+      partial: external_exports.boolean().optional().describe("If true, write as <name>-partial.json (in-progress artifact)")
+    },
+    async ({ run_id, tick, agent, kind, payload, partial: partial2 }) => {
+      const missionId = process.env.EVOR_MISSION_ID;
+      const result = writeArtifact(run_id, tick, agent, payload, kind, partial2, missionId);
+      if (!result.ok) {
+        return {
+          content: [
+            { type: "text", text: JSON.stringify({ error: result.error }) }
+          ]
+        };
+      }
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({
+              ok: true,
+              run_id,
+              tick,
+              agent,
+              path: result.path
+            })
+          }
+        ]
+      };
+    }
+  );
+  server.tool(
+    "evor_read_artifact",
+    [
+      "Read and validate a tick artifact written by an upstream agent.",
+      "Returns the parsed artifact payload, or {error:'not found'} when the upstream",
+      "agent hasn't produced it yet \u2014 a strong signal to stop and surface the gap,",
+      "not proceed on assumptions. Path mapping is identical to evor_write_artifact."
+    ].join(" "),
+    {
+      run_id: external_exports.string().describe("Active run identifier"),
+      tick: external_exports.number().int().min(0).describe("Tick whose artifact to read"),
+      agent: external_exports.enum(VALID_AGENTS).describe("Agent that wrote the artifact (determines path and validation schema)"),
+      kind: external_exports.string().optional().describe(
+        "Kind slug: required for sage-junior (finding kind) and acquirer (source slug)"
+      ),
+      partial: external_exports.boolean().optional().describe("If true, read the <name>-partial.json variant")
+    },
+    async ({ run_id, tick, agent, kind, partial: partial2 }) => {
+      const missionId = process.env.EVOR_MISSION_ID;
+      const result = readArtifact(run_id, tick, agent, kind, partial2, missionId);
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(
+              result.ok ? { ok: true, run_id, tick, agent, payload: result.payload, path: result.path } : { error: result.error }
+            )
+          }
+        ]
+      };
+    }
+  );
+}
+
+// src/tools/lineage.ts
+var import_fs11 = require("fs");
+var import_path12 = require("path");
+var import_os3 = require("os");
+function storePatch(runId, nodeId, patchContent, missionId) {
+  const paths = resolveRunPaths(runId, missionId);
+  const nodeDir = (0, import_path12.join)(paths.nodesDir, nodeId);
+  try {
+    if (!(0, import_fs11.existsSync)(nodeDir)) {
+      (0, import_fs11.mkdirSync)(nodeDir, { recursive: true });
+    }
+    const patchPath = (0, import_path12.join)(nodeDir, "parent.patch");
+    const tmpPath = `${patchPath}.tmp`;
+    (0, import_fs11.writeFileSync)(tmpPath, patchContent, "utf8");
+    (0, import_fs11.renameSync)(tmpPath, patchPath);
+    return { ok: true, patchPath };
+  } catch (err2) {
+    return {
+      ok: false,
+      error: `storePatch failed: ${err2.message}`
+    };
+  }
+}
+function writeHandoff(runId, tick, data, missionId) {
+  const paths = resolveRunPaths(runId, missionId);
+  let tmpDir = null;
+  let payloadFile = null;
+  try {
+    tmpDir = (0, import_fs11.mkdtempSync)((0, import_path12.join)((0, import_os3.tmpdir)(), "evor-handoff-"));
+    payloadFile = (0, import_path12.join)(tmpDir, "payload.json");
+    (0, import_fs11.writeFileSync)(payloadFile, JSON.stringify(data), "utf8");
+  } catch (err2) {
+    return {
+      ok: false,
+      error: `failed to write temp payload: ${err2.message}`
+    };
+  }
+  let result;
+  try {
+    result = callBridge("handoff_bridge.py", [
+      "--run-dir",
+      paths.runDir,
+      "--tick",
+      String(tick),
+      "--payload-file",
+      payloadFile
+    ]);
+  } finally {
+    try {
+      if (payloadFile) (0, import_fs11.unlinkSync)(payloadFile);
+    } catch {
+    }
+    try {
+      if (tmpDir) (0, import_fs11.rmdirSync)(tmpDir);
+    } catch {
+    }
+  }
+  if (!result.ok) {
+    return { ok: false, error: result.error ?? "handoff_bridge failed" };
+  }
+  const d = result.data;
+  if (d?.ok === true) {
+    return {
+      ok: true,
+      path: String(d.path),
+      seq: typeof d.seq === "number" ? d.seq : void 0
+    };
+  }
+  return {
+    ok: false,
+    error: String(d?.error ?? "unknown error from handoff_bridge")
+  };
+}
+function readHandoff(runId, opts = {}, missionId) {
+  const paths = resolveRunPaths(runId, missionId);
+  const bridgeArgs = ["--run-dir", paths.runDir];
+  if (opts.fromAgent) bridgeArgs.push("--from-agent", opts.fromAgent);
+  if (opts.toAgent) bridgeArgs.push("--to-agent", opts.toAgent);
+  if (opts.tick !== void 0) bridgeArgs.push("--tick", String(opts.tick));
+  const result = callBridge("read_handoff_bridge.py", bridgeArgs);
+  if (!result.ok) {
+    return { ok: false, error: result.error ?? "read_handoff_bridge failed" };
+  }
+  const d = result.data;
+  if (d?.ok === true) {
+    return {
+      ok: true,
+      handoff: d.handoff,
+      tick: typeof d.tick === "number" ? d.tick : void 0
+    };
+  }
+  return {
+    ok: false,
+    error: String(d?.error ?? "unknown error from read_handoff_bridge")
+  };
+}
+function drainInbox(runId, kind, missionId) {
+  const paths = resolveRunPaths(runId, missionId);
+  const result = callBridge("inbox_bridge.py", [
+    "--run-dir",
+    paths.runDir,
+    "--kind",
+    kind
+  ]);
+  if (!result.ok) {
+    return { ok: false, error: result.error ?? "inbox_bridge failed" };
+  }
+  const d = result.data;
+  if (d?.ok === true) {
+    return {
+      ok: true,
+      drained: typeof d.drained === "number" ? d.drained : 0
+    };
+  }
+  return {
+    ok: false,
+    error: String(d?.error ?? "unknown error from inbox_bridge")
+  };
+}
+function registerLineageTools(server) {
+  server.tool(
+    "evor_store_patch",
+    "Write a unified-diff parent patch to nodes/<node_id>/parent.patch atomically.",
+    {
+      run_id: external_exports.string().describe("Active run identifier"),
+      node_id: external_exports.string().describe("Node whose parent patch to store"),
+      patch_content: external_exports.string().describe("Unified-diff patch content (e.g. git format-patch output)")
+    },
+    async ({ run_id, node_id, patch_content }) => {
+      const missionId = process.env.EVOR_MISSION_ID;
+      const result = storePatch(run_id, node_id, patch_content, missionId);
+      if (!result.ok) {
+        return {
+          content: [
+            { type: "text", text: JSON.stringify({ error: result.error }) }
+          ]
+        };
+      }
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({
+              ok: true,
+              run_id,
+              node_id,
+              patch_path: result.patchPath
+            })
+          }
+        ]
+      };
+    }
+  );
+  server.tool(
+    "evor_write_handoff",
+    [
+      "Write a tick handoff payload to handoffs/<tick>-<seq>.json atomically.",
+      "Sequence numbers are auto-incremented so multiple handoffs per tick are supported."
+    ].join(" "),
+    {
+      run_id: external_exports.string().describe("Active run identifier"),
+      tick: external_exports.number().int().min(0).describe("Tick number for this handoff"),
+      data: external_exports.record(external_exports.unknown()).describe("Handoff payload object")
+    },
+    async ({ run_id, tick, data }) => {
+      const missionId = process.env.EVOR_MISSION_ID;
+      const result = writeHandoff(run_id, tick, data, missionId);
+      if (!result.ok) {
+        return {
+          content: [
+            { type: "text", text: JSON.stringify({ error: result.error }) }
+          ]
+        };
+      }
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({
+              ok: true,
+              run_id,
+              tick,
+              path: result.path,
+              seq: result.seq
+            })
+          }
+        ]
+      };
+    }
+  );
+  server.tool(
+    "evor_read_handoff",
+    [
+      "Read a handoff written by a prior agent. Three routing modes:",
+      "from_agent+to_agent \u2192 within-tick JSON handoff (handoffs/<from>_to_<to>.json);",
+      "tick \u2192 tick-N.md markdown handoff;",
+      "neither \u2192 latest tick handoff (highest tick number found).",
+      "Returns {error:'not found'} when the handoff does not exist \u2014 surface the gap, do not fabricate."
+    ].join(" "),
+    {
+      run_id: external_exports.string().describe("Active run identifier"),
+      from_agent: external_exports.string().optional().describe(
+        "Source agent name for within-tick handoff (e.g. 'evor', 'selector'). Requires to_agent."
+      ),
+      to_agent: external_exports.string().optional().describe(
+        "Destination agent name for within-tick handoff. Requires from_agent."
+      ),
+      tick: external_exports.number().int().min(0).optional().describe(
+        "Tick number for tick-markdown handoff; omit for latest tick (when from/to also omitted)"
+      )
+    },
+    async ({ run_id, from_agent, to_agent, tick }) => {
+      const missionId = process.env.EVOR_MISSION_ID;
+      const result = readHandoff(run_id, { fromAgent: from_agent, toAgent: to_agent, tick }, missionId);
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(
+              result.ok ? { ok: true, run_id, handoff: result.handoff, ...result.tick !== void 0 ? { tick: result.tick } : {} } : { error: result.error }
+            )
+          }
+        ]
+      };
+    }
+  );
+  server.tool(
+    "evor_drain_inbox",
+    [
+      "Drain the run's remember-inbox or signals-inbox into its target store, then truncate atomically.",
+      "kind='remember' drains remember-inbox.jsonl into wiki notes (LessonEntry).",
+      "kind='signals'  drains signals-inbox.jsonl into the SignalBus (deduped by signature).",
+      "Returns the count of successfully processed entries."
+    ].join(" "),
+    {
+      run_id: external_exports.string().describe("Active run identifier"),
+      kind: external_exports.enum(["remember", "signals"]).describe("Inbox to drain: 'remember' (\u2192 wiki) or 'signals' (\u2192 SignalBus)")
+    },
+    async ({ run_id, kind }) => {
+      const missionId = process.env.EVOR_MISSION_ID;
+      const result = drainInbox(run_id, kind, missionId);
+      if (!result.ok) {
+        return {
+          content: [
+            { type: "text", text: JSON.stringify({ error: result.error }) }
+          ]
+        };
+      }
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({
+              ok: true,
+              run_id,
+              kind,
+              drained: result.drained
+            })
+          }
+        ]
+      };
+    }
+  );
+}
+
+// src/tools/compute.ts
+var import_fs12 = require("fs");
+var import_path13 = require("path");
+function ok(data) {
+  return { content: [{ type: "text", text: JSON.stringify(data) }] };
+}
+function err(msg) {
+  return { content: [{ type: "text", text: JSON.stringify({ error: msg }) }] };
+}
+function jobStart(nodeId, runId, runDir, worktree, evalVersion) {
+  const python = process.env.EVOR_PYTHON ?? "python3";
+  const cmdArgs = [
+    python,
+    "-m",
+    "evor",
+    "run",
+    "--node-id",
+    nodeId,
+    "--run-id",
+    runId,
+    "--worktree",
+    worktree,
+    "--run-dir",
+    runDir
+  ];
+  if (evalVersion) cmdArgs.push("--eval-version", evalVersion);
+  return callPythonModule("evor.jobs", [
+    "start",
+    "--run-dir",
+    runDir,
+    "--cmd-json",
+    JSON.stringify(cmdArgs)
+  ]);
+}
+function jobStatus(jobId, runDir) {
+  return callPythonModule("evor.jobs", [
+    "status",
+    "--job-id",
+    jobId,
+    "--run-dir",
+    runDir
+  ]);
+}
+function validateRun(runDir) {
+  return callPythonModule("evor", [
+    "validate",
+    "--run-id",
+    runDir
+  ], { timeout: 3e4 });
+}
+function doctorRun(runDir, repair) {
+  const args = ["doctor"];
+  if (runDir) args.push("--run-id", runDir);
+  if (repair) args.push("--repair");
+  return callPythonModule("evor", args, { timeout: 6e4 });
+}
+function preflightRun(runId, runDir, noGpuCheck) {
+  const args = ["preflight", "--run-id", runId, "--run-dir", runDir];
+  if (noGpuCheck) args.push("--no-gpu-check");
+  return callPythonModule("evor", args, { timeout: 12e4 });
+}
+function freezeSplits(datasetPath, evalVersion, runDir, missionId) {
+  const args = [
+    "freeze-splits",
+    "--dataset-path",
+    datasetPath,
+    "--eval-version",
+    evalVersion,
+    "--run-dir",
+    runDir
+  ];
+  if (missionId) args.push("--mission-id", missionId);
+  return callPythonModule("evor.freeze", args, { timeout: 6e5 });
+}
+function initEvalSuite(missionId, evalVersion, taskDescription, runDir) {
+  return callPythonModule("evor.benchmark", [
+    "init-eval-suite",
+    "--mission-id",
+    missionId,
+    "--eval-version",
+    evalVersion,
+    "--task-description",
+    taskDescription,
+    "--run-dir",
+    runDir
+  ], { timeout: 6e5 });
+}
+function metaEvolve(runDir) {
+  return callPythonModule("evor.tree", [
+    "meta-evolve",
+    "--run-id",
+    runDir
+  ], { timeout: 6e4 });
+}
+function distillScan(path, evorRoot) {
+  const args = ["distill", "scan", "--root", path, "--json"];
+  if (evorRoot) args.push("--evor-root", evorRoot);
+  return callPythonModule("evor", args, { timeout: 3e5 });
+}
+function plotReport(runId, runDir, format) {
+  return callPythonModule("evor.plot_tree", [
+    "--run-id",
+    runId,
+    "--run-dir",
+    runDir,
+    "--format",
+    format ?? "png"
+  ], { timeout: 3e5 });
+}
+function wikiSummarize(runId, runDir, confirmedOnly, limit, evorRoot) {
+  const args = ["summarize"];
+  if (runId) args.push("--run-id", runId);
+  if (runDir) args.push("--run-dir", runDir);
+  if (confirmedOnly) args.push("--confirmed-only", "true");
+  if (limit !== void 0) args.push("--limit", String(limit));
+  args.push("--evor-root", evorRoot ?? getEvorRoot());
+  return callPythonModule("evor.wiki", args, { timeout: 3e4 });
+}
+function gotchasList(kind, scope, minConfidence, evorRoot, runDir) {
+  const args = ["gotchas"];
+  if (kind) args.push("--kind", kind);
+  if (scope) args.push("--scope", scope);
+  if (minConfidence !== void 0) args.push("--min-confidence", String(minConfidence));
+  args.push("--evor-root", evorRoot ?? getEvorRoot());
+  if (runDir) args.push("--run-dir", runDir);
+  return callPythonModule("evor", args, { timeout: 3e4 });
+}
+function registerComputeTools(server) {
+  server.tool(
+    "evor_run_start",
+    `Launch candidate node as a detached background job. Returns {job_id, status_path, log_path} instantly \u2014 watch with evor_run_status or Monitor(command: 'tail -f <log_path> | grep -E --line-buffered "elapsed_steps=|val_|Error|OOM"').`,
+    {
+      run_id: external_exports.string().describe("Active run identifier"),
+      node_id: external_exports.string().describe("TreeNode.id being evaluated"),
+      run_dir: external_exports.string().describe("Absolute path to .evor/runs/<mission>/<run-id>/"),
+      worktree: external_exports.string().describe("Absolute path to the candidate git worktree"),
+      eval_version: external_exports.string().optional().describe("Eval suite version override (e.g. v1)")
+    },
+    async ({ run_id, node_id, run_dir, worktree, eval_version }) => {
+      const result = jobStart(node_id, run_id, run_dir, worktree, eval_version);
+      if (!result.ok) return err(result.error ?? "evor_run_start failed");
+      const jobData = result.data;
+      const jobId = typeof jobData?.job_id === "string" ? jobData.job_id : void 0;
+      if (jobId) {
+        try {
+          const arPath = getActiveRunPath();
+          let existing = {};
+          if ((0, import_fs12.existsSync)(arPath)) {
+            try {
+              existing = JSON.parse((0, import_fs12.readFileSync)(arPath, "utf8"));
+            } catch {
+            }
+          }
+          const missionId = process.env.EVOR_MISSION_ID;
+          const ar = {
+            ...existing,
+            run_id,
+            run_dir,
+            job_id: jobId
+          };
+          if (missionId && !ar.mission_id) ar.mission_id = missionId;
+          const arTmp = `${arPath}.tmp`;
+          (0, import_fs12.writeFileSync)(arTmp, JSON.stringify(ar, null, 2), "utf8");
+          (0, import_fs12.renameSync)(arTmp, arPath);
+        } catch {
+        }
+      }
+      return ok(result.data);
+    }
+  );
+  server.tool(
+    "evor_run_status",
+    "Read status.json and tail the log for a running or completed job. Returns {state, exit_code?, started_at?, finished_at?, cmd?, tail?}.",
+    {
+      run_id: external_exports.string().describe("Active run identifier"),
+      job_id: external_exports.string().describe("Job identifier returned by evor_run_start"),
+      run_dir: external_exports.string().optional().describe(
+        "Explicit run_dir; falls back to resolveRunPaths(run_id) when omitted"
+      )
+    },
+    async ({ run_id, job_id, run_dir }) => {
+      const missionId = process.env.EVOR_MISSION_ID;
+      const resolvedDir = run_dir ?? resolveRunPaths(run_id, missionId).runDir;
+      const result = jobStatus(job_id, resolvedDir);
+      if (!result.ok) return err(result.error ?? "evor_run_status failed");
+      return ok(result.data);
+    }
+  );
+  server.tool(
+    "evor_capability",
+    "Probe hardware and write .evor/capability.json. Idempotent \u2014 safe to call at mission startup before preflight.",
+    {
+      evor_root: external_exports.string().optional().describe(
+        "Path to .evor/ root (default: EVOR_ROOT env or cwd/.evor)"
+      )
+    },
+    async ({ evor_root }) => {
+      const root = evor_root ?? getEvorRoot();
+      const result = callPythonModule("evor", [
+        "capability",
+        "--evor-root",
+        root
+      ], { timeout: 3e4 });
+      if (result.exitCode !== void 0 && result.exitCode !== 0) {
+        return err(result.error ?? "evor capability failed");
+      }
+      try {
+        const cap = JSON.parse((0, import_fs12.readFileSync)((0, import_path13.join)(root, "capability.json"), "utf8"));
+        return ok(cap);
+      } catch {
+        return err(
+          `evor capability ran but capability.json not found at ${root}: ` + (result.stderr ?? result.error ?? "")
+        );
+      }
+    }
+  );
+  server.tool(
+    "evor_preflight",
+    "Run the 5-step micro-train smoke-test. Returns {run_id, checks:{import_ok, loss_decreasing, gpu_active}, passed}.",
+    {
+      run_id: external_exports.string().describe("Active run identifier"),
+      run_dir: external_exports.string().optional().describe("Explicit run_dir override"),
+      no_gpu_check: external_exports.boolean().optional().describe(
+        "Skip GPU utilisation check (CPU-only environments)"
+      )
+    },
+    async ({ run_id, run_dir, no_gpu_check }) => {
+      const missionId = process.env.EVOR_MISSION_ID;
+      const resolvedDir = run_dir ?? resolveRunPaths(run_id, missionId).runDir;
+      const result = preflightRun(run_id, resolvedDir, no_gpu_check);
+      if (!result.ok) return err(result.error ?? "evor preflight failed");
+      return ok(result.data);
+    }
+  );
+  server.tool(
+    "evor_validate",
+    "Validate goal-contract.json schema, MetricSpec gameability guards, frozen-splits, and tree.json format. Returns a JSON ValidationReport.",
+    {
+      run_id: external_exports.string().describe("Active run identifier")
+    },
+    async ({ run_id }) => {
+      const missionId = process.env.EVOR_MISSION_ID;
+      const { runDir } = resolveRunPaths(run_id, missionId);
+      const result = validateRun(runDir);
+      if (!result.ok) return err(result.error ?? "evor validate failed");
+      return ok(result.data);
+    }
+  );
+  server.tool(
+    "evor_doctor",
+    "Check environment and .evor integrity: Python, torch, Node.js, env vars, tree.json format, mission-state, orphan pending nodes, frozen-split hashes. Pass repair=true to auto-fix obvious issues.",
+    {
+      run_id: external_exports.string().optional().describe(
+        "Active run identifier (omit for env-only check)"
+      ),
+      repair: external_exports.boolean().optional().describe(
+        "Auto-repair obvious issues (e.g. list-format tree.json \u2192 DICT)"
+      )
+    },
+    async ({ run_id, repair }) => {
+      const missionId = process.env.EVOR_MISSION_ID;
+      const runDir = run_id ? resolveRunPaths(run_id, missionId).runDir : void 0;
+      const result = doctorRun(runDir, repair);
+      if (!result.ok) return err(result.error ?? "evor doctor failed");
+      return ok(result.data);
+    }
+  );
+  server.tool(
+    "evor_freeze_splits",
+    "Freeze test and val splits from a dataset directory. Writes frozen-splits/ and returns {locked_split_hash, val_split_hash, test_item_count, val_item_count}.",
+    {
+      dataset_ref: external_exports.string().describe("Path to dataset directory or file"),
+      eval_version: external_exports.string().describe("Eval version string (e.g. v1)"),
+      run_id: external_exports.string().describe("Active run identifier"),
+      mission_id: external_exports.string().optional().describe("Mission ID carried into split_id")
+    },
+    async ({ dataset_ref, eval_version, run_id, mission_id }) => {
+      const resolvedMission = mission_id ?? process.env.EVOR_MISSION_ID;
+      const { runDir } = resolveRunPaths(run_id, resolvedMission);
+      const result = freezeSplits(dataset_ref, eval_version, runDir, resolvedMission);
+      if (!result.ok) return err(result.error ?? "evor_freeze_splits failed");
+      return ok(result.data);
+    }
+  );
+  server.tool(
+    "evor_init_eval_suite",
+    "Create the initial EvalSuite v1 for a new mission. Writes eval-suites/v1.json and angle-registry.json. Returns {eval_version, mission_id, domains, created_at}.",
+    {
+      mission_id: external_exports.string().describe("Mission identifier"),
+      eval_version: external_exports.string().describe("Eval version string (e.g. v1)"),
+      task_description: external_exports.string().describe("Task description for domain derivation"),
+      run_id: external_exports.string().describe("Active run identifier")
+    },
+    async ({ mission_id, eval_version, task_description, run_id }) => {
+      const resolvedMission = mission_id ?? process.env.EVOR_MISSION_ID;
+      const { runDir } = resolveRunPaths(run_id, resolvedMission);
+      const result = initEvalSuite(mission_id, eval_version, task_description, runDir);
+      if (!result.ok) return err(result.error ?? "evor_init_eval_suite failed");
+      return ok(result.data);
+    }
+  );
+  server.tool(
+    "evor_meta_evolve",
+    "Run TreeEngine.meta_evolve to update strategy.json based on the current frontier. Returns the updated StrategyState.",
+    {
+      run_id: external_exports.string().describe("Active run identifier")
+    },
+    async ({ run_id }) => {
+      const missionId = process.env.EVOR_MISSION_ID;
+      const { runDir } = resolveRunPaths(run_id, missionId);
+      const result = metaEvolve(runDir);
+      if (!result.ok) return err(result.error ?? "evor_meta_evolve failed");
+      return ok(result.data);
+    }
+  );
+  server.tool(
+    "evor_distill_scan",
+    "Deep-scan a workspace for brownfield onboarding. Returns a StartingPointReport and writes .evor/starting-point.json.",
+    {
+      path: external_exports.string().describe("Workspace root directory to scan"),
+      evor_root: external_exports.string().optional().describe(
+        "EVOR root (.evor/ dir); defaults to <path>/.evor/"
+      )
+    },
+    async ({ path, evor_root }) => {
+      const result = distillScan(path, evor_root);
+      if (!result.ok) return err(result.error ?? "evor distill scan failed");
+      return ok(result.data);
+    }
+  );
+  server.tool(
+    "evor_plot_report",
+    "Render the evolution tree as a PNG and/or HTML report. Writes report/tree.<ext> under the run directory.",
+    {
+      run_id: external_exports.string().describe("Active run identifier"),
+      format: external_exports.enum(["ascii", "png", "html"]).optional().describe(
+        "Output format (default: png)"
+      )
+    },
+    async ({ run_id, format }) => {
+      const missionId = process.env.EVOR_MISSION_ID;
+      const { runDir } = resolveRunPaths(run_id, missionId);
+      const result = plotReport(run_id, runDir, format);
+      if (!result.ok) return err(result.error ?? "evor_plot_report failed");
+      return ok(result.data ?? { ok: true, format: format ?? "png" });
+    }
+  );
+  server.tool(
+    "evor_wiki_summarize",
+    "Summarise wiki lessons by approach_family and hypothesis_verdict. Returns {confirmed, refuted, inconclusive, by_family}.",
+    {
+      run_id: external_exports.string().optional().describe("Active run identifier (used to locate evor_root)"),
+      confirmed_only: external_exports.boolean().optional().describe(
+        "If true, only include confirmed-hypothesis lessons (default false)"
+      ),
+      limit: external_exports.number().int().min(1).optional().describe(
+        "Maximum lessons to include in the summary (default 100)"
+      ),
+      evor_root: external_exports.string().optional().describe(
+        "Path to .evor/ root (default: EVOR_ROOT env or cwd/.evor)"
+      )
+    },
+    async ({ run_id, confirmed_only, limit, evor_root }) => {
+      const missionId = process.env.EVOR_MISSION_ID;
+      const runDir = run_id ? resolveRunPaths(run_id, missionId).runDir : void 0;
+      const result = wikiSummarize(run_id, runDir, confirmed_only, limit, evor_root);
+      if (!result.ok) return err(result.error ?? "evor_wiki_summarize failed");
+      return ok(result.data);
+    }
+  );
+  server.tool(
+    "evor_gotchas_list",
+    "List accumulated gotchas from the GotchaStore. Returns {gotchas: [...], total: N} sorted by confidence descending.",
+    {
+      run_id: external_exports.string().optional().describe(
+        "Active run identifier; if provided, also reads mission-scoped gotchas"
+      ),
+      evor_root: external_exports.string().optional().describe(
+        "Path to .evor/ root (default: EVOR_ROOT env or cwd/.evor)"
+      ),
+      kind: external_exports.enum(["runtime-failure", "hardware-constraint", "approach-deadend"]).optional().describe("Filter by gotcha kind; omit for all kinds"),
+      scope: external_exports.enum(["global", "mission"]).optional().describe(
+        "Filter by scope; omit for all scopes"
+      ),
+      min_confidence: external_exports.number().min(0).max(1).optional().describe(
+        "Minimum confidence threshold (0.0\u20131.0); default 0.0"
+      )
+    },
+    async ({ run_id, evor_root, kind, scope, min_confidence }) => {
+      const missionId = process.env.EVOR_MISSION_ID;
+      const runDir = run_id ? resolveRunPaths(run_id, missionId).runDir : void 0;
+      const result = gotchasList(kind, scope, min_confidence, evor_root, runDir);
+      if (!result.ok) return err(result.error ?? "evor_gotchas_list failed");
+      return ok(result.data);
+    }
+  );
+}
+
+// src/tools/gotcha.ts
+var import_fs13 = require("fs");
+var import_path14 = require("path");
+var import_os4 = require("os");
+function gotchaQuery(params) {
+  const evorRoot = params.evorRoot ?? getEvorRoot();
+  const runDir = params.runId ? resolveRunPaths(params.runId, params.missionId).runDir : void 0;
+  const bridgeArgs = [
+    "--action",
+    "query",
+    "--evor-root",
+    evorRoot
+  ];
+  if (runDir) bridgeArgs.push("--run-dir", runDir);
+  if (params.kind) bridgeArgs.push("--kind", params.kind);
+  if (params.scope) bridgeArgs.push("--scope", params.scope);
+  if (params.minConfidence !== void 0) {
+    bridgeArgs.push("--min-confidence", String(params.minConfidence));
+  }
+  const result = callBridge("gotcha_bridge.py", bridgeArgs);
+  if (!result.ok) {
+    return { ok: false, error: result.error ?? "gotcha_bridge query failed" };
+  }
+  const data = result.data;
+  if (data?.ok === true) {
+    return {
+      ok: true,
+      gotchas: data.gotchas,
+      total: data.total
+    };
+  }
+  return {
+    ok: false,
+    error: String(data?.error ?? "unknown error from gotcha_bridge")
+  };
+}
+function gotchaAdd(params) {
+  const evorRoot = params.evorRoot ?? getEvorRoot();
+  const runDir = resolveRunPaths(params.runId, params.missionId).runDir;
+  let tmpDir = null;
+  let payloadFile = null;
+  try {
+    tmpDir = (0, import_fs13.mkdtempSync)((0, import_path14.join)((0, import_os4.tmpdir)(), "evor-gotcha-"));
+    payloadFile = (0, import_path14.join)(tmpDir, "payload.json");
+    (0, import_fs13.writeFileSync)(
+      payloadFile,
+      JSON.stringify({
+        kind: params.kind,
+        signature: params.signature,
+        context: params.context,
+        resolution: params.resolution,
+        avoidance: params.avoidance,
+        scope: params.scope ?? "global",
+        confidence: params.confidence ?? 0.5
+      }),
+      "utf8"
+    );
+  } catch (err2) {
+    return {
+      ok: false,
+      error: `failed to write temp payload: ${err2.message}`
+    };
+  }
+  const bridgeArgs = [
+    "--action",
+    "add",
+    "--evor-root",
+    evorRoot,
+    "--run-dir",
+    runDir,
+    "--payload-file",
+    payloadFile
+  ];
+  let result;
+  try {
+    result = callBridge("gotcha_bridge.py", bridgeArgs);
+  } finally {
+    try {
+      if (payloadFile) (0, import_fs13.unlinkSync)(payloadFile);
+    } catch {
+    }
+    try {
+      if (tmpDir) (0, import_fs13.rmdirSync)(tmpDir);
+    } catch {
+    }
+  }
+  if (!result.ok) {
+    return { ok: false, error: result.error ?? "gotcha_bridge add failed" };
+  }
+  const data = result.data;
+  if (data?.ok === true) {
+    return { ok: true, gotcha: data.gotcha };
+  }
+  return {
+    ok: false,
+    error: String(data?.error ?? "unknown error from gotcha_bridge")
+  };
+}
+function storeBlob(params) {
+  const runDir = resolveRunPaths(params.runId, params.missionId).runDir;
+  if (!(0, import_fs13.existsSync)(runDir)) {
+    (0, import_fs13.mkdirSync)(runDir, { recursive: true });
+  }
+  let srcPath = params.path;
+  let tmpDir = null;
+  let tmpFile = null;
+  if (!srcPath) {
+    if (params.content === void 0) {
+      return { ok: false, error: "one of 'path' or 'content' is required" };
+    }
+    try {
+      tmpDir = (0, import_fs13.mkdtempSync)((0, import_path14.join)((0, import_os4.tmpdir)(), "evor-blob-"));
+      tmpFile = (0, import_path14.join)(tmpDir, "blob.bin");
+      (0, import_fs13.writeFileSync)(tmpFile, params.content, "utf8");
+      srcPath = tmpFile;
+    } catch (err2) {
+      return {
+        ok: false,
+        error: `failed to write temp content file: ${err2.message}`
+      };
+    }
+  }
+  const bridgeArgs = [
+    "--run-dir",
+    runDir,
+    "--src-path",
+    srcPath
+  ];
+  if (params.acquisitionId) {
+    bridgeArgs.push("--acquisition-id", params.acquisitionId);
+  }
+  let result;
+  try {
+    result = callBridge("store_blob_bridge.py", bridgeArgs);
+  } finally {
+    try {
+      if (tmpFile) (0, import_fs13.unlinkSync)(tmpFile);
+    } catch {
+    }
+    try {
+      if (tmpDir) (0, import_fs13.rmdirSync)(tmpDir);
+    } catch {
+    }
+  }
+  if (!result.ok) {
+    return { ok: false, error: result.error ?? "store_blob_bridge failed" };
+  }
+  const data = result.data;
+  if (data?.ok === true) {
+    return { ok: true, content_ref: String(data.content_ref) };
+  }
+  return {
+    ok: false,
+    error: String(data?.error ?? "unknown error from store_blob_bridge")
+  };
+}
+function registerGotchaTools(server) {
+  server.tool(
+    "evor_gotcha_query",
+    [
+      "Query the GotchaStore for known failure patterns, hardware constraints, and approach dead-ends.",
+      "Reads from the global store (.evor/wiki/gotchas/global.jsonl) and optionally the",
+      "mission-scoped store (run_dir/gotchas/mission.jsonl) when run_id is provided.",
+      "Returns entries sorted by confidence descending, then last_seen descending."
+    ].join(" "),
+    {
+      run_id: external_exports.string().optional().describe(
+        "Active run identifier; if provided, also reads mission-scoped gotchas"
+      ),
+      evor_root: external_exports.string().optional().describe(
+        "Path to .evor/ root (default: EVOR_ROOT env or cwd/.evor)"
+      ),
+      kind: external_exports.enum(["runtime-failure", "hardware-constraint", "approach-deadend"]).optional().describe("Filter by gotcha kind; omit for all kinds"),
+      scope: external_exports.enum(["global", "mission"]).optional().describe("Filter by scope; omit for all scopes"),
+      min_confidence: external_exports.number().min(0).max(1).optional().describe("Minimum confidence threshold (0.0\u20131.0); default 0.0")
+    },
+    async ({ run_id, evor_root, kind, scope, min_confidence }) => {
+      const missionId = process.env.EVOR_MISSION_ID;
+      const result = gotchaQuery({
+        runId: run_id,
+        evorRoot: evor_root,
+        kind,
+        scope,
+        minConfidence: min_confidence,
+        missionId
+      });
+      if (!result.ok) {
+        return {
+          content: [{ type: "text", text: JSON.stringify({ error: result.error }) }]
+        };
+      }
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({ ok: true, gotchas: result.gotchas, total: result.total })
+          }
+        ]
+      };
+    }
+  );
+  server.tool(
+    "evor_gotcha_add",
+    [
+      "Record a new gotcha or dedup-update an existing one in the GotchaStore.",
+      "Dedup key: (signature, scope). Repeat adds increment occurrences and raise confidence.",
+      "Global-scoped gotchas persist across missions so later missions benefit from prior failures."
+    ].join(" "),
+    {
+      run_id: external_exports.string().describe("Active run identifier"),
+      kind: external_exports.enum(["runtime-failure", "hardware-constraint", "approach-deadend"]).describe("Gotcha kind"),
+      signature: external_exports.string().describe("Dedup key \u2014 identical (signature, scope) pairs aggregate"),
+      context: external_exports.record(external_exports.string(), external_exports.unknown()).describe("Structured context dict (e.g. {batch_size: 256, gpu: 'A100'})"),
+      resolution: external_exports.string().describe("What resolved or worked around this gotcha"),
+      avoidance: external_exports.string().describe("How to avoid this gotcha in future attempts"),
+      scope: external_exports.enum(["global", "mission"]).default("global").describe("'global' persists across missions; 'mission' is run-scoped (default: global)"),
+      confidence: external_exports.number().min(0).max(1).default(0.5).describe("Initial confidence 0.0\u20131.0; raised toward 1.0 on repeat encounters"),
+      evor_root: external_exports.string().optional().describe(
+        "Path to .evor/ root (default: EVOR_ROOT env or cwd/.evor)"
+      )
+    },
+    async ({ run_id, kind, signature, context, resolution, avoidance, scope, confidence, evor_root }) => {
+      const missionId = process.env.EVOR_MISSION_ID;
+      const result = gotchaAdd({
+        runId: run_id,
+        kind,
+        signature,
+        context,
+        resolution,
+        avoidance,
+        scope,
+        confidence,
+        evorRoot: evor_root,
+        missionId
+      });
+      if (!result.ok) {
+        return {
+          content: [{ type: "text", text: JSON.stringify({ error: result.error }) }]
+        };
+      }
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({ ok: true, run_id, gotcha: result.gotcha })
+          }
+        ]
+      };
+    }
+  );
+  server.tool(
+    "evor_store_blob",
+    [
+      "Store a file or text blob in the ContentAddressedStore (sha256-addressed, dedup via hardlink).",
+      "Returns the content_ref (sha256 hex) which can be passed to evor_record_node or stored in tree artifacts.",
+      "If acquisition_id is provided, the blob is registered under the 'train' namespace (ADR-015 enforcement)."
+    ].join(" "),
+    {
+      run_id: external_exports.string().describe("Active run identifier"),
+      path: external_exports.string().optional().describe(
+        "Absolute path to an existing file to store. Mutually exclusive with 'content'."
+      ),
+      content: external_exports.string().optional().describe(
+        "Text content to store as a blob. Mutually exclusive with 'path'."
+      ),
+      kind: external_exports.string().optional().describe(
+        "Informational kind label (e.g. 'genome', 'dataset-sample'); stored as metadata only"
+      ),
+      acquisition_id: external_exports.string().optional().describe(
+        "If provided, registers the blob under this acquisition ID in the train namespace"
+      )
+    },
+    async ({ run_id, path: srcPath, content, acquisition_id }) => {
+      const missionId = process.env.EVOR_MISSION_ID;
+      const result = storeBlob({
+        runId: run_id,
+        path: srcPath,
+        content,
+        acquisitionId: acquisition_id,
+        missionId
+      });
+      if (!result.ok) {
+        return {
+          content: [{ type: "text", text: JSON.stringify({ error: result.error }) }]
+        };
+      }
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({ ok: true, run_id, content_ref: result.content_ref })
+          }
+        ]
+      };
+    }
+  );
+}
+
 // src/index.ts
+var EVOR_INSTRUCTIONS = "Evor runs an autonomous ML-research evolution: it evolves a model+dataset by mutation tree search under integrity gates. USE these evor_* tools whenever a mission is being set up, run, resumed, or inspected \u2014 any time you change or read .evor state, record a node/eval, launch or check a training run, write or read a tick artifact, cite a paper, emit/query a signal, or manage the run. These evor_* tools are the only sanctioned way to operate a run; do not author .evor state files by hand. Search for them whenever an evor run is active. Core loop: evor_init_run -> evor_record_node -> evor_run_start (async; watch with the native Monitor tool) -> evor_run_status -> evor_record_eval -> evor_integrity_check -> evor_wiki_add. Read upstream tick artifacts with evor_read_artifact before acting. Full catalog, lifecycle recipes, and artifact schemas: invoke the `oh-my-evor:evor-mcp` skill.";
 async function main() {
-  const server = new McpServer({
-    name: "evor",
-    version: "0.5.0"
-  });
+  const server = new McpServer(
+    {
+      name: "evor",
+      version: "0.6.0"
+    },
+    { instructions: EVOR_INSTRUCTIONS }
+  );
   registerInitTools(server);
   registerRecordTools(server);
   registerTreeTools(server);
@@ -22725,6 +24076,10 @@ async function main() {
   registerCiteTools(server);
   registerTelemetryTools(server);
   registerSignalTools(server);
+  registerArtifactTools(server);
+  registerLineageTools(server);
+  registerComputeTools(server);
+  registerGotchaTools(server);
   const transport = new StdioServerTransport();
   await server.connect(transport);
   process.on("SIGINT", async () => {
@@ -22732,8 +24087,8 @@ async function main() {
     process.exit(0);
   });
 }
-main().catch((err) => {
-  process.stderr.write(`[evor-mcp] fatal: ${err}
+main().catch((err2) => {
+  process.stderr.write(`[evor-mcp] fatal: ${err2}
 `);
   process.exit(1);
 });

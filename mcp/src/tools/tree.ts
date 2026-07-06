@@ -116,7 +116,7 @@ export function treeSelect(
     return {
       selected: [],
       scores: {},
-      error: pyResult.error ?? "python -m evor.tree select failed",
+      error: pyResult.error ?? "evor_select failed",
     };
   }
 
@@ -167,7 +167,7 @@ export function registerTreeTools(server: McpServer): void {
   // ── evor_select ────────────────────────────────────────────────────────────
   server.tool(
     "evor_select",
-    "Run UCB1 (or current strategy) selection: exec `python -m evor.tree select` and return ranked parent node IDs.",
+    "Select the next parent node(s) to expand by the active policy (UCB1 by default); returns ranked parent node IDs.",
     {
       run_id: z.string().describe("Active run identifier"),
       strategy: StrategyStateSchema.partial().optional().describe("Strategy overrides for this selection"),

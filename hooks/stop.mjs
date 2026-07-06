@@ -31,8 +31,9 @@
  * prevent the session from stopping.
  */
 
-import { existsSync, readFileSync, statSync } from 'fs';
+import { existsSync, readFileSync, writeFileSync, mkdirSync, statSync } from 'fs';
 import { join } from 'path';
+import { randomBytes } from 'crypto';
 
 // ── Kill switches ─────────────────────────────────────────────────────────────
 // DISABLE_EVOR: truthy value disables the entire evor hook layer.
@@ -46,6 +47,16 @@ if (skipHooks.includes('stop')) process.exit(0);
 const activeRunId = process.env.EVOR_ACTIVE_RUN_ID ?? '';
 if (!activeRunId) process.exit(0);
 
+// ── §17D: Read stop_hook_active from STDIN payload (NOT from env) ─────────────
+// stop_hook_active=true means the model is trying to stop again while we already
+// blocked it. Track block count; release after ≥2 blocks (don't fight the user).
+let stopHookActive = false;
+try {
+  const rawStdin = readFileSync(0, 'utf8');
+  const stopPayload = JSON.parse(rawStdin || '{}');
+  stopHookActive = !!stopPayload?.stop_hook_active;
+} catch { /* fail-open — missing STDIN is normal in tests */ }
+
 const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT ?? process.cwd();
 const evorRoot = process.env.EVOR_ROOT ?? join(pluginRoot, '.evor');
 const missionId = process.env.EVOR_MISSION_ID ?? '';
@@ -55,6 +66,60 @@ const runDir = missionId
   : join(evorRoot, 'runs', activeRunId);
 
 const runStatePath = join(runDir, 'run-state.json');
+
+// ── §15E: Gate silent when mission is in a terminal/paused state ──────────────
+// If the orchestrator already completed, failed, or paused the run, the stop
+// hook must not interfere — the user is free to end the session.
+try {
+  const missionStatePath = join(runDir, 'mission-state.json');
+  if (existsSync(missionStatePath)) {
+    const ms = JSON.parse(readFileSync(missionStatePath, 'utf8'));
+    const st = String(ms?.status ?? '').toLowerCase();
+    if (st === 'paused' || st === 'completed' || st === 'failed') {
+      process.exit(0); // terminal/paused — allow stop
+    }
+  }
+} catch { /* fail-open — a corrupt mission-state must not block the user */ }
+
+// ── §17D / §15E: Block-count escalation guard ────────────────────────────────
+// Per-session file tracks how many times this hook has blocked. Once the model
+// is already in a blocked stop (stop_hook_active=true) and we've blocked ≥2×,
+// we release to avoid an infinite fight. Each exit-2 message includes the
+// kill-switch guidance so the user can always override: EVOR_SKIP_HOOKS=stop.
+const sessionId = (process.env.CLAUDE_SESSION_ID ?? 'nosession').slice(0, 24);
+const blockCountPath = join(runDir, `stop-blocks-${sessionId}.json`);
+
+let blockCount = 0;
+try {
+  const bcData = JSON.parse(readFileSync(blockCountPath, 'utf8'));
+  blockCount = typeof bcData?.count === 'number' ? bcData.count : 0;
+} catch { /* no file yet — first block */ }
+
+if (stopHookActive) {
+  // Model is already stopped and trying again — increment and potentially release
+  blockCount++;
+  try {
+    mkdirSync(runDir, { recursive: true });
+    writeFileSync(blockCountPath, JSON.stringify({ count: blockCount, updated_at: new Date().toISOString() }));
+  } catch { /* state write failure is non-fatal */ }
+
+  if (blockCount >= 2) {
+    process.exit(0); // don't fight the user — release after 2 consecutive blocks
+  }
+}
+
+// Helper: wrap any exit-2 message with escalation info
+function blockStop(message) {
+  const attempt = blockCount + 1;
+  const suffix = `\n\n[Attempt ${attempt}/8] To force-stop regardless, set EVOR_SKIP_HOOKS=stop.`;
+  process.stdout.write(message + suffix);
+  // Record this block
+  try {
+    mkdirSync(runDir, { recursive: true });
+    writeFileSync(blockCountPath, JSON.stringify({ count: attempt, updated_at: new Date().toISOString() }));
+  } catch { /* non-fatal */ }
+  process.exit(2);
+}
 
 if (!existsSync(runStatePath)) process.exit(0);
 
@@ -71,12 +136,11 @@ try {
 const pendingIds = Array.isArray(runState?.pending_node_ids) ? runState.pending_node_ids : [];
 if (pendingIds.length > 0) {
   const tick = runState?.tick_count ?? '?';
-  process.stdout.write(
+  blockStop(
     `[EVOR CONTINUATION GUARD] Tick ${tick} started but tree DB not updated.\n` +
       `Call evor_record_node for nodes: ${pendingIds.join(', ')}.\n` +
       `Do not finish until the tree is updated.\n`
   );
-  process.exit(2);
 }
 
 // ── Guard 2: evolution drift-guard (Phase 2) ──────────────────────────────────
@@ -209,13 +273,12 @@ try {
 
   if (debtReasons.length > 0) {
     const tick = runState?.tick_count ?? '?';
-    process.stdout.write(
+    blockStop(
       `[EVOR DRIFT GUARD] Active run has behavioral debt after tick ${tick}.\n` +
         `Resolve the following before stopping:\n` +
         debtReasons.map((r, i) => `  ${i + 1}. ${r}`).join('\n') + '\n' +
         `\nDo not finish until drift is resolved.\n`
     );
-    process.exit(2);
   }
 } catch (err) {
   // FAIL-OPEN: unexpected error in drift-guard must never crash-block the session

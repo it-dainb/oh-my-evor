@@ -218,6 +218,40 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Path to the run directory containing signals-inbox.jsonl",
     )
 
+    # jobs subcommand — detached training-run manager
+    jobs_p = sub.add_parser("jobs", help="Detached job manager for training runs")
+    jobs_sub = jobs_p.add_subparsers(dest="jobs_action", required=True)
+
+    js_p = jobs_sub.add_parser(
+        "start", help="Launch a detached job; print {job_id, status_path, log_path}",
+    )
+    js_p.add_argument(
+        "--run-dir", required=True, type=Path,
+        help="Run directory — jobs/<job_id>/ will be created inside",
+    )
+    js_p.add_argument(
+        "--cmd-json", required=True,
+        help="JSON array of the full command + args to run",
+    )
+
+    jst_p = jobs_sub.add_parser("status", help="Read jobs/<job_id>/status.json")
+    jst_p.add_argument("--job-id", required=True, help="Job identifier")
+    jst_p.add_argument(
+        "--run-dir", required=True, type=Path,
+        help="Run directory containing the jobs/ subtree",
+    )
+
+    jsv_p = jobs_sub.add_parser(
+        "supervise",
+        help="[internal] Run child command, capture log, flip status on exit",
+    )
+    jsv_p.add_argument("--job-id", required=True)
+    jsv_p.add_argument("--run-dir", required=True, type=Path)
+    jsv_p.add_argument(
+        "--cmd-json", required=True,
+        help="JSON array of the full command + args to run as child",
+    )
+
     return parser
 
 
@@ -341,17 +375,21 @@ def _cmd_run(args: argparse.Namespace) -> int:
         print("[evor run] ERROR: cannot run without GoalContract.", file=sys.stderr)
         return 1
 
-    # ── Inject TelemetryCallback into worktree trainer ────────────────
-    # Forge is responsible for the injection before calling `python -m evor run`.
-    # Here we verify the injection is present and warn if not.
+    # ── Verify telemetry instrumentation in worktree trainer ─────────
+    # Forge is responsible for the instrumentation before calling `python -m evor run`.
+    # Accept either the env-path pattern (EVOR_TELEMETRY_PATH + open/write) or the
+    # legacy TelemetryCallback for back-compat with pre-§19 worktrees.
     trainer_path = worktree / "train" / "trainer.py"
     if trainer_path.exists():
         trainer_src = trainer_path.read_text()
-        if "TelemetryCallback" not in trainer_src:
+        _has_env_path = "EVOR_TELEMETRY_PATH" in trainer_src and "open(" in trainer_src
+        _has_legacy_cb = "TelemetryCallback" in trainer_src
+        if not _has_env_path and not _has_legacy_cb:
             print(
-                "[evor run] WARNING: TelemetryCallback not found in train/trainer.py. "
-                "Forge should have injected it. Training will proceed but telemetry "
-                "will not be recorded — Selector may reject this candidate.",
+                "[evor run] WARNING: no telemetry instrumentation found in train/trainer.py. "
+                "Expected EVOR_TELEMETRY_PATH + open() (env-path pattern) or TelemetryCallback. "
+                "Training will proceed but telemetry may not be recorded — "
+                "Selector may reject this candidate.",
                 file=sys.stderr,
             )
 
@@ -390,6 +428,11 @@ def _cmd_run(args: argparse.Namespace) -> int:
         "EVOR_NODE_ID": args.node_id,
         "EVOR_RUN_ID": args.run_id,
     }
+    # Export telemetry path so the candidate can append records via stdlib only (§19).
+    if run_dir is not None:
+        _tel_path = run_dir / "nodes" / args.node_id / "telemetry.jsonl"
+        _tel_path.parent.mkdir(parents=True, exist_ok=True)
+        env["EVOR_TELEMETRY_PATH"] = str(_tel_path)
 
     try:
         result = evaluator.run(
@@ -704,6 +747,31 @@ def _cmd_signals(args: argparse.Namespace) -> int:
     return 1
 
 
+def _cmd_jobs(args: argparse.Namespace) -> int:
+    """Dispatch jobs sub-actions to evor.jobs."""
+    from evor import jobs as _jobs  # local import — keep startup fast
+
+    if args.jobs_action == "start":
+        cmd_args: list[str] = json.loads(args.cmd_json)
+        run_dir = Path(args.run_dir).resolve()
+        result = _jobs.start_job(cmd_args, run_dir)
+        print(json.dumps(result))
+        return 0
+
+    if args.jobs_action == "status":
+        run_dir = Path(args.run_dir).resolve()
+        result = _jobs.status(args.job_id, run_dir)
+        print(json.dumps(result))
+        return 0 if result.get("state") not in ("error", "unknown") else 1
+
+    if args.jobs_action == "supervise":
+        cmd_args = json.loads(args.cmd_json)
+        run_dir = Path(args.run_dir).resolve()
+        return _jobs._supervise(args.job_id, run_dir, cmd_args)
+
+    return 1
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = _build_parser()
     args = parser.parse_args(argv)
@@ -726,6 +794,8 @@ def main(argv: list[str] | None = None) -> int:
         return _cmd_signals(args)
     if args.subcommand == "distill":
         return _cmd_distill(args)
+    if args.subcommand == "jobs":
+        return _cmd_jobs(args)
 
     parser.print_help()
     return 1

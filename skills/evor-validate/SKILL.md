@@ -3,6 +3,7 @@ name: evor-validate
 description: Run the Phase-2 contract/state validator against an active evor run directory and present the report
 argument-hint: "[run-dir or run-id]"
 level: 2
+skills: [oh-my-evor:evor-mcp]
 ---
 
 <Purpose>
@@ -36,17 +37,15 @@ Two-layer gameability check:
 
 If an argument was provided, treat it as the run directory path or run-id.
 Otherwise:
-1. Check `.evor/active-run.json` for the current active run.
-2. If found: use `run_dir` from that file.
+1. Call `evor_state_read` to retrieve the current active run.
+2. If found: use `run_dir` from the result.
 3. If not found: list available runs under `.evor/runs/` and prompt the user.
 
 ## Step 2 — Run the validator
 
-```bash
-PYTHONPATH="${EVOR_PLUGIN_ROOT:-$CLAUDE_PLUGIN_ROOT}/harness${PYTHONPATH:+:$PYTHONPATH}" python -m evor validate --run-id <run_dir>
-```
+Call `evor_validate({ run_id: "<run_dir>" })`.
 
-The validator exits 0 (VALID) or 1 (INVALID) and prints a JSON report to stdout.
+The tool returns a structured report with `valid: true` or `valid: false` and per-check details.
 
 ## Step 3 — Present the report
 
@@ -92,22 +91,13 @@ If the report shows INVALID:
 - Redirect to `/evor-doctor` for infrastructure issues (missing files, corrupt JSON).
 
 If the report shows VALID:
-- If `mission-state.json` status is `"draft"`: prompt the user to flip it to `"locked"`:
-  ```bash
-  python -c "
-  import json; from pathlib import Path; from datetime import datetime, timezone
-  p = Path('<run_dir>/mission-state.json')
-  d = json.loads(p.read_text()); d['status'] = 'locked'; d['updated_at'] = datetime.now(timezone.utc).isoformat()
-  p.write_text(json.dumps(d, indent=2))
-  print('Mission state locked.')
-  "
-  ```
+- If `mission-state.json` status is `"draft"`: call `evor_state_write({ mission_status: "locked" })` to flip it.
 - Print: "Contract is VALID. Mission is ready to run with /evor-run."
 
 </Steps>
 
 <Tool_Usage>
-- Bash — run `python -m evor validate --run-id <run_dir>`
-- Read — parse the JSON output
-- evor_state_read — read active-run.json for run resolution
+- `evor_state_read` — read active-run.json for run resolution
+- `evor_validate` — Phase-2 enforcement gate; returns structured pass/fail report
+- `evor_state_write` — flip mission_status to "locked" on pass
 </Tool_Usage>

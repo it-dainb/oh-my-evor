@@ -31,8 +31,8 @@ find "$HOME/.claude/plugins" -path "*oh-my-evor*/skills/evor-report/SKILL.md" 2>
 
 - Usage: `/evor-report [run-id]`
 - Reads `.evor/active-run.json` for the active run, or resolves from the given run-id argument
-- Renders an ASCII evolution tree and generates a PNG via `python -m evor.plot_tree`
-- Aggregates wiki lessons via `python -m evor.wiki summarize`
+- Renders an ASCII evolution tree and generates a PNG via `evor_plot_report`
+- Aggregates wiki lessons via `evor_wiki_summarize`
 - Exports a self-contained static HTML report to `<run-dir>/report/index.html`
 - Writes a `report/manifest.json` with metadata
 - Called automatically by the `evor` tick loop when a stop condition is met

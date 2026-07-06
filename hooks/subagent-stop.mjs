@@ -33,8 +33,9 @@
  * Fail-open: any error → exit 0. Never crash or block.
  */
 
-import { existsSync, statSync, readFileSync } from 'fs';
+import { existsSync, statSync, readFileSync, appendFileSync, renameSync, writeFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
+import { spawnSync } from 'child_process';
 
 // ── Kill switches ─────────────────────────────────────────────────────────────
 if (process.env.DISABLE_EVOR) process.exit(0);
@@ -107,7 +108,44 @@ if (!relPath) process.exit(0); // unrecognised role — exit silently
 
 const artifactPath = join(runDir, relPath);
 
-// ── Artifact presence check ───────────────────────────────────────────────────
+// ── §17D: Drain signals-inbox (command hook — reads env, calls Python harness) ─
+// Best-effort: call `python3 -m evor.signals drain --run-id <id> --run-dir <dir>`
+// to flush signals-inbox.jsonl into the SignalBus so the orchestrator can query
+// them. Fail-open: if Python/harness unavailable, leave the inbox in place —
+// the orchestrator will drain it on its next evor_signal_query call.
+if (['sage', 'mutagen', 'probe', 'forge', 'selector', 'acquirer'].includes(agentRole)) {
+  try {
+    const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT ?? process.cwd();
+    const harnessDir = process.env.EVOR_HARNESS_DIR ?? join(pluginRoot, 'harness');
+    const py = process.env.EVOR_PYTHON ?? 'python3';
+    const { delimiter } = await import('path');
+    const pythonEnv = {
+      ...process.env,
+      PYTHONPATH: process.env.PYTHONPATH
+        ? `${harnessDir}${delimiter}${process.env.PYTHONPATH}`
+        : harnessDir,
+    };
+
+    const inboxPath = join(runDir, 'signals-inbox.jsonl');
+    if (existsSync(inboxPath)) {
+      // Call the harness drain — purely best-effort side effect; stdio fully
+      // suppressed so no subprocess output leaks onto our stdout/stderr.
+      spawnSync(
+        py,
+        ['-m', 'evor.signals', 'drain',
+         '--run-id', activeRunId,
+         '--run-dir', runDir],
+        { stdio: ['ignore', 'ignore', 'ignore'], timeout: 3000, env: pythonEnv }
+      );
+    }
+  } catch {
+    // Drain failure is non-fatal — the orchestrator handles inbox draining
+  }
+}
+
+// ── Artifact presence check (silent on success, warn on failure) ──────────────
+// Contract: emit NOTHING on stdout when artifact is present and non-trivial.
+// Only warn (non-blocking) when artifact is absent or too small.
 const MIN_ARTIFACT_BYTES = 10;
 
 try {
@@ -127,7 +165,10 @@ try {
         `  Expected: ${artifactPath}\n` +
         `  Agent may have written a stub rather than a full deliverable.\n`
     );
+    process.exit(0);
   }
+
+  // Artifact present and non-trivial — exit silently (success path).
 } catch (err) {
   // Fail-open: stat errors are non-fatal
   process.stderr.write(`[evor:subagent-stop] artifact check failed (non-fatal): ${err.message}\n`);

@@ -3,6 +3,7 @@ name: evor
 description: Main 9-step Evor tick loop with meta-evolution, doom-loop detection, and parallel candidate scheduling
 argument-hint: "[run-id]"
 level: 4
+skills: [oh-my-evor:evor-mcp]
 ---
 
 <Purpose>
@@ -29,17 +30,17 @@ directly — STOP and spawn the correct sub-agent instead.
 | Implement+Run | `Task(subagent_type="oh-my-evor:evor-forge", …)` | writing/running training code yourself |
 | Analyze+Learn | `Task(subagent_type="oh-my-evor:evor-probe", …)` | writing lessons/verdicts yourself |
 
-**Artifact post-condition — verify on disk after EVERY Task, before advancing:**
+**Artifact post-condition — verify via MCP after EVERY Task, before advancing:**
 
-| Sub-agent | Artifact that MUST exist after its Task returns |
-|-----------|--------------------------------------------------|
-| evor-mutagen  | `ticks/<tick>/mutagen/proposals.json` |
-| evor-sage     | `ticks/<tick>/sage/findings.json` |
-| evor-selector | `ticks/<tick>/selector/verdict.json` |
-| evor-forge    | `ticks/<tick>/forge/forge-report.json` + `nodes/<node_id>/results.json` |
-| evor-probe    | `ticks/<tick>/probe/findings.json` |
+| Sub-agent | Artifact check |
+|-----------|----------------|
+| evor-mutagen  | `evor_read_artifact({ run_id, tick, agent: "mutagen" })` — `{error:"not found"}` → re-spawn |
+| evor-sage     | `evor_read_artifact({ run_id, tick, agent: "sage" })` — `{error:"not found"}` → re-spawn |
+| evor-selector | `evor_read_artifact({ run_id, tick, agent: "selector" })` — `{error:"not found"}` → re-spawn |
+| evor-forge    | `evor_read_artifact({ run_id, tick, agent: "forge" })` — `{error:"not found"}` → re-spawn |
+| evor-probe    | `evor_read_artifact({ run_id, tick, agent: "probe" })` — `{error:"not found"}` → re-spawn |
 
-If the artifact is missing, the sub-agent failed — re-spawn it with a corrective note. Do NOT
+If an artifact is missing, the sub-agent failed — re-spawn it with a corrective note. Do NOT
 fabricate the artifact yourself and do NOT proceed without it.
 
 **State-persistence post-condition — non-skippable:** running a candidate is not "done" until it
@@ -139,7 +140,7 @@ If the contract has NO `autonomy_charter` (legacy), fall back to consent-gated b
 If `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` is set in the environment:
 - Multiple Forge agents run in parallel, one per approved proposal (up to ResourcePlan.concurrency).
 - Evor manages the shared task-board via `evor_state_write` for inter-agent coordination.
-- Monitor tool is used to watch for `job_complete` or `self_heal_event` signals during compute-bound phases.
+- Use `Monitor` to watch for `job_complete` or `self_heal_event` signals during compute-bound phases.
 
 If the env var is unavailable, fall back to sequential candidate execution (concurrency=1): Forge agents run one at a time; Evor waits for each job_complete signal before starting the next.
 </Parallel_Execution>
@@ -150,14 +151,14 @@ If the env var is unavailable, fall back to sequential candidate execution (conc
 
 Before Step 1 of the first tick, guarantee the hardware profile exists — Mutagen and Selector
 read `.evor/capability.json` for hardware gotcha-avoidance, and setup's preflight may have been
-skipped. This is idempotent and cheap (no micro-train):
+skipped. Call `evor_capability` to probe hardware and write the capability profile. This is
+idempotent and cheap (no micro-train).
 
-```bash
-PYTHONPATH="${EVOR_PLUGIN_ROOT:-$CLAUDE_PLUGIN_ROOT}/harness${PYTHONPATH:+:$PYTHONPATH}" python -m evor capability --evor-root .evor --run-dir "$EVOR_RUN_DIR"
-```
+Confirm `.evor/capability.json` is present in the result. If the call fails, log a warning and
+continue — agents degrade gracefully to `cpu_only` defaults.
 
-Confirm `.evor/capability.json` exists after this. If the command fails (harness not importable),
-log a warning and continue — the agents degrade gracefully to `cpu_only` defaults.
+Use `TaskCreate` to open a tracking task for this run (title: "Mission <mission_id> — tick loop").
+Use `TaskUpdate` to mark each tick's step progress as the loop advances.
 
 ## Step 1 — Select
 
@@ -174,10 +175,10 @@ If the frontier has ≥2 nodes from distinct lineages with scores within 10% of 
 Spawn Mutagen and Sage as REAL sub-agents. Do NOT write proposals or citations yourself.
 
 1. `Task(subagent_type="oh-my-evor:evor-mutagen", description="Tick <n> proposals", prompt="Run dir: <run_dir>. Tick: <n>. Parent node(s): <ids>. Wildness: <w>. Generate N=<concurrency> proposals and write ticks/<n>/mutagen/proposals.json per your write-as-you-go contract.")`.
-   - **POST-CONDITION:** confirm `ticks/<n>/mutagen/proposals.json` exists and parses. If missing, re-spawn Mutagen with a corrective note. Never fabricate it.
-2. Write Mutagen's `investigation_queries[]` to `handoffs/mutagen_to_sage.json`, then
-   `Task(subagent_type="oh-my-evor:evor-sage", description="Tick <n> grounding", prompt="Run dir: <run_dir>. Tick: <n>. Answer the investigation_queries in handoffs/mutagen_to_sage.json and write ticks/<n>/sage/findings.json.")`.
-   - **POST-CONDITION:** confirm `ticks/<n>/sage/findings.json` exists. If missing, re-spawn Sage.
+   - **POST-CONDITION:** call `evor_read_artifact({ run_id, tick: n, agent: "mutagen" })`. If it returns `{error:"not found"}`, re-spawn Mutagen with a corrective note. Never fabricate the artifact.
+2. Write Mutagen's `investigation_queries[]` to the tick handoff via `evor_write_handoff({ run_id, tick: n, data: { to: "sage", investigation_queries: [...] } })`, then
+   `Task(subagent_type="oh-my-evor:evor-sage", description="Tick <n> grounding", prompt="Run dir: <run_dir>. Tick: <n>. Read the tick handoff via evor_read_handoff and answer the investigation_queries, then write ticks/<n>/sage/findings.json.")`.
+   - **POST-CONDITION:** call `evor_read_artifact({ run_id, tick: n, agent: "sage" })`. If it returns `{error:"not found"}`, re-spawn Sage.
 3. Attach Sage's findings to the matching `MutationProposal.citations[]`.
 
 Run Mutagen then Sage sequentially, or both in parallel when `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`. proposals.json and findings.json are the SUB-AGENTS' outputs — you never author them.
@@ -195,7 +196,7 @@ Spawn Selector as a REAL sub-agent in a SEPARATE context. Do NOT approve/reject 
 the whole point is an independent critic that did not generate the proposals it gates.
 
 `Task(subagent_type="oh-my-evor:evor-selector", description="Tick <n> gate", prompt="Run dir: <run_dir>. Tick: <n>. Evaluate all 6 gates for every proposal in ticks/<n>/mutagen/proposals.json against strategy.json, and write ticks/<n>/selector/verdict.json.")`.
-- **POST-CONDITION:** confirm `ticks/<n>/selector/verdict.json` exists. If missing, re-spawn Selector.
+- **POST-CONDITION:** call `evor_read_artifact({ run_id, tick: n, agent: "selector" })`. If it returns `{error:"not found"}`, re-spawn Selector.
 - Read the verdict; collect approved proposals. If zero pass, trigger Doom-Loop_Detection.
 - The rejection reasons are already in the verdict artifact; append a DecisionLogEntry summarizing them via `evor_state_write`.
 
@@ -203,10 +204,10 @@ the whole point is an independent critic that did not generate the proposals it 
 
 For each approved proposal, spawn Forge as a REAL sub-agent. Do NOT write or run training code yourself.
 
-`Task(subagent_type="oh-my-evor:evor-forge", description="Implement <node_id>", prompt="Run dir: <run_dir>. Tick: <n>. Node: <node_id>. Materialize the genome for proposal <id>, inject TelemetryCallback, store the delta, run the harness/training, and write ticks/<n>/forge/forge-report.json plus nodes/<node_id>/results.json and telemetry.")`.
-- **POST-CONDITION:** confirm `nodes/<node_id>/results.json` exists after each Forge Task. If missing, re-spawn Forge.
-- If parallel teams available: launch Forge Tasks concurrently; Monitor for job_complete. Otherwise run one at a time.
-- Then YOU (orchestrator) call `evor_record_node` to register each new TreeNode in tree.json, and append a DecisionLogEntry (decision_type="implement", node_ids=[node_id]).
+`Task(subagent_type="oh-my-evor:evor-forge", description="Implement <node_id>", prompt="Run dir: <run_dir>. Tick: <n>. Node: <node_id>. Materialize the genome for proposal <id>, instrument telemetry via EVOR_TELEMETRY_PATH env-path append, store the delta, run the harness/training, and write ticks/<n>/forge/forge-report.json plus nodes/<node_id>/results.json and telemetry.")`.
+- **POST-CONDITION:** call `evor_read_artifact({ run_id, tick: n, agent: "forge" })`. If it returns `{error:"not found"}`, re-spawn Forge.
+- If parallel teams available: launch Forge Tasks concurrently; use `Monitor` for job_complete. Otherwise run one at a time.
+- Then YOU (orchestrator) call `evor_record_node` to register each new TreeNode in tree.json, and append a DecisionLogEntry (decision_type="implement", node_ids=[node_id]) via `evor_state_write`.
 - **The node MUST appear in tree.json before you advance.** Training a candidate without recording it is a FAILED tick (the Stop hook enforces this).
 
 ## Step 6 — Evaluate + Integrity
@@ -214,12 +215,12 @@ For each approved proposal, spawn Forge as a REAL sub-agent. Do NOT write or run
 For each completed Forge job:
 1. Harness writes EvaluationResult to nodes/<id>/results.json.
 2. Call `evor_record_eval(run_id, node_id, result)` — this auto-triggers `evor_integrity_check`.
-3. `evor_integrity_check` calls `integrity_bridge.py` via the MCP subprocess bridge and writes IntegrityReport to evaluations/<node-id>.json.
-4. If IntegrityReport.verdict="failed": mark the node integrity_status="failed", skip promotion. Log failure_reason.
+3. `evor_integrity_check` verifies the result and writes IntegrityReport to evaluations/<node-id>.json.
+4. If IntegrityReport.verdict="failed": mark the node integrity_status="failed", skip promotion. Log failure_reason via `evor_state_write`.
 5. If passed: set node integrity_status="passed".
 
 **Ingestion Contamination Gate** (data-acquisition nodes only):
-- IntegrityGate checks acquisition_contamination_clear: no acquired sample collides with any frozen eval split.
+- The integrity check verifies acquisition_contamination_clear: no acquired sample collides with any frozen eval split.
 - If false: node is rejected at integrity, never promoted to frontier.
 
 ## Step 7 — Analyze + Learn
@@ -227,18 +228,18 @@ For each completed Forge job:
 For each node where integrity_status="passed", spawn Probe as a REAL sub-agent. Do NOT write lessons or hypothesis verdicts yourself.
 
 `Task(subagent_type="oh-my-evor:evor-probe", description="Analyze <node_id>", prompt="Run dir: <run_dir>. Tick: <n>. Node: <node_id>. Analyze nodes/<node_id>/telemetry.jsonl against the registered Hypothesis, and write ticks/<n>/probe/findings.json (LessonEntry + hypothesis_verdict).")`.
-- **POST-CONDITION:** confirm `ticks/<n>/probe/findings.json` exists. If missing, re-spawn Probe.
+- **POST-CONDITION:** call `evor_read_artifact({ run_id, tick: n, agent: "probe" })`. If it returns `{error:"not found"}`, re-spawn Probe.
 - Read the LessonEntry from the artifact; call `evor_wiki_add(run_id, lesson_entry)` to persist it.
 - Update node.lesson_ids with the returned lesson_id.
 - If Probe returns a BenchmarkUpgradeProposal:
-  - Log it as a DecisionLogEntry (decision_type="meta-evolve").
-  - Call BenchmarkManager.apply_upgrade() directly (Python method; no subprocess CLI — benchmark.py has no __main__ entry point).
-  - If consent_granted=true (user confirmed): bump eval_version, rescore frontier nodes.
+  - Log it as a DecisionLogEntry (decision_type="meta-evolve") via `evor_state_write`.
+  - Apply the benchmark upgrade.
+  - If consent_granted=true (user confirmed): bump eval_version via `evor_state_write`, rescore frontier nodes.
 
 ## Step 8 — Record
 
 For all nodes this tick:
-- Append DecisionLogEntry to decision-log.md (decision_type="record", node_ids=all_this_tick).
+- Append DecisionLogEntry to the run state (decision_type="record", node_ids=all_this_tick) via `evor_state_write`.
 - Update run-state.json: increment tick count, update best_score if improved, update frontier_ids.
 - Call `evor_state_write` with the run-state patch.
 
@@ -255,8 +256,8 @@ For all nodes this tick:
    - "evolve-n": tick count >= n → stop.
    - "evolve-until-regression": best_score < previous best → stop.
    - Circuit breaker: budget.circuit_breaker consecutive failures → stop with warning.
-4. If stop condition met: print final summary, call `evor-report` skill, exit loop.
-5. If continuing: call Meta-Evolution check (see below), then return to Step 1.
+4. If stop condition met: print final summary, invoke `evor-report` skill, call `evor_plot_report({ run_id })` to render the final tree PNG and HTML, then deliver via `SendUserFile`. Exit loop.
+5. If continuing: call Meta-Evolution check (see below), use `TaskUpdate` to mark tick complete, then return to Step 1.
 
 ## Step 9.5 — BenchmarkUpgrade Re-scoring (conditional)
 
@@ -266,7 +267,7 @@ If a BenchmarkUpgrade was applied in Step 7 and StrategyState.rescore_mode="sync
 - Update fitness_value using GoalContract.fitness_mode.
 - Nodes not re-scored within rescore_deadline_ticks are demoted to "v{old}-only" status.
 
-If rescore_mode="async": schedule re-scoring jobs via evor_schedule without blocking the tick loop.
+If rescore_mode="async": schedule re-scoring jobs via `evor_schedule` without blocking the tick loop.
 
 </Steps>
 
@@ -274,142 +275,83 @@ If rescore_mode="async": schedule re-scoring jobs via evor_schedule without bloc
 Every tick follows this mandatory lifecycle wrapping all 9 steps.
 
 **Tick Start — Read Prior Tick Handoff**
-If `tick_count > 0`, read the prior tick's handoff before beginning Step 1:
-```python
-from evor.handoff import latest_tick_handoff
-result = latest_tick_handoff(run_dir)
-if result:
-    prior_tick, handoff_text = result
-    # incorporate handoff_text (lessons, dominant_family, next_tick_seed) into orchestrator context
-```
-This prevents re-proposing dead-end families and provides Mutagen with the `next_tick_seed` hint.
+If `tick_count > 0`, call `evor_read_handoff({ run_id, to_agent: "orchestrator" })` before beginning Step 1. Incorporate the result's lessons, dominant_family, and next_tick_seed hint into orchestrator context before Step 1. This prevents re-proposing dead-end families and provides Mutagen with the `next_tick_seed` hint.
 
 **Tick Start — Inbox Drain (before Step 1)**
-After reading the tick handoff and before executing Step 1, drain the remember-inbox so
-`<evor-remember>` tags written by any agent this tick reach the wiki and gotcha store:
-```python
-import json
-from pathlib import Path
+After reading the tick handoff and before executing Step 1, drain both inboxes:
 
-inbox_path = Path(run_dir) / "remember-inbox.jsonl"
-if inbox_path.exists():
-    for line in inbox_path.read_text().splitlines():
-        line = line.strip()
-        if not line:
-            continue
-        try:
-            entry = json.loads(line)
-        except Exception:
-            continue
-        if entry.get("type") == "gotcha":
-            # Route to GotchaStore — use the MCP tool or direct Python API
-            # python -m evor.gotchas add  (or GotchaStore.add_gotcha() directly)
-            from evor.gotchas import GotchaStore, make_gotcha
-            store = GotchaStore(evor_root, run_dir)
-            store.add_gotcha(make_gotcha(
-                kind="runtime-failure",
-                signature=entry.get("signature", "inbox-gotcha"),
-                context=entry,
-                resolution=entry.get("text", ""),
-                avoidance=entry.get("text", ""),
-                scope="mission",
-                confidence=0.7,
-            ))
-        else:
-            # Default: route to CompoundingWiki via evor_wiki_add
-            evor_wiki_add(run_id, {"lesson": entry.get("text", ""), "source": "inbox"})
-    # Truncate inbox after draining — entries are now in wiki/gotcha store
-    inbox_path.write_text("")
 ```
-This is the step that makes `<evor-remember>` durable-fact tagging write-and-read rather
-than write-only. The PostToolUse hook appends entries; this step consumes them each tick.
+evor_drain_inbox({ run_id, kind: "remember" })
+evor_drain_inbox({ run_id, kind: "signals" })
+```
 
-**Before Each Step N (1–9): Write tick-state.json**
-Write `<run_dir>/tick-state.json` to mark the step in-progress before executing it:
+The `remember` drain routes `<evor-remember>` entries to the wiki and gotcha store. The `signals` drain routes `<evor-signal>` entries into the deduped signal bus. Both calls return the count drained and atomically truncate the inbox.
+
+**Before Each Step N (1–9): Write tick-state**
+Call `evor_state_write` with a `tick_state` payload before executing each step:
 ```json
 {
-  "tick": <current_tick_number>,
-  "current_step": <N>,
-  "step_status": "running",
-  "step_outputs": {},
-  "updated_at": "<ISO 8601>"
+  "tick_state": {
+    "tick": "<current_tick_number>",
+    "current_step": "<N>",
+    "step_status": "running",
+    "step_outputs": {},
+    "updated_at": "<ISO 8601>"
+  }
 }
 ```
-Use `evor_state_write` or write directly. This enables step-level resumability: if the loop
-is interrupted mid-tick, `evor-resume` reads `current_step` and restarts from that step.
+This enables step-level resumability: if the loop is interrupted mid-tick, `evor-resume` reads `current_step` and restarts from that step.
 
 **After Each Step N: Update step_status**
-Update `tick-state.json` to mark the step done with a brief output summary:
+Call `evor_state_write` with an updated `tick_state` payload to mark the step done:
 ```json
 {
-  "tick": <current_tick_number>,
-  "current_step": <N>,
-  "step_status": "done",
-  "step_outputs": { "<key>": "<brief summary of step output>" },
-  "updated_at": "<ISO 8601>"
+  "tick_state": {
+    "tick": "<current_tick_number>",
+    "current_step": "<N>",
+    "step_status": "done",
+    "step_outputs": { "<key>": "<brief summary of step output>" },
+    "updated_at": "<ISO 8601>"
+  }
 }
 ```
 
 **Tick End — Write Tick Handoff**
-After Step 9 (before the stop-check / next-tick loop decision), write the tick handoff:
-```python
-from evor.handoff import write_tick_handoff
-write_tick_handoff(run_dir, tick=current_tick_number, data={
-    "tick": current_tick_number,
-    "best_score": run_state["best_score"],
-    "best_node_id": run_state.get("best_node_id"),
-    "frontier_size": len(run_state.get("frontier_ids", [])),
-    "nodes_this_tick": [n["node_id"] for n in nodes_this_tick],
-    "lessons": [le["lesson_id"] for le in lessons_this_tick],
-    "dominant_family": dominant_approach_family_this_tick,
-    "next_tick_seed": "<brief hint for Mutagen: what to explore next based on Probe's lessons>",
-    "strategy_state": {
-        "wildness": strategy["wildness"],
-        "selection_policy": strategy["selection_policy"],
-        "meta_iteration": strategy["meta_iteration"]
-    }
-})
+After Step 9 (before the stop-check / next-tick loop decision), call `evor_write_handoff` with the tick summary:
+```json
+{
+  "tick": "<current_tick_number>",
+  "best_score": "<run_state.best_score>",
+  "best_node_id": "<run_state.best_node_id>",
+  "frontier_size": "<len(frontier_ids)>",
+  "nodes_this_tick": ["<node_id>"],
+  "lessons": ["<lesson_id>"],
+  "dominant_family": "<dominant_approach_family_this_tick>",
+  "next_tick_seed": "<brief hint for Mutagen: what to explore next based on Probe's lessons>",
+  "strategy_state": {
+    "wildness": "<strategy.wildness>",
+    "selection_policy": "<strategy.selection_policy>",
+    "meta_iteration": "<strategy.meta_iteration>"
+  }
+}
 ```
-This handoff is read at the start of the next tick (above) and by Mutagen before proposing.
+
+At milestones (every 5 ticks, or when best_score improves by ≥5%): call `evor_plot_report({ run_id })` then deliver the tree PNG via `SendUserFile`.
 
 **Step-Level Resume Detection**
-When the tick loop starts a new tick (or when `/evor-resume` invokes this skill), check
-`tick-state.json` for an interrupted tick before executing Step 1:
-```python
-import json; from pathlib import Path
-ts_path = Path(run_dir) / "tick-state.json"
-if ts_path.exists():
-    ts = json.loads(ts_path.read_text())
-    resume_tick = ts.get("tick")
-    resume_step = ts.get("current_step", 0)
-    resume_status = ts.get("step_status", "done")
-    current_tick = run_state.get("tick_count", 0)
-    if resume_tick == current_tick and resume_status == "running" and resume_step < 9:
-        # interrupted mid-tick — skip steps 1 through resume_step-1
-        print(f"[evor] Resuming tick {resume_tick} from step {resume_step} (interrupted mid-tick)")
-        start_step = resume_step  # re-run the interrupted step from the top
-    else:
-        start_step = 1  # fresh tick
-else:
-    start_step = 1
-```
-Re-run the interrupted step from its beginning (write tick-state with status="running" again).
-Steps 1 through `start_step - 1` are treated as already completed for this tick.
+When the tick loop starts a new tick (or when `/evor-resume` invokes this skill), call `evor_state_read` to retrieve the current `tick_state` before executing Step 1:
+
+- If `tick_state.tick == current_tick` AND `tick_state.step_status == "running"` AND `tick_state.current_step < 9`: an interrupted tick is detected — skip steps 1 through `tick_state.current_step - 1` and re-run the interrupted step from the top.
+- Otherwise: start at Step 1 (fresh tick).
+
+Re-run the interrupted step from its beginning (write tick-state with `step_status: "running"` again via `evor_state_write`).
 
 **Why This Matters**
-tick-state.json makes every tick resumable at the step level — an interrupted tick at step 5
-restarts from step 5, not step 1. Tick handoffs compound learning across ticks: Mutagen reads
-the prior handoff and avoids families proven ineffective; Probe's lessons accumulate across ticks
-rather than being siloed to the current tick's context.
+tick-state makes every tick resumable at the step level — an interrupted tick at step 5 restarts from step 5, not step 1. Tick handoffs compound learning across ticks: Mutagen reads the prior handoff and avoids families proven ineffective; Probe's lessons accumulate across ticks rather than being siloed to the current tick's context.
 </Tick_Lifecycle>
 
 <Meta_Evolution>
-Every `strategy.json.meta_loop_interval` ticks (default 5), run:
-```bash
-PYTHONPATH="${EVOR_PLUGIN_ROOT:-$CLAUDE_PLUGIN_ROOT}/harness${PYTHONPATH:+:$PYTHONPATH}" python -m evor.tree meta-evolve --run-id <run_id>
-```
-This updates strategy.json fields: ucb1_c, wildness, family_mix, meta_iteration.
-Log as DecisionLogEntry(decision_type="meta-evolve", strategy_delta=delta).
+Every `strategy.json.meta_loop_interval` ticks (default 5), call `evor_meta_evolve({ run_id })` to update strategy.json fields: ucb1_c, wildness, family_mix, meta_iteration. Log as DecisionLogEntry(decision_type="meta-evolve", strategy_delta=delta) via `evor_state_write`.
 
 If a BenchmarkUpgrade was recently applied (post_upgrade_exploration_ticks > 0):
 - Override wildness to strategy.post_upgrade_exploration_boost for post_upgrade_exploration_ticks remaining ticks.
@@ -435,42 +377,21 @@ Then apply the following overrides for the next tick:
 1. Set wildness override = 0.9 (maximum exploration) regardless of strategy.json.
 2. Force approach_family diversity: require Mutagen to generate proposals from 3 distinct families.
 3. If winning_families shows a monopoly (one family in last 5 entries), explicitly exclude that family for one tick.
-4. Log the intervention as DecisionLogEntry(decision_type="meta-evolve", rationale="doom-loop intervention").
-
-This pattern mirrors the malformed-tool detection pattern in `refs/ml-intern/agent/core/agent_loop.py`.
+4. Log the intervention as DecisionLogEntry(decision_type="meta-evolve", rationale="doom-loop intervention") via `evor_state_write`.
 </Doom_Loop_Detection>
 
 <Signal_Routing>
 The run has a SIGNAL BUS (`<run_dir>/signals.jsonl`) — the shared observation/pain-point stream.
 You are the ROUTER: you read it and PUSH the relevant slice to each sub-agent (agents also pull
-depth themselves). See `references/signal-protocol.md` for the schema + facets. A signal is
+depth themselves). See `agents/references/signal-protocol.md` for the schema + facets. A signal is
 neutral; each lens treats it differently — a brief to Mutagen, a gate to Selector, a default to
 Forge-architect, an escalate to you.
 
-**Tick start — drain the signal inbox** (alongside the remember-inbox drain). The PostToolUse hook
-appends `<evor-signal>` tags to `signals-inbox.jsonl`; drain them into the deduped bus:
-```python
-import json; from pathlib import Path
-from evor.signals import SignalBus, make_signal
-bus = SignalBus(run_dir)
-inbox = Path(run_dir) / "signals-inbox.jsonl"
-if inbox.exists():
-    for line in inbox.read_text().splitlines():
-        if not line.strip(): continue
-        e = json.loads(line)
-        desc = (e.get("evidence") or {}).get("description", "")
-        bus.emit(make_signal(kind=e["kind"], signature=f'{e["kind"]}:{desc[:24]}',
-                             shapes=e.get("shapes") or ["limit"], axes=e.get("axes") or ["accuracy"],
-                             severity=e.get("severity", "medium"), evidence=e.get("evidence", {}),
-                             source=e.get("source", "hook")))
-    inbox.write_text("")
-```
+**Tick start — drain the signal inbox** (handled by `evor_drain_inbox({ run_id, kind: "signals" })` in the Inbox Drain step above). The PostToolUse hook appends `<evor-signal>` tags to `signals-inbox.jsonl`; the drain call routes them into the deduped bus.
 
-**Before each sub-agent spawn — PUSH the digest** (the mandatory awareness floor). Query the bus for
-that agent's subscribed facets (in its `<Signal_Lens>`) and inject the digest into its Task prompt:
-```python
-digest = SignalBus(run_dir).digest(shapes=["limit","opportunity","trend"], min_severity="medium")  # Mutagen
-# → Task(subagent_type="oh-my-evor:evor-mutagen", prompt=... + f"\nRecent signals (dream around these): {digest}")
+**Before each sub-agent spawn — PUSH the digest** (the mandatory awareness floor). Call `evor_signal_digest({ run_id })` to retrieve the compact top-slice (severity≥medium), then inject the result into each sub-agent's Task prompt:
+```
+Task(subagent_type="oh-my-evor:evor-mutagen", prompt=... + "\nRecent signals (dream around these): " + digest)
 ```
 
 **Escalate signals — resolved by the Autonomy Charter, NEVER by asking.** When a signal implies the
@@ -484,20 +405,29 @@ into train — and NEVER stop to ask. A monotonic move always exists; take it an
 </Signal_Routing>
 
 <Tool_Usage>
+- `evor_capability` — probe hardware at run startup (Step 0)
 - `evor_tree_read` — read current tree state
-- `evor_signal_emit` / `evor_signal_query` — emit to / read the signal bus (or use the python `SignalBus` API directly)
 - `evor_select` — UCB1 selection
+- `evor_signal_emit` / `evor_signal_query` — emit to / read the signal bus
+- `evor_signal_digest` — compact bus top-slice for sub-agent spawn-prompt injection
+- `evor_drain_inbox` — drain remember-inbox and signals-inbox at tick start
 - `evor_record_node` — write new TreeNode to tree.json
 - `evor_record_eval` — write EvaluationResult, auto-trigger integrity check
-- `evor_integrity_check` — run IntegrityGate
+- `evor_integrity_check` — run the integrity checks
 - `evor_wiki_add` — persist LessonEntry
-- `evor_wiki_query` — query prior lessons (Sage uses this; orchestrator uses for context)
-- `evor_state_read` / `evor_state_write` — run state management
-- `evor_schedule` — submit jobs to ResourceScheduler
+- `evor_wiki_query` — query prior lessons
+- `evor_state_read` / `evor_state_write` — run state, tick-state, and tick_state writes
+- `evor_read_artifact` / `evor_write_artifact` — post-condition artifact checks; tick artifact writes
+- `evor_write_handoff` / `evor_read_handoff` — write and read per-tick handoffs
+- `evor_meta_evolve` — update strategy.json after meta-loop interval
+- `evor_schedule` — submit jobs to the run scheduler
 - `evor_cite` — attach citation to node
 - `evor_telemetry_ingest` — validate + append TelemetryRecord[] to nodes/<id>/telemetry.jsonl
-- Monitor — wait for job_complete or self_heal_event during compute-bound phases
-- python_repl — meta-evolution, benchmark upgrade, preflight checks
+- `evor_gotcha_add` — record a gotcha surfaced by inbox drain routing
+- `evor_plot_report` — render the evolution tree at milestones and stop
+- `Monitor` — watch for job_complete or self_heal_event during compute-bound phases; idle here, do not poll
+- `TaskCreate` / `TaskList` / `TaskUpdate` — track per-tick candidates and phase progress as a visible task list
+- `SendUserFile` — deliver evolution-tree PNG and metrics plot at milestones and mission stop
 </Tool_Usage>
 
 <Compaction_Survival>
@@ -537,27 +467,23 @@ Any agent or the orchestrator can mark a durable fact with XML tags in their tex
 <evor-remember gotcha>Hard constraint or failure that blocks a class of proposals</evor-remember>
 ```
 
-The `PostToolUse` hook (`hooks/post-tool-use.mjs`) scans tool inputs and responses for
-these tags and appends matches to `.evor/runs/<run_id>/remember-inbox.jsonl`:
-- `type: "wiki"` entries → route to `evor_wiki_add` (CompoundingWiki)
-- `type: "gotcha"` entries → route to `evor_gotchas add` (GotchaStore)
-
-The orchestrator processes the inbox at the start of each tick (after reading the tick
-handoff). Call `evor_wiki_add` / python `GotchaStore.add()` for each inbox entry, then
-truncate the inbox. This keeps the wiki and gotcha store current without requiring
-sub-agents to call those tools directly.
+The `PostToolUse` hook scans tool inputs and responses for these tags and appends matches to
+the remember-inbox. The orchestrator calls `evor_drain_inbox({ run_id, kind: "remember" })` at
+the start of each tick — it routes wiki entries to `evor_wiki_add` and gotcha entries to
+`evor_gotcha_add`, then atomically truncates the inbox. This keeps the wiki and gotcha store
+current without requiring sub-agents to call those tools directly.
 
 **Resume after compaction:**
 When Evor resumes after compaction, the `<evor-restore>` block in context provides:
-objective + current tick/step + best score/node + recovery hint. Always re-read
-`tick-state.json` and `run-state.json` from disk before acting — the restore block
-is a navigation aid, not the authoritative state.
+objective + current tick/step + best score/node + recovery hint. Always call `evor_state_read`
+before acting — the restore block is a navigation aid, not the authoritative state.
 </Compaction_Survival>
 
 <Execution_Policy>
-- Evor (orchestrator) idles via Monitor during compute-bound Forge phases — do not poll.
-- Wake on `job_complete` signal from harness or `self_heal_event` from SelfHealMonitor.
+- Evor (orchestrator) idles via `Monitor` during compute-bound Forge phases — do not poll.
+- Wake on `job_complete` signal from harness or `self_heal_event` from the harness.
 - Do not spawn more Forge agents than ResourcePlan.concurrency.
 - Respect budget.max_wall_clock_hours and budget.max_gpu_hours if set.
 - Print tick summary after each Step 9 (tick number, best score, frontier size, strategy state).
+- Use `TaskUpdate` to mark each tick complete in the task list after Step 9.
 </Execution_Policy>

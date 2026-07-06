@@ -16,7 +16,7 @@
       "type": "http",
       "url": "https://huggingface.co/mcp",
       "headers": {
-        "Authorization": "Bearer ${HF_TOKEN:-}"
+        "Authorization": "Bearer ${user_config.hf_token}"
       }
     }
   }

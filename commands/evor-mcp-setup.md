@@ -31,10 +31,9 @@ find "$HOME/.claude/plugins" -path "*oh-my-evor*/skills/evor-mcp-setup/SKILL.md"
 ## Quick Reference
 
 - Usage: `/evor-mcp-setup [--anon]`
-- Checks whether `hf-mcp` is already registered (`claude mcp list`)
+- Manual fallback for environments where the plugin's automatic userConfig token flow does not apply (older Claude Code versions, Bedrock, Vertex)
+- Checks whether `CLAUDE_PLUGIN_OPTION_HF_TOKEN` is already set (userConfig active — no action needed)
 - Prompts for an HF token (read-only scope sufficient) with link to https://huggingface.co/settings/tokens; Enter to skip → anonymous mode
-- Registers via `claude mcp add --scope user --transport http hf-mcp https://huggingface.co/mcp`
-- Token stored at user scope (`~/.claude.json`) — NEVER written to any committed file
-- Optional: writes `HF_TOKEN=...` to `.evor/.env` (gitignored) for harness/script use
-- Verifies registration with `claude mcp list` and prints next steps
-- After setup, restart your Claude Code session for the MCP server to load
+- Writes `HF_TOKEN=<token>` to `.evor/.env` (gitignored) for harness/script use
+- Token is NEVER written to any committed file
+- After writing, run `/evor-doctor` to verify the full environment

@@ -34,3 +34,8 @@ refs/
 # bundled python MCP venvs (built at runtime, not source)
 mcp/.venvs/
 mcp/.uv/
+
+# runtime state anywhere in the tree (not source) — nested .omc/.evor
+**/.omc/
+.evor/runs/
+.evor/active-run.json

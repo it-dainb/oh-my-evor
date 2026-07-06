@@ -3,6 +3,7 @@ name: evor-distill
 description: Scan an existing ML workspace to produce a starting-point report; pre-fills the evor-setup interview
 argument-hint: "[workspace-path]"
 level: 3
+skills: [oh-my-evor:evor-mcp]
 ---
 
 <Purpose>
@@ -33,25 +34,14 @@ Determine the workspace root and evor-root from arguments or defaults:
 
 ## Step 2 — Run the scanner
 
-Always run the scan with the bundled harness on PYTHONPATH so it works without any install step:
+Call `evor_distill_scan({ path: "<workspace>", evor_root: "<evorRoot>" })`.
 
-```bash
-PYTHONPATH="${EVOR_PLUGIN_ROOT:-$CLAUDE_PLUGIN_ROOT}/harness${PYTHONPATH:+:$PYTHONPATH}" python -m evor.distill scan --root <workspace> --evor-root <evorRoot>
-```
+This writes `<evorRoot>/starting-point.json` and returns a human summary. Bad or permission-denied paths are skipped; the scanner never throws on malformed input.
 
-This writes `<evorRoot>/starting-point.json` and prints a human summary. Exit 0 on success — bad or permission-denied paths are skipped; the scanner never throws on malformed input.
-
-If the command fails with a Python traceback (not an import error), show the last 20 lines of stderr and stop with:
+If the call returns `{error: ...}`, show the error and stop with:
 ```
 evor-distill scan failed. Check that the workspace path is accessible and retry.
 ```
-
-If the command still fails after adding the PYTHONPATH prefix (e.g. a missing dependency such as pydantic in the active Python environment), show the error and tell the user:
-```
-evor-distill: harness dependency missing in the active Python environment.
-Activate the conda/virtualenv that has pydantic and the other harness deps installed, then retry /evor-distill.
-```
-Do not attempt to install automatically.
 
 ## Step 3 — Read starting-point.json
 
@@ -125,6 +115,5 @@ model family hint, and baseline candidate) for you to confirm or edit.
 </Steps>
 
 <Tool_Usage>
-- Bash — run `python -m evor.distill scan --root <workspace> --evor-root <evorRoot>`
-- Read — parse starting-point.json
+- `evor_distill_scan` — deep-scan workspace; writes and returns a StartingPointReport to `<evorRoot>/starting-point.json`
 </Tool_Usage>

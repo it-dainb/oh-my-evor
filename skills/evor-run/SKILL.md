@@ -3,10 +3,11 @@ name: evor-run
 description: Load GoalContract, set active run state, and invoke the Evor tick loop
 argument-hint: "[mission-id or run-id]"
 level: 3
+skills: [oh-my-evor:evor-mcp]
 ---
 
 <Purpose>
-evor-run is the launch skill for an Evor mission. It validates that a GoalContract exists, checks for an existing run to resume, sets the EVOR_ACTIVE_RUN_ID environment variable, writes `.evor/active-run.json`, and delegates to the `evor` skill to start the tick loop. If no GoalContract is found for the specified mission, it redirects to `evor-setup`.
+evor-run is the launch skill for an Evor mission. It validates that a GoalContract exists, checks for an existing run to resume, sets the EVOR_ACTIVE_RUN_ID environment variable, writes the active-run state via `evor_state_write`, and delegates to the `evor` skill to start the tick loop. If no GoalContract is found for the specified mission, it redirects to `evor-setup`.
 </Purpose>
 
 <Use_When>
@@ -26,15 +27,13 @@ evor-run is the launch skill for an Evor mission. It validates that a GoalContra
 ## Step 1 — Resolve Mission and Run ID
 
 If arguments were provided, treat them as mission-id or run-id. Otherwise:
-1. Check `.evor/active-run.json` for a current active run.
-2. If found and run-state.json shows `status != "completed"`: offer to resume that run.
+1. Call `evor_state_read` to check for a current active run.
+2. If found and run-state shows `status != "completed"`: offer to resume that run.
 3. If not found: list available missions under `.evor/runs/` and prompt the user to select one, or redirect to `/evor-setup`.
 
 ## Step 2 — Load and Validate GoalContract
 
-```bash
-cat .evor/runs/<mission-slug>/<run-id>/goal-contract.json
-```
+Call `evor_read_goal_contract({ run_id: "<run_dir>" })` to load and validate the contract.
 
 Validate:
 - `mission_id`, `dataset_ref`, `baseline_value`, `locked_split_hash`, `eval_script_hash` are all present.
@@ -44,26 +43,20 @@ Validate:
 
 ## Step 2.5 — Phase-2 Lock Guard
 
-Read `mission-state.json` in the resolved run directory:
+Call `evor_state_read` to read mission-state for the resolved run directory.
 
-```bash
-cat .evor/runs/<mission-slug>/<run-id>/mission-state.json 2>/dev/null
-```
-
-- **File absent**: print `WARNING: mission-state.json not found — pre-Phase-2 run, proceeding without lock guard.` and continue. This is fail-open for legacy runs that predate Phase-2.
-- **File present, `status != "locked"`**: print the error below and **stop immediately**. Do not proceed to Step 3.
+- **No mission-state present**: print `WARNING: mission-state not found — pre-Phase-2 run, proceeding without lock guard.` and continue. This is fail-open for legacy runs.
+- **mission_state.status != "locked"**: print the error below and **stop immediately**. Do not proceed to Step 3.
   ```
   ERROR: mission-state.status=<status> — mission is not locked.
   The contract has not passed the Phase-2 validation gate.
   Run /evor-validate to validate and lock it, or /evor-setup to reinitialize.
   ```
-- **File present, `status == "locked"`**: continue to Step 3.
-
-`python -m evor run` enforces the same guard at the CLI level and exits with code 6 if the mission is not locked.
+- **mission_state.status == "locked"**: continue to Step 3.
 
 ## Step 3 — Check for Resume Path
 
-Check `.evor/runs/<mission-slug>/<run-id>/run-state.json`:
+Call `evor_state_read` to check run-state.json:
 - If `status = "initialized"` or `tick_count = 0`: this is a fresh start. Print: "Starting fresh mission: <mission_id> (run_id: <run_id>)."
 - If `status = "running"` and `tick_count > 0`: print resume summary:
   ```
@@ -80,24 +73,31 @@ Check `.evor/runs/<mission-slug>/<run-id>/run-state.json`:
 
 ## Step 4 — Set Active Run State
 
-```bash
-export EVOR_ACTIVE_RUN_ID=<run_id>
+Call `evor_state_write` to record the active run and set status to running:
+
+```
+evor_state_write({
+  mission_status: "running",
+  active_run: {
+    mission_id: "<mission_id>",
+    run_id: "<run_id>",
+    run_dir: ".evor/runs/<mission-slug>/<run-id>/",
+    started_at: "<ISO 8601>",
+    status: "running"
+  }
+})
 ```
 
-Write `.evor/active-run.json`:
-```json
-{
-  "mission_id": "<mission_id>",
-  "run_id": "<run_id>",
-  "run_dir": ".evor/runs/<mission-slug>/<run-id>/",
-  "started_at": "<ISO 8601>",
-  "status": "running"
-}
-```
+## Step 5 — Run-Watch Mode
 
-Update `run-state.json` via `evor_state_write`: set `status = "running"`.
+Choose the appropriate run-watch mode based on context:
 
-## Step 5 — Invoke the evor Skill
+- **Attended** (interactive session, run expected ≤~4h): after `evor_run_start` fires inside the tick loop, the `evor` skill watches the job with the native `Monitor` tool (`tail -f <log_path> | grep -E --line-buffered "elapsed_steps=|val_|Traceback|Error|OOM|Killed|FAILED"`). Session stays live.
+- **Scheduled / unattended** (multi-hour or overnight runs): the plugin job-status watcher (registered via `watchPaths` at run_start) fires a `FileChanged` wake when `jobs/<id>/status.json` changes. Use `CronCreate` to establish a recurring check-in cadence for multi-day missions. Session sleeps between check-ins.
+
+The tick loop in the `evor` skill manages this automatically; this note is for orientation when choosing `/evor-run` vs a scheduled invocation.
+
+## Step 6 — Invoke the evor Skill
 
 Read and follow `skills/evor/SKILL.md` exactly, passing:
 - `run_id` = the resolved run ID
@@ -109,8 +109,8 @@ The evor skill owns the tick loop from this point forward.
 </Steps>
 
 <Tool_Usage>
-- Read / Bash — load and validate GoalContract, run-state.json
-- evor_state_read — read current run state
-- evor_state_write — set status=running
+- `evor_state_read` — read active-run, mission-state, and run-state
+- `evor_read_goal_contract` — load and validate GoalContract
+- `evor_state_write` — set mission_status="running" and active_run record
 - Skill dispatch to `evor` — hand off tick loop execution
 </Tool_Usage>

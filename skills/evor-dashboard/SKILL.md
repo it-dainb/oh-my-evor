@@ -3,6 +3,7 @@ name: evor-dashboard
 description: Start the live FastAPI + SSE dashboard for the active Evor mission on port 8756
 argument-hint: "[run-id]"
 level: 2
+skills: [oh-my-evor:evor-mcp]
 ---
 
 <Purpose>
@@ -24,7 +25,7 @@ evor-dashboard starts the FastAPI dashboard server for the active Evor mission. 
 
 ## Step 1 — Resolve Run Directory
 
-Read `.evor/active-run.json` to get `run_dir`. If a run-id argument was provided, resolve `run_dir = .evor/runs/<mission-slug>/<run-id>/` directly.
+Call `evor_state_read` to get `run_dir` from the active run. If a run-id argument was provided, resolve `run_dir = .evor/runs/<mission-slug>/<run-id>/` directly.
 
 If no active run is found: print "No active run found. Start a mission with /evor-setup first." and stop.
 
@@ -93,6 +94,6 @@ Print: "Dashboard server stopped."
 </Steps>
 
 <Tool_Usage>
-- Bash — lsof, uvicorn background launch, curl health check, xdg-open/open
-- Read — .evor/active-run.json
+- `evor_state_read` — read active-run.json to resolve run_dir
+- `Bash` — lsof, uvicorn background launch, curl health check, xdg-open/open
 </Tool_Usage>

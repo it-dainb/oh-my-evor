@@ -3,6 +3,7 @@ name: evor-doctor
 description: Check environment health and .evor integrity; auto-repair obvious issues like list-format tree.json
 argument-hint: "[run-dir] [--repair]"
 level: 2
+skills: [oh-my-evor:evor-mcp]
 ---
 
 <Purpose>
@@ -38,15 +39,12 @@ Parse the argument for an optional run-dir path and `--repair` flag:
 
 ## Step 2 — Run doctor
 
-```bash
-# Env-only check:
-PYTHONPATH="${EVOR_PLUGIN_ROOT:-$CLAUDE_PLUGIN_ROOT}/harness${PYTHONPATH:+:$PYTHONPATH}" python -m evor doctor
+Call `evor_doctor` with the applicable arguments:
 
-# With run directory:
-PYTHONPATH="${EVOR_PLUGIN_ROOT:-$CLAUDE_PLUGIN_ROOT}/harness${PYTHONPATH:+:$PYTHONPATH}" python -m evor doctor --run-id <run_dir>
-
-# With repair (auto-fix list-format tree.json → DICT):
-PYTHONPATH="${EVOR_PLUGIN_ROOT:-$CLAUDE_PLUGIN_ROOT}/harness${PYTHONPATH:+:$PYTHONPATH}" python -m evor doctor --run-id <run_dir> --repair
+```
+evor_doctor({})                              // env-only check
+evor_doctor({ run_id: "<run_dir>" })         // env + .evor integrity check
+evor_doctor({ run_id: "<run_dir>", repair: true })  // env + .evor + auto-repair
 ```
 
 ## Step 3 — Present the report
@@ -111,6 +109,5 @@ Re-run /evor-validate to confirm the contract is now valid.
 </Steps>
 
 <Tool_Usage>
-- Bash — run `python -m evor doctor [--run-id <dir>] [--repair]`
-- Read — parse JSON report
+- `evor_doctor` — run environment and .evor integrity diagnostics; pass `repair: true` to auto-fix
 </Tool_Usage>

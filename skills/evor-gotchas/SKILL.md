@@ -3,6 +3,7 @@ name: evor-gotchas
 description: Inspect accumulated Gotchas (failures + hardware limits) and the hardware capability profile
 argument-hint: "[--kind K] [--scope S] [--min-confidence C] [--evor-root DIR] [--run-dir DIR]"
 level: 2
+skills: [oh-my-evor:evor-mcp]
 ---
 
 <Purpose>
@@ -18,7 +19,7 @@ It shows:
 Gotcha kinds:
   hardware-constraint  — probed at preflight; describes what this machine cannot do
                          (e.g. no GPU, arch < sm_90 so no flash-attn v3).
-  runtime-failure      — captured automatically by SelfHealMonitor and EvaluatorAdapter
+  runtime-failure      — captured automatically by the harness during evaluation
                          when OOM / NaN / missing-dep / checkpoint failures occur.
   approach-deadend     — written by Probe when a family of mutations consistently fails
                          to improve over multiple ticks.
@@ -48,15 +49,18 @@ Parse optional arguments:
 - `--evor-root DIR`     Path to .evor/ root (default: .evor in cwd)
 - `--run-dir DIR`       Path to active run directory for mission-scoped gotchas
 
-## Step 2 — Run gotchas subcommand
+## Step 2 — Query gotchas
 
-```bash
-PYTHONPATH="${EVOR_PLUGIN_ROOT:-$CLAUDE_PLUGIN_ROOT}/harness${PYTHONPATH:+:$PYTHONPATH}" python -m evor gotchas \
-    [--kind runtime-failure|hardware-constraint|approach-deadend] \
-    [--scope global|mission] \
-    [--min-confidence 0.7] \
-    [--evor-root .evor] \
-    [--run-dir .evor/runs/<mission>/<run-id>]
+Call `evor_gotchas_list` with the applicable filters:
+
+```
+evor_gotchas_list({
+  kind: "runtime-failure" | "hardware-constraint" | "approach-deadend",  // optional
+  scope: "global" | "mission",                                            // optional
+  min_confidence: 0.7,                                                    // optional
+  evor_root: ".evor",                                                     // optional
+  run_dir: ".evor/runs/<mission>/<run-id>"                                // optional
+})
 ```
 
 ## Step 3 — Present the capability profile
@@ -112,12 +116,11 @@ If runtime-failure gotchas with confidence >= 0.8 are present:
    reproduce the triggering configuration. Review the avoidance field."
 
 If no capability.json exists:
-  "Run /evor-setup or `python -m evor preflight --run-id <id>` to probe
-   hardware capability and seed hardware-constraint gotchas."
+  "Run /evor-setup (which calls evor_preflight) to probe hardware capability and seed hardware-constraint gotchas."
 
 </Steps>
 
 <Tool_Usage>
-- Bash — run `python -m evor gotchas [options]`
-- Read — parse JSON output for table rendering
+- `evor_gotchas_list` — query all accumulated gotchas, optionally filtered by kind/scope/confidence
+- `evor_state_read` — read capability profile from active run state
 </Tool_Usage>

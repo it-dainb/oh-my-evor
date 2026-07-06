@@ -145,7 +145,7 @@ python -m pytest harness/tests -q # 538 passing  (integrity gate, signals, tree 
 |---|---|---|
 | **Orchestration** | Skills + agents | `/oh-my-evor:*` skills, 11 hierarchical agents, Autonomy Charter (never-halt, monotonic-honesty) |
 | **MCP server** | 14 tools (TypeScript, prebuilt bundle) | `record_node`, `record_eval`, `integrity_check`, `select`, `signal_emit/query`, `state_*`, `tree_read`, `cite`, `wiki_*`, … |
-| **Compute harness** | Python | Integrity gate (13 checks), tree engine (UCB1 + crossover + prune), SignalBus, evaluator, telemetry, live dashboard |
+| **Compute harness** | Python | Integrity gate (13 checks), tree engine (UCB1 + crossover + prune), signal bus, evaluator, telemetry, live dashboard |
 | **Enforcement** | 6 hooks | `PreToolUse` capability governor, signal capture, compaction flush/rehydrate, stop-guards |
 | **Bridge** | Node ↔ Python | Per-call subprocess JSON; harness auto-resolved onto `PYTHONPATH` so it works after a bare install |
 
