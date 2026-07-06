@@ -1,17 +1,14 @@
 {
-  "lsp": [
-    {
-      "name": "pyright",
-      "command": "pyright-langserver",
-      "args": ["--stdio"],
-      "extensionToLanguage": {
-        ".py": "python"
-      },
-      "initializationOptions": {
-        "pythonVersion": "3.11",
-        "extraPaths": ["./harness"],
-        "exclude": ["mcp/", "ci/", "benchmarks/", "refs/"]
-      }
+  "pyright": {
+    "command": "pyright-langserver",
+    "args": ["--stdio"],
+    "extensionToLanguage": {
+      ".py": "python"
+    },
+    "initializationOptions": {
+      "pythonVersion": "3.11",
+      "extraPaths": ["./harness"],
+      "exclude": ["mcp/", "ci/", "benchmarks/", "refs/"]
     }
-  ]
+  }
 }

@@ -24059,7 +24059,7 @@ async function main() {
   const server = new McpServer(
     {
       name: "evor",
-      version: "1.0.0"
+      version: "1.0.1"
     },
     { instructions: EVOR_INSTRUCTIONS }
   );
