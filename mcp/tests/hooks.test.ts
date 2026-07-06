@@ -86,12 +86,17 @@ describe("session-start hook", () => {
     rmSync(tmpDir, { recursive: true, force: true });
   });
 
-  it("exits 0 silently when active-run.json is absent (no active run)", () => {
+  it("exports EVOR_PLUGIN_ROOT (but no active-run env) when active-run.json is absent", () => {
+    writeFileSync(join(tmpDir, ".deps-ok"), "cached"); // skip the env-dependent dep-check
     const result = runHook(SESSION_START, { EVOR_ROOT: tmpDir });
     expect(result.status).toBe(0);
     expect(result.stderr).toBe("");
-    // stdout is empty when no active run
-    expect(result.stdout.trim()).toBe("");
+    const output = JSON.parse(result.stdout.trim());
+    // The plugin root is always exported so slash commands can resolve their SKILL.md.
+    expect(output.env.EVOR_PLUGIN_ROOT).toBeTruthy();
+    // …but with no mission in flight there is no active-run context or message.
+    expect(output.env.EVOR_ACTIVE_RUN_ID).toBeUndefined();
+    expect(output.message).toBeUndefined();
   });
 
   it("exits 0 and emits env JSON when active-run.json is valid", () => {

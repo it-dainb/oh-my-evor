@@ -10,9 +10,9 @@ This command resumes a paused or interrupted Evor mission by restoring run state
 
 1. Read the bundled skill instructions with one deterministic read:
    ```bash
-   cat "$CLAUDE_PLUGIN_ROOT/skills/evor-run/SKILL.md"
+   cat "${EVOR_PLUGIN_ROOT:-$CLAUDE_PLUGIN_ROOT}/skills/evor-run/SKILL.md"
    ```
-   Claude Code sets `CLAUDE_PLUGIN_ROOT` to this plugin's install directory, so this resolves no matter what your current working directory is.
+   `EVOR_PLUGIN_ROOT` is exported by this plugin’s SessionStart hook and `CLAUDE_PLUGIN_ROOT` by Claude Code — either points at the plugin’s install directory, so this resolves regardless of your current working directory.
 2. Follow that SKILL.md exactly with the resume flag active, treating the user's arguments as:
 
 ```text

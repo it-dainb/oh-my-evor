@@ -20,6 +20,7 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { join, dirname, delimiter } from 'path';
 import { spawnSync } from 'child_process';
+import { fileURLToPath } from 'url';
 
 /**
  * Build an <evor-restore> summary from on-disk state files.
@@ -109,7 +110,13 @@ const skipHooks = (process.env.EVOR_SKIP_HOOKS ?? '').split(',').map(s => s.trim
 if (skipHooks.includes('session-start')) process.exit(0);
 
 // ── Active run discovery ──────────────────────────────────────────────────────
-const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT ?? process.cwd();
+// This hook lives at <pluginRoot>/hooks/session-start.mjs, so the plugin root is
+// two levels up from the script itself — a deterministic anchor that never depends
+// on the current working directory. Prefer Claude Code's own CLAUDE_PLUGIN_ROOT
+// when present, else derive it from our own location.
+const pluginRoot =
+  process.env.CLAUDE_PLUGIN_ROOT
+  ?? dirname(dirname(fileURLToPath(import.meta.url)));
 const evorRoot = process.env.EVOR_ROOT ?? join(pluginRoot, '.evor');
 const activeRunFile = join(evorRoot, 'active-run.json');
 
@@ -121,16 +128,20 @@ function clearEnvAndExit(reason) {
   if (reason) process.stderr.write(`[evor:session-start] ${reason}\n`);
   process.stdout.write(
     JSON.stringify({
-      env: { EVOR_ACTIVE_RUN_ID: '', EVOR_MISSION_ID: '', EVOR_RUN_DIR: '' },
+      env: { EVOR_PLUGIN_ROOT: pluginRoot, EVOR_ACTIVE_RUN_ID: '', EVOR_MISSION_ID: '', EVOR_RUN_DIR: '' },
       ...(depWarning ? { message: depWarning } : {}),
     }) + '\n'
   );
   process.exit(0);
 }
 
-// No active run — normal state when no mission is in flight
+// No active run — normal state when no mission is in flight. Still export the
+// plugin root so slash commands can resolve their SKILL.md without searching.
 if (!existsSync(activeRunFile)) {
-  if (depWarning) process.stdout.write(JSON.stringify({ message: depWarning }) + '\n');
+  process.stdout.write(JSON.stringify({
+    env: { EVOR_PLUGIN_ROOT: pluginRoot },
+    ...(depWarning ? { message: depWarning } : {}),
+  }) + '\n');
   process.exit(0);
 }
 
@@ -154,6 +165,7 @@ const runDir = missionId
 
 const output = {
   env: {
+    EVOR_PLUGIN_ROOT: pluginRoot,
     EVOR_ACTIVE_RUN_ID: runId,
     EVOR_MISSION_ID: missionId,
     EVOR_RUN_DIR: runDir,
