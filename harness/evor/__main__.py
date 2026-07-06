@@ -513,16 +513,18 @@ def _cmd_preflight(args: argparse.Namespace) -> int:
         )
         return 5
 
-    # Evaluate overall pass/fail
-    # gpu_active is advisory when no GPU detected; skip from gate if --no-gpu-check
-    required = {"import_ok", "loss_decreasing"}
+    # Evaluate overall pass/fail.
+    # import_ok always gates. gpu_active gates unless --no-gpu-check.
+    # loss_decreasing gates ONLY when it was actually evaluated (a candidate worktree
+    # was supplied); at setup it is None (deferred to the first real training run) and
+    # must NOT fail the environment smoke-test.
+    checks = report["checks"]
+    required = {"import_ok"}
     if not args.no_gpu_check:
         required.add("gpu_active")
+    if checks.get("loss_decreasing") is not None:
+        required.add("loss_decreasing")
 
-    # loss_decreasing is stubbed (False) until EvaluatorAdapter is fully wired to a
-    # real micro-train; in that case report it but do not hard-fail (the stub marks it False
-    # explicitly so callers know it was not evaluated, not that it failed)
-    checks = report["checks"]
     failed = [k for k in required if not checks.get(k, False)]
 
     if failed:

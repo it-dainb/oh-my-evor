@@ -1,6 +1,6 @@
 [project]
 name = "oh-my-evor-harness"
-version = "1.0.1"
+version = "1.0.2"
 description = "Python compute harness for oh-my-evor"
 requires-python = ">=3.10"
 dependencies = [

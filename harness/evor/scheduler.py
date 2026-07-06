@@ -206,22 +206,32 @@ class ResourceScheduler:
             return max(1, plan.concurrency - 1)
         return plan.concurrency + 1
 
-    def preflight(self, run_id: str) -> dict[str, bool]:
-        """5-step micro-train smoke-test (spec R3, §evor-setup).
+    def preflight(
+        self,
+        run_id: str,
+        eval_script: "Path | None" = None,
+        worktree: "Path | None" = None,
+    ) -> dict[str, "bool | None"]:
+        """Environment smoke-test (spec R3, §evor-setup), plus a 5-step micro-train
+        loss-decreasing check when a candidate worktree is supplied.
 
-        Verifies:
-          1. import_ok     — torch importable
-          2. loss_decreasing — loss at step 5 < loss at step 1
-          3. gpu_active    — GPU utilisation > 0% if GPU detected
+        Checks:
+          1. import_ok       — torch importable
+          2. gpu_active      — a GPU is detected
+          3. loss_decreasing — loss at step 5 < loss at step 1, evaluated ONLY when
+                               ``eval_script`` and ``worktree`` are supplied (a
+                               materialised candidate). At setup time — before any
+                               candidate exists — this is reported as ``None``
+                               (deferred to the first real training run), never a
+                               failure.
 
-        Raises NotImplementedError when torch is unavailable — the caller
-        gates on this and prompts the user to confirm or override.
-        GPU checks are skipped (passes trivially) when no GPU is detected.
+        Raises NotImplementedError only when torch itself is unavailable; the caller
+        gates on that and prompts the user to install it or override.
         """
-        checks: dict[str, bool] = {
+        checks: dict[str, "bool | None"] = {
             "import_ok": False,
-            "loss_decreasing": False,
             "gpu_active": False,
+            "loss_decreasing": None,
         }
         try:
             import importlib
@@ -236,24 +246,62 @@ class ResourceScheduler:
         gpus = query_gpus()
         checks["gpu_active"] = len(gpus) > 0
 
-        if checks["gpu_active"]:
-            # GPU detected — the micro-train COULD run, but preflight() has no
-            # fixed eval_script / worktree at this call site (it is invoked before
-            # the candidate worktree is materialised).  Raise so the caller knows
-            # this check was not evaluated rather than silently returning False.
-            # Wiring: pass eval_script + worktree as kwargs then invoke
-            # EvaluatorAdapter.run() with EVOR_PROBE_STEPS=5.
-            # See KNOWN_GAPS.md#G2.
-            raise NotImplementedError(
-                "Preflight loss_decreasing check requires a live EvaluatorAdapter "
-                "micro-train (5 steps). Call preflight() after the candidate worktree "
-                "is materialised and supply eval_script + worktree — see KNOWN_GAPS.md#G2."
+        if eval_script is not None and worktree is not None:
+            # Candidate worktree materialised — run the real 5-step micro-train and
+            # report whether the loss decreased (loss[step5] < loss[step1]).
+            checks["loss_decreasing"] = self._preflight_micro_train(
+                run_id, eval_script, worktree
             )
-
-        # No GPU: micro-train cannot execute; loss_decreasing stays False.
-        # gpu_active=False already signals the caller that the GPU path is inactive.
-        checks["loss_decreasing"] = False
+        # else: no candidate yet — loss_decreasing stays None (deferred, not failed).
         return checks
+
+    def _preflight_micro_train(
+        self, run_id: str, eval_script: "Path", worktree: "Path"
+    ) -> bool:
+        """Run a 5-step EvaluatorAdapter micro-train; return loss[step5] < loss[step1].
+
+        Executes the locked eval script against the materialised candidate worktree
+        with EVOR_PROBE_STEPS=5, then reads the emitted telemetry and compares the
+        first and last recorded training loss. Any failure to run or to find two
+        comparable loss samples returns False (the caller reports it, not a crash).
+        """
+        import os
+
+        try:
+            from evor.evaluator import EvaluatorAdapter
+
+            adapter = EvaluatorAdapter(run_dir=self._run_dir)
+            os.environ["EVOR_PROBE_STEPS"] = "5"
+            adapter.run(
+                node_id=f"preflight-{run_id}",
+                eval_script=eval_script,
+                worktree=worktree,
+            )
+            tel_path = (
+                (self._run_dir / "nodes" / f"preflight-{run_id}" / "telemetry.jsonl")
+                if self._run_dir is not None
+                else worktree / "telemetry.jsonl"
+            )
+            if not tel_path.exists():
+                return False
+            losses: list[float] = []
+            import json as _json
+
+            for line in tel_path.read_text().splitlines():
+                try:
+                    rec = _json.loads(line)
+                except ValueError:
+                    continue
+                v = rec.get("train_loss", rec.get("loss"))
+                if isinstance(v, (int, float)):
+                    losses.append(float(v))
+            if len(losses) < 2:
+                return False
+            return losses[-1] < losses[0]
+        except Exception:
+            return False
+        finally:
+            os.environ.pop("EVOR_PROBE_STEPS", None)
 
     def submit(
         self,
