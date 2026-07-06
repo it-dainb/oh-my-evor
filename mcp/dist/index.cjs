@@ -21715,6 +21715,17 @@ function upsertNode(runId, node, missionId) {
 var import_child_process = require("child_process");
 var import_path4 = require("path");
 var _bridgeDir = process.env.EVOR_BRIDGE_DIR ?? (0, import_path4.resolve)(__dirname, "..", "bridge");
+function _harnessDir() {
+  return process.env.EVOR_HARNESS_DIR ?? (0, import_path4.resolve)(_bridgeDir, "..", "..", "harness");
+}
+function _pythonEnv() {
+  const harness = _harnessDir();
+  const existing = process.env.PYTHONPATH;
+  return {
+    ...process.env,
+    PYTHONPATH: existing ? `${harness}${import_path4.delimiter}${existing}` : harness
+  };
+}
 function pythonBin() {
   return process.env.EVOR_PYTHON ?? "python3";
 }
@@ -21756,7 +21767,7 @@ function callPythonModule(module2, args, opts) {
   const result = (0, import_child_process.spawnSync)(pythonBin(), ["-m", module2, ...args], {
     encoding: "utf8",
     timeout: opts?.timeout ?? 3e4,
-    env: process.env,
+    env: _pythonEnv(),
     cwd: opts?.cwd
   });
   return _parseSpawnResult(result);
@@ -21766,7 +21777,7 @@ function callBridge(scriptName, args, opts) {
   const result = (0, import_child_process.spawnSync)(pythonBin(), [script, ...args], {
     encoding: "utf8",
     timeout: opts?.timeout ?? 6e4,
-    env: process.env,
+    env: _pythonEnv(),
     cwd: opts?.cwd
   });
   return _parseSpawnResult(result);

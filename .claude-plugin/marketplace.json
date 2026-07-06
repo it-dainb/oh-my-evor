@@ -1,16 +1,29 @@
 {
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
   "name": "oh-my-evor",
+  "description": "Autonomous ML research evolution engine for Claude Code — specialized agents evolve a model+dataset via mutations, tree search, integrity gates, and compounding lessons.",
   "owner": {
     "name": "oh-my-evor contributors"
   },
-  "description": "Autonomous ML research evolution engine for Claude Code — a roster of specialized agents evolve a model+dataset via mutations, tree search, integrity gates, and compounding lessons.",
   "plugins": [
     {
       "name": "oh-my-evor",
-      "source": "./",
-      "description": "Autonomous ML research evolution engine: 11 specialized agents (Sage/Mutagen/Probe/Selector/Forge + sub-teams), MCP tools, hook-enforced capability governor, signal telemetry bus, and integrity/anti-gaming gates. Requires a one-time build: run ./install.sh after cloning.",
+      "description": "Autonomous ML research evolution engine: 11 specialized agents (Sage/Mutagen/Probe/Selector/Forge + sub-teams), MCP tools, a hook-enforced capability governor, a signal telemetry bus, and integrity/anti-gaming gates. The MCP server bundle ships prebuilt; the Python harness needs its deps (run ./install.sh once, or pip install -e harness).",
       "version": "0.1.0",
-      "license": "MIT"
+      "author": {
+        "name": "oh-my-evor contributors"
+      },
+      "source": "./",
+      "category": "productivity",
+      "homepage": "https://github.com/it-dainb/oh-my-evor",
+      "tags": [
+        "ml-research",
+        "evolution",
+        "multi-agent",
+        "autonomous",
+        "orchestration"
+      ]
     }
-  ]
+  ],
+  "version": "0.1.0"
 }

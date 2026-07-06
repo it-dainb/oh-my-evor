@@ -5,7 +5,17 @@
   "author": {
     "name": "oh-my-evor contributors"
   },
+  "repository": "https://github.com/it-dainb/oh-my-evor",
+  "homepage": "https://github.com/it-dainb/oh-my-evor",
   "license": "MIT",
+  "keywords": [
+    "claude-code",
+    "plugin",
+    "ml-research",
+    "evolution",
+    "multi-agent",
+    "autonomous"
+  ],
   "skills": [
     "./skills/evor/",
     "./skills/evor-setup/",

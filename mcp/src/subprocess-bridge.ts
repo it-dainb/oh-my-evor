@@ -7,7 +7,7 @@
  */
 
 import { spawnSync, SpawnSyncReturns } from "child_process";
-import { resolve } from "path";
+import { resolve, delimiter } from "path";
 
 // In the esbuild CJS bundle, __dirname is the directory of the output file
 // (mcp/dist/).  Bridge scripts live at mcp/bridge/, one level up.
@@ -16,6 +16,27 @@ import { resolve } from "path";
 // set EVOR_BRIDGE_DIR if they need a different location.
 const _bridgeDir = process.env.EVOR_BRIDGE_DIR
   ?? resolve(__dirname, "..", "bridge");
+
+/**
+ * Directory containing the `evor` Python package. From the shipped layout
+ * (mcp/dist/index.cjs → bridge at mcp/bridge/), the harness is two levels up.
+ * Injected onto PYTHONPATH so `import evor` / `python -m evor` resolves after a
+ * bare `/plugin install` — i.e. WITHOUT relying on `pip install -e harness`,
+ * a particular cwd, or a pre-set PYTHONPATH. Overridable via EVOR_HARNESS_DIR.
+ */
+function _harnessDir(): string {
+  return process.env.EVOR_HARNESS_DIR ?? resolve(_bridgeDir, "..", "..", "harness");
+}
+
+/** Spawn env with the harness prepended to PYTHONPATH so `evor` is importable. */
+function _pythonEnv(): NodeJS.ProcessEnv {
+  const harness = _harnessDir();
+  const existing = process.env.PYTHONPATH;
+  return {
+    ...process.env,
+    PYTHONPATH: existing ? `${harness}${delimiter}${existing}` : harness,
+  };
+}
 
 /** Python executable — overridable for tests and non-default venvs. */
 function pythonBin(): string {
@@ -83,7 +104,7 @@ export function callPythonModule(
   const result = spawnSync(pythonBin(), ["-m", module, ...args], {
     encoding: "utf8",
     timeout: opts?.timeout ?? 30_000,
-    env: process.env as Record<string, string>,
+    env: _pythonEnv() as Record<string, string>,
     cwd: opts?.cwd,
   });
   return _parseSpawnResult(result);
@@ -104,7 +125,7 @@ export function callBridge(
   const result = spawnSync(pythonBin(), [script, ...args], {
     encoding: "utf8",
     timeout: opts?.timeout ?? 60_000,
-    env: process.env as Record<string, string>,
+    env: _pythonEnv() as Record<string, string>,
     cwd: opts?.cwd,
   });
   return _parseSpawnResult(result);
