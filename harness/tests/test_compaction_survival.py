@@ -325,3 +325,162 @@ class TestSubagentStopArtifactCheck:
         assert expected_file in result.stdout, (
             f"Warning for role={role} must mention artifact {expected_file}"
         )
+
+
+# ── GAP8: nested layout compaction survival ───────────────────────────────────
+
+class TestNestedLayoutCompactionSurvival:
+    """PreCompact flush + session-start re-hydration both work on the nested
+    runs/<mission>/<run-id>/ layout used by real MCP runs (EVOR_MISSION_ID set).
+
+    The flat layout (runs/<run-id>/) is already covered by
+    TestPreCompactCheckpoint; this class proves the nested path end-to-end.
+    """
+
+    def test_nested_precompact_writes_checkpoint_to_nested_dir(
+        self, tmp_path: Path
+    ) -> None:
+        """Checkpoint is written into runs/<mission>/<run-id>/checkpoints/, not flat."""
+        run_id = "run-nested-gap8-001"
+        mission_id = "mission-nested-gap8-001"
+        run_dir = tmp_path / "runs" / mission_id / run_id
+        run_dir.mkdir(parents=True)
+
+        (tmp_path / "active-run.json").write_text(
+            json.dumps({"run_id": run_id, "mission_id": mission_id})
+        )
+        (run_dir / "run-state.json").write_text(
+            json.dumps({
+                "tick_count": 5, "best_score": 0.77,
+                "best_node_id": "node-nest-01", "pending_node_ids": [],
+            })
+        )
+        (run_dir / "tick-state.json").write_text(
+            json.dumps({"tick": 5, "current_step": 2})
+        )
+        (run_dir / "mission-state.json").write_text(
+            json.dumps({"objective": "nested layout flush test", "status": "running"})
+        )
+
+        result = run_hook(PRE_COMPACT, {
+            "EVOR_ROOT": str(tmp_path),
+            "EVOR_ACTIVE_RUN_ID": run_id,
+            "EVOR_MISSION_ID": mission_id,
+        })
+        assert result.returncode == 0
+
+        # Checkpoint must land in the NESTED dir, not a flat runs/<run_id>/ path
+        checkpoints_dir = run_dir / "checkpoints"
+        assert checkpoints_dir.exists(), (
+            "checkpoints/ must be created inside the nested run dir"
+        )
+        flat_checkpoints = tmp_path / "runs" / run_id / "checkpoints"
+        assert not flat_checkpoints.exists(), (
+            "flat layout must not be created when mission_id is set"
+        )
+
+        files = list(checkpoints_dir.glob("precompact-*.json"))
+        assert len(files) == 1
+        cp = json.loads(files[0].read_text())
+        assert cp["run_id"] == run_id
+        assert cp["mission_id"] == mission_id
+        assert cp["current_tick"] == 5
+        assert cp["best_score"] == pytest.approx(0.77)
+        assert cp["best_node_id"] == "node-nest-01"
+
+    def test_nested_session_start_rehydrates_from_state_files(
+        self, tmp_path: Path
+    ) -> None:
+        """session-start.mjs resolves the nested run dir and emits <evor-restore>."""
+        run_id = "run-nested-gap8-002"
+        mission_id = "mission-nested-gap8-002"
+        run_dir = tmp_path / "runs" / mission_id / run_id
+        run_dir.mkdir(parents=True)
+
+        (tmp_path / "active-run.json").write_text(
+            json.dumps({"run_id": run_id, "mission_id": mission_id})
+        )
+        (run_dir / "run-state.json").write_text(
+            json.dumps({
+                "tick_count": 8, "best_score": 0.91,
+                "best_node_id": "node-best-nest", "pending_node_ids": [],
+            })
+        )
+        (run_dir / "tick-state.json").write_text(
+            json.dumps({"tick": 8, "current_step": 3})
+        )
+        (run_dir / "mission-state.json").write_text(
+            json.dumps({"objective": "nested rehydration test", "status": "running"})
+        )
+
+        result = run_hook(SESSION_START, {"EVOR_ROOT": str(tmp_path)})
+        assert result.returncode == 0
+
+        output = json.loads(result.stdout.strip())
+        env = output.get("env", {})
+        assert env["EVOR_ACTIVE_RUN_ID"] == run_id
+        assert env["EVOR_MISSION_ID"] == mission_id
+        # EVOR_RUN_DIR must contain both mission and run segments
+        assert mission_id in env["EVOR_RUN_DIR"]
+        assert run_id in env["EVOR_RUN_DIR"]
+
+        # <evor-restore> block must be present in the emitted message
+        message = output.get("message", "")
+        assert "<evor-restore>" in message, (
+            "session-start must emit <evor-restore> for nested layout"
+        )
+        assert run_id[:10] in message
+        assert "Tick 8" in message
+
+    def test_nested_full_compaction_loop(self, tmp_path: Path) -> None:
+        """Full loop: pre-compact flush → session-start re-hydration on nested layout."""
+        run_id = "run-nested-gap8-loop"
+        mission_id = "mission-nested-gap8-loop"
+        run_dir = tmp_path / "runs" / mission_id / run_id
+        run_dir.mkdir(parents=True)
+
+        (tmp_path / "active-run.json").write_text(
+            json.dumps({"run_id": run_id, "mission_id": mission_id})
+        )
+        (run_dir / "run-state.json").write_text(
+            json.dumps({
+                "tick_count": 12, "best_score": 0.88,
+                "best_node_id": "node-loop-final",
+                "pending_node_ids": ["node-pending-1"],
+            })
+        )
+        (run_dir / "tick-state.json").write_text(
+            json.dumps({"tick": 12, "current_step": 7})
+        )
+        (run_dir / "mission-state.json").write_text(
+            json.dumps({"objective": "full loop nested test", "status": "running"})
+        )
+
+        # Step 1 — PreCompact flush
+        compact_result = run_hook(PRE_COMPACT, {
+            "EVOR_ROOT": str(tmp_path),
+            "EVOR_ACTIVE_RUN_ID": run_id,
+            "EVOR_MISSION_ID": mission_id,
+        })
+        assert compact_result.returncode == 0
+        compact_out = json.loads(compact_result.stdout.strip())
+        assert compact_out.get("continue") is True
+        restore_msg = compact_out["systemMessage"]
+        assert "<evor-restore>" in restore_msg
+        assert "Tick 12" in restore_msg
+
+        cp_files = list((run_dir / "checkpoints").glob("precompact-*.json"))
+        assert len(cp_files) == 1
+        cp = json.loads(cp_files[0].read_text())
+        assert cp["current_tick"] == 12
+        assert cp["best_score"] == pytest.approx(0.88)
+        assert "node-pending-1" in cp["pending_node_ids"]
+
+        # Step 2 — session-start re-hydration (simulates a resumed session)
+        session_result = run_hook(SESSION_START, {"EVOR_ROOT": str(tmp_path)})
+        assert session_result.returncode == 0
+        session_out = json.loads(session_result.stdout.strip())
+        assert session_out["env"]["EVOR_MISSION_ID"] == mission_id
+        assert "<evor-restore>" in session_out.get("message", ""), (
+            "re-hydrated session must carry <evor-restore> for nested layout"
+        )

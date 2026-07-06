@@ -1,0 +1,44 @@
+{
+  "agents": [
+    {
+      "agent_id": "asage-pass1-8613b8325200899d",
+      "agent_type": "sage-pass1",
+      "started_at": "2026-07-04T13:42:29.924Z",
+      "parent_mode": "none",
+      "status": "completed",
+      "completed_at": "2026-07-04T13:42:29.924Z",
+      "duration_ms": 0
+    },
+    {
+      "agent_id": "a45a795b5ed007acd",
+      "agent_type": "unknown",
+      "started_at": "2026-07-04T13:58:37.432Z",
+      "parent_mode": "none",
+      "status": "completed",
+      "completed_at": "2026-07-04T13:58:37.432Z",
+      "duration_ms": 0
+    },
+    {
+      "agent_id": "a31335f0a48d94714",
+      "agent_type": "unknown",
+      "started_at": "2026-07-04T15:00:40.861Z",
+      "parent_mode": "none",
+      "status": "completed",
+      "completed_at": "2026-07-04T15:00:40.861Z",
+      "duration_ms": 0
+    },
+    {
+      "agent_id": "af8005815dd86e755",
+      "agent_type": "unknown",
+      "started_at": "2026-07-04T15:08:42.622Z",
+      "parent_mode": "none",
+      "status": "completed",
+      "completed_at": "2026-07-04T15:08:42.622Z",
+      "duration_ms": 0
+    }
+  ],
+  "total_spawned": 0,
+  "total_completed": 4,
+  "total_failed": 0,
+  "last_updated": "2026-07-04T15:08:42.725Z"
+}

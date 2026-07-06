@@ -1,0 +1,118 @@
+{
+  "version": "1.0.0",
+  "lastScanned": 1783274455059,
+  "projectRoot": "/storages_local/research/oh-my-evor/mcp",
+  "techStack": {
+    "languages": [
+      {
+        "name": "JavaScript/TypeScript",
+        "version": null,
+        "confidence": "high",
+        "markers": [
+          "package.json"
+        ]
+      },
+      {
+        "name": "TypeScript",
+        "version": null,
+        "confidence": "high",
+        "markers": [
+          "tsconfig.json"
+        ]
+      }
+    ],
+    "frameworks": [
+      {
+        "name": "vitest",
+        "version": "1.0.0",
+        "category": "testing"
+      }
+    ],
+    "packageManager": "npm",
+    "runtime": null
+  },
+  "build": {
+    "buildCommand": "npm run build",
+    "testCommand": "npm test",
+    "lintCommand": "npm run lint",
+    "devCommand": null,
+    "scripts": {
+      "build": "node build.mjs",
+      "test": "vitest run --passWithNoTests",
+      "typecheck": "tsc --noEmit",
+      "lint": "tsc --noEmit"
+    }
+  },
+  "conventions": {
+    "namingStyle": "camelCase",
+    "importStyle": null,
+    "testPattern": "*.test.ts",
+    "fileOrganization": null
+  },
+  "structure": {
+    "isMonorepo": false,
+    "workspaces": [],
+    "mainDirectories": [
+      "src",
+      "tests"
+    ],
+    "gitBranches": null
+  },
+  "customNotes": [],
+  "directoryMap": {
+    "bridge": {
+      "path": "bridge",
+      "purpose": null,
+      "fileCount": 2,
+      "lastAccessed": 1783274455049,
+      "keyFiles": [
+        "integrity_bridge.py",
+        "scheduler_bridge.py"
+      ]
+    },
+    "dist": {
+      "path": "dist",
+      "purpose": "Distribution/build output",
+      "fileCount": 1,
+      "lastAccessed": 1783274455049,
+      "keyFiles": [
+        "index.cjs"
+      ]
+    },
+    "src": {
+      "path": "src",
+      "purpose": "Source code",
+      "fileCount": 5,
+      "lastAccessed": 1783274455054,
+      "keyFiles": [
+        "contracts.ts",
+        "index.ts",
+        "run-store.ts",
+        "subprocess-bridge.ts",
+        "tree-store.ts"
+      ]
+    },
+    "tests": {
+      "path": "tests",
+      "purpose": "Test files",
+      "fileCount": 12,
+      "lastAccessed": 1783274455055,
+      "keyFiles": [
+        "cite.test.ts",
+        "hooks.test.ts",
+        "integrity.test.ts",
+        "record.test.ts",
+        "schemas.test.ts"
+      ]
+    },
+    "src/schemas": {
+      "path": "src/schemas",
+      "purpose": "Schema definitions",
+      "fileCount": 0,
+      "lastAccessed": 1783274455056,
+      "keyFiles": []
+    }
+  },
+  "hotPaths": [],
+  "userDirectives": []
+}

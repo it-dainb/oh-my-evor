@@ -956,3 +956,168 @@ class TestIngestionContaminationGate:
         # The implementation counts exact hash matches; 1/21 < 5%, so may pass or fail
         # depending on implementation detail — just verify the check ran (not None)
         assert report.checks.acquisition_contamination_clear is not None
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# BUG-2: per-step val spike check bypassed with real TelemetrySummary model
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestRewardHackingValSeriesBug:
+    """BUG-2: _check_reward_hacking's spike detection is permanently dead in
+    production because TelemetrySummary has no val_series field AND because
+    the check uses isinstance(tele, dict) which is False for Pydantic models.
+
+    Two-part fix required:
+      (a) Add val_series: Optional[list[float]] = None to TelemetrySummary
+          (contracts.py) and thread it through _build_telemetry_summary
+          (evaluator.py).
+      (b) Change _check_reward_hacking to use getattr(tele, 'val_series', None)
+          instead of the isinstance(tele, dict) guard (integrity.py).
+    """
+
+    def test_telemetry_summary_has_val_series_field(self):
+        """TelemetrySummary must expose val_series so spike data survives parsing."""
+        from evor.contracts import TelemetrySummary
+
+        ts = TelemetrySummary(total_steps=3, val_series=[0.2, 0.25, 0.9])
+        assert hasattr(ts, "val_series"), (
+            "TelemetrySummary is missing the val_series field; spike detection "
+            "cannot work without it"
+        )
+        assert ts.val_series == [0.2, 0.25, 0.9]
+
+    def test_spike_detected_with_pydantic_telemetry_summary(self):
+        """Spike check must fire when telemetry_summary is a TelemetrySummary
+        Pydantic model — the production code path.
+
+        Current bug: isinstance(tele, dict) is False for Pydantic models,
+        so series=None always and the check is silently skipped.
+        """
+        from evor.contracts import TelemetrySummary
+        from evor.integrity import IntegrityGate
+        from types import SimpleNamespace
+
+        gate = IntegrityGate.__new__(IntegrityGate)
+        goal = SimpleNamespace(
+            metric_specs=[SimpleNamespace(metric_name="acc", role="primary_fitness")],
+        )
+
+        # val_series has a spike at step 2: 0.9 - 0.25 = 0.65 > 0.30
+        ts = TelemetrySummary(total_steps=3, val_series=[0.2, 0.25, 0.9])
+        result = SimpleNamespace(metrics={"acc": 0.5}, telemetry_summary=ts)
+
+        # Must detect the spike; currently returns False (isinstance check bypasses it)
+        assert gate._check_reward_hacking(result, goal) is True, (
+            "spike in val_series not detected when telemetry_summary is a "
+            "TelemetrySummary model (isinstance guard dead-codes the check)"
+        )
+
+    def test_build_telemetry_summary_preserves_val_series(self):
+        """_build_telemetry_summary must thread val_series from raw data dict."""
+        from evor.evaluator import _build_telemetry_summary
+
+        raw = {
+            "telemetry_summary": {
+                "total_steps": 5,
+                "val_series": [0.2, 0.3, 0.5, 0.6, 0.95],
+            }
+        }
+        ts = _build_telemetry_summary(raw)
+        assert ts.val_series == [0.2, 0.3, 0.5, 0.6, 0.95], (
+            "_build_telemetry_summary dropped val_series; spike data lost before "
+            "_check_reward_hacking even sees the EvaluationResult"
+        )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# BUG-3: reward hacking ceiling + spike check direction-blind
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestRewardHackingDirectionAware:
+    """BUG-3: LEAK_CEILING=0.98 and the per-step spike test (delta > 0.30)
+    are both direction-blind.
+
+    For higher-is-better metrics (accuracy, F1, AUC) the ceiling and upward
+    spike tests are correct.  For lower-is-better metrics (MSE, perplexity,
+    loss) the symmetrical tests apply:
+      - Near-zero absolute value  ≤ LEAK_FLOOR signals a leakage ceiling hit.
+      - A sudden downward spike   (series[i-1] - series[i] > 0.30) signals
+        an implausible single-step drop.
+
+    Fix: read primary_spec.direction from goal.metric_specs; apply
+    direction-appropriate ceiling check and spike sign.
+    """
+
+    def test_near_perfect_lower_is_better_flagged(self):
+        """MSE=0.001 on a hard regression task = suspiciously near-zero.
+
+        Current bug: 0.001 >= 0.98 is False → not flagged as leakage.
+        """
+        from evor.integrity import IntegrityGate
+        from types import SimpleNamespace
+
+        gate = IntegrityGate.__new__(IntegrityGate)
+        goal = SimpleNamespace(
+            metric_specs=[SimpleNamespace(
+                metric_name="mse",
+                role="primary_fitness",
+                direction="lower",
+            )],
+        )
+
+        result = SimpleNamespace(metrics={"mse": 0.001}, telemetry_summary={})
+        assert gate._check_reward_hacking(result, goal) is True, (
+            "near-perfect lower-is-better metric (mse=0.001) not flagged; "
+            "LEAK_CEILING=0.98 is direction-blind and misses lower-is-better ceiling"
+        )
+
+    def test_sudden_drop_in_lower_is_better_spike_flagged(self):
+        """Sudden DROP in a lower-is-better val series is the spike signature.
+
+        Current bug: check uses series[i] - series[i-1] > 0.30 (upward only);
+        a drop of -0.38 in a lower-is-better series is never caught.
+        """
+        from evor.integrity import IntegrityGate
+        from types import SimpleNamespace
+
+        gate = IntegrityGate.__new__(IntegrityGate)
+        goal = SimpleNamespace(
+            metric_specs=[SimpleNamespace(
+                metric_name="val_loss",
+                role="primary_fitness",
+                direction="lower",
+            )],
+        )
+
+        # Drop: 0.5 → 0.48 → 0.1 (delta = -0.38, magnitude > 0.30)
+        result = SimpleNamespace(
+            metrics={"val_loss": 0.1},
+            telemetry_summary={"val_series": [0.5, 0.48, 0.1]},
+        )
+        assert gate._check_reward_hacking(result, goal) is True, (
+            "sudden downward spike in lower-is-better val_series not flagged; "
+            "direction-blind check only catches upward spikes"
+        )
+
+    def test_higher_is_better_ceiling_unchanged(self):
+        """Existing higher-is-better behaviour must be preserved after the fix."""
+        from evor.integrity import IntegrityGate
+        from types import SimpleNamespace
+
+        gate = IntegrityGate.__new__(IntegrityGate)
+        goal = SimpleNamespace(
+            metric_specs=[SimpleNamespace(
+                metric_name="accuracy",
+                role="primary_fitness",
+                direction="higher",
+            )],
+        )
+
+        # Legit improvement well below ceiling — must NOT be flagged
+        assert gate._check_reward_hacking(
+            SimpleNamespace(metrics={"accuracy": 0.82}, telemetry_summary={}), goal
+        ) is False
+        # Near-perfect on hard task — must be flagged
+        assert gate._check_reward_hacking(
+            SimpleNamespace(metrics={"accuracy": 0.99}, telemetry_summary={}), goal
+        ) is True

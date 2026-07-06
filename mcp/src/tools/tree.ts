@@ -67,7 +67,7 @@ export function treeRead(
   depth?: number,
   missionId?: string
 ): TreeNode[] {
-  const nodes = readTree(runId);
+  const nodes = readTree(runId, missionId);
 
   if (subtreeRoot !== undefined) {
     if (!(subtreeRoot in nodes)) {

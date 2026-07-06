@@ -218,14 +218,26 @@ def _wrap_legacy_per_domain(data: dict[str, Any]) -> dict[str, Any]:
 
 
 def _build_telemetry_summary(data: dict[str, Any]) -> TelemetrySummary:
-    """Build TelemetrySummary from eval script output or defaults."""
+    """Build TelemetrySummary from eval script output or defaults.
+
+    val_series is threaded through so IntegrityGate._check_reward_hacking can
+    run its per-step spike detection on the real EvaluationResult.
+    """
     ts = data.get("telemetry_summary", {})
+    raw_series = ts.get("val_series")
+    val_series: list[float] | None = None
+    if raw_series is not None:
+        try:
+            val_series = [float(x) for x in raw_series]
+        except (TypeError, ValueError):
+            val_series = None
     return TelemetrySummary(
         final_train_loss=ts.get("final_train_loss"),
         best_val_metric=ts.get("best_val_metric"),
         grad_norm_median=ts.get("grad_norm_median"),
         throughput_samples_per_sec=ts.get("throughput_samples_per_sec"),
         total_steps=int(ts.get("total_steps", 0)),
+        val_series=val_series,
     )
 
 

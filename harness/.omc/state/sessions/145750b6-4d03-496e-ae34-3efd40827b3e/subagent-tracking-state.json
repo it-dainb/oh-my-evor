@@ -548,10 +548,44 @@
       "status": "completed",
       "completed_at": "2026-07-04T11:55:12.720Z",
       "duration_ms": 0
+    },
+    {
+      "agent_id": "asignal-lenses-44eed77973ca5fc9",
+      "agent_type": "signal-lenses",
+      "started_at": "2026-07-04T18:06:33.780Z",
+      "parent_mode": "none",
+      "status": "completed",
+      "completed_at": "2026-07-04T18:11:24.453Z",
+      "duration_ms": 290673
+    },
+    {
+      "agent_id": "asignal-mcp-82b22a78eda4a660",
+      "agent_type": "signal-mcp",
+      "started_at": "2026-07-04T18:06:46.692Z",
+      "parent_mode": "none",
+      "status": "completed",
+      "completed_at": "2026-07-04T18:11:17.371Z",
+      "duration_ms": 270679
+    },
+    {
+      "agent_id": "aacquirer-agent-6828953352cf8e1a",
+      "agent_type": "acquirer-agent",
+      "started_at": "2026-07-05T04:00:13.779Z",
+      "parent_mode": "none",
+      "status": "running"
+    },
+    {
+      "agent_id": "asetup-thorough-b75c24b1de8a5662",
+      "agent_type": "setup-thorough",
+      "started_at": "2026-07-05T04:00:24.432Z",
+      "parent_mode": "none",
+      "status": "completed",
+      "completed_at": "2026-07-05T04:02:12.851Z",
+      "duration_ms": 108419
     }
   ],
-  "total_spawned": 11,
-  "total_completed": 74,
+  "total_spawned": 15,
+  "total_completed": 77,
   "total_failed": 0,
-  "last_updated": "2026-07-04T11:55:25.694Z"
+  "last_updated": "2026-07-05T04:02:12.954Z"
 }

@@ -1,0 +1,79 @@
+{
+  "updatedAt": "2026-07-05T18:00:54.067Z",
+  "missions": [
+    {
+      "id": "session:145750b6-4d03-496e-ae34-3efd40827b3e:none",
+      "source": "session",
+      "name": "none",
+      "objective": "Session mission",
+      "createdAt": "2026-07-04T16:28:37.858Z",
+      "updatedAt": "2026-07-05T18:00:54.067Z",
+      "status": "running",
+      "workerCount": 2,
+      "taskCounts": {
+        "total": 2,
+        "pending": 0,
+        "blocked": 0,
+        "inProgress": 1,
+        "completed": 1,
+        "failed": 0
+      },
+      "agents": [
+        {
+          "name": "sage-family:asage-f",
+          "role": "sage-family",
+          "ownership": "asage-family-394e11fbbcf43582",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-07-05T18:00:54.067Z"
+        },
+        {
+          "name": "forge-family:aforge-",
+          "role": "forge-family",
+          "ownership": "aforge-family-127eee612623ee77",
+          "status": "running",
+          "currentStep": null,
+          "latestUpdate": null,
+          "completedSummary": null,
+          "updatedAt": "2026-07-04T16:29:06.345Z"
+        }
+      ],
+      "timeline": [
+        {
+          "id": "session-start:asage-family-394e11fbbcf43582:2026-07-04T16:28:37.858Z",
+          "at": "2026-07-04T16:28:37.858Z",
+          "kind": "update",
+          "agent": "sage-family:asage-f",
+          "detail": "started sage-family:asage-f",
+          "sourceKey": "session-start:asage-family-394e11fbbcf43582"
+        },
+        {
+          "id": "session-start:aforge-family-127eee612623ee77:2026-07-04T16:29:06.345Z",
+          "at": "2026-07-04T16:29:06.345Z",
+          "kind": "update",
+          "agent": "forge-family:aforge-",
+          "detail": "started forge-family:aforge-",
+          "sourceKey": "session-start:aforge-family-127eee612623ee77"
+        },
+        {
+          "id": "session-stop:a4459df6d30537f32:2026-07-05T17:58:31.126Z",
+          "at": "2026-07-05T17:58:31.126Z",
+          "kind": "completion",
+          "agent": "sage-family:asage-f",
+          "detail": "completed",
+          "sourceKey": "session-stop:a4459df6d30537f32"
+        },
+        {
+          "id": "session-stop:a745126ac9c9b2652:2026-07-05T18:00:54.067Z",
+          "at": "2026-07-05T18:00:54.067Z",
+          "kind": "completion",
+          "agent": "sage-family:asage-f",
+          "detail": "completed",
+          "sourceKey": "session-stop:a745126ac9c9b2652"
+        }
+      ]
+    }
+  ]
+}

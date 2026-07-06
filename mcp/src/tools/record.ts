@@ -4,12 +4,12 @@
  * evor_record_eval — write EvaluationResult + auto-trigger integrity check
  */
 
-import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "fs";
 import { join } from "path";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { TreeNode, TreeNodeSchema, EvaluationResultSchema } from "../contracts.js";
-import { upsertNode } from "../tree-store.js";
+import { readTree, upsertNode } from "../tree-store.js";
 import { ensureRunDirs, resolveRunPaths } from "../run-store.js";
 import { callBridge } from "../subprocess-bridge.js";
 
@@ -43,9 +43,11 @@ export function readRunState(runStatePath: string, runId: string): Record<string
   }
 }
 
-/** Write run-state.json (plain JSON, no atomic rename needed for simple state). */
+/** Write run-state.json atomically using write-to-tmp + rename. */
 export function writeRunState(runStatePath: string, state: Record<string, unknown>): void {
-  writeFileSync(runStatePath, JSON.stringify(state, null, 2), "utf8");
+  const tmpPath = `${runStatePath}.tmp`;
+  writeFileSync(tmpPath, JSON.stringify(state, null, 2), "utf8");
+  renameSync(tmpPath, runStatePath);
 }
 
 // ── Core logic (exported for tests) ────────────────────────────────────────
@@ -61,7 +63,7 @@ export function recordNode(runId: string, node: TreeNode, missionId?: string): {
   const paths = ensureRunDirs(runId, missionId);
 
   // 1. Atomically upsert node into tree.json
-  upsertNode(runId, node);
+  upsertNode(runId, node, missionId);
 
   // 2. Append a brief record entry to decision-log.md
   const logLine = [
@@ -94,7 +96,7 @@ export function recordEval(
   nodeId: string,
   result: unknown,
   missionId?: string
-): { resultsPath: string; integrityVerdict: string | null } {
+): { resultsPath: string; integrityVerdict: string | null; integrityError: string | null } {
   const paths = resolveRunPaths(runId, missionId);
   const nodeDir = join(paths.nodesDir, nodeId);
 
@@ -112,13 +114,37 @@ export function recordEval(
     "--node-id", nodeId,
     "--run-dir", paths.runDir,
   ];
+  let integrityError: string | null = null;
   const integrityResult = callBridge("integrity_bridge.py", bridgeArgs);
   if (integrityResult.ok && integrityResult.data != null) {
     const report = integrityResult.data as Record<string, unknown>;
     integrityVerdict = typeof report.verdict === "string" ? report.verdict : null;
+  } else if (!integrityResult.ok) {
+    // Surface WHY the bridge failed (e.g. "Node X not found in tree.json") so the
+    // orchestrator can act (record the node first) instead of a silent, un-diagnosable
+    // null. This is what turned a missing-node into a ~30-min manual debug detour.
+    integrityError = integrityResult.error ?? "integrity bridge failed";
   }
 
-  return { resultsPath, integrityVerdict };
+  // Write the integrity verdict back to the node's integrity_status field in tree.json.
+  // Without this, tree.json nodes stay "pending" forever even after the gate runs.
+  if (integrityVerdict === "passed" || integrityVerdict === "failed") {
+    try {
+      const nodes = readTree(runId, missionId);
+      const node = nodes[nodeId];
+      if (node) {
+        upsertNode(runId, {
+          ...node,
+          integrity_status: integrityVerdict as "passed" | "failed",
+        }, missionId);
+      }
+    } catch {
+      // Non-fatal: if tree.json cannot be updated the run continues; the
+      // orchestrator can re-check integrity explicitly via evor_integrity_check.
+    }
+  }
+
+  return { resultsPath, integrityVerdict, integrityError };
 }
 
 // ── Tool registrations ──────────────────────────────────────────────────────
@@ -163,7 +189,7 @@ export function registerRecordTools(server: McpServer): void {
     },
     async ({ run_id, node_id, result }) => {
       const missionId = process.env.EVOR_MISSION_ID;
-      const { resultsPath, integrityVerdict } = recordEval(run_id, node_id, result, missionId);
+      const { resultsPath, integrityVerdict, integrityError } = recordEval(run_id, node_id, result, missionId);
       return {
         content: [
           {
@@ -175,6 +201,7 @@ export function registerRecordTools(server: McpServer): void {
               status: result.status,
               results_path: resultsPath,
               integrity_verdict: integrityVerdict,
+              integrity_error: integrityError,
             }),
           },
         ],

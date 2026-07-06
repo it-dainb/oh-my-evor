@@ -155,6 +155,58 @@ try {
     } catch (_) { /* fail-open on parse errors */ }
   }
 
+  // (d) Inline-shortcut guard — catches the orchestrator role-playing the roster
+  // inline instead of spawning Task sub-agents + persisting state. Fires when a tick
+  // is claimed (tick-state present, tick >= 1) but its sub-agent artifacts and/or
+  // tree nodes are absent. This is the enforcement teeth behind the SKILL's
+  // Orchestrator_Contract: a tick that leaves no proposals/verdict/node on disk was
+  // done inline and must be redone via real Task spawns.
+  if (runState?.status === 'running') {
+    let curTick = null;
+    const tsPath = join(runDir, 'tick-state.json');
+    if (existsSync(tsPath)) {
+      try { curTick = JSON.parse(readFileSync(tsPath, 'utf8'))?.tick ?? null; } catch (_) { /* ignore */ }
+    }
+
+    let nodeCount = 0;
+    if (existsSync(treePath)) {
+      try {
+        const td = JSON.parse(readFileSync(treePath, 'utf8'));
+        const nr = td.nodes ?? {};
+        nodeCount = Array.isArray(nr) ? nr.length : Object.keys(nr).length;
+      } catch (_) { /* ignore */ }
+    }
+
+    if (typeof curTick === 'number' && curTick >= 1) {
+      const tickDir = join(runDir, 'ticks', String(curTick));
+      const proposalsPath = join(tickDir, 'mutagen', 'proposals.json');
+      const verdictPath = join(tickDir, 'selector', 'verdict.json');
+
+      if (!existsSync(proposalsPath)) {
+        debtReasons.push(
+          `tick ${curTick} has no ticks/${curTick}/mutagen/proposals.json — evor-mutagen was not ` +
+            `spawned. Call Task(subagent_type="oh-my-evor:evor-mutagen", …); do not role-play the roster inline.`
+        );
+      } else if (!existsSync(verdictPath)) {
+        debtReasons.push(
+          `tick ${curTick} has proposals but no ticks/${curTick}/selector/verdict.json — spawn ` +
+            `Task(subagent_type="oh-my-evor:evor-selector", …) to gate them (never self-approve).`
+        );
+      }
+
+      // Forge produced a report (a candidate WAS implemented) but nothing reached the
+      // tree. This is the "trained inline, recorded nothing" shortcut. (An all-rejected
+      // tick has no forge-report and legitimately adds 0 nodes — not flagged.)
+      const forgeReport = join(tickDir, 'forge', 'forge-report.json');
+      if (existsSync(forgeReport) && nodeCount === 0) {
+        debtReasons.push(
+          `tick ${curTick} has a Forge report but tree.json has 0 nodes — call evor_record_node + ` +
+            `evor_record_eval for the candidate(s) Forge trained. A trained candidate with no tree node is a failed tick.`
+        );
+      }
+    }
+  }
+
   if (debtReasons.length > 0) {
     const tick = runState?.tick_count ?? '?';
     process.stdout.write(

@@ -1,0 +1,7 @@
+{
+  "mission_id": "frontier-1ms",
+  "objective": "Beat the CIFAR-10 accuracy/latency frontier: max test accuracy with single-image CPU inference <= 1ms.",
+  "status": "locked",
+  "best_score": null,
+  "best_node_id": null
+}

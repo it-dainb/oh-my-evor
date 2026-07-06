@@ -223,6 +223,71 @@ Set `GoalContract.eval_script_hash`.
 Print confirmation: "Frozen splits initialized. locked_split_hash: <hash>. Files are read-only (chmod 444)."
 </Frozen_Split_Setup>
 
+<Materialize_Anchors>
+## Materialize anchors (MANDATORY — no placeholders)
+
+This step produces the real cryptographic anchors written into the GoalContract. NEVER write human-readable labels, version strings, or any non-hex text into `locked_split_hash` or `eval_script_hash`. The tick loop's integrity gate will reject them.
+
+**locked_split_hash — real sha256 of the frozen test split:**
+
+If `python -m evor.freeze freeze-splits` ran successfully it already returns this value — use it.
+If the freeze module is unavailable or splits are baked into cached features/index arrays rather than files, compute from the sorted index list:
+
+```bash
+python -c "
+import hashlib, json
+# Replace with the actual sorted list of integer test-split indices
+indices = sorted(<test_split_indices>)
+blob = json.dumps(indices, separators=(',', ':')).encode()
+print(hashlib.sha256(blob).hexdigest())
+"
+```
+
+Set `GoalContract.locked_split_hash` to the 64-hex-char result.
+
+**eval_script_hash — sha256 of the evaluate.py bytes (after any patches):**
+
+```bash
+python -c "
+import hashlib
+print(hashlib.sha256(open('<path_to_evaluate.py>', 'rb').read()).hexdigest())
+"
+```
+
+Set `GoalContract.eval_script_hash` to the 64-hex-char result.
+
+**Frozen-split manifests — must carry real hashes, not empty fields:**
+
+After `freeze-splits`, verify:
+- `frozen-splits/v1-test.json` exists and its `split_hash` field is a 64-hex-char string.
+- `eval-suites/v1.json` will be written by EvalSuite_Initialization immediately after this section.
+
+If `frozen_test.split_hash` is empty or absent, recompute from the sorted test index list (see above) and patch the file before continuing. An empty `split_hash` will fail the Phase-2 `frozen_splits_*` check.
+
+**Class→domain mapping guard:**
+
+If any `MetricConstraint` or guard in the contract references a class→domain mapping file (e.g., `class_domain_map.json`):
+- Materialize that file now, from the available dataset.
+- If it cannot be built at setup time, REMOVE the guard from the contract entirely. Only lock guards that are satisfiable from tick 1. A guard that references a file that does not exist will block every tick.
+
+**POST-CONDITION (assert before proceeding to Validate_And_Lock):**
+
+```python
+import re
+
+for field_name, field_val in [
+    ("locked_split_hash", goal_contract.locked_split_hash),
+    ("eval_script_hash",  goal_contract.eval_script_hash),
+]:
+    assert re.fullmatch(r'[0-9a-f]{64}', field_val or ''), (
+        f"SETUP FAILED: {field_name}='{field_val}' is not a valid sha256 hex digest. "
+        "Replace the placeholder with a real hash before continuing."
+    )
+```
+
+Setup halts with a clear error if either field contains a label, a version string, an empty string, or any non-64-hex value. Do NOT proceed to `Validate_And_Lock` with a placeholder — the validator will reject it and the mission will not lock.
+</Materialize_Anchors>
+
 <EvalSuite_Initialization>
 Create the initial EvalSuite v1 (Addendum v2 Pillar 3):
 
@@ -305,6 +370,15 @@ After consent:
 1. Generate `run_id` = `<mission_id>-<timestamp>` (e.g., "cifar10-improve-2026-07-20260703T142300").
 2. Create run directory: `.evor/runs/<mission-slug>/<run-id>/`.
 3. Write `GoalContract` to `.evor/runs/<mission-slug>/<run-id>/goal-contract.json`.
+   Before writing, set the autonomy charter on the contract:
+   ```python
+   goal_contract.autonomy_charter = AutonomyCharter(
+       posture="aggressive-never-halt",
+       license_gate=False,
+       data_acquisition_enabled=True,
+   )
+   ```
+   Print: "Mission will run FULLY AUTONOMOUS to the goal — the monotonic-honesty invariant auto-decides every mid-run choice with no human questions."
 4. Initialize `run-state.json`:
    ```json
    {

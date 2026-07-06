@@ -4,7 +4,7 @@
  * evor_state_write — merge-patch run-state.json; append strategy delta to strategy.json
  */
 
-import { existsSync, readFileSync, writeFileSync } from "fs";
+import { existsSync, readFileSync, renameSync, writeFileSync } from "fs";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { StrategyStateSchema } from "../contracts.js";
@@ -70,7 +70,9 @@ export function stateWrite(
       }
     }
     const updatedStrategy = { ...currentStrategy, ...strategyDelta };
-    writeFileSync(paths.strategyPath, JSON.stringify(updatedStrategy, null, 2), "utf8");
+    const strategyTmpPath = `${paths.strategyPath}.tmp`;
+    writeFileSync(strategyTmpPath, JSON.stringify(updatedStrategy, null, 2), "utf8");
+    renameSync(strategyTmpPath, paths.strategyPath);
   }
 
   return updated;

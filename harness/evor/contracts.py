@@ -197,6 +197,57 @@ class Budget(BaseModel):
     max_gpu_hours: Optional[float] = None
 
 
+class EvolutionBounds(BaseModel):
+    """How far escalate-mode may adapt the otherwise-locked GoalContract.
+
+    Escalation is MONOTONIC — it may only make the objective harder or more
+    honest, never easier. Softening is structurally impossible; comparability
+    changes need consent; the anti-cheat core (primary metric, split/eval hash)
+    is frozen. ``None`` on a contract = fully frozen (no auto-adaptation).
+    """
+
+    model_config = ConfigDict(strict=True)
+
+    benchmark_may_harden: bool = True
+    """auto: add harder eval domains / worst-case slices (can only lower scores)."""
+    metrics_may_add_tracked: bool = True
+    """auto: add secondary *tracked* metrics (never replace the primary)."""
+    budget_ceiling_extensions: int = 0
+    """auto: number of times budget may be extended within a pre-set ceiling."""
+    primary_metric_frozen: bool = True
+    """the primary metric definition + comparability basis never auto-change."""
+    comparability_change_requires_consent: bool = True
+    """any change to what the primary number MEANS is gated on human consent."""
+
+
+class AutonomyCharter(BaseModel):
+    """Principle-based FULL autonomy: after setup, the mission runs to the goal with
+    ZERO human-in-the-loop. Every mid-run decision is auto-resolved by the
+    Monotonic-Honesty Invariant — it must move the evaluation toward *harder / more
+    honest*, never *easier / score-inflating*. A monotonic move always exists, so the
+    run never halts for a human; a forbidden-direction action is routed around, not
+    asked about. Setup is the sole HITL. ``None`` on a contract = legacy consent-gated
+    behavior (may ask mid-run).
+    """
+
+    model_config = ConfigDict(strict=True)
+
+    posture: Literal["aggressive-never-halt"] = "aggressive-never-halt"
+    """The only posture: never stop for a human; always take the monotonic move."""
+    invariant: str = (
+        "Every autonomous decision MUST be monotonic: it may make the evaluation harder "
+        "or more honest, never easier or comparability-shifting. Forbidden directions "
+        "(softening the metric, shifting comparability to inflate a score, leaking test "
+        "into train) are routed around — never executed, never halted on."
+    )
+    license_gate: bool = False
+    """False = research mode: acquire data from any source (GitHub/HF/web/authors) freely."""
+    data_acquisition_enabled: bool = True
+    """Agents may enrich train + harden test by acquiring external data (always de-duped)."""
+    always_on_checks: list[str] = ["no-test-leakage", "comparability-eval-version"]
+    """The two checks that ARE the invariant — enforced automatically, never HITL, never bypassed."""
+
+
 class GoalContract(BaseModel):
     model_config = ConfigDict(strict=True)
 
@@ -224,6 +275,10 @@ class GoalContract(BaseModel):
     expansion_policy: Optional[ExpansionPolicy] = None
     allowed_licenses: list[str]
     """allowlist for data-acquisition provenance (R-3)"""
+    evolution_bounds: Optional[EvolutionBounds] = None
+    """escalate-mode bounds; None = fully frozen (no auto-adaptation)."""
+    autonomy_charter: Optional[AutonomyCharter] = None
+    """full-autonomy charter; None = legacy consent-gated (may ask mid-run)."""
     created_at: str
 
 
@@ -386,6 +441,10 @@ class TelemetrySummary(BaseModel):
     grad_norm_median: Optional[float] = None
     throughput_samples_per_sec: Optional[float] = None
     total_steps: int
+    val_series: Optional[list[float]] = None
+    """Per-step validation metric values emitted by the trainer.
+    Required for per-step spike detection in IntegrityGate._check_reward_hacking.
+    Eval scripts should emit this under telemetry_summary.val_series."""
 
 
 class AngleVsSOTAInline(BaseModel):
@@ -883,6 +942,55 @@ class GotchaEntry(BaseModel):
     """ISO 8601 timestamp of first occurrence."""
     last_seen: str
     """ISO 8601 timestamp of most recent occurrence."""
+
+
+# Signal facet vocabularies — the ONLY closed sets in the signal system.
+# Signal `kind` stays free-text/open; facets are how lenses subscribe.
+SignalShape = Literal["limit", "opportunity", "failure", "trend"]
+SignalAxis = Literal[
+    "memory", "compute", "accuracy", "stability", "data", "generalization", "cost"
+]
+SignalSeverity = Literal["low", "medium", "high", "critical"]
+
+
+class Signal(BaseModel):
+    """A neutral, self-describing observation on the run's signal bus.
+
+    Producers emit signals; consumers read them through their own lens (see each
+    agent's <Signal_Lens>). The bus lives at ``<run_dir>/signals.jsonl``.
+
+    ``kind`` is free-text and open-ended (e.g. 'cuda-oom', 'training-too-slow',
+    'class-confusion', 'eval-saturated') so new signal types need no code change.
+    ``shapes``/``axes`` are the closed facet vocabularies lenses subscribe to.
+    ``signature`` is the dedup key: repeat emits increment ``occurrences``,
+    bump ``last_seen``, and raise ``confidence`` (mirrors GotchaEntry) — this is
+    the storm/dedup + oscillation damper (recurrence x confidence).
+    """
+
+    model_config = ConfigDict(strict=True)
+
+    signal_id: str
+    kind: str
+    """Free-text signal type — open-ended by design."""
+    signature: str
+    """Dedup key (e.g. 'cuda-oom-bs256', 'slow-train-cand'); repeats aggregate."""
+    shapes: list[SignalShape]
+    """Closed facet set: limit | opportunity | failure | trend (>=1)."""
+    axes: list[SignalAxis]
+    """Closed facet set: memory | compute | accuracy | stability | data | generalization | cost."""
+    severity: SignalSeverity
+    """low | medium | high | critical — gates whether it reaches a spawn digest."""
+    evidence: dict[str, Any]
+    """Structured evidence (metric values, config, telemetry excerpt, node_id, etc.)."""
+    source: str
+    """Emitting role (e.g. 'evor-forge-analyst', 'evor-probe', 'self-heal-monitor')."""
+    tick: Optional[int] = None
+    node_id: Optional[str] = None
+    confidence: float = 0.5
+    """0.0-1.0; raised toward 1.0 on repeat (recurrence damper)."""
+    occurrences: int = 1
+    first_seen: str
+    last_seen: str
 
 
 class CapabilityProfile(BaseModel):

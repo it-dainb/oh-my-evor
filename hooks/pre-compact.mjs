@@ -40,7 +40,10 @@ if (skipHooks.includes('pre-compact')) process.exit(0);
 // ── Parse hook input ──────────────────────────────────────────────────────────
 let trigger = 'auto';
 try {
-  const hookInput = JSON.parse(process.env.CLAUDE_HOOK_INPUT ?? '{}');
+  // Claude Code delivers the hook payload on STDIN (fd 0), not via env var.
+  let raw = '';
+  try { raw = readFileSync(0, 'utf8'); } catch { raw = ''; }
+  const hookInput = JSON.parse(raw || process.env.CLAUDE_HOOK_INPUT || '{}');
   trigger = hookInput?.trigger ?? 'auto';
 } catch {
   // malformed input — default to auto, proceed

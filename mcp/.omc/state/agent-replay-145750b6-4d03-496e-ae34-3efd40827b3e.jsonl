@@ -1,0 +1,4 @@
+{"t":0,"agent":"asage-f","agent_type":"sage-family","event":"agent_start","parent_mode":"none"}
+{"t":0,"agent":"aforge-","agent_type":"forge-family","event":"agent_start","parent_mode":"none"}
+{"t":0,"agent":"a4459df","agent_type":"unknown","event":"agent_stop","success":true,"duration_ms":0}
+{"t":0,"agent":"a745126","agent_type":"unknown","event":"agent_stop","success":true,"duration_ms":0}

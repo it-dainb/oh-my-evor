@@ -35,15 +35,30 @@ function _parseSpawnResult(result: SpawnSyncReturns<string>): PyResult {
     return { ok: false, error: result.error.message };
   }
   const code = result.status ?? 1;
+  const stdoutStr = ((result.stdout as string) ?? "").trim();
   if (code !== 0) {
+    // Bridge scripts report structured errors (e.g. "node not found in tree.json")
+    // as JSON on STDOUT even when they exit non-zero. Surface that message instead
+    // of a blank "python exited N" so the caller can act on it (this is what made
+    // a missing-node failure look like a mysterious empty-stderr crash).
+    let data: unknown = undefined;
+    if (stdoutStr) {
+      try { data = JSON.parse(stdoutStr); } catch { /* non-JSON stdout */ }
+    }
+    const structuredError =
+      data && typeof data === "object" && "error" in (data as Record<string, unknown>)
+        ? String((data as Record<string, unknown>).error)
+        : "";
+    const stderrStr = ((result.stderr as string) ?? "").trim();
     return {
       ok: false,
       exitCode: code,
-      error: `python exited ${code}`,
+      error: structuredError || stderrStr || stdoutStr || `python exited ${code}`,
+      data,
       stderr: (result.stderr as string) ?? "",
     };
   }
-  const stdout = ((result.stdout as string) ?? "").trim();
+  const stdout = stdoutStr;
   if (!stdout) {
     return { ok: true, data: null };
   }

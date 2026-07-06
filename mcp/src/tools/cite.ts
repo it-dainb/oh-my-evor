@@ -21,7 +21,7 @@ export function addCitation(
   citation: string,
   missionId?: string
 ): { ok: boolean; citations?: string[]; error?: string } {
-  const nodes = readTree(runId);
+  const nodes = readTree(runId, missionId);
   const node = nodes[nodeId];
 
   if (!node) {
@@ -34,7 +34,7 @@ export function addCitation(
   }
 
   const updated = { ...node, citations: [...node.citations, citation] };
-  upsertNode(runId, updated);
+  upsertNode(runId, updated, missionId);
 
   return { ok: true, citations: updated.citations };
 }

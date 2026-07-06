@@ -7,7 +7,7 @@ BASE CHECKS (1–10):
   3. no_label_contamination  — 100-pair sha256 cross-check (SHORT-CIRCUIT if 1 fails)
   4. no_eval_shift           — sha256(eval_script) == GoalContract.eval_script_hash
   5. telemetry_sane          — loss not NaN/Inf/constant; grad_norm > 0 if present (R6)
-  6. reward_hacking_probe    — val_metric jump > 30% baseline in one step → flag
+  6. reward_hacking_probe    — near-perfect val (leakage ceiling) or per-step val spike → flag
   7. frozen_split_read_only  — chmod 444 still intact on all frozen-split files (Pillar 2 layer 1)
   8. near_dup_leakage        — near-dup aug-of-test check; data-augmentation nodes only (Pillar 2 layer 3)
   9. data_provenance_valid   — source_sample_ids trace to train only (Pillar 2 layer 4)
@@ -225,8 +225,8 @@ class IntegrityGate:
         reward_hacking_probe = self._check_reward_hacking(result, goal)
         if reward_hacking_probe:
             failures.append(
-                "reward_hacking_probe: val_metric improved > 30% of baseline "
-                "in a single step — potential reward hacking"
+                "reward_hacking_probe: near-perfect val (leakage ceiling) or a "
+                "suspicious per-step val spike — potential test leakage / reward hacking"
             )
 
         # ── Check 7: frozen_split_read_only ──────────────────────────────
@@ -448,27 +448,76 @@ class IntegrityGate:
     def _check_reward_hacking(
         self, result: EvaluationResult, goal: GoalContract
     ) -> bool:
-        """Check 6: detect suspicious val_metric jump > 30% of baseline.
+        """Check 6: detect leakage signatures — a near-perfect val (leakage ceiling) or
+        a sudden per-step val SPIKE. A large but sub-ceiling improvement over baseline is
+        legitimate SUCCESS, not hacking, and must NOT be flagged.
+
+        Direction-aware (Bug 3 fix):
+          higher-is-better: ceiling hit = val >= LEAK_CEILING (0.98)
+                            spike     = series[i] - series[i-1] > SPIKE_THRESH
+          lower-is-better:  ceiling hit = val <= LEAK_FLOOR (0.02)
+                            spike     = series[i-1] - series[i] > SPIKE_THRESH
 
         Returns True when hacking is flagged (bad); False when clean.
         """
-        primary_metric = next(
-            (m.metric_name for m in goal.metric_specs if m.role == "primary_fitness"),
+        # Read the full primary MetricSpec so we can inspect direction (Bug 3).
+        primary_spec = next(
+            (m for m in goal.metric_specs if m.role == "primary_fitness"),
             None,
         )
-        if primary_metric is None:
+        if primary_spec is None:
             return False
+
+        primary_metric = primary_spec.metric_name
+        # Default to "higher" so existing test fixtures that omit direction keep working.
+        direction = getattr(primary_spec, "direction", "higher")
 
         candidate_val = result.metrics.get(primary_metric)
         if candidate_val is None:
             return False
 
-        baseline = goal.baseline_value
-        if baseline == 0.0:
-            return False
+        # A genuine model improving the metric by a large RELATIVE amount while still far
+        # from the ceiling is SUCCESS, not hacking (e.g. baseline 0.20 -> 0.38). Test
+        # leakage instead shows an IMPLAUSIBLY HIGH/LOW absolute value (near-perfect on a
+        # hard task) or a sudden per-step val spike. Flag those — never legitimate progress.
+        LEAK_CEILING = 0.98   # near-perfect for higher-is-better metrics (accuracy, F1)
+        LEAK_FLOOR   = 0.02   # near-perfect for lower-is-better  metrics (MSE, loss)
+        SPIKE_THRESH = 0.30   # per-step magnitude threshold (both directions)
 
-        jump_fraction = abs(candidate_val - baseline) / abs(baseline)
-        return jump_fraction > 0.30
+        if direction == "higher" and candidate_val >= LEAK_CEILING:
+            return True
+        if direction == "lower"  and candidate_val <= LEAK_FLOOR:
+            return True
+
+        # Best-effort per-step spike check when a val series is present in telemetry.
+        # Bug-2 fix: TelemetrySummary is a Pydantic model in production, not a dict, so
+        # isinstance(tele, dict) was False and silently bypassed the check.  Use getattr
+        # as the primary path; fall back to dict.get() for backwards-compat with tests
+        # that pass a plain dict.
+        tele = getattr(result, "telemetry_summary", None)
+        series = None
+        if tele is not None:
+            if isinstance(tele, dict):
+                series = (
+                    tele.get("val_series")
+                    or tele.get("val_top1_series")
+                    or tele.get("val_metric_series")
+                )
+            else:
+                # Pydantic TelemetrySummary (production path)
+                series = getattr(tele, "val_series", None)
+
+        if isinstance(series, list) and len(series) >= 3:
+            for i in range(2, len(series)):
+                try:
+                    delta = float(series[i]) - float(series[i - 1])
+                    if direction == "higher" and delta >  SPIKE_THRESH:
+                        return True
+                    if direction == "lower"  and delta < -SPIKE_THRESH:
+                        return True
+                except (TypeError, ValueError):
+                    continue
+        return False
 
     def _load_aug_sample_bytes(
         self, provenance_path: Path, run_dir: Path | None

@@ -1,0 +1,22 @@
+{
+  "mission_id": "frontier-1ms",
+  "run_id": "run-live-01",
+  "status": "locked",
+  "objective": "Beat the accuracy/latency Pareto frontier on CIFAR-10: maximize test top-1 accuracy subject to a HARD constraint of single-image CPU inference latency <= 1.0 ms (single core, int8 permitted), training budget <= 30 min on one consumer machine.",
+  "task_type": "image-classification",
+  "dataset": "CIFAR-10 (frozen test split)",
+  "metric_spec": {
+    "primary": "test_top1_accuracy",
+    "direction": "maximize",
+    "hard_constraints": [
+      {"name": "cpu_latency_ms_per_image", "op": "<=", "value": 1.0, "measurement": "single core, batch=1, int8 allowed, median of 1000 runs"},
+      {"name": "train_wall_minutes", "op": "<=", "value": 30.0}
+    ],
+    "composite": "accuracy is the score; any candidate violating a hard constraint scores 0 (dominated)"
+  },
+  "sota_reference": "to be established by Sage (accuracy-under-1ms-CPU frontier, not unconstrained SOTA)",
+  "wildness": 0.85,
+  "allowed_licenses": ["MIT", "Apache-2.0", "BSD-3-Clause", "CC-BY-4.0", "public-domain"],
+  "locked_split_hash": "sha256:FROZEN-cifar10-test-placeholder",
+  "eval_script_hash": "sha256:LOCKED-evaluate-placeholder"
+}

@@ -36,6 +36,14 @@ export type ApproachFamily = z.infer<typeof ApproachFamilySchema>;
 // MetricSpec / MetricRegistry (Pillar 3)
 // ────────────────────────────────────────────────────────────────────────────
 
+/** Hard constraint on a secondary metric used as a gamability guard (mirrors Python MetricConstraint). */
+export const MetricConstraintSchema = z.object({
+  metric: z.string().describe("Name of the metric to constrain"),
+  op: z.enum([">=", "<=", "==", ">", "<"]).describe("Comparison operator"),
+  threshold: z.number().describe("Threshold value for the constraint"),
+});
+export type MetricConstraint = z.infer<typeof MetricConstraintSchema>;
+
 export const MetricSpecSchema = z.object({
   metric_name: z.string(),
   direction: z.enum(["higher", "lower"]),
@@ -43,6 +51,11 @@ export const MetricSpecSchema = z.object({
   aggregation_rule: z.enum(["macro_avg", "weighted_avg", "min", "max"]),
   role: z.enum(["primary_fitness", "secondary_reported"]),
   sota_bar: z.number().optional(),
+  // Composite / F-beta / constrained / custom modes (mirrors Python MetricSpec)
+  fitness_formula: z.string().optional().describe("Expression e.g. '0.7*recall+0.3*precision'"),
+  fbeta: z.number().optional().describe("Beta for F-beta score; only active when metric_name='fbeta'"),
+  constraints: z.array(MetricConstraintSchema).default([]).describe("Hard guards against degenerate solutions"),
+  custom_metrics: z.array(z.string()).default([]).describe("Extra metric names the evaluator should emit"),
 });
 export type MetricSpec = z.infer<typeof MetricSpecSchema>;
 
@@ -81,6 +94,39 @@ export const ExpansionPolicySchema = z.object({
   pretraining_canary_threshold_pp: z.number(),
 });
 export type ExpansionPolicy = z.infer<typeof ExpansionPolicySchema>;
+
+// ────────────────────────────────────────────────────────────────────────────
+// EvolutionBounds / AutonomyCharter (GoalContract addenda)
+// ────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Escalate-mode bounds — how far the mission may auto-adapt the GoalContract.
+ * Escalation is MONOTONIC: it may only make the objective harder/more honest,
+ * never easier. None on a contract = fully frozen (no auto-adaptation).
+ * Mirrors Python EvolutionBounds exactly.
+ */
+export const EvolutionBoundsSchema = z.object({
+  benchmark_may_harden: z.boolean().default(true).describe("auto: add harder eval domains / worst-case slices"),
+  metrics_may_add_tracked: z.boolean().default(true).describe("auto: add secondary tracked metrics (never replace primary)"),
+  budget_ceiling_extensions: z.number().int().min(0).default(0).describe("auto: number of times budget may be extended within a pre-set ceiling"),
+  primary_metric_frozen: z.boolean().default(true).describe("the primary metric definition + comparability basis never auto-change"),
+  comparability_change_requires_consent: z.boolean().default(true).describe("any change to what the primary number MEANS is gated on human consent"),
+});
+export type EvolutionBounds = z.infer<typeof EvolutionBoundsSchema>;
+
+/**
+ * Full-autonomy charter — after setup, the mission runs to the goal with
+ * ZERO human-in-the-loop. None on a contract = legacy consent-gated behavior.
+ * Mirrors Python AutonomyCharter exactly.
+ */
+export const AutonomyCharterSchema = z.object({
+  posture: z.literal("aggressive-never-halt").default("aggressive-never-halt").describe("The only posture: never stop for a human; always take the monotonic move"),
+  invariant: z.string().describe("Monotonic-honesty invariant statement"),
+  license_gate: z.boolean().default(false).describe("False = research mode: acquire data from any source freely"),
+  data_acquisition_enabled: z.boolean().default(true).describe("Agents may enrich train + harden test by acquiring external data"),
+  always_on_checks: z.array(z.string()).default(["no-test-leakage", "comparability-eval-version"]).describe("Checks that are the invariant — enforced automatically, never HITL"),
+});
+export type AutonomyCharter = z.infer<typeof AutonomyCharterSchema>;
 
 // ────────────────────────────────────────────────────────────────────────────
 // GoalContract
@@ -135,6 +181,12 @@ export const GoalContractSchema = z.object({
   eval_script_hash: z.string(),
   expansion_policy: ExpansionPolicySchema.optional(),
   allowed_licenses: z.array(z.string()),
+  evolution_bounds: EvolutionBoundsSchema.optional().describe(
+    "escalate-mode bounds; None = fully frozen (no auto-adaptation)"
+  ),
+  autonomy_charter: AutonomyCharterSchema.optional().describe(
+    "full-autonomy charter; None = legacy consent-gated (may ask mid-run)"
+  ),
   created_at: ISODate,
 });
 export type GoalContract = z.infer<typeof GoalContractSchema>;
@@ -290,6 +342,9 @@ export const IntegrityReportSchema = z.object({
     acquisition_contamination_clear: z.boolean().nullable(),
     acquired_data_provenance_valid: z.boolean().nullable(),
     acquisition_namespace_enforced: z.boolean().nullable(),
+    structure_ok: z.boolean().nullable().optional().describe(
+      "ForgeStructureGate: genome seams + forward pass + telemetry + eval lock. null = gate not run."
+    ),
   }),
   verdict: z.enum(["passed", "failed"]),
   failure_reason: z.string().optional(),
@@ -411,6 +466,9 @@ export type DecisionLogEntry = z.infer<typeof DecisionLogEntrySchema>;
 
 export const GenomeConfigSchema = z.object({
   genome_version: z.string(),
+  model_family: z.string().optional().describe(
+    "Architecture family for ForgeStructureGate seam check: cnn, embedding, graph, vlm. None = universal-only invariants"
+  ),
   backbone: z.string().optional(),
   head: z.string().optional(),
   neck: z.string().optional(),
@@ -674,6 +732,35 @@ export const CapabilityProfileSchema = z.object({
 export type CapabilityProfile = z.infer<typeof CapabilityProfileSchema>;
 
 // ────────────────────────────────────────────────────────────────────────────
+// Signal (signal bus — <run_dir>/signals.jsonl)
+// ────────────────────────────────────────────────────────────────────────────
+
+export const SignalShapeSchema = z.enum(["limit", "opportunity", "failure", "trend"]);
+export const SignalAxisSchema = z.enum([
+  "memory", "compute", "accuracy", "stability", "data", "generalization", "cost",
+]);
+export const SignalSeveritySchema = z.enum(["low", "medium", "high", "critical"]);
+
+export const SignalSchema = z.object({
+  signal_id: z.string(),
+  kind: z.string(),
+  /** Dedup key — repeat emits with the same signature aggregate. */
+  signature: z.string(),
+  shapes: z.array(SignalShapeSchema).min(1),
+  axes: z.array(SignalAxisSchema),
+  severity: SignalSeveritySchema,
+  evidence: z.record(z.string(), z.unknown()),
+  source: z.string(),
+  tick: z.number().int().nullable().optional(),
+  node_id: z.string().nullable().optional(),
+  confidence: z.number().min(0).max(1),
+  occurrences: z.number().int().min(1),
+  first_seen: ISODate,
+  last_seen: ISODate,
+});
+export type Signal = z.infer<typeof SignalSchema>;
+
+// ────────────────────────────────────────────────────────────────────────────
 // Schema registry (all 27 schemas, for validation tooling)
 // ────────────────────────────────────────────────────────────────────────────
 
@@ -715,4 +802,6 @@ export const ALL_SCHEMAS = {
   // Gotcha knowledge layer
   GotchaEntry: GotchaEntrySchema,
   CapabilityProfile: CapabilityProfileSchema,
+  // Signal bus
+  Signal: SignalSchema,
 } as const;

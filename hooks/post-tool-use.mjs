@@ -23,8 +23,9 @@
  * Guard is inert (immediate exit 0) when EVOR_ACTIVE_RUN_ID is unset.
  */
 
-import { existsSync, statSync, appendFileSync, mkdirSync } from 'fs';
+import { existsSync, statSync, appendFileSync, mkdirSync, readFileSync, readdirSync } from 'fs';
 import { join } from 'path';
+import { createHash } from 'node:crypto';
 
 // ── Kill switches ─────────────────────────────────────────────────────────────
 if (process.env.DISABLE_EVOR) process.exit(0);
@@ -38,7 +39,10 @@ if (!activeRunId) process.exit(0); // No active evor run — nothing to validate
 
 let input;
 try {
-  input = JSON.parse(process.env.CLAUDE_HOOK_INPUT ?? '{}');
+  // Claude Code delivers the hook payload on STDIN (fd 0), not via env var.
+  let raw = '';
+  try { raw = readFileSync(0, 'utf8'); } catch { raw = ''; }
+  input = JSON.parse(raw || process.env.CLAUDE_HOOK_INPUT || '{}');
 } catch {
   // Malformed hook input — do not block; exit safely
   process.exit(0);
@@ -49,13 +53,50 @@ const toolInput = input?.tool_input ?? {};
 
 const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT ?? process.cwd();
 const evorRoot = process.env.EVOR_ROOT ?? join(pluginRoot, '.evor');
-const missionId = process.env.EVOR_MISSION_ID ?? '';
+
+// BUG H fix: mirror run-store.ts:lookupMissionId so inboxes always land at the
+// canonical nested path (runs/<mission>/<runId>/) the MCP drain expects.
+// When EVOR_MISSION_ID is set in the session env use it directly; otherwise
+// resolve it from disk — (1) active-run.json, then (2) directory scan — and
+// fall back to the flat layout only for truly bare/legacy runs.
+let missionId = process.env.EVOR_MISSION_ID ?? '';
+if (!missionId) {
+  try {
+    const ar = JSON.parse(readFileSync(join(evorRoot, 'active-run.json'), 'utf8'));
+    if (ar?.run_id === activeRunId && ar?.mission_id) missionId = String(ar.mission_id);
+  } catch { /* no/invalid active-run.json — fall through to scan */ }
+}
+if (!missionId) {
+  try {
+    for (const entry of readdirSync(join(evorRoot, 'runs'), { withFileTypes: true })) {
+      if (entry.isDirectory() && existsSync(join(evorRoot, 'runs', entry.name, activeRunId))) {
+        missionId = entry.name;
+        break;
+      }
+    }
+  } catch { /* runs/ dir absent or unreadable — stay flat */ }
+}
 
 /** Derive the run's directory from a run ID. */
 function runDir(runId) {
   return missionId
     ? join(evorRoot, 'runs', missionId, runId)
     : join(evorRoot, 'runs', runId);
+}
+
+// BUG G fix: deterministic signature for SignalBus dedup.
+// Prefer description text when present; otherwise stable-stringify the full
+// evidence object (sorted keys, no undefined values).
+function stableStringify(v) {
+  if (v === null || typeof v !== 'object') return JSON.stringify(v);
+  if (Array.isArray(v)) return '[' + v.map(stableStringify).join(',') + ']';
+  return '{' + Object.keys(v).sort().map(k => JSON.stringify(k) + ':' + stableStringify(v[k])).join(',') + '}';
+}
+function signalSignature(kind, evidence) {
+  const text = (evidence?.description && typeof evidence.description === 'string')
+    ? evidence.description
+    : stableStringify(evidence ?? {});
+  return kind + ':' + createHash('sha256').update(text, 'utf8').digest('hex').slice(0, 16);
 }
 
 const warnings = [];
@@ -126,8 +167,18 @@ try {
 
   const surfaces = [];
   if (typeof toolInput?.content === 'string') surfaces.push(toolInput.content);
-  const toolResponse = input?.tool_response;
-  if (typeof toolResponse === 'string') surfaces.push(toolResponse);
+  // tool_response may be a string OR an object ({stdout, stderr, content}).
+  const tr = input?.tool_response;
+  if (typeof tr === 'string') surfaces.push(tr);
+  else if (tr && typeof tr === 'object') {
+    if (typeof tr.stdout === 'string') surfaces.push(tr.stdout);
+    if (typeof tr.content === 'string') surfaces.push(tr.content);
+    if (Array.isArray(tr.content)) {
+      for (const part of tr.content) {
+        if (part && typeof part.text === 'string') surfaces.push(part.text);
+      }
+    }
+  }
 
   const entries = [];
   for (const text of surfaces) {
@@ -155,8 +206,46 @@ try {
     const inboxPath = join(inboxDir, 'remember-inbox.jsonl');
     appendFileSync(inboxPath, entries.map(e => JSON.stringify(e)).join('\n') + '\n', 'utf8');
   }
+
+  // <evor-signal kind="..." shapes="limit,failure" axes="memory,compute" severity="high">
+  //   short evidence description
+  // </evor-signal>  → signals-inbox.jsonl (drained by Evor into the SignalBus, deduped).
+  const SIGNAL_RE = /<evor-signal\s+([^>]*?)>([\s\S]*?)<\/evor-signal>/gi;
+  const sigEntries = [];
+  for (const text of surfaces) {
+    let sm;
+    SIGNAL_RE.lastIndex = 0;
+    while ((sm = SIGNAL_RE.exec(text)) !== null) {
+      const attrs = {};
+      for (const am of sm[1].matchAll(/(\w+)="([^"]*)"/g)) attrs[am[1]] = am[2];
+      const desc = (sm[2] || '').trim();
+      if (!attrs.kind && !desc) continue;
+      const splitCsv = (v) => (v || '').split(',').map((x) => x.trim()).filter(Boolean);
+      const kind = attrs.kind || 'observation';
+      const evidence = { description: desc };
+      sigEntries.push({
+        kind,
+        signature: signalSignature(kind, evidence),
+        shapes: splitCsv(attrs.shapes || attrs.shape),
+        axes: splitCsv(attrs.axes || attrs.axis),
+        severity: attrs.severity || 'medium',
+        evidence,
+        source: `hook:${toolName}`,
+        created_at: new Date().toISOString(),
+      });
+    }
+  }
+  if (sigEntries.length > 0) {
+    const inboxDir = runDir(activeRunId);
+    mkdirSync(inboxDir, { recursive: true });
+    appendFileSync(
+      join(inboxDir, 'signals-inbox.jsonl'),
+      sigEntries.map((e) => JSON.stringify(e)).join('\n') + '\n',
+      'utf8'
+    );
+  }
 } catch {
-  // Fail-open — evor-remember capture is advisory, never blocks
+  // Fail-open — evor-remember / evor-signal capture is advisory, never blocks
 }
 
 process.exit(0);

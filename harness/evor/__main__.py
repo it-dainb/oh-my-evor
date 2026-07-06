@@ -135,6 +135,32 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Path to run directory for mission-scoped gotchas.",
     )
 
+    # capability subcommand — lightweight hardware probe + persist (no micro-train)
+    cap_p = sub.add_parser(
+        "capability",
+        help="Probe hardware and write .evor/capability.json (+ seed hardware gotchas)",
+    )
+    cap_p.add_argument(
+        "--evor-root", type=Path, default=None,
+        help="Path to .evor/ root. Defaults to .evor/ in cwd.",
+    )
+    cap_p.add_argument(
+        "--run-dir", type=Path, default=None,
+        help="Optional run directory for mission-scoped gotcha writes.",
+    )
+
+    # signals subcommand — manage the run's SignalBus
+    sig_p = sub.add_parser("signals", help="Manage the run's SignalBus")
+    sig_sub = sig_p.add_subparsers(dest="signals_action", required=True)
+    drain_p = sig_sub.add_parser(
+        "drain",
+        help="Drain signals-inbox.jsonl (hook captures) into signals.jsonl",
+    )
+    drain_p.add_argument(
+        "--run-dir", type=Path, required=True,
+        help="Path to the run directory containing signals-inbox.jsonl",
+    )
+
     return parser
 
 
@@ -529,12 +555,47 @@ def _cmd_gotchas(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_capability(args: argparse.Namespace) -> int:
+    """Probe hardware and persist .evor/capability.json (lightweight; no micro-train).
+
+    Idempotent: safe to call at tick-loop startup to guarantee Mutagen/Selector have
+    a hardware profile for gotcha-avoidance even when setup's preflight was skipped.
+    """
+    evor_root = (args.evor_root or Path(".evor")).resolve()
+    run_dir = args.run_dir.resolve() if args.run_dir else None
+    from evor.capability import probe_capability
+
+    profile = probe_capability(evor_root, run_dir)
+    print(
+        f"[evor capability] wrote {evor_root / 'capability.json'} "
+        f"(cpu_only={profile.cpu_only}, gpu_arch={profile.gpu_arch}, "
+        f"dtypes={profile.supported_dtypes})"
+    )
+    return 0
+
+
+def _cmd_signals(args: argparse.Namespace) -> int:
+    from evor.signals import SignalBus, drain_inbox  # local import — keep startup fast
+    if args.signals_action == "drain":
+        run_dir = Path(args.run_dir)
+        if not run_dir.is_dir():
+            print(json.dumps({"ok": False, "error": f"run-dir not found: {run_dir}"}))
+            return 1
+        bus = SignalBus(run_dir)
+        count = drain_inbox(run_dir, bus)
+        print(json.dumps({"ok": True, "drained": count}))
+        return 0
+    return 1
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = _build_parser()
     args = parser.parse_args(argv)
 
     if args.subcommand == "run":
         return _cmd_run(args)
+    if args.subcommand == "capability":
+        return _cmd_capability(args)
     if args.subcommand == "preflight":
         return _cmd_preflight(args)
     if args.subcommand == "validate":
@@ -543,6 +604,8 @@ def main(argv: list[str] | None = None) -> int:
         return _cmd_doctor(args)
     if args.subcommand == "gotchas":
         return _cmd_gotchas(args)
+    if args.subcommand == "signals":
+        return _cmd_signals(args)
 
     parser.print_help()
     return 1

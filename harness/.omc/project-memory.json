@@ -24,8 +24,8 @@
     "runtime": null
   },
   "build": {
-    "buildCommand": "cd /storages_local/research/oh-my-evor/mcp && npx tsc --noEmit 2>&1 && echo \"tsc OK\" && npx vitest run 2>&1 | tail -10",
-    "testCommand": "cd /storages_local/research/oh-my-evor/mcp && npx vitest run tests/hooks.test.ts 2>&1 | tail -8",
+    "buildCommand": "cd /storages_local/research/oh-my-evor/mcp && npm run build 2>&1",
+    "testCommand": "cd /storages_local/research/oh-my-evor/mcp && npx vitest run 2>&1 | tail -60",
     "lintCommand": "ruff check",
     "devCommand": null,
     "scripts": {}
@@ -94,15 +94,15 @@
       "type": "file"
     },
     {
-      "path": "evor/evaluator.py",
-      "accessCount": 13,
-      "lastAccessed": 1783095975224,
+      "path": "evor/contracts.py",
+      "accessCount": 14,
+      "lastAccessed": 1783188416222,
       "type": "file"
     },
     {
-      "path": "evor/contracts.py",
-      "accessCount": 12,
-      "lastAccessed": 1783096044079,
+      "path": "evor/evaluator.py",
+      "accessCount": 13,
+      "lastAccessed": 1783095975224,
       "type": "file"
     },
     {
@@ -169,6 +169,12 @@
       "path": "tests/test_validate.py",
       "accessCount": 2,
       "lastAccessed": 1783165065429,
+      "type": "file"
+    },
+    {
+      "path": "evor/signals.py",
+      "accessCount": 2,
+      "lastAccessed": 1783188411132,
       "type": "file"
     },
     {

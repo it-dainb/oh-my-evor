@@ -1,0 +1,8 @@
+{
+  "gpu_arch": null,
+  "cpu_only": true,
+  "supported_dtypes": ["fp32", "int8"],
+  "notes": "Mission targets CPU inference <=1ms. Capability profile pinned CPU-only + int8 so Dreamer's proposals stay deployment-realistic (no CUDA-only inference tricks); int8 is central to hitting the 1ms bar.",
+  "cores": 8,
+  "avx512": true
+}

@@ -6,7 +6,7 @@
  * first use.
  */
 
-import { existsSync, mkdirSync } from "fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync } from "fs";
 import { join, resolve } from "path";
 import { homedir } from "os";
 
@@ -52,19 +52,52 @@ export interface RunPaths {
   evalSuitesDir: string;
   /** frozen-splits/ */
   frozenSplitsDir: string;
+  /** signals.jsonl — append/dedup signal bus */
+  signalsPath: string;
+}
+
+/**
+ * Look up the mission id for a run when the caller did not supply one, so the
+ * MCP tools resolve the SAME canonical nested layout (runs/<mission>/<run-id>/)
+ * that setup and the harness write to — never a divergent flat runs/<run-id>/.
+ *
+ * Resolution order: active-run.json (authoritative) → scan runs/<mission>/<runId>/.
+ * Returns null only when no nested match exists (truly bare/legacy run).
+ */
+export function lookupMissionId(evorRoot: string, runId: string): string | null {
+  // 1. active-run.json — authoritative when it names this run.
+  try {
+    const ar = JSON.parse(readFileSync(join(evorRoot, "active-run.json"), "utf8"));
+    if (ar?.run_id === runId && ar?.mission_id) return String(ar.mission_id);
+  } catch {
+    /* no/invalid active-run.json — fall through to scan */
+  }
+  // 2. Scan runs/<mission>/<runId>/ for a nested directory that contains this run.
+  try {
+    for (const entry of readdirSync(join(evorRoot, "runs"), { withFileTypes: true })) {
+      if (entry.isDirectory() && existsSync(join(evorRoot, "runs", entry.name, runId))) {
+        return entry.name;
+      }
+    }
+  } catch {
+    /* no runs/ dir yet */
+  }
+  return null;
 }
 
 /**
  * Derive all canonical paths for a run.
  *
- * `missionId` is optional: when omitted, `runId` is treated as a bare
- * directory name directly under `.evor/runs/` (for tooling that only has
- * the run-id and looks up the mission from run-state.json).
+ * `missionId` is optional: when omitted it is resolved via `lookupMissionId`
+ * (active-run.json → directory scan) so tools that only hold the run-id still
+ * hit the canonical nested layout. Only a truly bare/legacy run falls back to
+ * `.evor/runs/<run-id>/`.
  */
 export function resolveRunPaths(runId: string, missionId?: string): RunPaths {
   const evorRoot = getEvorRoot();
-  const runDir = missionId
-    ? join(evorRoot, "runs", missionId, runId)
+  const mission = missionId ?? lookupMissionId(evorRoot, runId) ?? undefined;
+  const runDir = mission
+    ? join(evorRoot, "runs", mission, runId)
     : join(evorRoot, "runs", runId);
 
   return {
@@ -82,6 +115,7 @@ export function resolveRunPaths(runId: string, missionId?: string): RunPaths {
     wikiDir: join(runDir, "wiki"),
     evalSuitesDir: join(runDir, "eval-suites"),
     frozenSplitsDir: join(runDir, "frozen-splits"),
+    signalsPath: join(runDir, "signals.jsonl"),
   };
 }
 

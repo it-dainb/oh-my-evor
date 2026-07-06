@@ -21,7 +21,13 @@
     "./agents/evor-mutagen.md",
     "./agents/evor-probe.md",
     "./agents/evor-forge.md",
-    "./agents/evor-selector.md"
+    "./agents/evor-selector.md",
+    "./agents/evor-sage-junior.md",
+    "./agents/evor-forge-architect.md",
+    "./agents/evor-forge-junior.md",
+    "./agents/evor-forge-critic.md",
+    "./agents/evor-forge-analyst.md",
+    "./agents/evor-acquirer.md"
   ],
   "mcpServers": "./.mcp.json",
   "commands": "./commands/"

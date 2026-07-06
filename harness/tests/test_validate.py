@@ -35,6 +35,7 @@ from evor.validate import (
 from evor.contracts import GoalContract, MetricSpec, MetricConstraint
 
 _PYTHON = sys.executable
+_HARNESS_DIR = Path(__file__).resolve().parent.parent
 
 
 # ─── Fixture helpers ───────────────────────────────────────────────────────────
@@ -423,6 +424,7 @@ def test_validate_cli_exits_0_on_valid(tmp_path: Path) -> None:
     result = subprocess.run(
         [_PYTHON, "-m", "evor", "validate", "--run-id", str(run_dir)],
         capture_output=True, text=True,
+        cwd=str(_HARNESS_DIR),
     )
     assert result.returncode == 0, (
         f"validate CLI should exit 0 on valid contract.\n"
@@ -440,6 +442,7 @@ def test_validate_cli_exits_1_on_invalid(tmp_path: Path) -> None:
     result = subprocess.run(
         [_PYTHON, "-m", "evor", "validate", "--run-id", str(run_dir)],
         capture_output=True, text=True,
+        cwd=str(_HARNESS_DIR),
     )
     assert result.returncode == 1, (
         f"validate CLI should exit 1 on invalid contract.\n"
@@ -453,6 +456,7 @@ def test_validate_cli_help(tmp_path: Path) -> None:
     result = subprocess.run(
         [_PYTHON, "-m", "evor", "validate", "--help"],
         capture_output=True, text=True,
+        cwd=str(_HARNESS_DIR),
     )
     assert result.returncode == 0
     assert "run-id" in result.stdout.lower() or "run_id" in result.stdout.lower()
@@ -462,6 +466,7 @@ def test_doctor_cli_help(tmp_path: Path) -> None:
     result = subprocess.run(
         [_PYTHON, "-m", "evor", "doctor", "--help"],
         capture_output=True, text=True,
+        cwd=str(_HARNESS_DIR),
     )
     assert result.returncode == 0
 

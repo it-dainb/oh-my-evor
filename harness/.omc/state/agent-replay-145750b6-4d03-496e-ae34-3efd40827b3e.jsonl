@@ -86,3 +86,10 @@
 {"t":0,"agent":"adc80f2","agent_type":"unknown","event":"agent_stop","success":true,"duration_ms":0}
 {"t":0,"agent":"a2371aa","agent_type":"unknown","event":"agent_stop","success":true,"duration_ms":0}
 {"t":0,"agent":"a89601a","agent_type":"executor","event":"agent_stop","success":true,"duration_ms":2068145}
+{"t":0,"agent":"asignal","agent_type":"signal-lenses","event":"agent_start","parent_mode":"none"}
+{"t":0,"agent":"asignal","agent_type":"signal-mcp","event":"agent_start","parent_mode":"none"}
+{"t":0,"agent":"asignal","agent_type":"signal-mcp","event":"agent_stop","success":true,"duration_ms":270679}
+{"t":0,"agent":"asignal","agent_type":"signal-lenses","event":"agent_stop","success":true,"duration_ms":290673}
+{"t":0,"agent":"aacquir","agent_type":"acquirer-agent","event":"agent_start","parent_mode":"none"}
+{"t":0,"agent":"asetup-","agent_type":"setup-thorough","event":"agent_start","parent_mode":"none"}
+{"t":0,"agent":"asetup-","agent_type":"setup-thorough","event":"agent_stop","success":true,"duration_ms":108419}

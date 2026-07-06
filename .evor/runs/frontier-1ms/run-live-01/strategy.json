@@ -1,0 +1,7 @@
+{
+  "wildness": 0.85,
+  "concurrency": 6,
+  "winning_families": [],
+  "meta_evolved": false,
+  "notes": "Tick 1, cold start. Wildness deliberately high (0.85) to probe the full breadth of Dreamer's ideation on a hard multi-objective frontier."
+}

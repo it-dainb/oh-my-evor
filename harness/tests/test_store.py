@@ -320,3 +320,45 @@ def test_namespace_accumulates_hashes(store: ContentAddressedStore) -> None:
     import json
     ns = json.loads(store._ns_path.read_text())
     assert len(ns["acq-multi"]["hashes"]) == 2
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# BUG-1: gc() ignores symlink refcounts — symlink-protected blobs deleted
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def test_gc_respects_symlink_refcount(
+    store: ContentAddressedStore, tmp_path: Path
+) -> None:
+    """gc() must not delete a blob whose refcount was bumped by a symlink link().
+
+    Root cause: link() increments the blob's refcount to signal an outstanding
+    symlink reference ("must protect from GC" per the comment in link()), but
+    gc() ignores refcounts entirely and deletes every blob not in
+    referenced_hashes, causing the symlink to dangle.
+
+    Fix: gc() must skip deletion when counts.get(full_hash, 0) > 1 (i.e. the
+    blob has an outstanding symlink reference beyond the single put() call).
+    """
+    src = _write_file(tmp_path / "sym_protected.bin", b"symlink-protected data")
+    h = store.put(src)  # refcount = 1
+
+    target = tmp_path / "link_to_blob"
+    with patch("evor.store.os.link", side_effect=OSError("cross-device")):
+        store.link(h, target)  # symlink fallback — refcount bumped to 2
+
+    import json
+    counts = json.loads(store._refcounts_path.read_text())
+    assert counts[h] == 2, "symlink path must bump refcount to 2"
+
+    # gc() with no referenced_hashes must NOT delete the symlink-protected blob
+    deleted = store.gc(referenced_hashes=set())
+
+    assert deleted == 0, (
+        "gc() deleted a blob with refcount=2 (outstanding symlink reference); "
+        "symlink is now dangling"
+    )
+    assert store.get(h).exists(), "blob must survive gc() while symlink-referenced"
+    assert target.read_bytes() == b"symlink-protected data", (
+        "symlink must not dangle after gc()"
+    )

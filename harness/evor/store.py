@@ -148,7 +148,13 @@ class ContentAddressedStore:
                 continue
             for blob in list(shard.iterdir()):
                 full_hash = shard.name + blob.name
-                if full_hash not in referenced_hashes:
+                # Honor symlink-protection refcounts: link() with the symlink
+                # fallback bumps refcount to signal an outstanding external
+                # reference ("symlink points to blob PATH — must protect from
+                # GC").  Only delete when the blob is absent from the caller's
+                # reference set AND refcount ≤ 1 (at most the single put()-call
+                # reference, no symlink bump on top).
+                if full_hash not in referenced_hashes and counts.get(full_hash, 0) <= 1:
                     # make temporarily writable so unlink works
                     blob.chmod(stat.S_IRUSR | stat.S_IWUSR)
                     blob.unlink()

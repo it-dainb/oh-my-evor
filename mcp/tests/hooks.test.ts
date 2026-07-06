@@ -26,7 +26,7 @@
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { spawnSync } from "child_process";
-import { mkdtempSync, rmSync, writeFileSync, mkdirSync, readdirSync, readFileSync } from "fs";
+import { mkdtempSync, rmSync, writeFileSync, mkdirSync, readdirSync, readFileSync, existsSync } from "fs";
 import { join, resolve } from "path";
 import { tmpdir } from "os";
 
@@ -36,12 +36,32 @@ const HOOKS_DIR = resolve(process.cwd(), "../hooks");
 const SESSION_START = join(HOOKS_DIR, "session-start.mjs");
 const POST_TOOL_USE = join(HOOKS_DIR, "post-tool-use.mjs");
 const STOP = join(HOOKS_DIR, "stop.mjs");
+const PRE_COMPACT = join(HOOKS_DIR, "pre-compact.mjs");
+const SUBAGENT_STOP = join(HOOKS_DIR, "subagent-stop.mjs");
+const PRE_TOOL_USE = join(HOOKS_DIR, "pre-tool-use.mjs");
 
 /** Spawn a hook script as a child process with a minimal, controlled env. */
 function runHook(scriptPath: string, env: Record<string, string>) {
   return spawnSync(process.execPath, [scriptPath], {
     // Expose only PATH plus test-specific vars — no accidental leakage from
     // the real session environment (e.g. EVOR_ACTIVE_RUN_ID set by CI).
+    env: { PATH: process.env.PATH ?? "/usr/bin:/bin", ...env },
+    encoding: "utf8",
+    timeout: 5000,
+  });
+}
+
+/**
+ * Like runHook but delivers hook payload via STDIN (the real Claude Code delivery
+ * path) rather than the CLAUDE_HOOK_INPUT env-var fallback.
+ */
+function runHookWithStdin(
+  scriptPath: string,
+  env: Record<string, string>,
+  stdin: string,
+) {
+  return spawnSync(process.execPath, [scriptPath], {
+    input: stdin,
     env: { PATH: process.env.PATH ?? "/usr/bin:/bin", ...env },
     encoding: "utf8",
     timeout: 5000,
@@ -685,6 +705,19 @@ describe("stop hook — drift-guard (Phase 2)", () => {
     const runId = "run-drift-005";
     const runDir = join(tmpDir, "runs", runId);
     mkdirSync(join(runDir, "evaluations"), { recursive: true });
+    // A compliant completed tick carries its sub-agent artifacts (Mutagen + Selector
+    // ran). All proposals rejected → 0 nodes is legitimate (no forge-report), so the
+    // inline-shortcut guard must NOT fire.
+    mkdirSync(join(runDir, "ticks", "4", "mutagen"), { recursive: true });
+    mkdirSync(join(runDir, "ticks", "4", "selector"), { recursive: true });
+    writeFileSync(
+      join(runDir, "ticks", "4", "mutagen", "proposals.json"),
+      JSON.stringify({ proposals: [] })
+    );
+    writeFileSync(
+      join(runDir, "ticks", "4", "selector", "verdict.json"),
+      JSON.stringify({ verdict: "rejected" })
+    );
 
     writeFileSync(
       join(runDir, "run-state.json"),
@@ -790,9 +823,6 @@ describe("stop hook — drift-guard (Phase 2)", () => {
 });
 
 // ─── pre-compact.mjs ──────────────────────────────────────────────────────────
-
-const PRE_COMPACT = join(HOOKS_DIR, "pre-compact.mjs");
-const SUBAGENT_STOP = join(HOOKS_DIR, "subagent-stop.mjs");
 
 describe("pre-compact hook", () => {
   let tmpDir: string;
@@ -1145,5 +1175,978 @@ describe("session-start hook — evor-restore injection", () => {
     const output = JSON.parse(result.stdout.trim());
     // message may or may not include evor-restore; just must not error
     expect(output.env.EVOR_ACTIVE_RUN_ID).toBe(runId);
+  });
+});
+
+// ─── STDIN delivery path — post-tool-use and pre-compact ─────────────────────
+//
+// Existing tests pass input via CLAUDE_HOOK_INPUT env var (the old/fallback path).
+// These tests prove the real production path — STDIN — also works correctly.
+// A bug here would mean fixes to readFileSync(0) did nothing in practice.
+
+describe("post-tool-use — STDIN delivery path", () => {
+  let tmpDir: string;
+  const RUN_ID = "run-stdin-001";
+  const NODE_ID = "node-stdin-0001";
+
+  beforeEach(() => {
+    tmpDir = mkdtempSync(join(tmpdir(), "evor-stdin-ptu-"));
+  });
+  afterEach(() => {
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it("reads evor_record_eval payload from STDIN (no CLAUDE_HOOK_INPUT env)", () => {
+    // results.json present; telemetry absent → must warn via STDIN-parsed tool_name
+    const nodeDir = join(tmpDir, "runs", RUN_ID, "nodes", NODE_ID);
+    mkdirSync(nodeDir, { recursive: true });
+    writeFileSync(join(nodeDir, "results.json"), '{"ok":true}');
+    // telemetry.jsonl intentionally absent
+
+    const result = runHookWithStdin(
+      POST_TOOL_USE,
+      // Note: NO CLAUDE_HOOK_INPUT — only STDIN carries the payload
+      { EVOR_ACTIVE_RUN_ID: RUN_ID, EVOR_ROOT: tmpDir },
+      JSON.stringify({ tool_name: "evor_record_eval", tool_input: { run_id: RUN_ID, node_id: NODE_ID } }),
+    );
+    expect(result.status).toBe(0);
+    expect(result.stdout).toMatch(/EVOR WARNING/);
+    expect(result.stdout).toMatch(/telemetry/i);
+  });
+
+  it("exits 0 silently for unrelated tool via STDIN (no env fallback)", () => {
+    const result = runHookWithStdin(
+      POST_TOOL_USE,
+      { EVOR_ACTIVE_RUN_ID: RUN_ID, EVOR_ROOT: tmpDir },
+      JSON.stringify({ tool_name: "Read", tool_input: { file_path: "/foo.txt" } }),
+    );
+    expect(result.status).toBe(0);
+    expect(result.stdout.trim()).toBe("");
+  });
+
+  it("exits 0 safely on empty STDIN (fail-open; no env fallback)", () => {
+    const result = runHookWithStdin(
+      POST_TOOL_USE,
+      { EVOR_ACTIVE_RUN_ID: RUN_ID, EVOR_ROOT: tmpDir },
+      "",
+    );
+    expect(result.status).toBe(0);
+  });
+
+  it("exits 0 safely on malformed STDIN JSON (fail-open)", () => {
+    const result = runHookWithStdin(
+      POST_TOOL_USE,
+      { EVOR_ACTIVE_RUN_ID: RUN_ID, EVOR_ROOT: tmpDir },
+      "{not valid json,,",
+    );
+    expect(result.status).toBe(0);
+  });
+});
+
+describe("pre-compact — STDIN delivery path", () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = mkdtempSync(join(tmpdir(), "evor-stdin-pc-"));
+  });
+  afterEach(() => {
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it("reads trigger field from STDIN (no CLAUDE_HOOK_INPUT env)", () => {
+    const runId = "run-pc-stdin-001";
+    const runDir = join(tmpDir, "runs", runId);
+    mkdirSync(runDir, { recursive: true });
+    writeFileSync(join(tmpDir, "active-run.json"), JSON.stringify({ run_id: runId }));
+    writeFileSync(
+      join(runDir, "run-state.json"),
+      JSON.stringify({ tick_count: 1, best_score: 0.5, best_node_id: "n1", pending_node_ids: [] }),
+    );
+
+    // Deliver trigger via STDIN only — no CLAUDE_HOOK_INPUT
+    const result = runHookWithStdin(
+      PRE_COMPACT,
+      { EVOR_ROOT: tmpDir, EVOR_ACTIVE_RUN_ID: runId },
+      JSON.stringify({ trigger: "manual" }),
+    );
+    expect(result.status).toBe(0);
+    const out = JSON.parse(result.stdout.trim());
+    expect(out.continue).toBe(true);
+    expect(out.systemMessage).toContain("<evor-restore>");
+
+    // The checkpoint must record trigger="manual" (from STDIN, not default "auto")
+    const checkpointsDir = join(runDir, "checkpoints");
+    const files = readdirSync(checkpointsDir);
+    const cp = JSON.parse(readFileSync(join(checkpointsDir, files[0]), "utf8"));
+    expect(cp.trigger).toBe("manual");
+  });
+
+  it("defaults trigger to 'auto' on empty STDIN (no env fallback)", () => {
+    const runId = "run-pc-stdin-002";
+    const runDir = join(tmpDir, "runs", runId);
+    mkdirSync(runDir, { recursive: true });
+    writeFileSync(join(tmpDir, "active-run.json"), JSON.stringify({ run_id: runId }));
+    writeFileSync(
+      join(runDir, "run-state.json"),
+      JSON.stringify({ tick_count: 1, pending_node_ids: [] }),
+    );
+
+    const result = runHookWithStdin(
+      PRE_COMPACT,
+      { EVOR_ROOT: tmpDir, EVOR_ACTIVE_RUN_ID: runId },
+      "",
+    );
+    expect(result.status).toBe(0);
+    const out = JSON.parse(result.stdout.trim());
+    expect(out.continue).toBe(true);
+
+    const checkpointsDir = join(runDir, "checkpoints");
+    const files = readdirSync(checkpointsDir);
+    const cp = JSON.parse(readFileSync(join(checkpointsDir, files[0]), "utf8"));
+    expect(cp.trigger).toBe("auto");
+  });
+});
+
+// ─── subagent-stop — STDIN agent_type fallback ────────────────────────────────
+//
+// BUG: subagent-stop.mjs only checked EVOR_AGENT_ROLE env var; if it was unset
+// (the default when not explicitly configured), the hook was always dormant.
+// Fix: parse agent_type from the SubagentStop STDIN payload as a fallback.
+
+describe("subagent-stop — STDIN agent_type fallback", () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = mkdtempSync(join(tmpdir(), "evor-sa-stdin-"));
+  });
+  afterEach(() => {
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it("warns when EVOR_AGENT_ROLE is unset but agent_type=evor-sage arrives on STDIN and artifact missing", () => {
+    const runId = "run-sa-stdin-001";
+    const runDir = join(tmpDir, "runs", runId);
+    mkdirSync(runDir, { recursive: true });
+    writeFileSync(join(runDir, "tick-state.json"), JSON.stringify({ tick: 3, current_step: 5 }));
+    // sage artifact intentionally absent
+
+    const result = runHookWithStdin(
+      SUBAGENT_STOP,
+      // No EVOR_AGENT_ROLE — role must be inferred from STDIN payload
+      { EVOR_ROOT: tmpDir, EVOR_ACTIVE_RUN_ID: runId },
+      JSON.stringify({ agent_type: "oh-my-evor:evor-sage", session_id: "sess-xyz" }),
+    );
+    expect(result.status).toBe(0); // advisory — never blocks
+    expect(result.stdout).toContain("[EVOR SUBAGENT WARNING]");
+    expect(result.stdout).toContain("sage");
+    expect(result.stdout).toContain("findings.json");
+  });
+
+  it("warns for evor-forge via STDIN when forge-report.json is absent", () => {
+    const runId = "run-sa-stdin-002";
+    const tick = 2;
+    const runDir = join(tmpDir, "runs", runId);
+    mkdirSync(runDir, { recursive: true });
+    writeFileSync(join(runDir, "tick-state.json"), JSON.stringify({ tick, current_step: 8 }));
+    // forge-report.json intentionally absent
+
+    const result = runHookWithStdin(
+      SUBAGENT_STOP,
+      { EVOR_ROOT: tmpDir, EVOR_ACTIVE_RUN_ID: runId },
+      JSON.stringify({ agent_type: "oh-my-evor:evor-forge" }),
+    );
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain("[EVOR SUBAGENT WARNING]");
+    expect(result.stdout).toContain("forge-report.json");
+  });
+
+  it("exits 0 silently when STDIN agent_type is a sub-sub-agent (evor-forge-junior, untracked)", () => {
+    const runId = "run-sa-stdin-003";
+    const runDir = join(tmpDir, "runs", runId);
+    mkdirSync(runDir, { recursive: true });
+    writeFileSync(join(runDir, "tick-state.json"), JSON.stringify({ tick: 1, current_step: 3 }));
+
+    const result = runHookWithStdin(
+      SUBAGENT_STOP,
+      { EVOR_ROOT: tmpDir, EVOR_ACTIVE_RUN_ID: runId },
+      JSON.stringify({ agent_type: "oh-my-evor:evor-forge-junior" }),
+    );
+    // forge-junior has no tracked artifact — hook must exit 0 silently
+    expect(result.status).toBe(0);
+    expect(result.stdout.trim()).toBe("");
+  });
+
+  it("exits 0 silently on empty STDIN when EVOR_AGENT_ROLE also unset (fail-open)", () => {
+    const runId = "run-sa-stdin-004";
+    mkdirSync(join(tmpDir, "runs", runId), { recursive: true });
+
+    const result = runHookWithStdin(
+      SUBAGENT_STOP,
+      { EVOR_ROOT: tmpDir, EVOR_ACTIVE_RUN_ID: runId },
+      "",
+    );
+    expect(result.status).toBe(0);
+    expect(result.stdout.trim()).toBe("");
+  });
+
+  it("EVOR_AGENT_ROLE env var still takes precedence over STDIN agent_type", () => {
+    const runId = "run-sa-stdin-005";
+    const tick = 4;
+    const runDir = join(tmpDir, "runs", runId);
+    const artifactDir = join(runDir, "ticks", String(tick), "selector");
+    mkdirSync(artifactDir, { recursive: true });
+    writeFileSync(join(runDir, "tick-state.json"), JSON.stringify({ tick, current_step: 9 }));
+    writeFileSync(
+      join(artifactDir, "verdict.json"),
+      JSON.stringify({ approved: ["p1"], rejected: [] }),
+    );
+
+    // STDIN says "sage" but env says "selector" — env wins; selector artifact present → no warning
+    const result = runHookWithStdin(
+      SUBAGENT_STOP,
+      { EVOR_ROOT: tmpDir, EVOR_ACTIVE_RUN_ID: runId, EVOR_AGENT_ROLE: "selector" },
+      JSON.stringify({ agent_type: "oh-my-evor:evor-sage" }),
+    );
+    expect(result.status).toBe(0);
+    expect(result.stdout.trim()).toBe(""); // selector artifact present → no warning
+  });
+});
+
+// ─── pre-tool-use hook (capability governor) ─────────────────────────────────
+//
+// This hook is security-critical: it enforces the Orchestrator_Contract by making
+// the wrong agent physically unable to do a specialist's job. It reads its payload
+// exclusively from STDIN (no env fallback), so all tests use runHookWithStdin.
+
+describe("pre-tool-use hook — kill switches and inert guard", () => {
+  const ACTIVE_ENV = { EVOR_ACTIVE_RUN_ID: "run-gov-001" };
+
+  it("exits 0 silently (DISABLE_EVOR) even with a deny-worthy payload", () => {
+    const result = runHookWithStdin(
+      PRE_TOOL_USE,
+      { DISABLE_EVOR: "1", ...ACTIVE_ENV },
+      JSON.stringify({ tool_name: "Write", tool_input: { file_path: "/x/model.py" } }),
+    );
+    expect(result.status).toBe(0);
+    expect(result.stdout.trim()).toBe("");
+  });
+
+  it("exits 0 silently (EVOR_SKIP_HOOKS=pre-tool-use) even with a deny-worthy payload", () => {
+    const result = runHookWithStdin(
+      PRE_TOOL_USE,
+      { EVOR_SKIP_HOOKS: "pre-tool-use", ...ACTIVE_ENV },
+      JSON.stringify({ tool_name: "Write", tool_input: { file_path: "/x/model.py" } }),
+    );
+    expect(result.status).toBe(0);
+    expect(result.stdout.trim()).toBe("");
+  });
+
+  it("exits 0 silently when EVOR_ACTIVE_RUN_ID is unset (governor is inert)", () => {
+    const result = runHookWithStdin(
+      PRE_TOOL_USE,
+      {}, // no active run
+      JSON.stringify({ tool_name: "Write", tool_input: { file_path: "/x/model.py" } }),
+    );
+    expect(result.status).toBe(0);
+    expect(result.stdout.trim()).toBe("");
+  });
+
+  it("exits 0 (fail-open) on malformed STDIN JSON", () => {
+    const result = runHookWithStdin(PRE_TOOL_USE, ACTIVE_ENV, "{not valid json,,");
+    expect(result.status).toBe(0);
+    expect(result.stdout.trim()).toBe("");
+  });
+
+  it("exits 0 (fail-open) on empty STDIN", () => {
+    const result = runHookWithStdin(PRE_TOOL_USE, ACTIVE_ENV, "");
+    expect(result.status).toBe(0);
+    expect(result.stdout.trim()).toBe("");
+  });
+});
+
+describe("pre-tool-use hook — main Evor code-authoring restrictions", () => {
+  const ACTIVE_ENV = { EVOR_ACTIVE_RUN_ID: "run-gov-002" };
+
+  it("denies Write of a .py file by main Evor (no agent_type)", () => {
+    const result = runHookWithStdin(
+      PRE_TOOL_USE,
+      ACTIVE_ENV,
+      JSON.stringify({ tool_name: "Write", tool_input: { file_path: "/runs/r1/nodes/n1/model.py" } }),
+    );
+    expect(result.status).toBe(0);
+    const out = JSON.parse(result.stdout.trim());
+    expect(out.hookSpecificOutput.permissionDecision).toBe("deny");
+    expect(out.hookSpecificOutput.hookEventName).toBe("PreToolUse");
+    expect(out.hookSpecificOutput.permissionDecisionReason).toMatch(/orchestrator-only/i);
+  });
+
+  it("denies Edit of a .py file by main Evor", () => {
+    const result = runHookWithStdin(
+      PRE_TOOL_USE,
+      ACTIVE_ENV,
+      JSON.stringify({ tool_name: "Edit", tool_input: { file_path: "/runs/r1/train.py" } }),
+    );
+    expect(result.status).toBe(0);
+    const out = JSON.parse(result.stdout.trim());
+    expect(out.hookSpecificOutput.permissionDecision).toBe("deny");
+  });
+
+  it("denies Bash training command (python3 train.py) by main Evor", () => {
+    const result = runHookWithStdin(
+      PRE_TOOL_USE,
+      ACTIVE_ENV,
+      JSON.stringify({ tool_name: "Bash", tool_input: { command: "python3 train.py --epochs 10" } }),
+    );
+    expect(result.status).toBe(0);
+    const out = JSON.parse(result.stdout.trim());
+    expect(out.hookSpecificOutput.permissionDecision).toBe("deny");
+    expect(out.hookSpecificOutput.permissionDecisionReason).toMatch(/evor-forge/i);
+  });
+
+  it("denies Bash with torch training pattern by main Evor", () => {
+    const result = runHookWithStdin(
+      PRE_TOOL_USE,
+      ACTIVE_ENV,
+      JSON.stringify({ tool_name: "Bash", tool_input: { command: "python3 runner.py --model torch" } }),
+    );
+    expect(result.status).toBe(0);
+    const out = JSON.parse(result.stdout.trim());
+    expect(out.hookSpecificOutput.permissionDecision).toBe("deny");
+  });
+
+  it("allows main Evor to run the evor CLI (python -m evor ...)", () => {
+    const result = runHookWithStdin(
+      PRE_TOOL_USE,
+      ACTIVE_ENV,
+      JSON.stringify({ tool_name: "Bash", tool_input: { command: "python3 -m evor run --run-id abc" } }),
+    );
+    expect(result.status).toBe(0);
+    expect(result.stdout.trim()).toBe("");
+  });
+
+  it("allows main Evor to run evor sub-module (python -m evor.wiki ...)", () => {
+    const result = runHookWithStdin(
+      PRE_TOOL_USE,
+      ACTIVE_ENV,
+      JSON.stringify({ tool_name: "Bash", tool_input: { command: "python3 -m evor.wiki context --mission-id m1" } }),
+    );
+    expect(result.status).toBe(0);
+    expect(result.stdout.trim()).toBe("");
+  });
+
+  it("allows main Evor to Write a non-.py file (e.g. run-state.json)", () => {
+    const result = runHookWithStdin(
+      PRE_TOOL_USE,
+      ACTIVE_ENV,
+      JSON.stringify({ tool_name: "Write", tool_input: { file_path: "/runs/r1/run-state.json" } }),
+    );
+    expect(result.status).toBe(0);
+    expect(result.stdout.trim()).toBe("");
+  });
+
+  it("deny JSON has the required hookSpecificOutput shape", () => {
+    const result = runHookWithStdin(
+      PRE_TOOL_USE,
+      ACTIVE_ENV,
+      JSON.stringify({ tool_name: "Write", tool_input: { file_path: "/x/model.py" } }),
+    );
+    const out = JSON.parse(result.stdout.trim());
+    expect(out).toHaveProperty("hookSpecificOutput");
+    expect(out.hookSpecificOutput).toHaveProperty("hookEventName", "PreToolUse");
+    expect(out.hookSpecificOutput).toHaveProperty("permissionDecision", "deny");
+    expect(typeof out.hookSpecificOutput.permissionDecisionReason).toBe("string");
+    expect(out.hookSpecificOutput.permissionDecisionReason.length).toBeGreaterThan(0);
+  });
+});
+
+describe("pre-tool-use hook — non-Forge sub-agent code restrictions", () => {
+  const ACTIVE_ENV = { EVOR_ACTIVE_RUN_ID: "run-gov-003" };
+
+  it("denies evor-sage from writing .py files", () => {
+    const result = runHookWithStdin(
+      PRE_TOOL_USE,
+      ACTIVE_ENV,
+      JSON.stringify({
+        tool_name: "Write",
+        tool_input: { file_path: "/nodes/n1/model.py" },
+        agent_type: "oh-my-evor:evor-sage",
+      }),
+    );
+    expect(result.status).toBe(0);
+    const out = JSON.parse(result.stdout.trim());
+    expect(out.hookSpecificOutput.permissionDecision).toBe("deny");
+  });
+
+  it("denies evor-mutagen from writing .py files", () => {
+    const result = runHookWithStdin(
+      PRE_TOOL_USE,
+      ACTIVE_ENV,
+      JSON.stringify({
+        tool_name: "Edit",
+        tool_input: { file_path: "/nodes/n1/model.py" },
+        agent_type: "oh-my-evor:evor-mutagen",
+      }),
+    );
+    expect(result.status).toBe(0);
+    const out = JSON.parse(result.stdout.trim());
+    expect(out.hookSpecificOutput.permissionDecision).toBe("deny");
+  });
+
+  it("denies evor-forge (lead) from directly writing .py files and names evor-forge-junior", () => {
+    const result = runHookWithStdin(
+      PRE_TOOL_USE,
+      ACTIVE_ENV,
+      JSON.stringify({
+        tool_name: "Write",
+        tool_input: { file_path: "/nodes/n1/model.py" },
+        agent_type: "oh-my-evor:evor-forge",
+      }),
+    );
+    expect(result.status).toBe(0);
+    const out = JSON.parse(result.stdout.trim());
+    expect(out.hookSpecificOutput.permissionDecision).toBe("deny");
+    expect(out.hookSpecificOutput.permissionDecisionReason).toMatch(/evor-forge-junior/i);
+  });
+
+  it("allows evor-forge-junior to write .py files (it is the code author)", () => {
+    const result = runHookWithStdin(
+      PRE_TOOL_USE,
+      ACTIVE_ENV,
+      JSON.stringify({
+        tool_name: "Write",
+        tool_input: { file_path: "/nodes/n1/model.py" },
+        agent_type: "oh-my-evor:evor-forge-junior",
+      }),
+    );
+    expect(result.status).toBe(0);
+    expect(result.stdout.trim()).toBe("");
+  });
+
+  it("allows evor-forge-junior to run training Bash commands", () => {
+    const result = runHookWithStdin(
+      PRE_TOOL_USE,
+      ACTIVE_ENV,
+      JSON.stringify({
+        tool_name: "Bash",
+        tool_input: { command: "python3 train.py --epochs 5" },
+        agent_type: "oh-my-evor:evor-forge-junior",
+      }),
+    );
+    expect(result.status).toBe(0);
+    expect(result.stdout.trim()).toBe("");
+  });
+
+  it("denies evor-forge (lead) from running raw training (not evor CLI)", () => {
+    const result = runHookWithStdin(
+      PRE_TOOL_USE,
+      ACTIVE_ENV,
+      JSON.stringify({
+        tool_name: "Bash",
+        tool_input: { command: "python3 train.py --epochs 10" },
+        agent_type: "oh-my-evor:evor-forge",
+      }),
+    );
+    expect(result.status).toBe(0);
+    const out = JSON.parse(result.stdout.trim());
+    expect(out.hookSpecificOutput.permissionDecision).toBe("deny");
+    // Deny message should guide toward evor CLI or delegate to junior
+    expect(out.hookSpecificOutput.permissionDecisionReason).toMatch(/python -m evor/i);
+  });
+
+  it("allows evor-forge (lead) to run evor CLI harness", () => {
+    const result = runHookWithStdin(
+      PRE_TOOL_USE,
+      ACTIVE_ENV,
+      JSON.stringify({
+        tool_name: "Bash",
+        tool_input: { command: "python3 -m evor run --run-id r1" },
+        agent_type: "oh-my-evor:evor-forge",
+      }),
+    );
+    expect(result.status).toBe(0);
+    expect(result.stdout.trim()).toBe("");
+  });
+});
+
+describe("pre-tool-use hook — spawn hierarchy gate", () => {
+  const ACTIVE_ENV = { EVOR_ACTIVE_RUN_ID: "run-gov-004" };
+
+  it("denies main Evor from spawning evor-sage-junior directly", () => {
+    const result = runHookWithStdin(
+      PRE_TOOL_USE,
+      ACTIVE_ENV,
+      JSON.stringify({
+        tool_name: "Task",
+        tool_input: { subagent_type: "oh-my-evor:evor-sage-junior", prompt: "research X" },
+      }),
+    );
+    expect(result.status).toBe(0);
+    const out = JSON.parse(result.stdout.trim());
+    expect(out.hookSpecificOutput.permissionDecision).toBe("deny");
+    expect(out.hookSpecificOutput.permissionDecisionReason).toMatch(/evor-sage/i);
+  });
+
+  it("allows evor-sage to spawn evor-sage-junior", () => {
+    const result = runHookWithStdin(
+      PRE_TOOL_USE,
+      ACTIVE_ENV,
+      JSON.stringify({
+        tool_name: "Task",
+        tool_input: { subagent_type: "oh-my-evor:evor-sage-junior", prompt: "research X" },
+        agent_type: "oh-my-evor:evor-sage",
+      }),
+    );
+    expect(result.status).toBe(0);
+    expect(result.stdout.trim()).toBe("");
+  });
+
+  it("denies evor-mutagen from spawning evor-forge-junior (wrong parent)", () => {
+    const result = runHookWithStdin(
+      PRE_TOOL_USE,
+      ACTIVE_ENV,
+      JSON.stringify({
+        tool_name: "Task",
+        tool_input: { subagent_type: "oh-my-evor:evor-forge-junior", prompt: "code X" },
+        agent_type: "oh-my-evor:evor-mutagen",
+      }),
+    );
+    expect(result.status).toBe(0);
+    const out = JSON.parse(result.stdout.trim());
+    expect(out.hookSpecificOutput.permissionDecision).toBe("deny");
+    expect(out.hookSpecificOutput.permissionDecisionReason).toMatch(/evor-forge/i);
+  });
+
+  it("allows evor-forge to spawn all of its sub-team members", () => {
+    const forgeSubs = [
+      "evor-forge-junior",
+      "evor-forge-architect",
+      "evor-forge-critic",
+      "evor-forge-analyst",
+    ];
+    for (const sub of forgeSubs) {
+      const result = runHookWithStdin(
+        PRE_TOOL_USE,
+        ACTIVE_ENV,
+        JSON.stringify({
+          tool_name: "Task",
+          tool_input: { subagent_type: `oh-my-evor:${sub}`, prompt: "..." },
+          agent_type: "oh-my-evor:evor-forge",
+        }),
+      );
+      expect(result.status).toBe(0);
+      expect(result.stdout.trim()).toBe(""); // must not deny
+    }
+  });
+
+  it("denies evor-sage from spawning a Forge sub-team member (evor-forge-critic)", () => {
+    const result = runHookWithStdin(
+      PRE_TOOL_USE,
+      ACTIVE_ENV,
+      JSON.stringify({
+        tool_name: "Task",
+        tool_input: { subagent_type: "oh-my-evor:evor-forge-critic", prompt: "..." },
+        agent_type: "oh-my-evor:evor-sage",
+      }),
+    );
+    expect(result.status).toBe(0);
+    const out = JSON.parse(result.stdout.trim());
+    expect(out.hookSpecificOutput.permissionDecision).toBe("deny");
+  });
+
+  it("also blocks spawning via the Agent tool name (not just Task)", () => {
+    const result = runHookWithStdin(
+      PRE_TOOL_USE,
+      ACTIVE_ENV,
+      JSON.stringify({
+        tool_name: "Agent",
+        tool_input: { subagent_type: "oh-my-evor:evor-sage-junior", prompt: "..." },
+        // no agent_type → main Evor
+      }),
+    );
+    expect(result.status).toBe(0);
+    const out = JSON.parse(result.stdout.trim());
+    expect(out.hookSpecificOutput.permissionDecision).toBe("deny");
+  });
+});
+
+describe("pre-tool-use hook — evor-acquirer dual-parent gate", () => {
+  const ACTIVE_ENV = { EVOR_ACTIVE_RUN_ID: "run-gov-005" };
+
+  it("allows main Evor to spawn evor-acquirer (harden-test path)", () => {
+    const result = runHookWithStdin(
+      PRE_TOOL_USE,
+      ACTIVE_ENV,
+      JSON.stringify({ tool_name: "Task", tool_input: { subagent_type: "oh-my-evor:evor-acquirer", prompt: "..." } }),
+    );
+    expect(result.status).toBe(0);
+    expect(result.stdout.trim()).toBe("");
+  });
+
+  it("allows evor-forge to spawn evor-acquirer (enrich-train path)", () => {
+    const result = runHookWithStdin(
+      PRE_TOOL_USE,
+      ACTIVE_ENV,
+      JSON.stringify({
+        tool_name: "Task",
+        tool_input: { subagent_type: "oh-my-evor:evor-acquirer", prompt: "..." },
+        agent_type: "oh-my-evor:evor-forge",
+      }),
+    );
+    expect(result.status).toBe(0);
+    expect(result.stdout.trim()).toBe("");
+  });
+
+  it("denies evor-sage from spawning evor-acquirer", () => {
+    const result = runHookWithStdin(
+      PRE_TOOL_USE,
+      ACTIVE_ENV,
+      JSON.stringify({
+        tool_name: "Task",
+        tool_input: { subagent_type: "oh-my-evor:evor-acquirer", prompt: "..." },
+        agent_type: "oh-my-evor:evor-sage",
+      }),
+    );
+    expect(result.status).toBe(0);
+    const out = JSON.parse(result.stdout.trim());
+    expect(out.hookSpecificOutput.permissionDecision).toBe("deny");
+    expect(out.hookSpecificOutput.permissionDecisionReason).toMatch(/evor-acquirer/i);
+  });
+
+  it("denies evor-mutagen from spawning evor-acquirer", () => {
+    const result = runHookWithStdin(
+      PRE_TOOL_USE,
+      ACTIVE_ENV,
+      JSON.stringify({
+        tool_name: "Task",
+        tool_input: { subagent_type: "oh-my-evor:evor-acquirer", prompt: "..." },
+        agent_type: "oh-my-evor:evor-mutagen",
+      }),
+    );
+    expect(result.status).toBe(0);
+    const out = JSON.parse(result.stdout.trim());
+    expect(out.hookSpecificOutput.permissionDecision).toBe("deny");
+  });
+});
+
+describe("pre-tool-use hook — Mutagen research-tool denial", () => {
+  const ACTIVE_ENV = { EVOR_ACTIVE_RUN_ID: "run-gov-006" };
+  const MUTAGEN_ENV = { ...ACTIVE_ENV, ...{ agent_type: "ignored-via-stdin" } };
+
+  it("denies evor-mutagen from using WebSearch", () => {
+    const result = runHookWithStdin(
+      PRE_TOOL_USE,
+      ACTIVE_ENV,
+      JSON.stringify({
+        tool_name: "WebSearch",
+        tool_input: { query: "latest ML papers" },
+        agent_type: "oh-my-evor:evor-mutagen",
+      }),
+    );
+    expect(result.status).toBe(0);
+    const out = JSON.parse(result.stdout.trim());
+    expect(out.hookSpecificOutput.permissionDecision).toBe("deny");
+    expect(out.hookSpecificOutput.permissionDecisionReason).toMatch(/Mutagen/i);
+    expect(out.hookSpecificOutput.permissionDecisionReason).toMatch(/investigation_queries/i);
+  });
+
+  it("denies evor-mutagen from using WebFetch", () => {
+    const result = runHookWithStdin(
+      PRE_TOOL_USE,
+      ACTIVE_ENV,
+      JSON.stringify({
+        tool_name: "WebFetch",
+        tool_input: { url: "https://arxiv.org/abs/1234.5678" },
+        agent_type: "oh-my-evor:evor-mutagen",
+      }),
+    );
+    expect(result.status).toBe(0);
+    const out = JSON.parse(result.stdout.trim());
+    expect(out.hookSpecificOutput.permissionDecision).toBe("deny");
+  });
+
+  it("denies evor-mutagen from using Exa web search tool", () => {
+    const result = runHookWithStdin(
+      PRE_TOOL_USE,
+      ACTIVE_ENV,
+      JSON.stringify({
+        tool_name: "mcp__claude_ai_Exa__web_search_exa",
+        tool_input: { query: "..." },
+        agent_type: "oh-my-evor:evor-mutagen",
+      }),
+    );
+    expect(result.status).toBe(0);
+    const out = JSON.parse(result.stdout.trim());
+    expect(out.hookSpecificOutput.permissionDecision).toBe("deny");
+  });
+
+  it("denies evor-mutagen from using Consensus search", () => {
+    const result = runHookWithStdin(
+      PRE_TOOL_USE,
+      ACTIVE_ENV,
+      JSON.stringify({
+        tool_name: "mcp__claude_ai_Consensus__search",
+        tool_input: { query: "..." },
+        agent_type: "oh-my-evor:evor-mutagen",
+      }),
+    );
+    expect(result.status).toBe(0);
+    const out = JSON.parse(result.stdout.trim());
+    expect(out.hookSpecificOutput.permissionDecision).toBe("deny");
+  });
+
+  it("allows evor-sage (not mutagen) to use WebSearch", () => {
+    const result = runHookWithStdin(
+      PRE_TOOL_USE,
+      ACTIVE_ENV,
+      JSON.stringify({
+        tool_name: "WebSearch",
+        tool_input: { query: "ML papers" },
+        agent_type: "oh-my-evor:evor-sage",
+      }),
+    );
+    expect(result.status).toBe(0);
+    expect(result.stdout.trim()).toBe("");
+  });
+
+  it("allows evor-sage-junior (researcher) to use WebSearch", () => {
+    const result = runHookWithStdin(
+      PRE_TOOL_USE,
+      ACTIVE_ENV,
+      JSON.stringify({
+        tool_name: "WebSearch",
+        tool_input: { query: "residual networks" },
+        agent_type: "oh-my-evor:evor-sage-junior",
+      }),
+    );
+    expect(result.status).toBe(0);
+    expect(result.stdout.trim()).toBe("");
+  });
+});
+
+// ─── BUG G: signal inbox signature ───────────────────────────────────────────
+// Every <evor-signal> inbox entry must carry a deterministic `signature` field
+// so the Python SignalBus drain can dedup recurring pain-points.
+// Format: kind + ':' + sha256(description).slice(0,16)
+
+describe("post-tool-use — signal inbox: signature (BUG G)", () => {
+  let tmpDir: string;
+  const RUN_ID = "run-sig-001";
+  const MISSION_ID = "mission-sig-001";
+
+  beforeEach(() => {
+    tmpDir = mkdtempSync(join(tmpdir(), "evor-sig-"));
+    mkdirSync(join(tmpDir, "runs", MISSION_ID, RUN_ID), { recursive: true });
+    writeFileSync(
+      join(tmpDir, "active-run.json"),
+      JSON.stringify({ run_id: RUN_ID, mission_id: MISSION_ID }),
+    );
+  });
+  afterEach(() => {
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it("writes a signature field to each signal inbox entry", () => {
+    const result = runHookWithStdin(
+      POST_TOOL_USE,
+      { EVOR_ACTIVE_RUN_ID: RUN_ID, EVOR_MISSION_ID: MISSION_ID, EVOR_ROOT: tmpDir },
+      JSON.stringify({
+        tool_name: "Write",
+        tool_input: {},
+        tool_response:
+          '<evor-signal kind="limit" shapes="memory" axes="compute" severity="high">GPU OOM at batch 32</evor-signal>',
+      }),
+    );
+    expect(result.status).toBe(0);
+
+    const inboxPath = join(tmpDir, "runs", MISSION_ID, RUN_ID, "signals-inbox.jsonl");
+    const entry = JSON.parse(readFileSync(inboxPath, "utf8").trim().split("\n")[0]);
+    expect(entry).toHaveProperty("signature");
+    expect(typeof entry.signature).toBe("string");
+    // Format: "kind:hex16"
+    expect(entry.signature).toMatch(/^limit:[0-9a-f]{16}$/);
+  });
+
+  it("identical evidence produces identical signature (dedup stability)", () => {
+    const tag =
+      '<evor-signal kind="limit" shapes="memory" axes="compute" severity="high">GPU OOM at batch 32</evor-signal>';
+    const result = runHookWithStdin(
+      POST_TOOL_USE,
+      { EVOR_ACTIVE_RUN_ID: RUN_ID, EVOR_MISSION_ID: MISSION_ID, EVOR_ROOT: tmpDir },
+      JSON.stringify({ tool_name: "Write", tool_input: {}, tool_response: tag + "\n" + tag }),
+    );
+    expect(result.status).toBe(0);
+
+    const lines = readFileSync(
+      join(tmpDir, "runs", MISSION_ID, RUN_ID, "signals-inbox.jsonl"),
+      "utf8",
+    )
+      .trim()
+      .split("\n")
+      .filter(Boolean);
+    expect(lines.length).toBe(2);
+    const [e1, e2] = lines.map((l) => JSON.parse(l));
+    // Same evidence → same signature → drain can dedup
+    expect(e1.signature).toBe(e2.signature);
+  });
+
+  it("different descriptions produce different signatures", () => {
+    const result = runHookWithStdin(
+      POST_TOOL_USE,
+      { EVOR_ACTIVE_RUN_ID: RUN_ID, EVOR_MISSION_ID: MISSION_ID, EVOR_ROOT: tmpDir },
+      JSON.stringify({
+        tool_name: "Write",
+        tool_input: {},
+        tool_response: [
+          '<evor-signal kind="limit">OOM at batch 32</evor-signal>',
+          '<evor-signal kind="limit">OOM at batch 64</evor-signal>',
+        ].join("\n"),
+      }),
+    );
+    expect(result.status).toBe(0);
+
+    const lines = readFileSync(
+      join(tmpDir, "runs", MISSION_ID, RUN_ID, "signals-inbox.jsonl"),
+      "utf8",
+    )
+      .trim()
+      .split("\n")
+      .filter(Boolean);
+    expect(lines.length).toBe(2);
+    const [e1, e2] = lines.map((l) => JSON.parse(l));
+    expect(e1.signature).not.toBe(e2.signature);
+  });
+
+  it("entry contains required drain contract fields: kind, signature, shapes, axes, severity, evidence, source, created_at", () => {
+    const result = runHookWithStdin(
+      POST_TOOL_USE,
+      { EVOR_ACTIVE_RUN_ID: RUN_ID, EVOR_MISSION_ID: MISSION_ID, EVOR_ROOT: tmpDir },
+      JSON.stringify({
+        tool_name: "Bash",
+        tool_input: {},
+        tool_response:
+          '<evor-signal kind="failure" shapes="divergence" axes="loss" severity="critical">training diverged</evor-signal>',
+      }),
+    );
+    expect(result.status).toBe(0);
+
+    const entry = JSON.parse(
+      readFileSync(
+        join(tmpDir, "runs", MISSION_ID, RUN_ID, "signals-inbox.jsonl"),
+        "utf8",
+      ).trim(),
+    );
+    expect(entry).toHaveProperty("kind", "failure");
+    expect(entry).toHaveProperty("signature");
+    expect(entry).toHaveProperty("shapes");
+    expect(entry).toHaveProperty("axes");
+    expect(entry).toHaveProperty("severity", "critical");
+    expect(entry).toHaveProperty("evidence");
+    expect(entry).toHaveProperty("source");
+    expect(entry).toHaveProperty("created_at");
+    // Fields the hook must NOT synthesize (drain's job)
+    expect(entry).not.toHaveProperty("signal_id");
+    expect(entry).not.toHaveProperty("confidence");
+    expect(entry).not.toHaveProperty("occurrences");
+    expect(entry).not.toHaveProperty("first_seen");
+    expect(entry).not.toHaveProperty("last_seen");
+  });
+});
+
+// ─── BUG H: signal inbox path resolution when EVOR_MISSION_ID is unset ───────
+// runDir() previously used only the EVOR_MISSION_ID env var; when unset it wrote
+// to a flat runs/<runId>/ path that the MCP drain never reads (it expects the
+// canonical nested runs/<mission>/<runId>/ layout).
+// Fix mirrors run-store.ts:lookupMissionId — active-run.json first, dir scan second.
+
+describe("post-tool-use — signal inbox path resolution (BUG H)", () => {
+  const RUN_ID = "run-bugH-001";
+  const MISSION_ID = "mission-bugH-001";
+  let tmpDir: string;
+
+  afterEach(() => {
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it("resolves nested path via active-run.json when EVOR_MISSION_ID env is unset", () => {
+    tmpDir = mkdtempSync(join(tmpdir(), "evor-bugH-ar-"));
+    mkdirSync(join(tmpDir, "runs", MISSION_ID, RUN_ID), { recursive: true });
+    writeFileSync(
+      join(tmpDir, "active-run.json"),
+      JSON.stringify({ run_id: RUN_ID, mission_id: MISSION_ID }),
+    );
+
+    const result = runHookWithStdin(
+      POST_TOOL_USE,
+      // NO EVOR_MISSION_ID — must be recovered from active-run.json
+      { EVOR_ACTIVE_RUN_ID: RUN_ID, EVOR_ROOT: tmpDir },
+      JSON.stringify({
+        tool_name: "Bash",
+        tool_input: {},
+        tool_response: '<evor-signal kind="failure">training diverged</evor-signal>',
+      }),
+    );
+    expect(result.status).toBe(0);
+
+    // Inbox must land at canonical nested path
+    expect(existsSync(join(tmpDir, "runs", MISSION_ID, RUN_ID, "signals-inbox.jsonl"))).toBe(true);
+    // Must NOT land at flat path
+    expect(existsSync(join(tmpDir, "runs", RUN_ID, "signals-inbox.jsonl"))).toBe(false);
+  });
+
+  it("resolves nested path via directory scan when active-run.json names a different run", () => {
+    tmpDir = mkdtempSync(join(tmpdir(), "evor-bugH-scan-"));
+    mkdirSync(join(tmpDir, "runs", MISSION_ID, RUN_ID), { recursive: true });
+    // active-run.json points to a different run — scan fallback must find MISSION_ID
+    writeFileSync(
+      join(tmpDir, "active-run.json"),
+      JSON.stringify({ run_id: "other-run", mission_id: "other-mission" }),
+    );
+
+    const result = runHookWithStdin(
+      POST_TOOL_USE,
+      { EVOR_ACTIVE_RUN_ID: RUN_ID, EVOR_ROOT: tmpDir },
+      JSON.stringify({
+        tool_name: "Bash",
+        tool_input: {},
+        tool_response: '<evor-signal kind="failure">loss exploded</evor-signal>',
+      }),
+    );
+    expect(result.status).toBe(0);
+
+    expect(existsSync(join(tmpDir, "runs", MISSION_ID, RUN_ID, "signals-inbox.jsonl"))).toBe(true);
+  });
+
+  it("falls back to flat path when no active-run.json and no nested dir exist (bare/legacy run)", () => {
+    tmpDir = mkdtempSync(join(tmpdir(), "evor-bugH-flat-"));
+    // Only flat layout — no mission nesting, no active-run.json
+    mkdirSync(join(tmpDir, "runs", RUN_ID), { recursive: true });
+
+    const result = runHookWithStdin(
+      POST_TOOL_USE,
+      { EVOR_ACTIVE_RUN_ID: RUN_ID, EVOR_ROOT: tmpDir },
+      JSON.stringify({
+        tool_name: "Bash",
+        tool_input: {},
+        tool_response: '<evor-signal kind="observation">step 10 loss 2.1</evor-signal>',
+      }),
+    );
+    expect(result.status).toBe(0);
+
+    expect(existsSync(join(tmpDir, "runs", RUN_ID, "signals-inbox.jsonl"))).toBe(true);
+  });
+
+  it("exits 0 safely (fail-open) when EVOR_ROOT does not exist", () => {
+    tmpDir = mkdtempSync(join(tmpdir(), "evor-bugH-noroot-"));
+    // EVOR_ROOT points to a nonexistent subdir — resolution must not throw
+    const result = runHookWithStdin(
+      POST_TOOL_USE,
+      { EVOR_ACTIVE_RUN_ID: RUN_ID, EVOR_ROOT: join(tmpDir, "nonexistent") },
+      JSON.stringify({
+        tool_name: "Bash",
+        tool_input: {},
+        tool_response: '<evor-signal kind="observation">test</evor-signal>',
+      }),
+    );
+    expect(result.status).toBe(0);
   });
 });

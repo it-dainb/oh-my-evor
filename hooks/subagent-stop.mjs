@@ -55,7 +55,25 @@ const runDir = missionId
   : join(evorRoot, 'runs', activeRunId);
 
 // ── Role + tick resolution ────────────────────────────────────────────────────
-const agentRole = (process.env.EVOR_AGENT_ROLE ?? '').toLowerCase().trim();
+// Primary: EVOR_AGENT_ROLE env var set explicitly by the spawning orchestrator.
+// Fallback: parse agent_type from the SubagentStop STDIN payload that Claude Code
+// delivers (e.g. {"agent_type":"oh-my-evor:evor-sage","session_id":...}).
+// Only the five lead roles have tracked artifacts; sub-sub-agents (forge-junior,
+// sage-junior, etc.) are silently ignored if their stripped name is unrecognised.
+let agentRole = (process.env.EVOR_AGENT_ROLE ?? '').toLowerCase().trim();
+
+if (!agentRole) {
+  try {
+    const raw = readFileSync(0, 'utf8');
+    const payload = JSON.parse(raw || '{}');
+    const agentType = (payload?.agent_type ?? '').toLowerCase();
+    // Strip "oh-my-evor:evor-" prefix → bare role name (e.g. "sage", "forge").
+    const stripped = agentType.replace(/^oh-my-evor:evor-/, '').replace(/^evor-/, '');
+    const KNOWN_ROLES = new Set(['sage', 'mutagen', 'probe', 'forge', 'selector']);
+    if (KNOWN_ROLES.has(stripped)) agentRole = stripped;
+  } catch { /* fail-open — malformed or absent STDIN never blocks */ }
+}
+
 if (!agentRole) process.exit(0); // no role hint — cannot check specific artifact
 
 let currentTick = process.env.EVOR_CURRENT_TICK

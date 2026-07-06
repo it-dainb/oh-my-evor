@@ -1,0 +1,46 @@
+{
+  "agents": [
+    {
+      "agent_id": "asage-family-394e11fbbcf43582",
+      "agent_type": "sage-family",
+      "started_at": "2026-07-04T16:28:37.858Z",
+      "parent_mode": "none",
+      "status": "failed",
+      "completed_at": "2026-07-05T17:58:31.126Z",
+      "duration_ms": 91793268,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
+    },
+    {
+      "agent_id": "aforge-family-127eee612623ee77",
+      "agent_type": "forge-family",
+      "started_at": "2026-07-04T16:29:06.345Z",
+      "parent_mode": "none",
+      "status": "failed",
+      "completed_at": "2026-07-05T17:58:31.126Z",
+      "duration_ms": 91764781,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
+    },
+    {
+      "agent_id": "a4459df6d30537f32",
+      "agent_type": "unknown",
+      "started_at": "2026-07-05T17:58:31.126Z",
+      "parent_mode": "none",
+      "status": "completed",
+      "completed_at": "2026-07-05T17:58:31.126Z",
+      "duration_ms": 0
+    },
+    {
+      "agent_id": "a745126ac9c9b2652",
+      "agent_type": "unknown",
+      "started_at": "2026-07-05T18:00:54.067Z",
+      "parent_mode": "none",
+      "status": "completed",
+      "completed_at": "2026-07-05T18:00:54.067Z",
+      "duration_ms": 0
+    }
+  ],
+  "total_spawned": 2,
+  "total_completed": 2,
+  "total_failed": 2,
+  "last_updated": "2026-07-05T18:00:54.170Z"
+}

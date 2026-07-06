@@ -1,0 +1,7 @@
+{
+  "tool_name": "Bash",
+  "tool_input_preview": "{\"command\":\"RD=/plugin/.evor/runs/imagenet-a-robustness-2026-07/imagenet-a-robustness-2026-07-20260704T000000\\necho \\\"======== A. post-tool-use WITH EVOR_RUN_DIR set (proper routing test) ========\\\"\\n...",
+  "error": "Exit code 2\n======== A. post-tool-use WITH EVOR_RUN_DIR set (proper routing test) ========\nexit=0\n--- remember-inbox now? ---\n(end)\n\n======== B. Do hooks FIRE under --plugin-dir? (throwaway -p session, check for [EVOR CONTEXT]) ========\n{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"api_error_status\":null,\"duration_ms\":2694,\"duration_api_ms\":2406,\"ttft_ms\":2618,\"ttft_stream_ms\":2618,\"time_to_request_ms\":239,\"num_turns\":1,\"result\":\"ok\",\"stop_reason\":\"end_turn\",\"session_id\":\"100bdd9a-ff40-...",
+  "timestamp": "2026-07-04T15:35:55.778Z",
+  "retry_count": 1
+}

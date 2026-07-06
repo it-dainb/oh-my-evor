@@ -29,6 +29,7 @@ _RUN_ID = "run-wiring-20260704T000000"
 _NODE_A = "node-wire-aaaa-0001"
 _NODE_B = "node-wire-bbbb-0002"
 _PYTHON = sys.executable  # the venv Python running the tests
+_HARNESS_DIR = Path(__file__).resolve().parent.parent
 
 
 def _node_dict(
@@ -228,13 +229,13 @@ def _write_minimal_frozen_split(frozen_dir: Path, name: str, samples: dict) -> N
     }, indent=2))
 
 
-def _run(args: list[str], cwd: Path | None = None) -> subprocess.CompletedProcess:
+def _run(args: list[str], cwd: Path = _HARNESS_DIR) -> subprocess.CompletedProcess:
     """Run a subprocess with the venv Python, capturing output."""
     return subprocess.run(
         [_PYTHON] + args,
         capture_output=True,
         text=True,
-        cwd=str(cwd) if cwd else None,
+        cwd=str(cwd),
     )
 
 
@@ -834,3 +835,37 @@ def test_doctor_cli_help_resolves(tmp_path: Path) -> None:
     """P2: `python -m evor doctor --help` must resolve without error."""
     result = _run(["-m", "evor", "doctor", "--help"])
     assert result.returncode == 0
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Regression: tree.py --run-id accepts an absolute filesystem path
+# ─────────────────────────────────────────────────────────────────────────────
+
+def test_tree_select_accepts_absolute_run_dir(tmp_path: Path) -> None:
+    """Regression: evor.tree select --run-id <absolute/path> works when the path is a dir.
+
+    mcp/src/tools/tree.ts:107 passes paths.runDir (a full filesystem path) as
+    the --run-id value.  tree.py:691 guards:
+        run_dir = Path(args.run_id) if Path(args.run_id).is_dir() else Path(".evor/runs") / args.run_id
+    so an absolute existing directory is used directly — no re-joining under
+    .evor/runs/.  This test locks that behaviour so a refactor cannot silently
+    break the TS→Python bridge.
+    """
+    run_dir, _ = _build_fixture_run_dir(tmp_path)
+
+    # Pass the resolved absolute path exactly as the TS layer does.
+    result = _run(["-m", "evor.tree", "select", "--run-id", str(run_dir.resolve())])
+
+    assert result.returncode == 0, (
+        f"evor.tree select failed with absolute --run-id (exit {result.returncode}).\n"
+        f"stderr: {result.stderr}\nstdout: {result.stdout}"
+    )
+
+    data = json.loads(result.stdout)
+    assert "selected" in data, f"Missing 'selected' key: {data}"
+    assert isinstance(data["selected"], list) and len(data["selected"]) >= 1, (
+        "select must return at least one node ID"
+    )
+    assert "ValidationError" not in result.stderr, (
+        f"Unexpected ValidationError with absolute path:\n{result.stderr}"
+    )
