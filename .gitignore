@@ -10,6 +10,9 @@ venv/
 .pytest_cache/
 .ruff_cache/
 mcp/dist/
+# ...but ship the built MCP bundle so the plugin installs without a Node build
+!mcp/dist/
+!mcp/dist/index.cjs
 harness/.venv/
 
 # reference repos (read-only, not part of this project)

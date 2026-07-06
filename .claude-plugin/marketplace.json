@@ -1,0 +1,16 @@
+{
+  "name": "oh-my-evor",
+  "owner": {
+    "name": "oh-my-evor contributors"
+  },
+  "description": "Autonomous ML research evolution engine for Claude Code — a roster of specialized agents evolve a model+dataset via mutations, tree search, integrity gates, and compounding lessons.",
+  "plugins": [
+    {
+      "name": "oh-my-evor",
+      "source": "./",
+      "description": "Autonomous ML research evolution engine: 11 specialized agents (Sage/Mutagen/Probe/Selector/Forge + sub-teams), MCP tools, hook-enforced capability governor, signal telemetry bus, and integrity/anti-gaming gates. Requires a one-time build: run ./install.sh after cloning.",
+      "version": "0.1.0",
+      "license": "MIT"
+    }
+  ]
+}
