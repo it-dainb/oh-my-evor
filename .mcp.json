@@ -5,18 +5,12 @@
       "args": ["${CLAUDE_PLUGIN_ROOT}/mcp/dist/index.cjs"]
     },
     "semantic-scholar": {
-      "command": "uvx",
-      "args": ["semantic-scholar-mcp"],
-      "env": {
-        "PATH": "${HOME}/.local/bin:${HOME}/.cargo/bin:/opt/homebrew/bin:/usr/local/bin:${PATH}"
-      }
+      "command": "node",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/mcp/bin/py-mcp.cjs", "semantic-scholar-mcp"]
     },
     "arxiv": {
-      "command": "uvx",
-      "args": ["arxiv-mcp-server"],
-      "env": {
-        "PATH": "${HOME}/.local/bin:${HOME}/.cargo/bin:/opt/homebrew/bin:/usr/local/bin:${PATH}"
-      }
+      "command": "node",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/mcp/bin/py-mcp.cjs", "arxiv-mcp-server"]
     },
     "hf-mcp": {
       "type": "http",

@@ -30,3 +30,7 @@ refs/
 
 # HF token (never commit)
 .evor/.env
+
+# bundled python MCP venvs (built at runtime, not source)
+mcp/.venvs/
+mcp/.uv/

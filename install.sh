@@ -37,6 +37,14 @@ cd "$ROOT"
 "$PY" -c "import evor" >/dev/null 2>&1 || { echo "ERROR: 'import evor' failed after install"; exit 1; }
 echo "    harness importable: $($PY -c 'import evor,os;print(os.path.dirname(evor.__file__))')"
 
+# --- 3. pre-warm the bundled research MCP venvs (avoids first-connect delay) --
+# The research MCPs (semantic-scholar, arxiv) run from self-contained venvs built
+# by mcp/bin/py-mcp.cjs. Pre-building here means their first connect in Claude Code
+# is instant instead of racing the connect timeout while pip downloads deps.
+echo "==> [3/3] Pre-warming research MCP venvs (uv provisions Python 3.11 + deps)"
+EVOR_PYTHON="$PY" node "$ROOT/mcp/bin/py-mcp.cjs" arxiv-mcp-server --prebuild || echo "    (arxiv prewarm skipped — will build on first use)"
+EVOR_PYTHON="$PY" node "$ROOT/mcp/bin/py-mcp.cjs" semantic-scholar-mcp --prebuild || echo "    (semantic-scholar prewarm skipped — will build on first use)"
+
 cat <<EOF
 
 ==> Done. Next, register the plugin with Claude Code:

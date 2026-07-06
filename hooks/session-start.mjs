@@ -104,34 +104,6 @@ function checkHarnessDeps(pRoot, eRoot) {
 }
 
 /**
- * Check that `uv` is available, since the bundled research MCPs (semantic-scholar,
- * arxiv) that power Sage launch via `uvx` — and `uv` is NOT part of a stock Python
- * install. Cached via a `.uv-ok` sentinel; never throws. Returns a one-line fix, or ''.
- * @param {string} eRoot  resolved .evor root (writable)
- * @returns {string}
- */
-function checkUv(eRoot) {
-  try {
-    const sentinel = join(eRoot, '.uv-ok');
-    if (existsSync(sentinel)) return '';
-    // Check `uv` with the SAME PATH the .mcp.json servers inject, so this verdict
-    // matches what the MCP spawner will actually see (uv usually lands in ~/.local/bin,
-    // which is often absent from a GUI/minimal spawn PATH → the "uvx ENOENT" failure).
-    const home = process.env.HOME ?? '';
-    const uvPath = [`${home}/.local/bin`, `${home}/.cargo/bin`, '/opt/homebrew/bin', '/usr/local/bin', process.env.PATH ?? '']
-      .filter(Boolean).join(':');
-    const res = spawnSync('uv', ['--version'], { encoding: 'utf8', timeout: 3000, env: { ...process.env, PATH: uvPath } });
-    if (res.status === 0) {
-      try { mkdirSync(dirname(sentinel), { recursive: true }); writeFileSync(sentinel, new Date().toISOString()); } catch { /* read-only — re-check next session */ }
-      return '';
-    }
-    return `[oh-my-evor] 'uv' not found — the semantic-scholar + arxiv research MCPs that power Sage launch via uvx and need it. Install once: pip install uv (or https://docs.astral.sh/uv). Everything else is unaffected.`;
-  } catch {
-    return '';
-  }
-}
-
-/**
  * Cheap, bounded workspace classification for brownfield ML detection.
  * Honors the contract IGNORE list; caps entries per directory and depth.
  * Never throws — returns greenfield on any error.
@@ -245,8 +217,6 @@ const activeRunFile = join(evorRoot, 'active-run.json');
 
 // One-time harness/deps health check (surfaces a clear fix on incomplete installs).
 const depWarning = checkHarnessDeps(pluginRoot, evorRoot);
-// One-time check that `uv` is present for the bundled research MCPs (Sage).
-const uvWarning = checkUv(evorRoot);
 
 /** Emit clear-env JSON and exit 0 gracefully. */
 function clearEnvAndExit(reason) {
@@ -289,7 +259,7 @@ if (!existsSync(activeRunFile)) {
     }
   }
 
-  const parts = [depWarning, uvWarning, nudge].filter(Boolean);
+  const parts = [depWarning, nudge].filter(Boolean);
   process.stdout.write(JSON.stringify({
     env: { EVOR_PLUGIN_ROOT: pluginRoot },
     ...(parts.length ? { message: parts.join('\n\n') } : {}),
@@ -344,8 +314,8 @@ if (restoreBlock) {
   output.message += `\n\n${restoreBlock}`;
 }
 
-// Surface any harness/deps or uv warning first so an incomplete install is obvious.
-const prefixWarnings = [depWarning, uvWarning].filter(Boolean).join('\n\n');
+// Surface any harness/deps warning first so an incomplete install is obvious.
+const prefixWarnings = [depWarning].filter(Boolean).join('\n\n');
 if (prefixWarnings) output.message = `${prefixWarnings}\n\n${output.message}`;
 
 process.stdout.write(JSON.stringify(output) + '\n');
