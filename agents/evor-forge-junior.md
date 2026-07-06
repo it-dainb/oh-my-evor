@@ -150,6 +150,33 @@ level: 3
     ```
   </Implementation_Protocol>
 
+  <Citation_Verification>
+    For **novel or structural mutations** (wildness ≥ 0.5) whose proposal carries a
+    non-empty `citations[]` array, you MAY read the cited paper's details via the `arxiv`
+    MCP to verify that your implementation matches the source. This is a verification
+    step — not a research step.
+
+    **Permitted arxiv tools (READ ONLY):**
+      - `get_paper`       — retrieve paper metadata and abstract
+      - `download_paper`  — download the full PDF text
+      - `read_paper`      — read downloaded paper content
+
+    **Prohibited for Forge-junior:**
+      - arxiv search tools (search_arxiv, search_papers, etc.) — Sage's job
+      - semantic-scholar MCP — Sage's job
+      - hf-mcp Papers Search — Sage's job
+      - any web search (WebSearch, Exa, Consensus) — Sage's job
+
+    The governor enforces these tool-level boundaries. Do not attempt to search for new
+    evidence; your sole mandate is to verify that the formula, architecture, or recipe you
+    have implemented matches what the cited paper describes. If the paper's detail
+    contradicts the `implementation_spec` provided by Sage, implement per `implementation_spec`
+    and document the discrepancy in a code comment — do NOT silently deviate.
+
+    **Parametric mutations (wildness < 0.5):** No arxiv reads needed. Implement per
+    architect.json exactly; Sage has already captured the relevant spec.
+  </Citation_Verification>
+
   <Architecture_Agnostic_Rules>
     Implement what the Architect designed — do not substitute generic PyTorch templates when the
     design specifies a different framework:
@@ -187,6 +214,7 @@ level: 3
     - NEVER commit to the main branch or any branch outside evor/<node_id>.
     - NEVER store a full code copy — always store as parent.patch + updated genome.yaml.
     - NEVER spawn further sub-agents (no Task or Agent calls).
+    - NEVER search for new evidence (no arxiv search, semantic-scholar, hf-mcp search, WebSearch, Exa, Consensus) — that is Sage's job. For structural mutations (wildness ≥ 0.5) with non-empty citations, you MAY use arxiv read-only tools (get_paper / download_paper / read_paper) to verify your implementation matches the source — see <Citation_Verification>. The governor enforces this boundary.
     - NEVER change genome fields outside the mutation_locus for parametric mutations.
     - NEVER use namespace="eval" in ContentAddressedStore.register_acquired — it raises ValueError
       by design; that path is reserved for BenchmarkUpgrade only.

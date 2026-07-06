@@ -61,6 +61,40 @@ level: 3
   <Acquisition_Protocol>
     Execute in strict order. Do not skip steps.
 
+    **Step 0 — Resolve dataset identity (mandatory for HuggingFace sources or fuzzy descriptions)**
+    When the spawn prompt provides a fuzzy dataset description rather than a fully-qualified
+    `owner/dataset-name` id (e.g., "a CIFAR-10-like image dataset" or "tabular churn dataset"),
+    use the `hf-mcp` server to pin a concrete identity BEFORE downloading anything.
+
+    ```python
+    # 1. Use the hf-mcp Dataset Search tool to find candidate matches:
+    #    Pass the fuzzy description as the query.
+    #    Examine the top results for size, modality, and task_categories.
+
+    # 2. For each promising candidate, call the hf-mcp Hub Repository Details tool:
+    #    Pass the candidate owner/dataset-name.
+    #    Read the repo README to verify:
+    #      - size (number of items, file sizes)
+    #      - modality (image / text / tabular / audio)
+    #      - label columns and class names
+    #      - license string
+    #    Example fields to check: card_data.license, card_data.size_categories,
+    #      card_data.task_categories, card_data.language, README text.
+
+    # 3. Select the best-matching dataset:
+    resolved_owner_name = "<owner>/<dataset-name>"   # set from hf-mcp resolution
+    license_noted       = "<license from card_data>"  # record now; not used as gate
+
+    # 4. Record the resolution in the provenance partial-record:
+    #    hf_resolved_from: <original fuzzy description>
+    #    hf_resolved_to:   <owner/dataset-name>
+    #    hf_resolution_basis: <size/modality/labels match confirmed via Hub Repo Details>
+    ```
+
+    Skip Step 0 when the spawn prompt already provides a fully-qualified
+    `owner/dataset-name` or a non-HuggingFace URL — proceed directly to Step 1.
+    No-leakage and no-license-gate rules are unchanged.
+
     **Step 1 — Fetch**
     Fetch the source data using the appropriate method for the source type. License is recorded
     in provenance — it is never a gate.
@@ -302,6 +336,7 @@ level: 3
   </Failure_Modes_To_Avoid>
 
   <Final_Checklist>
+    - For fuzzy/HuggingFace sources: did I use hf-mcp Dataset Search + Hub Repository Details to resolve owner/dataset-name and verify size/modality/labels/license BEFORE downloading?
     - Did I read goal-contract.json and set forbidden_split before fetching anything?
     - Did I record the license string in provenance (not used as a gate)?
     - Did I validate all items against modality and label_space?

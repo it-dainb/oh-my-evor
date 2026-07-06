@@ -109,12 +109,43 @@ try {
   }
 
   // ── Research-delegation gate — Mutagen never researches; it delegates to Sage ──
+  // Covers all search/discovery channels including the three research MCPs
+  // (semantic-scholar, arxiv, hf-mcp) — anchoring-bias separation is load-bearing.
   if (agentType === 'evor-mutagen') {
-    if (/Consensus__search|Exa__web|WebSearch|WebFetch|evor_cite/i.test(tool)) {
+    if (/Consensus__search|Exa__web|WebSearch|WebFetch|evor_cite|semantic[_-]scholar|arxiv|hf[_-]mcp/i.test(tool)) {
       deny(
         `[EVOR GOVERNOR] Mutagen does not gather evidence. Emit investigation_queries[] (research angles) ` +
           `for Sage — the orchestrator routes them to Sage, who fans out to Sage-junior researchers. Do not research directly.`
       );
+    }
+  }
+
+  // ── forge-junior research gate — narrow arxiv read-only grant; all search denied ──
+  // forge-junior may retrieve a cited paper via the arxiv MCP (get_paper / download_paper /
+  // read_paper) to verify its implementation matches the source formula. It must not search
+  // for new evidence — citation discovery is exclusively Sage's job.
+  if (agentType === 'evor-forge-junior') {
+    const isArxivReadOnly =
+      /arxiv/i.test(tool) && /get_paper|download_paper|read_paper/i.test(tool);
+    if (!isArxivReadOnly) {
+      if (/semantic[_-]scholar/i.test(tool) || /hf[_-]mcp/i.test(tool)) {
+        deny(
+          `[EVOR GOVERNOR] forge-junior may not use research discovery tools (${tool}). ` +
+            `Citation lookup is Sage's job. Allowed: arxiv get_paper / download_paper / read_paper to verify a cited formula.`
+        );
+      }
+      if (/WebSearch|WebFetch|Exa__web/i.test(tool)) {
+        deny(
+          `[EVOR GOVERNOR] forge-junior may not search the web. ` +
+            `Allowed: arxiv get_paper / download_paper / read_paper to verify a cited formula only.`
+        );
+      }
+      if (/arxiv/i.test(tool)) {
+        deny(
+          `[EVOR GOVERNOR] forge-junior may only READ arxiv papers (get_paper / download_paper / read_paper) — ` +
+            `searching for new evidence is Sage's job. Use the cited arXiv ID directly.`
+        );
+      }
     }
   }
 

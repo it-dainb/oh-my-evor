@@ -20,8 +20,13 @@ refs/
 
 # evor runtime sentinels (not source)
 .evor/.deps-ok
+.evor/.uv-ok
+.evor/.workspace-class
 
 # omc runtime state (not source)
 .omc/state/
 .omc/project-memory.json
 .omc/notepad.md
+
+# HF token (never commit)
+.evor/.env

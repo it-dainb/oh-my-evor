@@ -11,6 +11,13 @@
     "arxiv": {
       "command": "uvx",
       "args": ["arxiv-mcp-server"]
+    },
+    "hf-mcp": {
+      "type": "http",
+      "url": "https://huggingface.co/mcp",
+      "headers": {
+        "Authorization": "Bearer ${HF_TOKEN:-}"
+      }
     }
   }
 }

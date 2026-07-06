@@ -1930,6 +1930,216 @@ describe("pre-tool-use hook — Mutagen research-tool denial", () => {
     expect(result.status).toBe(0);
     expect(result.stdout.trim()).toBe("");
   });
+
+  // Verify Mutagen is still denied all three research MCPs after the governor grant additions.
+  it("denies evor-mutagen from using semantic-scholar MCP tool", () => {
+    const result = runHookWithStdin(
+      PRE_TOOL_USE,
+      ACTIVE_ENV,
+      JSON.stringify({
+        tool_name: "mcp__semantic-scholar__search_papers",
+        tool_input: { query: "contrastive learning" },
+        agent_type: "oh-my-evor:evor-mutagen",
+      }),
+    );
+    expect(result.status).toBe(0);
+    const out = JSON.parse(result.stdout.trim());
+    expect(out.hookSpecificOutput.permissionDecision).toBe("deny");
+    expect(out.hookSpecificOutput.permissionDecisionReason).toMatch(/Mutagen/i);
+  });
+
+  it("denies evor-mutagen from using any arxiv MCP tool", () => {
+    const result = runHookWithStdin(
+      PRE_TOOL_USE,
+      ACTIVE_ENV,
+      JSON.stringify({
+        tool_name: "mcp__arxiv__get_paper",
+        tool_input: { arxiv_id: "2301.00001" },
+        agent_type: "oh-my-evor:evor-mutagen",
+      }),
+    );
+    expect(result.status).toBe(0);
+    const out = JSON.parse(result.stdout.trim());
+    expect(out.hookSpecificOutput.permissionDecision).toBe("deny");
+    expect(out.hookSpecificOutput.permissionDecisionReason).toMatch(/Mutagen/i);
+  });
+
+  it("denies evor-mutagen from using any hf-mcp tool", () => {
+    const result = runHookWithStdin(
+      PRE_TOOL_USE,
+      ACTIVE_ENV,
+      JSON.stringify({
+        tool_name: "mcp__hf-mcp__model_search",
+        tool_input: { query: "llama" },
+        agent_type: "oh-my-evor:evor-mutagen",
+      }),
+    );
+    expect(result.status).toBe(0);
+    const out = JSON.parse(result.stdout.trim());
+    expect(out.hookSpecificOutput.permissionDecision).toBe("deny");
+    expect(out.hookSpecificOutput.permissionDecisionReason).toMatch(/Mutagen/i);
+  });
+});
+
+// ─── pre-tool-use hook — governor grants (Acquirer hf-mcp + forge-junior arxiv) ─
+//
+// Contract section 3 grants:
+//   Acquirer  — hf-mcp Dataset Search + Hub Repository Details (already pass-through;
+//               no deny rule targets it, so these tests confirm the absence of denial).
+//   forge-junior — arxiv read-only (get_paper / download_paper / read_paper) to verify
+//               a cited formula; arxiv search + semantic-scholar + WebSearch still denied.
+
+describe("pre-tool-use hook — governor grants (Acquirer hf-mcp + forge-junior arxiv)", () => {
+  const ACTIVE_ENV = { EVOR_ACTIVE_RUN_ID: "run-gov-007" };
+
+  // ── Acquirer: hf-mcp dataset tools allowed ─────────────────────────────────
+
+  it("allows evor-acquirer to use hf-mcp dataset search", () => {
+    const result = runHookWithStdin(
+      PRE_TOOL_USE,
+      ACTIVE_ENV,
+      JSON.stringify({
+        tool_name: "mcp__hf-mcp__dataset_search",
+        tool_input: { query: "tabular churn" },
+        agent_type: "oh-my-evor:evor-acquirer",
+      }),
+    );
+    expect(result.status).toBe(0);
+    expect(result.stdout.trim()).toBe(""); // not denied
+  });
+
+  it("allows evor-acquirer to use hf-mcp hub repository details", () => {
+    const result = runHookWithStdin(
+      PRE_TOOL_USE,
+      ACTIVE_ENV,
+      JSON.stringify({
+        tool_name: "mcp__hf-mcp__hub_repository_details",
+        tool_input: { repo_id: "scikit-learn/tabular-playground" },
+        agent_type: "oh-my-evor:evor-acquirer",
+      }),
+    );
+    expect(result.status).toBe(0);
+    expect(result.stdout.trim()).toBe("");
+  });
+
+  // ── forge-junior: arxiv read-only allowed ──────────────────────────────────
+
+  it("allows evor-forge-junior to use arxiv get_paper (formula verification)", () => {
+    const result = runHookWithStdin(
+      PRE_TOOL_USE,
+      ACTIVE_ENV,
+      JSON.stringify({
+        tool_name: "mcp__arxiv__get_paper",
+        tool_input: { arxiv_id: "1706.03762" },
+        agent_type: "oh-my-evor:evor-forge-junior",
+      }),
+    );
+    expect(result.status).toBe(0);
+    expect(result.stdout.trim()).toBe("");
+  });
+
+  it("allows evor-forge-junior to use arxiv download_paper", () => {
+    const result = runHookWithStdin(
+      PRE_TOOL_USE,
+      ACTIVE_ENV,
+      JSON.stringify({
+        tool_name: "mcp__arxiv__download_paper",
+        tool_input: { arxiv_id: "2005.14165" },
+        agent_type: "oh-my-evor:evor-forge-junior",
+      }),
+    );
+    expect(result.status).toBe(0);
+    expect(result.stdout.trim()).toBe("");
+  });
+
+  it("allows evor-forge-junior to use arxiv read_paper", () => {
+    const result = runHookWithStdin(
+      PRE_TOOL_USE,
+      ACTIVE_ENV,
+      JSON.stringify({
+        tool_name: "mcp__arxiv__read_paper",
+        tool_input: { arxiv_id: "1512.03385" },
+        agent_type: "oh-my-evor:evor-forge-junior",
+      }),
+    );
+    expect(result.status).toBe(0);
+    expect(result.stdout.trim()).toBe("");
+  });
+
+  // ── forge-junior: search / discovery tools denied ─────────────────────────
+
+  it("denies evor-forge-junior from using arxiv search", () => {
+    const result = runHookWithStdin(
+      PRE_TOOL_USE,
+      ACTIVE_ENV,
+      JSON.stringify({
+        tool_name: "mcp__arxiv__search_papers",
+        tool_input: { query: "attention mechanism" },
+        agent_type: "oh-my-evor:evor-forge-junior",
+      }),
+    );
+    expect(result.status).toBe(0);
+    const out = JSON.parse(result.stdout.trim());
+    expect(out.hookSpecificOutput.permissionDecision).toBe("deny");
+    expect(out.hookSpecificOutput.permissionDecisionReason).toMatch(/forge-junior/i);
+    expect(out.hookSpecificOutput.permissionDecisionReason).toMatch(/arxiv/i);
+  });
+
+  it("denies evor-forge-junior from using semantic-scholar", () => {
+    const result = runHookWithStdin(
+      PRE_TOOL_USE,
+      ACTIVE_ENV,
+      JSON.stringify({
+        tool_name: "mcp__semantic-scholar__search_papers",
+        tool_input: { query: "transformer variants" },
+        agent_type: "oh-my-evor:evor-forge-junior",
+      }),
+    );
+    expect(result.status).toBe(0);
+    const out = JSON.parse(result.stdout.trim());
+    expect(out.hookSpecificOutput.permissionDecision).toBe("deny");
+    expect(out.hookSpecificOutput.permissionDecisionReason).toMatch(/forge-junior/i);
+  });
+
+  it("denies evor-forge-junior from using WebSearch", () => {
+    const result = runHookWithStdin(
+      PRE_TOOL_USE,
+      ACTIVE_ENV,
+      JSON.stringify({
+        tool_name: "WebSearch",
+        tool_input: { query: "label smoothing formula" },
+        agent_type: "oh-my-evor:evor-forge-junior",
+      }),
+    );
+    expect(result.status).toBe(0);
+    const out = JSON.parse(result.stdout.trim());
+    expect(out.hookSpecificOutput.permissionDecision).toBe("deny");
+    expect(out.hookSpecificOutput.permissionDecisionReason).toMatch(/forge-junior/i);
+  });
+
+  it("denies evor-forge-junior from using hf-mcp (not a dataset-acquisition agent)", () => {
+    const result = runHookWithStdin(
+      PRE_TOOL_USE,
+      ACTIVE_ENV,
+      JSON.stringify({
+        tool_name: "mcp__hf-mcp__dataset_search",
+        tool_input: { query: "cifar" },
+        agent_type: "oh-my-evor:evor-forge-junior",
+      }),
+    );
+    expect(result.status).toBe(0);
+    const out = JSON.parse(result.stdout.trim());
+    expect(out.hookSpecificOutput.permissionDecision).toBe("deny");
+  });
+
+  // ── fail-open: malformed input never throws ────────────────────────────────
+
+  it("exits 0 (fail-open) on completely empty input object for governor grant path", () => {
+    const result = runHookWithStdin(PRE_TOOL_USE, ACTIVE_ENV, "{}");
+    expect(result.status).toBe(0);
+    // No deny output — empty tool_name matches nothing
+    expect(result.stdout.trim()).toBe("");
+  });
 });
 
 // ─── BUG G: signal inbox signature ───────────────────────────────────────────

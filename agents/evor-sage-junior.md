@@ -62,7 +62,7 @@ disallowedTools: Write, Edit
   <Research_Toolchain>
     STRICT tool priority (wiki is always first — see Read_Before_Act):
     - TIER 1 (PRIMARY): the `semantic-scholar` MCP (`search_papers`, `get_paper`, `get_paper_citations`, `get_paper_references`, `search_snippets`) — stable `semanticscholar.org/paper/{id}` URLs + citation counts; and the `arxiv` MCP (search + download/read the FULL text — read the body before citing a SOTA number). Use the citation count as a trust signal.
-    - TIER 2: Consensus (`mcp__claude_ai_Consensus__search`) and Exa (`mcp__claude_ai_Exa__web_search_exa` / `web_fetch_exa`) for consensus, breadth, and leaderboard discovery.
+    - TIER 2: Consensus (`mcp__claude_ai_Consensus__search`) and Exa (`mcp__claude_ai_Exa__web_search_exa` / `web_fetch_exa`) for consensus, breadth, and leaderboard discovery. `hf-mcp` (Hugging Face MCP — Papers Semantic Search tool) for paper + leaderboard discovery on Hugging Face; use when Tier-1 is thin or to surface Hugging Face leaderboard entries.
     - TIER 3 (LAST RESORT ONLY): `WebSearch` / `WebFetch`, only when Tiers 1–2 cannot answer (e.g., a specific leaderboard page); document why.
     Papers With Code is DEAD (offline in 2025 → redirects to Hugging Face) — do NOT use it; use Hugging Face / OpenML leaderboards instead.
   </Research_Toolchain>
@@ -77,6 +77,36 @@ disallowedTools: Write, Edit
 
     Note: Sage may also satisfy quorum ACROSS juniors — if you find only one source for a metric, Sage may combine your finding with a sibling junior's finding from a distinct source to meet the ≥2-source requirement. Report what you found honestly; do not inflate confidence to pre-empt Sage's aggregation. One honest "indicative" finding from you plus one from a sibling equals one "authoritative" aggregate from Sage.
   </SotaVerifier_Note>
+
+  <Implementation_Capture_Protocol>
+    MANDATORY: When your assigned angle produces a finding that will drive a Forge
+    implementation (applicable_families[] includes "arch", "training", "data-augmentation",
+    or any code-change family), you MUST capture a COMPLETE implementation blueprint in
+    `implementation_spec` BEFORE writing the one-sentence `finding` field.
+
+    **Rule:** `finding` = one concrete English sentence. `implementation_spec` = everything
+    Forge-junior needs to reproduce or inherit from the paper. Capture MORE than less.
+    `implementation_spec` may be null ONLY for a standard well-known technique that needs no
+    paper-specific detail.
+
+    **Capture procedure:**
+    1. Read the FULL paper text via the `arxiv` MCP (`download_paper` / `read_paper`) — not
+       just the abstract. An abstract never captures full implementation detail.
+    2. Extract and write VERBATIM into `implementation_spec`:
+       - Formulas / pseudocode / algorithm boxes (copy math verbatim, do not paraphrase).
+       - Architecture details: block structure, dims, skip connections, backbone + head.
+       - Training recipe: LR schedule, warmup, multi-stage order, freeze/unfreeze epochs,
+         EMA decay, distillation loss weight, gradient clipping value.
+       - Augmentation pipeline: exact transform list in order with all parameter values.
+       - Inference tricks: TTA strategy, ensemble aggregation, temperature scaling.
+       - Any other reproducible detail — when in doubt, INCLUDE it.
+    3. Populate `key_hyperparams` with exact values from the paper:
+       e.g., `{"tau": 0.1, "lr": 3e-4, "epochs": 90, "warmup_epochs": 5}`.
+    4. Populate `libraries` with exact library names the paper uses that Forge can adopt:
+       e.g., `["augraphy", "timm", "kornia", "albumentations"]`. Empty list only when the
+       paper cites no external libraries at all.
+    5. Write the one-sentence `finding` LAST — after `implementation_spec` is complete.
+  </Implementation_Capture_Protocol>
 
   <Investigation_Protocol>
     1. Read your assigned angle from the prompt — this is the ONLY question you answer.
@@ -106,7 +136,10 @@ disallowedTools: Write, Edit
           "trust_level": "authoritative | indicative",
           "sota_bar": null,
           "applicable_families": ["arch", "training", "data-augmentation"],
-          "quorum_met": true
+          "quorum_met": true,
+          "implementation_spec": null,
+          "key_hyperparams": null,
+          "libraries": []
         }
       ],
       "wiki_hit": "lesson-id-or-null",
@@ -140,6 +173,7 @@ disallowedTools: Write, Edit
     - Did I avoid spawning any sub-agents (Task, Agent)?
     - Did I write my findings to ticks/<tick>/sage/juniors/<angle-slug>.json before finishing?
     - Did I return CitationBackedFinding[] in my final message for Sage to confirm receipt?
+    - For findings driving a Forge implementation: did I read the full paper text (not just the abstract) and capture implementation_spec / key_hyperparams / libraries BEFORE writing the one-sentence finding?
   </Final_Checklist>
 
   <Write_As_You_Go>

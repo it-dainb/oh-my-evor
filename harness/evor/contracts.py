@@ -1022,6 +1022,63 @@ class CapabilityProfile(BaseModel):
 
 
 # ────────────────────────────────────────────────────────────────────────────
+# CitationBackedFinding (math-fidelity schema, v0.4.0)
+# ────────────────────────────────────────────────────────────────────────────
+
+
+class CitationBackedFinding(BaseModel):
+    """A single research finding backed by ≥1 citation, with an optional full
+    implementation blueprint.
+
+    Sage and Sage-junior emit these as structured evidence; Forge consumes them
+    to guide implementation.  ``implementation_spec`` carries EVERYTHING Forge-junior
+    needs to reproduce or inherit from the paper — formulas AND training recipe,
+    augmentation, inference tricks, libraries, etc. — not just math.  ``libraries``
+    names the exact tools the paper uses so Forge can adopt them directly.
+    Paraphrasing is forbidden for verbatim math inside implementation_spec.
+    """
+
+    model_config = ConfigDict(strict=True)
+
+    title: str
+    """Short descriptive title of the finding."""
+    source_url: str
+    """Primary URL (paper, blog, leaderboard) that anchors this finding."""
+    sources: list[str]
+    """All URLs / DOIs consulted (>=1 required for quorum_met=True)."""
+    finding: str
+    """One concrete English sentence stating what was found."""
+    evidence: str
+    """Metric values, dataset names, and experimental conditions supporting the finding."""
+    confidence: Literal["high", "medium", "low"]
+    trust_level: Literal["authoritative", "indicative"]
+    sota_bar: Optional[float] = None
+    """Numeric SOTA threshold this finding implies, if applicable."""
+    applicable_families: list[ApproachFamily]
+    """Which ApproachFamily tags this finding applies to."""
+    quorum_met: bool
+    """True iff >=2 independent sources with <=5% divergence confirmed the finding."""
+    junior_sources: list[str] = Field(default_factory=list)
+    """URLs fetched by Sage-junior (informational; not counted toward quorum)."""
+    # ── Implementation fidelity (NEW in v0.4.0) — a COMPLETE blueprint, not just math ──
+    implementation_spec: Optional[str] = None
+    """Everything Forge-junior needs to reproduce or INHERIT from the paper — more than
+    less.  Copy math VERBATIM (formulas / pseudocode / algorithm boxes: loss, attention,
+    optimizer update); structure the rest.  Include, as present: architecture details
+    (blocks, dims, backbone/head); training method / recipe (schedule, warmup, multi-stage,
+    freeze/unfreeze, EMA, distillation); augmentation pipeline (exact transforms + order +
+    params); inference tricks (TTA, ensembling, temperature/calibration, sliding-window);
+    and any other reproducible detail.  When in doubt, INCLUDE it.
+    None = a standard well-known technique needing no paper-specific detail."""
+    key_hyperparams: Optional[dict[str, Any]] = None
+    """Exact hyperparameter values from the paper's experiments, e.g.
+    {"tau": 0.1, "lr": 3e-4, "epochs": 90}.  None = none to carry forward."""
+    libraries: list[str] = Field(default_factory=list)
+    """Exact libraries / tools the paper uses that Forge can inherit or reuse directly,
+    e.g. ["augraphy", "timm", "kornia", "albumentations"].  Empty if none noted."""
+
+
+# ────────────────────────────────────────────────────────────────────────────
 # Schema registry (all models, for validation tooling / test iteration)
 # ────────────────────────────────────────────────────────────────────────────
 
@@ -1167,6 +1224,8 @@ ALL_MODELS: dict[str, type[BaseModel]] = {
     # Gotcha knowledge layer
     "GotchaEntry": GotchaEntry,
     "CapabilityProfile": CapabilityProfile,
+    # Math-fidelity schema (v0.4.0)
+    "CitationBackedFinding": CitationBackedFinding,
     # Distill contracts
     "DetectedDataset": DetectedDataset,
     "DetectedModel": DetectedModel,

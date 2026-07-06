@@ -39,6 +39,54 @@ level: 2
     that does not match what Selector approved, invalidating the integrity chain.
   </Read_Before_Act>
 
+  <Citation_Fidelity_Protocol>
+    When `selector_to_forge.json` contains a MutationProposal whose `citations[]` array
+    carries one or more CitationBackedFinding records with:
+      - a non-null `implementation_spec`, OR
+      - a non-empty `key_hyperparams` object (any keys present), OR
+      - a non-empty `libraries` list (any entries present)
+
+    you MUST pass ALL three fields VERBATIM into the Architect spawn prompt as
+    `implementation_notes` — do NOT paraphrase, summarize, or drop the library list.
+    Forge-junior implements exactly what is written there and adopts the cited libraries
+    where applicable.
+
+    **Passthrough procedure (execute in Read_Before_Act, before spawning Architect):**
+
+    ```python
+    import json
+    from pathlib import Path
+
+    proposal = json.loads((run_dir / "handoffs" / "selector_to_forge.json").read_text())
+    implementation_notes = []
+
+    for citation in proposal.get("citations", []):
+        spec    = citation.get("implementation_spec")
+        hparams = citation.get("key_hyperparams") or {}
+        libs    = citation.get("libraries") or []
+
+        if spec or hparams or libs:
+            implementation_notes.append({
+                "source_url":         citation["source_url"],
+                "implementation_spec": spec,      # pass VERBATIM — never paraphrase
+                "key_hyperparams":    hparams,    # pass VERBATIM — exact values
+                "libraries":          libs,        # pass VERBATIM — exact list
+            })
+
+    # Include implementation_notes in the Architect spawn prompt.
+    # If implementation_notes is non-empty, prepend this instruction to the prompt:
+    #   "Implement exactly as the implementation_spec states. Adopt the cited libraries
+    #   (implementation_notes[*].libraries) where applicable. Do NOT substitute other
+    #   libraries without documenting the deviation in a code comment."
+    ```
+
+    **Hard rules:**
+    - Never paraphrase `implementation_spec` — Sage read the full paper to produce it.
+    - Never drop `libraries` — Forge-junior must know which library the paper used.
+    - If multiple citations carry non-null specs, pass all of them; let Architect resolve
+      precedence and note conflicts in the design comment.
+  </Citation_Fidelity_Protocol>
+
   <Check_Capability_And_Gotchas>
     Before spawning any team member, verify the hardware can run what the proposal asks:
 
@@ -99,6 +147,10 @@ level: 2
                + <current genome.yaml path>
                + <capability constraints: cpu_only, gpu_arch, supported_dtypes, safe_batch_size>
                + <prior tick context summary>
+               + <implementation_notes from Citation_Fidelity_Protocol — VERBATIM, if non-empty>
+               + ("If implementation_notes is non-empty: implement exactly as the "
+                  "implementation_spec states; adopt the cited libraries where applicable; "
+                  "document any deviations with a code comment explaining why.")
                + "Write ticks/<tick>/forge/architect.json. EVOR_RUN_DIR=" + run_dir
       )
       POST-CONDITION: assert Path(run_dir / "ticks" / tick / "forge" / "architect.json").exists()
@@ -435,6 +487,7 @@ level: 2
 
   <Final_Checklist>
     - Did I read selector_to_forge.json and the latest tick handoff before spawning Architect?
+    - If any citation carries non-null implementation_spec / non-empty key_hyperparams / non-empty libraries: did I pass ALL three fields VERBATIM into the Architect spawn as implementation_notes (not paraphrased)?
     - Did I read .evor/capability.json and GotchaStore before spawning Architect?
     - Did I create the worktree on evor/<node_id> branch before spawning Architect?
     - Does architect.json exist at ticks/<tick>/forge/architect.json? (POST-CONDITION)
