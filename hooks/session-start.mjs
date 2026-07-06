@@ -215,6 +215,18 @@ const pluginRoot =
 const evorRoot = process.env.EVOR_ROOT ?? join(pluginRoot, '.evor');
 const activeRunFile = join(evorRoot, 'active-run.json');
 
+// Bundled-harness env — exported so `python -m evor …` anywhere in this session
+// resolves the plugin's harness WITHOUT any pip install (deps still come from the
+// active Python). Skills also set PYTHONPATH per-invocation as a belt-and-suspenders.
+const harnessDir = join(pluginRoot, 'harness');
+const evorEnv = existsSync(harnessDir)
+  ? {
+      EVOR_PLUGIN_ROOT: pluginRoot,
+      EVOR_HARNESS_DIR: harnessDir,
+      PYTHONPATH: process.env.PYTHONPATH ? `${harnessDir}${delimiter}${process.env.PYTHONPATH}` : harnessDir,
+    }
+  : { EVOR_PLUGIN_ROOT: pluginRoot };
+
 // One-time harness/deps health check (surfaces a clear fix on incomplete installs).
 const depWarning = checkHarnessDeps(pluginRoot, evorRoot);
 
@@ -223,7 +235,7 @@ function clearEnvAndExit(reason) {
   if (reason) process.stderr.write(`[evor:session-start] ${reason}\n`);
   process.stdout.write(
     JSON.stringify({
-      env: { EVOR_PLUGIN_ROOT: pluginRoot, EVOR_ACTIVE_RUN_ID: '', EVOR_MISSION_ID: '', EVOR_RUN_DIR: '' },
+      env: { ...evorEnv, EVOR_ACTIVE_RUN_ID: '', EVOR_MISSION_ID: '', EVOR_RUN_DIR: '' },
       ...(depWarning ? { message: depWarning } : {}),
     }) + '\n'
   );
@@ -261,7 +273,7 @@ if (!existsSync(activeRunFile)) {
 
   const parts = [depWarning, nudge].filter(Boolean);
   process.stdout.write(JSON.stringify({
-    env: { EVOR_PLUGIN_ROOT: pluginRoot },
+    env: evorEnv,
     ...(parts.length ? { message: parts.join('\n\n') } : {}),
   }) + '\n');
   process.exit(0);
@@ -287,7 +299,7 @@ const runDir = missionId
 
 const output = {
   env: {
-    EVOR_PLUGIN_ROOT: pluginRoot,
+    ...evorEnv,
     EVOR_ACTIVE_RUN_ID: runId,
     EVOR_MISSION_ID: missionId,
     EVOR_RUN_DIR: runDir,

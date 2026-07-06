@@ -31,18 +31,12 @@ Determine the workspace root and evor-root from arguments or defaults:
 - `<workspace>`: use the argument if provided, else the current working directory.
 - `<evorRoot>`: use `$EVOR_ROOT` if set, else `<workspace>/.evor`.
 
-If `python -m evor` is not importable, stop and tell the user:
-```
-Module 'evor' not found. The harness must be on PYTHONPATH.
-Run: bash install.sh   (or: pip install -e harness)
-then retry /evor-distill.
-```
-Do not attempt to install automatically.
-
 ## Step 2 — Run the scanner
 
+Always run the scan with the bundled harness on PYTHONPATH so it works without any install step:
+
 ```bash
-python -m evor.distill scan --root <workspace> --evor-root <evorRoot>
+PYTHONPATH="${EVOR_PLUGIN_ROOT:-$CLAUDE_PLUGIN_ROOT}/harness${PYTHONPATH:+:$PYTHONPATH}" python -m evor.distill scan --root <workspace> --evor-root <evorRoot>
 ```
 
 This writes `<evorRoot>/starting-point.json` and prints a human summary. Exit 0 on success — bad or permission-denied paths are skipped; the scanner never throws on malformed input.
@@ -51,6 +45,13 @@ If the command fails with a Python traceback (not an import error), show the las
 ```
 evor-distill scan failed. Check that the workspace path is accessible and retry.
 ```
+
+If the command still fails after adding the PYTHONPATH prefix (e.g. a missing dependency such as pydantic in the active Python environment), show the error and tell the user:
+```
+evor-distill: harness dependency missing in the active Python environment.
+Activate the conda/virtualenv that has pydantic and the other harness deps installed, then retry /evor-distill.
+```
+Do not attempt to install automatically.
 
 ## Step 3 — Read starting-point.json
 

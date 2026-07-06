@@ -153,7 +153,7 @@ read `.evor/capability.json` for hardware gotcha-avoidance, and setup's prefligh
 skipped. This is idempotent and cheap (no micro-train):
 
 ```bash
-python -m evor capability --evor-root .evor --run-dir "$EVOR_RUN_DIR"
+PYTHONPATH="${EVOR_PLUGIN_ROOT:-$CLAUDE_PLUGIN_ROOT}/harness${PYTHONPATH:+:$PYTHONPATH}" python -m evor capability --evor-root .evor --run-dir "$EVOR_RUN_DIR"
 ```
 
 Confirm `.evor/capability.json` exists after this. If the command fails (harness not importable),
@@ -406,7 +406,7 @@ rather than being siloed to the current tick's context.
 <Meta_Evolution>
 Every `strategy.json.meta_loop_interval` ticks (default 5), run:
 ```bash
-python -m evor.tree meta-evolve --run-id <run_id>
+PYTHONPATH="${EVOR_PLUGIN_ROOT:-$CLAUDE_PLUGIN_ROOT}/harness${PYTHONPATH:+:$PYTHONPATH}" python -m evor.tree meta-evolve --run-id <run_id>
 ```
 This updates strategy.json fields: ucb1_c, wildness, family_mix, meta_iteration.
 Log as DecisionLogEntry(decision_type="meta-evolve", strategy_delta=delta).

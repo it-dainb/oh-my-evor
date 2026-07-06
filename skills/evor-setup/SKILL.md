@@ -277,7 +277,7 @@ After environment discovery, initialize frozen data splits (Addendum v2 Pillar 2
 
 ```python
 # Call via python_repl or subprocess:
-python -m evor.freeze freeze-splits \
+PYTHONPATH="${EVOR_PLUGIN_ROOT:-$CLAUDE_PLUGIN_ROOT}/harness${PYTHONPATH:+:$PYTHONPATH}" python -m evor.freeze freeze-splits \
   --dataset-path <dataset_ref> \
   --eval-version v1 \
   --run-dir .evor/runs/<mission-slug>/<run-id>/
@@ -367,7 +367,7 @@ Setup halts with a clear error if either field contains a label, a version strin
 Create the initial EvalSuite v1 (Addendum v2 Pillar 3):
 
 ```python
-python -m evor.benchmark init-eval-suite \
+PYTHONPATH="${EVOR_PLUGIN_ROOT:-$CLAUDE_PLUGIN_ROOT}/harness${PYTHONPATH:+:$PYTHONPATH}" python -m evor.benchmark init-eval-suite \
   --mission-id <mission_id> \
   --eval-version v1 \
   --task-description "<task_description>" \
@@ -387,7 +387,7 @@ Set `GoalContract.eval_version = "v1"`.
 Run a 5-step smoke-train to verify the environment is functional:
 
 ```bash
-python -m evor preflight --run-id <run_id>
+PYTHONPATH="${EVOR_PLUGIN_ROOT:-$CLAUDE_PLUGIN_ROOT}/harness${PYTHONPATH:+:$PYTHONPATH}" python -m evor preflight --run-id <run_id>
 ```
 
 The preflight runs a micro-train (10 random samples, 2-layer MLP, 5 steps) and verifies:
@@ -509,7 +509,7 @@ Then proceed to Validate_And_Lock.
 Run the Phase-2 enforcement gate and lock the contract before `/evor-run` is possible.
 
 ```bash
-python -m evor validate --run-id <run_dir>
+PYTHONPATH="${EVOR_PLUGIN_ROOT:-$CLAUDE_PLUGIN_ROOT}/harness${PYTHONPATH:+:$PYTHONPATH}" python -m evor validate --run-id <run_dir>
 ```
 
 **On pass (exit 0):**

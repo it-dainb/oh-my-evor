@@ -51,7 +51,7 @@ Parse optional arguments:
 ## Step 2 — Run gotchas subcommand
 
 ```bash
-python -m evor gotchas \
+PYTHONPATH="${EVOR_PLUGIN_ROOT:-$CLAUDE_PLUGIN_ROOT}/harness${PYTHONPATH:+:$PYTHONPATH}" python -m evor gotchas \
     [--kind runtime-failure|hardware-constraint|approach-deadend] \
     [--scope global|mission] \
     [--min-confidence 0.7] \

@@ -49,7 +49,7 @@ Stop reason:    <from run-state or "in-progress snapshot">
 ## Step 3 — Render Evolution Tree
 
 ```bash
-python -m evor.plot_tree \
+PYTHONPATH="${EVOR_PLUGIN_ROOT:-$CLAUDE_PLUGIN_ROOT}/harness${PYTHONPATH:+:$PYTHONPATH}" python -m evor.plot_tree \
   --run-id <run_id> \
   --run-dir <run_dir> \
   --format ascii \
@@ -60,7 +60,7 @@ Print the ASCII tree output. Each node shows: node_id (truncated), approach_fami
 
 Then generate a PNG for the HTML export:
 ```bash
-python -m evor.plot_tree \
+PYTHONPATH="${EVOR_PLUGIN_ROOT:-$CLAUDE_PLUGIN_ROOT}/harness${PYTHONPATH:+:$PYTHONPATH}" python -m evor.plot_tree \
   --run-id <run_id> \
   --run-dir <run_dir> \
   --format png \
@@ -84,7 +84,7 @@ If per_domain data is available in EvaluationResult, render a secondary per-doma
 ## Step 5 — Aggregate Wiki Lessons
 
 ```bash
-python -m evor.wiki summarize \
+PYTHONPATH="${EVOR_PLUGIN_ROOT:-$CLAUDE_PLUGIN_ROOT}/harness${PYTHONPATH:+:$PYTHONPATH}" python -m evor.wiki summarize \
   --run-id <run_id> \
   --run-dir <run_dir> \
   --confirmed-only false
@@ -119,7 +119,7 @@ Wins by family: arch=12, training=8, data-augmentation=5, ...
 ## Step 7 — Export Static HTML
 
 ```bash
-python -m evor.plot_tree \
+PYTHONPATH="${EVOR_PLUGIN_ROOT:-$CLAUDE_PLUGIN_ROOT}/harness${PYTHONPATH:+:$PYTHONPATH}" python -m evor.plot_tree \
   --run-id <run_id> \
   --run-dir <run_dir> \
   --format html \

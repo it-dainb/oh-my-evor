@@ -43,7 +43,7 @@ Otherwise:
 ## Step 2 — Run the validator
 
 ```bash
-python -m evor validate --run-id <run_dir>
+PYTHONPATH="${EVOR_PLUGIN_ROOT:-$CLAUDE_PLUGIN_ROOT}/harness${PYTHONPATH:+:$PYTHONPATH}" python -m evor validate --run-id <run_dir>
 ```
 
 The validator exits 0 (VALID) or 1 (INVALID) and prints a JSON report to stdout.

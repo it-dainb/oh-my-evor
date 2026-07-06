@@ -40,13 +40,13 @@ Parse the argument for an optional run-dir path and `--repair` flag:
 
 ```bash
 # Env-only check:
-python -m evor doctor
+PYTHONPATH="${EVOR_PLUGIN_ROOT:-$CLAUDE_PLUGIN_ROOT}/harness${PYTHONPATH:+:$PYTHONPATH}" python -m evor doctor
 
 # With run directory:
-python -m evor doctor --run-id <run_dir>
+PYTHONPATH="${EVOR_PLUGIN_ROOT:-$CLAUDE_PLUGIN_ROOT}/harness${PYTHONPATH:+:$PYTHONPATH}" python -m evor doctor --run-id <run_dir>
 
 # With repair (auto-fix list-format tree.json → DICT):
-python -m evor doctor --run-id <run_dir> --repair
+PYTHONPATH="${EVOR_PLUGIN_ROOT:-$CLAUDE_PLUGIN_ROOT}/harness${PYTHONPATH:+:$PYTHONPATH}" python -m evor doctor --run-id <run_dir> --repair
 ```
 
 ## Step 3 — Present the report
