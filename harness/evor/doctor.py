@@ -6,12 +6,9 @@ Entry point: python -m evor doctor [--run-id <run_dir>]
 Checks:
   env     — Python version, torch presence (reported, not required), Node.js,
               EVOR_ROOT / EVOR_PYTHON env vars
-  .evor   — tree.json DICT format (repairs LIST → DICT), mission-state.json
-              present, no orphan pending_node_ids vs tree.json, frozen-splits
+  .evor   — tree.json DICT format, mission-state.json present,
+              no orphan pending_node_ids vs tree.json, frozen-splits
               hash matches goal-contract locked_split_hash
-Repairs:
-  - Rewrites a list-format tree.json to DICT format (with --repair flag)
-  - Reports without modifying by default (dry-run)
 """
 from __future__ import annotations
 
@@ -21,7 +18,6 @@ import shutil
 import subprocess
 import sys
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -217,48 +213,6 @@ def _check_tree_format(
             status="ok",
             detail=f"DICT format ({len(nodes_val)} nodes)",
         ))
-        return
-
-    if isinstance(nodes_val, list):
-        # Repairable: convert list-of-dicts to dict keyed by node id
-        if repair:
-            try:
-                nodes_dict = {
-                    n["id"]: n
-                    for n in nodes_val
-                    if isinstance(n, dict) and "id" in n
-                }
-                data["nodes"] = nodes_dict
-                data["_doctor_repaired_at"] = datetime.now(timezone.utc).isoformat()
-                tree_path.write_text(json.dumps(data, indent=2))
-                items.append(DoctorItem(
-                    category="evor",
-                    name="tree_json",
-                    status="repaired",
-                    detail=(
-                        f"Repaired LIST→DICT format ({len(nodes_dict)} nodes). "
-                        f"Original had {len(nodes_val)} entries."
-                    ),
-                    repaired=True,
-                ))
-                repaired.append("tree_json: LIST→DICT conversion")
-            except Exception as exc:
-                items.append(DoctorItem(
-                    category="evor",
-                    name="tree_json",
-                    status="error",
-                    detail=f"LIST format found but repair failed: {exc}",
-                ))
-        else:
-            items.append(DoctorItem(
-                category="evor",
-                name="tree_json",
-                status="error",
-                detail=(
-                    f"tree.json uses legacy LIST format ({len(nodes_val)} nodes). "
-                    "Re-run with --repair to convert to DICT format."
-                ),
-            ))
         return
 
     items.append(DoctorItem(

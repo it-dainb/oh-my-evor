@@ -70,7 +70,7 @@ describe("recordNode", () => {
     const runId = "run-001";
     const node = makeNode({ depth: 1 });
 
-    const { treePath } = recordNode(runId, node);
+    const { treePath } = recordNode(runId, node, "test-mission");
 
     expect(existsSync(treePath)).toBe(true);
     const tree = JSON.parse(readFileSync(treePath, "utf8"));
@@ -81,15 +81,15 @@ describe("recordNode", () => {
   it("creates run directory if it does not exist", () => {
     const runId = "run-002";
     const node = makeNode();
-    recordNode(runId, node);
-    expect(existsSync(join(tmpRoot, "runs", runId, "tree.json"))).toBe(true);
+    recordNode(runId, node, "test-mission");
+    expect(existsSync(join(tmpRoot, "runs", "test-mission", runId, "tree.json"))).toBe(true);
   });
 
   it("appends to decision-log.md", () => {
     const runId = "run-003";
     const node = makeNode({ approach_family: "training" });
-    recordNode(runId, node);
-    const logPath = join(tmpRoot, "runs", runId, "decision-log.md");
+    recordNode(runId, node, "test-mission");
+    const logPath = join(tmpRoot, "runs", "test-mission", runId, "decision-log.md");
     expect(existsSync(logPath)).toBe(true);
     const log = readFileSync(logPath, "utf8");
     expect(log).toContain(node.id);
@@ -101,7 +101,7 @@ describe("recordNode", () => {
     const node = makeNode();
 
     // Bootstrap run dirs and pre-populate pending_node_ids
-    const paths = ensureRunDirs(runId);
+    const paths = ensureRunDirs(runId, "test-mission");
     writeRunState(paths.runStatePath, {
       run_id: runId,
       status: "running",
@@ -112,7 +112,7 @@ describe("recordNode", () => {
       pending_node_ids: [node.id, "other-node"],
     });
 
-    const { pendingRemaining } = recordNode(runId, node);
+    const { pendingRemaining } = recordNode(runId, node, "test-mission");
 
     expect(pendingRemaining).toBe(1);
     const state = readRunState(paths.runStatePath, runId);
@@ -122,19 +122,19 @@ describe("recordNode", () => {
   it("handles missing run-state.json gracefully (fresh state)", () => {
     const runId = "run-005";
     const node = makeNode();
-    const { pendingRemaining } = recordNode(runId, node);
+    const { pendingRemaining } = recordNode(runId, node, "test-mission");
     expect(pendingRemaining).toBe(0);
   });
 
   it("second recordNode call upserts the same node", () => {
     const runId = "run-006";
     const node = makeNode({ metrics: { acc: 0.5 } });
-    recordNode(runId, node);
+    recordNode(runId, node, "test-mission");
     const updated: TreeNode = { ...node, metrics: { acc: 0.9 }, status: "done" };
-    recordNode(runId, updated);
+    recordNode(runId, updated, "test-mission");
 
     const tree = JSON.parse(
-      readFileSync(join(tmpRoot, "runs", runId, "tree.json"), "utf8")
+      readFileSync(join(tmpRoot, "runs", "test-mission", runId, "tree.json"), "utf8")
     );
     expect(tree.nodes[node.id].metrics.acc).toBe(0.9);
     expect(tree.nodes[node.id].status).toBe("done");
@@ -162,7 +162,7 @@ describe("recordEval", () => {
     const nodeId = randomUUID();
     const result = makeResult(nodeId, runId);
 
-    const { resultsPath } = recordEval(runId, nodeId, result);
+    const { resultsPath } = recordEval(runId, nodeId, result, "test-mission");
 
     expect(existsSync(resultsPath)).toBe(true);
     const written = JSON.parse(readFileSync(resultsPath, "utf8"));
@@ -173,7 +173,7 @@ describe("recordEval", () => {
   it("creates node directory when absent", () => {
     const runId = "run-eval-002";
     const nodeId = randomUUID();
-    const { resultsPath } = recordEval(runId, nodeId, makeResult(nodeId, runId));
+    const { resultsPath } = recordEval(runId, nodeId, makeResult(nodeId, runId), "test-mission");
     expect(existsSync(resultsPath)).toBe(true);
   });
 
@@ -181,15 +181,15 @@ describe("recordEval", () => {
     const runId = "run-eval-003";
     const nodeId = randomUUID();
     // bridge will fail in test env (no Python harness) — must not throw
-    const { integrityVerdict } = recordEval(runId, nodeId, makeResult(nodeId, runId));
+    const { integrityVerdict } = recordEval(runId, nodeId, makeResult(nodeId, runId), "test-mission");
     expect(integrityVerdict).toBeNull();
   });
 
   it("overwrites existing results.json on repeated call", () => {
     const runId = "run-eval-004";
     const nodeId = randomUUID();
-    recordEval(runId, nodeId, { ...makeResult(nodeId, runId), metrics: { accuracy: 0.5 } });
-    const { resultsPath } = recordEval(runId, nodeId, { ...makeResult(nodeId, runId), metrics: { accuracy: 0.9 } });
+    recordEval(runId, nodeId, { ...makeResult(nodeId, runId), metrics: { accuracy: 0.5 } }, "test-mission");
+    const { resultsPath } = recordEval(runId, nodeId, { ...makeResult(nodeId, runId), metrics: { accuracy: 0.9 } }, "test-mission");
     const written = JSON.parse(readFileSync(resultsPath, "utf8"));
     expect(written.metrics.accuracy).toBe(0.9);
   });

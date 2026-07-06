@@ -28,7 +28,6 @@ import pytest
 from evor.contracts import (
     Budget,
     GoalContract,
-    LegacyMetric,
     MetricSpec,
     StopCondition,
     StrategyState,
@@ -99,7 +98,6 @@ def _write_tree_fixture(run_dir: Path) -> None:
         mission_type="fixed",
         task_description="CLI path test",
         dataset_ref="/data/test",
-        metrics=[LegacyMetric(name="accuracy", direction="higher", primary=True)],
         metric_specs=[MetricSpec(
             metric_name="accuracy",
             direction="higher",

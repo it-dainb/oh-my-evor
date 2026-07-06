@@ -47,7 +47,7 @@ function writeInboxEntry(runDir: string, entry: Record<string, unknown>): void {
 describe("querySignals — inbox drain parity (§15B fix)", () => {
   it("drains signals-inbox.jsonl so a hook-appended signal is visible to querySignals", () => {
     const runId = "run-inbox-drain-001";
-    const paths = resolveRunPaths(runId);
+    const paths = resolveRunPaths(runId, "test-mission");
     mkdirSync(paths.runDir, { recursive: true });
 
     // Simulate a hook writing to the inbox (the pre-tool-use.mjs path).
@@ -77,7 +77,7 @@ describe("querySignals — inbox drain parity (§15B fix)", () => {
 
   it("inbox file is removed after drain (idempotent — second query returns same signal from signals.jsonl)", () => {
     const runId = "run-inbox-drain-002";
-    const paths = resolveRunPaths(runId);
+    const paths = resolveRunPaths(runId, "test-mission");
     mkdirSync(paths.runDir, { recursive: true });
 
     writeInboxEntry(paths.runDir, {
@@ -108,7 +108,7 @@ describe("querySignals — inbox drain parity (§15B fix)", () => {
 
   it("deduplicates inbox signals by signature against signals already in the bus", () => {
     const runId = "run-inbox-drain-003";
-    const paths = resolveRunPaths(runId);
+    const paths = resolveRunPaths(runId, "test-mission");
     mkdirSync(paths.runDir, { recursive: true });
 
     // Pre-emit a signal directly into the bus.
@@ -145,7 +145,7 @@ describe("querySignals — inbox drain parity (§15B fix)", () => {
 
   it("skips malformed inbox lines and still returns valid signals", () => {
     const runId = "run-inbox-drain-004";
-    const paths = resolveRunPaths(runId);
+    const paths = resolveRunPaths(runId, "test-mission");
     mkdirSync(paths.runDir, { recursive: true });
 
     const inboxPath = join(paths.runDir, "signals-inbox.jsonl");
@@ -178,7 +178,7 @@ describe("querySignals — inbox drain parity (§15B fix)", () => {
   it("querySignals is a no-op when inbox does not exist (no error)", () => {
     const runId = "run-inbox-drain-005";
     // Don't create any files — querySignals should return [] without error.
-    const results = querySignals(runId, {});
+    const results = querySignals(runId, {}, "test-mission");
     expect(results).toEqual([]);
   });
 });
@@ -186,7 +186,7 @@ describe("querySignals — inbox drain parity (§15B fix)", () => {
 describe("digestSignals — drains inbox and returns compact top-slice", () => {
   it("returns only severity>=medium signals by default and caps at max_items", () => {
     const runId = "run-digest-001";
-    const paths = resolveRunPaths(runId);
+    const paths = resolveRunPaths(runId, "test-mission");
     mkdirSync(paths.runDir, { recursive: true });
 
     // Emit a low-severity signal (should be excluded from digest).
@@ -222,7 +222,7 @@ describe("digestSignals — drains inbox and returns compact top-slice", () => {
 
   it("respects max_items cap", () => {
     const runId = "run-digest-002";
-    const paths = resolveRunPaths(runId);
+    const paths = resolveRunPaths(runId, "test-mission");
     mkdirSync(paths.runDir, { recursive: true });
 
     // Emit 5 distinct high-severity signals.
@@ -244,7 +244,7 @@ describe("digestSignals — drains inbox and returns compact top-slice", () => {
 
   it("digest entries have the compact shape (no signal_id, first_seen, last_seen)", () => {
     const runId = "run-digest-003";
-    const paths = resolveRunPaths(runId);
+    const paths = resolveRunPaths(runId, "test-mission");
     mkdirSync(paths.runDir, { recursive: true });
 
     emitSignal(runId, {

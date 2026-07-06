@@ -141,13 +141,8 @@ class TreeEngine:
         for ms in self._goal.metric_specs:
             if ms.role == "primary_fitness":
                 return ms.metric_name
-        for m in self._goal.metrics:
-            if m.primary:
-                return m.name
         if self._goal.metric_specs:
             return self._goal.metric_specs[0].metric_name
-        if self._goal.metrics:
-            return self._goal.metrics[0].name
         return ""
 
     def _node_metric(self, node: TreeNode) -> float:
@@ -638,10 +633,11 @@ def _load_engine(run_dir: Path, strategy_override: dict | None = None) -> TreeEn
 
     with open(tree_path) as fh:
         tree_data = json.load(fh)
-    # C1 fix: handle DICT format {"nodes": {"id": {...}}, "updated_at": "..."}
-    # written by mcp/src/tree-store.ts::writeTree(); also accept legacy LIST format.
+    # DICT format {"nodes": {"id": {...}}, "updated_at": "..."} written by mcp/src/tree-store.ts::writeTree()
     nodes_dict = tree_data.get("nodes", {})
-    nodes = [TreeNode.model_validate(v) for v in (nodes_dict.values() if isinstance(nodes_dict, dict) else nodes_dict)]
+    if not isinstance(nodes_dict, dict):
+        sys.exit(f"tree.json uses invalid format (expected DICT 'nodes' object) at {tree_path}")
+    nodes = [TreeNode.model_validate(v) for v in nodes_dict.values()]
 
     with open(strategy_path) as fh:
         raw_strategy = json.load(fh)

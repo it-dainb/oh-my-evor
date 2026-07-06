@@ -11,7 +11,6 @@ Coverage:
   - non-zero exit (no OOM marker) → status='error'
   - OOM marker in stderr → status='oom'
   - BenchmarkRescore merge: cached + partial → merged per_domain
-  - legacy eval script (no per_domain) → wrapped as {'default': metrics}
   - isolation: EvaluationResult.metrics comes from STDOUT, not env or file writes
 """
 
@@ -34,7 +33,7 @@ from evor.contracts import (
     TelemetrySummary,
     TreeNode,
 )
-from evor.evaluator import EvaluatorAdapter, _compute_fitness, _parse_stdout, _wrap_legacy_per_domain
+from evor.evaluator import EvaluatorAdapter, _compute_fitness, _parse_stdout
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -53,7 +52,6 @@ def _make_goal(
         mission_type=mission_type,  # type: ignore[arg-type]
         task_description="Test task",
         dataset_ref="/data/test",
-        metrics=[{"name": "accuracy", "direction": "higher", "primary": True}],
         metric_specs=[{
             "metric_name": "accuracy",
             "direction": "higher",
@@ -231,19 +229,6 @@ class TestSuccessPath:
         )
         assert result.status == "regression"
 
-    def test_legacy_eval_no_per_domain_wrapped(self, tmp_path: Path):
-        """Legacy scripts without per_domain → wrapped as {'default': metrics}."""
-        # Script outputs only metrics (no per_domain)
-        script = textwrap.dedent("""\
-            import json
-            print(json.dumps({"metrics": {"accuracy": 0.80}}))
-        """)
-        result = _run_eval(tmp_path, script)
-        assert result.status == "success"
-        assert "default" in result.per_domain
-        assert result.per_domain["default"]["accuracy"] == pytest.approx(0.80)
-
-
 # ─────────────────────────────────────────────────────────────────────────────
 # EVOR_EVAL_VERSION injection
 # ─────────────────────────────────────────────────────────────────────────────
@@ -272,7 +257,7 @@ class TestEvalVersionInjection:
             env={},
         )
         # We can't directly read the env inside the subprocess, but we know the script
-        # reads EVOR_EVAL_VERSION. The per_domain is empty so it wraps as default.
+        # reads EVOR_EVAL_VERSION.
         # Key assertion: EvaluatorAdapter injected v2 → script saw it → no version mismatch
         assert result.status in ("success", "regression")
 
@@ -536,21 +521,3 @@ class TestParseStdout:
         assert err is None
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# _wrap_legacy_per_domain unit test
-# ─────────────────────────────────────────────────────────────────────────────
-
-class TestWrapLegacyPerDomain:
-    def test_wraps_when_per_domain_absent(self):
-        data = {"metrics": {"accuracy": 0.85}}
-        result = _wrap_legacy_per_domain(data)
-        assert "per_domain" in result
-        assert result["per_domain"] == {"default": {"accuracy": 0.85}}
-
-    def test_no_wrap_when_per_domain_present(self):
-        data = {
-            "metrics": {"accuracy": 0.85},
-            "per_domain": {"domA": {"accuracy": 0.85}},
-        }
-        result = _wrap_legacy_per_domain(data)
-        assert result["per_domain"] == {"domA": {"accuracy": 0.85}}

@@ -64,7 +64,7 @@ describe("addCitation", () => {
   it("appends citation to node.citations in tree.json", () => {
     const runId = "run-cite-001";
     const node = makeNode(randomUUID());
-    writeTree(runId, { [node.id]: node });
+    writeTree(runId, { [node.id]: node }, "test-mission");
 
     const result = addCitation(runId, node.id, "https://arxiv.org/abs/1234.5678");
 
@@ -78,7 +78,7 @@ describe("addCitation", () => {
   it("accumulates multiple citations", () => {
     const runId = "run-cite-002";
     const node = makeNode(randomUUID());
-    writeTree(runId, { [node.id]: node });
+    writeTree(runId, { [node.id]: node }, "test-mission");
 
     addCitation(runId, node.id, "doi:10.1234/test.1");
     const result = addCitation(runId, node.id, "doi:10.1234/test.2");
@@ -92,7 +92,7 @@ describe("addCitation", () => {
   it("deduplicates identical citations", () => {
     const runId = "run-cite-003";
     const node = makeNode(randomUUID());
-    writeTree(runId, { [node.id]: node });
+    writeTree(runId, { [node.id]: node }, "test-mission");
 
     addCitation(runId, node.id, "https://example.com/paper");
     const result = addCitation(runId, node.id, "https://example.com/paper");
@@ -104,7 +104,7 @@ describe("addCitation", () => {
     const runId = "run-cite-004";
     const node = makeNode(randomUUID());
     const nodeWithCitation = { ...node, citations: ["existing-bib-key"] };
-    writeTree(runId, { [node.id]: nodeWithCitation });
+    writeTree(runId, { [node.id]: nodeWithCitation }, "test-mission");
 
     const result = addCitation(runId, node.id, "new-bib-key");
 
@@ -116,7 +116,7 @@ describe("addCitation", () => {
     const fakeNodeId = randomUUID();
     // No tree.json written — node does not exist
 
-    const result = addCitation(runId, fakeNodeId, "some-citation");
+    const result = addCitation(runId, fakeNodeId, "some-citation", "test-mission");
 
     expect(result.ok).toBe(false);
     expect(result.error).toContain(fakeNodeId);
@@ -126,7 +126,7 @@ describe("addCitation", () => {
     const runId = "run-cite-006";
     const node1 = makeNode(randomUUID());
     const node2 = makeNode(randomUUID());
-    writeTree(runId, { [node1.id]: node1, [node2.id]: node2 });
+    writeTree(runId, { [node1.id]: node1, [node2.id]: node2 }, "test-mission");
 
     addCitation(runId, node1.id, "bib:entry1");
 

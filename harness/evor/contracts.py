@@ -5,19 +5,18 @@ All 27+ schemas mirroring mcp/src/contracts.ts exactly.
 Field names match the TypeScript interfaces; model_config = ConfigDict(strict=True) on all.
 
 ApproachFamily: 7-tag literal taxonomy per R-12.
-Legacy "augmentation" tag aliased to "data-augmentation" on read (H002/H003).
 """
 
 from __future__ import annotations
 
 from typing import Any, Literal, Optional, Union
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field
 
 # ────────────────────────────────────────────────────────────────────────────
 # Shared type aliases
 # ────────────────────────────────────────────────────────────────────────────
 
-# 7-tag ApproachFamily taxonomy (R-12); legacy "augmentation" aliased on read
+# 7-tag ApproachFamily taxonomy (R-12)
 ApproachFamily = Literal[
     "arch",
     "training",
@@ -27,13 +26,6 @@ ApproachFamily = Literal[
     "algo",
     "other",
 ]
-
-
-def _alias_approach_family(value: str) -> str:
-    """Normalise legacy 'augmentation' tag to 'data-augmentation'."""
-    if value == "augmentation":
-        return "data-augmentation"
-    return value
 
 
 # ────────────────────────────────────────────────────────────────────────────
@@ -161,14 +153,6 @@ class ExpansionPolicy(BaseModel):
 # ────────────────────────────────────────────────────────────────────────────
 
 
-class LegacyMetric(BaseModel):
-    model_config = ConfigDict(strict=True)
-
-    name: str
-    direction: Literal["higher", "lower"]
-    primary: bool
-
-
 class StopCondition(BaseModel):
     model_config = ConfigDict(strict=True)
 
@@ -226,8 +210,7 @@ class AutonomyCharter(BaseModel):
     Monotonic-Honesty Invariant — it must move the evaluation toward *harder / more
     honest*, never *easier / score-inflating*. A monotonic move always exists, so the
     run never halts for a human; a forbidden-direction action is routed around, not
-    asked about. Setup is the sole HITL. ``None`` on a contract = legacy consent-gated
-    behavior (may ask mid-run).
+    asked about. Setup is the sole HITL.
     """
 
     model_config = ConfigDict(strict=True)
@@ -256,8 +239,6 @@ class GoalContract(BaseModel):
     mission_type: Literal["fixed", "open_ended"]
     task_description: str
     dataset_ref: str
-    metrics: list[LegacyMetric]
-    """legacy flat metrics; retained for back-compat reading"""
     metric_specs: list[MetricSpec]
     fitness_mode: Literal["aggregate", "worst-domain", "weighted"]
     eval_version: str
@@ -277,8 +258,8 @@ class GoalContract(BaseModel):
     """allowlist for data-acquisition provenance (R-3)"""
     evolution_bounds: Optional[EvolutionBounds] = None
     """escalate-mode bounds; None = fully frozen (no auto-adaptation)."""
-    autonomy_charter: Optional[AutonomyCharter] = None
-    """full-autonomy charter; None = legacy consent-gated (may ask mid-run)."""
+    autonomy_charter: AutonomyCharter = Field(default_factory=AutonomyCharter)
+    """full-autonomy charter; always present — charter is mandatory for all missions."""
     created_at: str
 
 
@@ -385,11 +366,6 @@ class TreeNode(BaseModel):
     created_at: str
     completed_at: Optional[str] = None
 
-    @field_validator("approach_family", mode="before")
-    @classmethod
-    def normalise_approach_family(cls, v: str) -> str:
-        return _alias_approach_family(v)
-
 
 # ────────────────────────────────────────────────────────────────────────────
 # MutationProposal
@@ -421,11 +397,6 @@ class MutationProposal(BaseModel):
     wildness: float
     critic_approved: bool
     critic_review: CriticReview
-
-    @field_validator("approach_family", mode="before")
-    @classmethod
-    def normalise_approach_family(cls, v: str) -> str:
-        return _alias_approach_family(v)
 
 
 # ────────────────────────────────────────────────────────────────────────────
@@ -556,11 +527,6 @@ class LessonEntry(BaseModel):
     telemetry_evidence: Optional[str] = None
     tags: list[str]
     created_at: str
-
-    @field_validator("approach_family", mode="before")
-    @classmethod
-    def normalise_approach_family(cls, v: str) -> str:
-        return _alias_approach_family(v)
 
 
 # ────────────────────────────────────────────────────────────────────────────
@@ -1184,7 +1150,7 @@ class StartingPointReport(BaseModel):
 
 
 ALL_MODELS: dict[str, type[BaseModel]] = {
-    # Base 11 (+ Hypothesis)
+    # Base 10 (+ Hypothesis)
     "GoalContract": GoalContract,
     "TreeNode": TreeNode,
     "Hypothesis": Hypothesis,

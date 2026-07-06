@@ -62,7 +62,7 @@ export interface RunPaths {
  * that setup and the harness write to — never a divergent flat runs/<run-id>/.
  *
  * Resolution order: active-run.json (authoritative) → scan runs/<mission>/<runId>/.
- * Returns null only when no nested match exists (truly bare/legacy run).
+ * Returns null when no nested match is found; callers must treat null as an error.
  */
 export function lookupMissionId(evorRoot: string, runId: string): string | null {
   // 1. active-run.json — authoritative when it names this run.
@@ -90,15 +90,19 @@ export function lookupMissionId(evorRoot: string, runId: string): string | null 
  *
  * `missionId` is optional: when omitted it is resolved via `lookupMissionId`
  * (active-run.json → directory scan) so tools that only hold the run-id still
- * hit the canonical nested layout. Only a truly bare/legacy run falls back to
- * `.evor/runs/<run-id>/`.
+ * hit the canonical nested layout. A missing nested match is an error — pass
+ * `missionId` explicitly if the directory does not exist yet (e.g. first use).
  */
 export function resolveRunPaths(runId: string, missionId?: string): RunPaths {
   const evorRoot = getEvorRoot();
-  const mission = missionId ?? lookupMissionId(evorRoot, runId) ?? undefined;
-  const runDir = mission
-    ? join(evorRoot, "runs", mission, runId)
-    : join(evorRoot, "runs", runId);
+  const mission = missionId ?? lookupMissionId(evorRoot, runId);
+  if (mission === null) {
+    throw new Error(
+      `resolveRunPaths: run "${runId}" not found under runs/<mission>/<run-id>/ layout` +
+        ` — pass missionId explicitly or ensure active-run.json is present`
+    );
+  }
+  const runDir = join(evorRoot, "runs", mission, runId);
 
   return {
     runDir,

@@ -119,7 +119,7 @@ afterEach(() => {
 describe("Lock mechanism: upsertNode cross-process lock", () => {
   it("upsertNode clears .tree.lock after a successful write", () => {
     const runId = "run-lock-clear-001";
-    const paths = ensureRunDirs(runId);
+    const paths = ensureRunDirs(runId, "test-mission");
     const lockPath = join(paths.runDir, ".tree.lock");
 
     upsertNode(runId, makeNode());
@@ -129,7 +129,7 @@ describe("Lock mechanism: upsertNode cross-process lock", () => {
 
   it("stale .tree.lock (older than stale threshold) is broken and upsert proceeds", () => {
     const runId = "run-lock-stale-001";
-    const paths = ensureRunDirs(runId);
+    const paths = ensureRunDirs(runId, "test-mission");
     const lockPath = join(paths.runDir, ".tree.lock");
 
     // Create a stale lock file backdated by 11 seconds (> 10s stale threshold)
@@ -148,7 +148,7 @@ describe("Lock mechanism: upsertNode cross-process lock", () => {
 
   it("fresh .tree.lock causes upsertNode to throw after spin exhaustion", () => {
     const runId = "run-lock-fresh-001";
-    const paths = ensureRunDirs(runId);
+    const paths = ensureRunDirs(runId, "test-mission");
     const lockPath = join(paths.runDir, ".tree.lock");
 
     // Create a fresh lock to simulate a hung concurrent process
@@ -201,7 +201,6 @@ describe("Schema fields: GoalContractSchema evolution_bounds / autonomy_charter"
     mission_type: "fixed" as const,
     task_description: "Test task",
     dataset_ref: "dataset-v1",
-    metrics: [{ name: "accuracy", direction: "higher" as const, primary: true }],
     metric_specs: [],
     fitness_mode: "aggregate" as const,
     eval_version: "v1",
@@ -248,7 +247,7 @@ describe("Schema fields: GoalContractSchema evolution_bounds / autonomy_charter"
     expect(result.success).toBe(true);
   });
 
-  it("GoalContractSchema remains valid without evolution_bounds/autonomy_charter (optional)", () => {
+  it("GoalContractSchema parses without autonomy_charter in input (defaults to mandatory AutonomyCharter)", () => {
     const result = GoalContractSchema.safeParse(validGoalContractBase);
     expect(result.success).toBe(true);
   });
@@ -288,7 +287,7 @@ describe("Schema fields: GenomeConfigSchema model_family", () => {
 describe("stateWrite: strategy.json write is atomic", () => {
   it("original strategy.json is preserved when renameSync is blocked", () => {
     const runId = "run-strategy-atomic-001";
-    const paths = ensureRunDirs(runId);
+    const paths = ensureRunDirs(runId, "test-mission");
 
     // Write original strategy content
     writeFileSync(

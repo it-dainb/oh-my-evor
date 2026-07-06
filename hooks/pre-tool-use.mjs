@@ -75,10 +75,9 @@ try {
     /\.py$/.test(filePath) ||
     /\/ticks\/[^/]+\/(mutagen|sage|selector|probe|forge)\//.test(filePath);
 
-  // Bash that runs training/model code (but NOT the evor CLI, which is orchestration).
+  // Bash that runs training/model code (the guard blocks python -m evor outright).
   const runsTraining =
     /\bpython[0-9.]*\b/.test(cmd) &&
-    !/\bpython[0-9.]*\s+-m\s+evor(\b|\.)/.test(cmd) &&
     /(\.py\b|\btick\.py\b|\btrain\b|\btorch\b|\.fit\(|\.pt\b|torchvision)/.test(cmd);
 
   // ── Spawn-hierarchy gate — child agents may be spawned ONLY by their parent ──
@@ -194,14 +193,10 @@ try {
   // Fail-open — a governor error must never block legitimate work.
 }
 
-// ── §3 / §15C: .evor write-guard (ON by default; set EVOR_GUARD_DIRECT_WRITES=0 to disable) ──
+// ── §3 / §15C: .evor write-guard (unconditional during active run) ──
 // Denies direct writes to .evor/runs/** state artifacts and top-level .evor/*.json.
 // ALLOWS .evor/worktrees/** (Forge's code surface) + cache markers.
-const _guardDisabled = ['0', 'off', 'false', 'no'].includes(
-  (process.env.EVOR_GUARD_DIRECT_WRITES ?? '').trim().toLowerCase()
-);
-if (!_guardDisabled) {
-  try {
+try {
     // Path patterns for protected artifacts
     const PROTECTED_RUNS_RE = /[/\\]\.evor[/\\]runs[/\\]/;
     const PROTECTED_TOP_RE  = /[/\\]\.evor[/\\][^/\\]+\.json$/;
@@ -284,7 +279,6 @@ if (!_guardDisabled) {
   } catch {
     // Fail-open — guard error must never block legitimate work
   }
-}
 
 // ── §15C: Agent-kind spoofing guard (always-on when run is active) ────────────
 // Prevents one role from writing into another role's artifact slot.

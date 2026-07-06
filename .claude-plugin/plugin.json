@@ -1,7 +1,7 @@
 {
   "name": "oh-my-evor",
   "displayName": "oh-my-evor",
-  "version": "0.6.0",
+  "version": "1.0.0",
   "description": "Autonomous ML research evolution engine for Claude Code",
   "author": {
     "name": "oh-my-evor contributors"
@@ -27,7 +27,6 @@
     "./skills/evor-doctor/",
     "./skills/evor-gotchas/",
     "./skills/evor-distill/",
-    "./skills/evor-mcp-setup/",
     "./skills/evor-mcp/",
     "./skills/evor-schedule/"
   ],

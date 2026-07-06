@@ -45,7 +45,12 @@ Validate:
 
 Call `evor_state_read` to read mission-state for the resolved run directory.
 
-- **No mission-state present**: print `WARNING: mission-state not found — pre-Phase-2 run, proceeding without lock guard.` and continue. This is fail-open for legacy runs.
+- **No mission-state present**: print the error below and **stop immediately**. Do not proceed to Step 3.
+  ```
+  ERROR: mission-state.json not found — mission is not locked.
+  The contract has not passed the Phase-2 validation gate.
+  Run /evor-validate to validate and lock it, or /evor-setup to reinitialize.
+  ```
 - **mission_state.status != "locked"**: print the error below and **stop immediately**. Do not proceed to Step 3.
   ```
   ERROR: mission-state.status=<status> — mission is not locked.

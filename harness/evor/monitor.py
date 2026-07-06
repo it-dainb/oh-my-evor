@@ -28,12 +28,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Optional
 
-# GotchaStore import — optional; monitor works without it for backward compat
-try:
-    from evor.gotchas import GotchaStore, make_gotcha
-    _GOTCHA_STORE_AVAILABLE = True
-except ImportError:
-    _GOTCHA_STORE_AVAILABLE = False
+from evor.gotchas import GotchaStore, make_gotcha
+
+_GOTCHA_STORE_AVAILABLE = True
 
 _MAX_RETRIES = 3
 

@@ -217,18 +217,6 @@ def _parse_stdout(
     return data, None
 
 
-def _wrap_legacy_per_domain(data: dict[str, Any]) -> dict[str, Any]:
-    """Wrap legacy eval scripts that emit only aggregate metrics.
-
-    If per_domain is absent or empty, synthesise {'default': aggregate_metrics}.
-    This preserves backward-compat with pre-Pillar-3 eval scripts.
-    """
-    per_domain = data.get("per_domain")
-    if not per_domain:
-        data["per_domain"] = {"default": dict(data.get("metrics", {}))}
-    return data
-
-
 def _build_telemetry_summary(data: dict[str, Any]) -> TelemetrySummary:
     """Build TelemetrySummary from eval script output or defaults.
 
@@ -370,9 +358,6 @@ class EvaluatorAdapter:
                 status="error",
                 benchmark_raw=stderr_text or parse_error or "unknown error",
             )
-
-        # Wrap legacy scripts that emit only aggregate metrics
-        data = _wrap_legacy_per_domain(data)
 
         # ── BenchmarkRescore merge (R-6) ──────────────────────────────────
         effective_eval_version = goal.eval_version

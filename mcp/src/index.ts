@@ -46,7 +46,7 @@ async function main(): Promise<void> {
   const server = new McpServer(
     {
       name: "evor",
-      version: "0.6.0",
+      version: "1.0.0",
     },
     { instructions: EVOR_INSTRUCTIONS }
   );

@@ -33,7 +33,6 @@ from evor.contracts import (
     EvalSuite,
     EvaluationResult,
     GoalContract,
-    LegacyMetric,
     LessonEntry,
     MetricSpec,
     MutationLocusArch,
@@ -75,7 +74,6 @@ def _make_goal(
         mission_type=mission_type,  # type: ignore[arg-type]
         task_description="Integration test task",
         dataset_ref="/data/integ",
-        metrics=[LegacyMetric(name="accuracy", direction="higher", primary=True)],
         metric_specs=[
             MetricSpec(
                 metric_name="accuracy",

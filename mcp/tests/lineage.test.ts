@@ -62,7 +62,7 @@ function pythonEnv(): Record<string, string> {
 describe("storePatch", () => {
   it("writes patch content to nodes/<node_id>/parent.patch", () => {
     const runId = "run-lp-001";
-    ensureRunDirs(runId);
+    ensureRunDirs(runId, "test-mission");
     const nodeId = "node-abc";
     const patchContent = "diff --git a/model.py b/model.py\n--- a/model.py\n+++ b/model.py\n@@ -1 +1 @@\n-old\n+new\n";
 
@@ -78,7 +78,7 @@ describe("storePatch", () => {
 
   it("creates node directory when it does not exist", () => {
     const runId = "run-lp-002";
-    ensureRunDirs(runId);
+    ensureRunDirs(runId, "test-mission");
     const nodeId = "node-new-xyz";
 
     const result = storePatch(runId, nodeId, "--- /dev/null\n+++ b/foo.py\n");
@@ -90,7 +90,7 @@ describe("storePatch", () => {
 
   it("overwrites an existing parent.patch", () => {
     const runId = "run-lp-003";
-    ensureRunDirs(runId);
+    ensureRunDirs(runId, "test-mission");
     const nodeId = "node-overwrite";
 
     storePatch(runId, nodeId, "first content");
@@ -103,14 +103,14 @@ describe("storePatch", () => {
 
   it("writes empty patch content without error", () => {
     const runId = "run-lp-004";
-    ensureRunDirs(runId);
+    ensureRunDirs(runId, "test-mission");
     const result = storePatch(runId, "node-empty", "");
     expect(result.ok).toBe(true);
   });
 
   it("returns patchPath in the result", () => {
     const runId = "run-lp-005";
-    ensureRunDirs(runId);
+    ensureRunDirs(runId, "test-mission");
     const result = storePatch(runId, "node-path-check", "patch");
     expect(result.patchPath).toMatch(/parent\.patch$/);
   });
@@ -123,7 +123,7 @@ describe("writeHandoff", () => {
 
   it.skipIf(!hasHarness)("writes handoffs/<tick>-0.json for first handoff", () => {
     const runId = "run-hf-001";
-    ensureRunDirs(runId);
+    ensureRunDirs(runId, "test-mission");
     const result = writeHandoff(runId, 3, { summary: "tick 3 done", best_score: 0.91 });
     expect(result.ok).toBe(true);
     expect(result.seq).toBe(0);
@@ -136,7 +136,7 @@ describe("writeHandoff", () => {
 
   it.skipIf(!hasHarness)("auto-increments seq for the same tick", () => {
     const runId = "run-hf-002";
-    ensureRunDirs(runId);
+    ensureRunDirs(runId, "test-mission");
     const r1 = writeHandoff(runId, 1, { part: "a" });
     const r2 = writeHandoff(runId, 1, { part: "b" });
     expect(r1.ok).toBe(true);
@@ -147,7 +147,7 @@ describe("writeHandoff", () => {
 
   it.skipIf(!hasHarness)("different ticks get independent seq counters", () => {
     const runId = "run-hf-003";
-    ensureRunDirs(runId);
+    ensureRunDirs(runId, "test-mission");
     const r1 = writeHandoff(runId, 1, { tick: 1 });
     const r2 = writeHandoff(runId, 2, { tick: 2 });
     expect(r1.seq).toBe(0);
@@ -156,7 +156,7 @@ describe("writeHandoff", () => {
 
   it.skipIf(!hasHarness)("path contains tick and seq", () => {
     const runId = "run-hf-004";
-    ensureRunDirs(runId);
+    ensureRunDirs(runId, "test-mission");
     const result = writeHandoff(runId, 7, { msg: "hello" });
     expect(result.ok).toBe(true);
     expect(result.path).toMatch(/handoffs[/\\]7-0\.json$/);
@@ -171,7 +171,7 @@ describe("drainInbox", () => {
 
   it.skipIf(!hasHarness)("returns drained=0 when signals-inbox is absent", () => {
     const runId = "run-di-001";
-    ensureRunDirs(runId);
+    ensureRunDirs(runId, "test-mission");
     const result = drainInbox(runId, "signals");
     expect(result.ok).toBe(true);
     expect(result.drained).toBe(0);
@@ -179,7 +179,7 @@ describe("drainInbox", () => {
 
   it.skipIf(!hasHarness)("returns drained=0 when remember-inbox is absent", () => {
     const runId = "run-di-002";
-    ensureRunDirs(runId);
+    ensureRunDirs(runId, "test-mission");
     const result = drainInbox(runId, "remember");
     expect(result.ok).toBe(true);
     expect(result.drained).toBe(0);
@@ -187,7 +187,7 @@ describe("drainInbox", () => {
 
   it.skipIf(!hasHarness)("drains a signals-inbox entry", () => {
     const runId = "run-di-003";
-    const paths = ensureRunDirs(runId);
+    const paths = ensureRunDirs(runId, "test-mission");
     const inbox = join(paths.runDir, "signals-inbox.jsonl");
     writeFileSync(inbox, JSON.stringify({
       kind: "cuda-oom",

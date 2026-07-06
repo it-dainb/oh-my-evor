@@ -32,7 +32,6 @@ def _goal_contract(mission_type: str = "fixed") -> dict:
         "mission_type": mission_type,
         "task_description": "Improve CIFAR-10 accuracy",
         "dataset_ref": "/data/cifar10",
-        "metrics": [{"name": "accuracy", "direction": "higher", "primary": True}],
         "metric_specs": [
             {
                 "metric_name": "accuracy",
@@ -372,13 +371,11 @@ def build_run(
     (run_dir / "run-state.json").write_text(json.dumps(_run_state()))
     (run_dir / "strategy.json").write_text(json.dumps(_make_strategy()))
 
-    # Tree
-    nodes = [
-        _make_node(NODE_A, [], 0, 0.851, "arch"),
-        _make_node(NODE_B, [NODE_A], 1, 0.823, "training"),
-    ]
+    # Tree (DICT format: {"nodes": {"<id>": {...}}, "updated_at": "..."})
+    node_a = _make_node(NODE_A, [], 0, 0.851, "arch")
+    node_b = _make_node(NODE_B, [NODE_A], 1, 0.823, "training")
     (run_dir / "tree.json").write_text(
-        json.dumps({"nodes": nodes, "root_ids": [NODE_A], "version": 1})
+        json.dumps({"nodes": {NODE_A: node_a, NODE_B: node_b}, "updated_at": "2026-01-01T00:00:00Z"})
     )
 
     # Per-node data

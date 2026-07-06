@@ -39,7 +39,6 @@ from evor.contracts import (
     GenomeConfig,
     GoalContract,
     Hypothesis,
-    LegacyMetric,
     MetricConstraint,
     MetricSpec,
     MutationProposal,
@@ -65,7 +64,6 @@ def _make_goal(
         mission_type=mission_type,  # type: ignore[arg-type]
         task_description="Test task",
         dataset_ref="/data/test",
-        metrics=[LegacyMetric(name="accuracy", direction="higher", primary=True)],
         metric_specs=[
             MetricSpec(
                 metric_name="accuracy",
@@ -719,7 +717,6 @@ def _make_goal_with_formula(
         mission_type="fixed",
         task_description="Formula test",
         dataset_ref="/data/test",
-        metrics=[LegacyMetric(name="recall", direction="higher", primary=True)],
         metric_specs=[
             MetricSpec(
                 metric_name="recall",

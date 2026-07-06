@@ -53,7 +53,6 @@ if TYPE_CHECKING:
 # ─────────────────────────────────────────────────────────────────────────────
 
 _FAMILY_ALIASES: dict[str, str] = {
-    "augmentation": "data-augmentation",
     "data_augmentation": "data-augmentation",
     "data_curation": "data-curation",
     "data_acquisition": "data-acquisition",
@@ -61,13 +60,12 @@ _FAMILY_ALIASES: dict[str, str] = {
 
 
 def _canonicalize_family(family: str) -> str:
-    """Normalise legacy/variant family tags to canonical ApproachFamily values.
+    """Normalise underscored variant family tags to canonical ApproachFamily values.
 
     Defined at module scope so all callers (IntegrityGate.check + tests) share
     the exact same resolution logic.
 
     Mappings:
-      'augmentation'      → 'data-augmentation'
       'data_augmentation' → 'data-augmentation'
       'data_curation'     → 'data-curation'
       'data_acquisition'  → 'data-acquisition'
@@ -240,7 +238,7 @@ class IntegrityGate:
 
         # ── Check 8: near_dup_leakage ─────────────────────────────────────
         # True = leakage detected (bad); False = clean (good)
-        # Skipped for non-data-augmentation nodes (evaluated AFTER alias resolution)
+        # Skipped for non-data-augmentation nodes (evaluated AFTER family normalisation)
         near_dup_leakage = False
         if is_data_augmentation and provenance_path is not None:
             aug_bytes = self._load_aug_sample_bytes(provenance_path, run_dir)

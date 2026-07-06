@@ -5,9 +5,9 @@ Entry point: python -m evor <subcommand> [options]
 
 Subcommands:
   run        — Forge's primary invocation after materialising code in worktree.
-               Loads GoalContract, injects TelemetryCallback, submits job via
-               ResourceScheduler, supervises via SelfHealMonitor, runs
-               EvaluatorAdapter on completion, writes EvaluationResult.
+               Loads GoalContract, verifies EVOR_TELEMETRY_PATH instrumentation,
+               submits job via ResourceScheduler, supervises via SelfHealMonitor,
+               runs EvaluatorAdapter on completion, writes EvaluationResult.
                Requires mission-state.json status=="locked" (Phase-2 gate).
 
   preflight  — 5-step micro-train smoke-test (spec R3 / §evor-setup).
@@ -296,34 +296,31 @@ def _cmd_run(args: argparse.Namespace) -> int:
                 run_dir = _run_id_path.resolve()
 
     # ── Phase-2 lock guard ────────────────────────────────────────────
-    # If mission-state.json exists and status != "locked", block execution.
-    # Fail-open when mission-state.json is absent (pre-phase-2 or legacy run).
+    # mission-state.json must exist and status must be "locked" before running.
     if run_dir:
         ms_path = run_dir / "mission-state.json"
-        if ms_path.exists():
-            try:
-                ms = json.loads(ms_path.read_text())
-                ms_status = ms.get("status", "")
-                if ms_status != "locked":
-                    print(
-                        f"[evor run] ERROR: mission-state.status={ms_status!r}. "
-                        "Contract must be locked before running. "
-                        "Re-run /evor-setup to complete contract validation and lock the mission.",
-                        file=sys.stderr,
-                    )
-                    return 6
-            except Exception as exc:
+        if not ms_path.exists():
+            print(
+                "[evor run] ERROR: mission-state.json not found. "
+                "Run /evor-setup to complete contract validation and lock the mission.",
+                file=sys.stderr,
+            )
+            return 6
+        try:
+            ms = json.loads(ms_path.read_text())
+            ms_status = ms.get("status", "")
+            if ms_status != "locked":
                 print(
-                    f"[evor run] WARNING: could not read mission-state.json: {exc}. "
-                    "Proceeding (fail-open for infra errors).",
+                    f"[evor run] ERROR: mission-state.status={ms_status!r}. "
+                    "Contract must be locked before running. "
+                    "Re-run /evor-setup to complete contract validation and lock the mission.",
                     file=sys.stderr,
                 )
-        # else: mission-state.json absent = pre-phase-2 run; warn but continue
-        else:
+                return 6
+        except Exception as exc:
             print(
-                "[evor run] WARNING: mission-state.json not found — "
-                "run was set up before Phase-2 enforcement. "
-                "Run /evor-setup to create a locked contract for new missions.",
+                f"[evor run] WARNING: could not read mission-state.json: {exc}. "
+                "Proceeding (fail-open for infra errors).",
                 file=sys.stderr,
             )
 
@@ -348,16 +345,9 @@ def _cmd_run(args: argparse.Namespace) -> int:
             try:
                 from evor.contracts import TreeNode
                 tree_data = json.loads(tree_path.read_text())
-                # C3 fix: handle DICT format {"nodes": {"id": {...}}} from TS writeTree()
-                # Fall back to list scan for legacy LIST format.
+                # DICT format {"nodes": {"id": {...}}} from TS writeTree()
                 nodes_val = tree_data.get("nodes", {})
-                if isinstance(nodes_val, dict):
-                    node_data = nodes_val.get(args.node_id)
-                else:
-                    node_data = next(
-                        (n for n in nodes_val if n.get("id") == args.node_id),
-                        None,
-                    )
+                node_data = nodes_val.get(args.node_id) if isinstance(nodes_val, dict) else None
                 if node_data:
                     node = TreeNode.model_validate(node_data)
             except Exception as exc:
@@ -377,17 +367,15 @@ def _cmd_run(args: argparse.Namespace) -> int:
 
     # ── Verify telemetry instrumentation in worktree trainer ─────────
     # Forge is responsible for the instrumentation before calling `python -m evor run`.
-    # Accept either the env-path pattern (EVOR_TELEMETRY_PATH + open/write) or the
-    # legacy TelemetryCallback for back-compat with pre-§19 worktrees.
+    # Required pattern: EVOR_TELEMETRY_PATH + open() (§19-clean env-path write).
     trainer_path = worktree / "train" / "trainer.py"
     if trainer_path.exists():
         trainer_src = trainer_path.read_text()
         _has_env_path = "EVOR_TELEMETRY_PATH" in trainer_src and "open(" in trainer_src
-        _has_legacy_cb = "TelemetryCallback" in trainer_src
-        if not _has_env_path and not _has_legacy_cb:
+        if not _has_env_path:
             print(
                 "[evor run] WARNING: no telemetry instrumentation found in train/trainer.py. "
-                "Expected EVOR_TELEMETRY_PATH + open() (env-path pattern) or TelemetryCallback. "
+                "Expected EVOR_TELEMETRY_PATH + open() (env-path pattern). "
                 "Training will proceed but telemetry may not be recorded — "
                 "Selector may reject this candidate.",
                 file=sys.stderr,

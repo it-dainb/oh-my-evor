@@ -98,7 +98,7 @@ describe("Bug D: emitSignal has no verify-after-write (sibling of upsertNode clo
         severity: "high",
         evidence: { batch_size: 512 },
         source: "evor-forge-analyst",
-      }),
+      }, "test-mission"),
     ).toThrow(/failed to persist.*after.*attempts/i);
   });
 
@@ -117,7 +117,7 @@ describe("Bug D: emitSignal has no verify-after-write (sibling of upsertNode clo
         severity: "medium",
         evidence: {},
         source: "test",
-      });
+      }, "test-mission");
     } catch {
       // expected after fix
     }
@@ -138,7 +138,7 @@ describe("Bug D: emitSignal has no verify-after-write (sibling of upsertNode clo
       severity: "medium",
       evidence: { usage_gb: 12 },
       source: "test",
-    });
+    }, "test-mission");
 
     expect(signal.signal_id).toMatch(/^sig-[0-9a-f]{12}$/);
     expect(signal.occurrences).toBe(1);

@@ -5,11 +5,9 @@ Covers:
   - _build_env() exports EVOR_TELEMETRY_PATH when run_dir is provided
   - _build_env() skips EVOR_TELEMETRY_PATH when run_dir is None
   - candidate writing via env-path produces records parseable by TelemetryCallback.read_records()
-  - env-path records are schema-identical to TelemetryCallback.log() records
   - TelemetrySummary / Probe read env-path records unchanged (same JSONL shape)
-  - _check_telemetry gate accepts EVOR_TELEMETRY_PATH + open() pattern (new preferred)
-  - _check_telemetry gate accepts TelemetryCallback pattern (legacy back-compat)
-  - _check_telemetry gate rejects code with neither pattern
+  - _check_telemetry gate accepts EVOR_TELEMETRY_PATH + open() pattern (required)
+  - _check_telemetry gate rejects code without EVOR_TELEMETRY_PATH + open()
   - __main__.py _cmd_run env dict includes EVOR_TELEMETRY_PATH when run_dir is set
 """
 from __future__ import annotations
@@ -181,28 +179,6 @@ class TestEnvPathRecordSchema:
         assert records[1]["train_loss"] == pytest.approx(1.0)
         assert records[2]["node_id"] == "test-node"
 
-    def test_env_path_and_callback_records_structurally_identical(self, tmp_path: Path) -> None:
-        """Records from env-path writes and TelemetryCallback.log() must have the same keys."""
-        # Write one record via env-path
-        env_path = tmp_path / "env.jsonl"
-        _write_env_path_record(env_path, step=0, train_loss=0.5, lr=0.001, grad_norm=1.2)
-        env_rec = _read_jsonl(env_path)[0]
-
-        # Write one record via TelemetryCallback
-        cb = TelemetryCallback("test-node", "test-run", run_dir=tmp_path)
-        cb.log(step=0, train_loss=0.5, lr=0.001, grad_norm=1.2)
-        cb_rec = cb.read_records()[0]
-
-        # Same required fields
-        for field in ("step", "node_id", "run_id", "timestamp", "train_loss", "lr", "grad_norm"):
-            assert field in env_rec, f"env-path record missing {field!r}"
-            assert field in cb_rec, f"callback record missing {field!r}"
-
-        # Values agree (timestamps will differ — that's fine)
-        assert env_rec["step"] == cb_rec["step"]
-        assert env_rec["train_loss"] == pytest.approx(cb_rec["train_loss"])
-        assert env_rec["node_id"] == cb_rec["node_id"]
-        assert env_rec["run_id"] == cb_rec["run_id"]
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -265,19 +241,6 @@ class TestCheckTelemetryGate:
         check = gate._check_telemetry(candidate_dir)
         assert check.passed, f"env-path pattern should pass: {check.reason}"
         assert "EVOR_TELEMETRY_PATH" in check.reason
-
-    def test_legacy_callback_pattern_passes(self, tmp_path: Path) -> None:
-        """TelemetryCallback in train/ → telemetry check passes (back-compat)."""
-        source = (
-            'from evor.telemetry import TelemetryCallback\n'
-            'cb = TelemetryCallback("n1", "r1")\n'
-            'cb.log(step=0, train_loss=0.5)\n'
-        )
-        candidate_dir = self._make_candidate(tmp_path, source)
-        gate = ForgeStructureGate()
-        check = gate._check_telemetry(candidate_dir)
-        assert check.passed, f"legacy TelemetryCallback should still pass: {check.reason}"
-        assert "legacy pattern" in check.reason
 
     def test_no_instrumentation_fails(self, tmp_path: Path) -> None:
         """No telemetry instrumentation → check fails."""

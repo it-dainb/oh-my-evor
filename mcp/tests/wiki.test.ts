@@ -60,7 +60,7 @@ describe("wikiAdd", () => {
   it("writes cross-run wiki markdown", () => {
     const runId = "run-add-001";
     const entry = makeEntry();
-    const { indexPath } = wikiAdd(runId, entry);
+    const { indexPath } = wikiAdd(runId, entry, "test-mission");
 
     const wikiMd = join(tmpRoot, "wiki", `${entry.lesson_id}.md`);
     expect(existsSync(wikiMd)).toBe(true);
@@ -75,7 +75,7 @@ describe("wikiAdd", () => {
   it("appends entry to index.jsonl", () => {
     const runId = "run-add-002";
     const entry = makeEntry();
-    const { indexPath } = wikiAdd(runId, entry);
+    const { indexPath } = wikiAdd(runId, entry, "test-mission");
 
     expect(existsSync(indexPath)).toBe(true);
     const lines = readFileSync(indexPath, "utf8").split("\n").filter(Boolean);
@@ -87,9 +87,9 @@ describe("wikiAdd", () => {
   it("writes per-run wiki copy", () => {
     const runId = "run-add-003";
     const entry = makeEntry();
-    wikiAdd(runId, entry);
+    wikiAdd(runId, entry, "test-mission");
 
-    const perRunMd = join(tmpRoot, "runs", runId, "wiki", `${entry.lesson_id}.md`);
+    const perRunMd = join(tmpRoot, "runs", "test-mission", runId, "wiki", `${entry.lesson_id}.md`);
     expect(existsSync(perRunMd)).toBe(true);
   });
 
@@ -97,8 +97,8 @@ describe("wikiAdd", () => {
     const runId = "run-add-004";
     const e1 = makeEntry();
     const e2 = makeEntry();
-    wikiAdd(runId, e1);
-    wikiAdd(runId, e2);
+    wikiAdd(runId, e1, "test-mission");
+    wikiAdd(runId, e2, "test-mission");
 
     const indexPath = join(tmpRoot, "wiki", "index.jsonl");
     const lines = readFileSync(indexPath, "utf8").split("\n").filter(Boolean);
@@ -111,7 +111,7 @@ describe("wikiAdd", () => {
   it("renders root_cause section when present", () => {
     const runId = "run-add-005";
     const entry = makeEntry({ root_cause: "Batch norm before relu caused gradient issues." });
-    wikiAdd(runId, entry);
+    wikiAdd(runId, entry, "test-mission");
 
     const md = readFileSync(join(tmpRoot, "wiki", `${entry.lesson_id}.md`), "utf8");
     expect(md).toContain("## Root Cause");
@@ -121,7 +121,7 @@ describe("wikiAdd", () => {
   it("renders citations section when present", () => {
     const runId = "run-add-006";
     const entry = makeEntry({ citations: ["https://arxiv.org/abs/1234.5678"] });
-    wikiAdd(runId, entry);
+    wikiAdd(runId, entry, "test-mission");
 
     const md = readFileSync(join(tmpRoot, "wiki", `${entry.lesson_id}.md`), "utf8");
     expect(md).toContain("## Citations");
@@ -140,8 +140,8 @@ describe("wikiQuery", () => {
     const runId = "run-query-001";
     const relevant = makeEntry({ observation: "dropout regularization improves generalisation" });
     const irrelevant = makeEntry({ observation: "batch size does not matter here", tags: [] });
-    wikiAdd(runId, relevant);
-    wikiAdd(runId, irrelevant);
+    wikiAdd(runId, relevant, "test-mission");
+    wikiAdd(runId, irrelevant, "test-mission");
 
     const results = wikiQuery("dropout regularization");
     expect(results).toHaveLength(1);
@@ -150,9 +150,9 @@ describe("wikiQuery", () => {
 
   it("returns all lessons when query is empty", () => {
     const runId = "run-query-002";
-    wikiAdd(runId, makeEntry());
-    wikiAdd(runId, makeEntry());
-    wikiAdd(runId, makeEntry());
+    wikiAdd(runId, makeEntry(), "test-mission");
+    wikiAdd(runId, makeEntry(), "test-mission");
+    wikiAdd(runId, makeEntry(), "test-mission");
 
     const results = wikiQuery("");
     expect(results).toHaveLength(3);
@@ -162,8 +162,8 @@ describe("wikiQuery", () => {
     const runId = "run-query-003";
     const archLesson = makeEntry({ approach_family: "arch" });
     const trainLesson = makeEntry({ approach_family: "training" });
-    wikiAdd(runId, archLesson);
-    wikiAdd(runId, trainLesson);
+    wikiAdd(runId, archLesson, "test-mission");
+    wikiAdd(runId, trainLesson, "test-mission");
 
     const results = wikiQuery("", { family: "arch" });
     expect(results).toHaveLength(1);
@@ -174,8 +174,8 @@ describe("wikiQuery", () => {
     const runId = "run-query-004";
     const confirmed = makeEntry({ hypothesis_verdict: "confirmed" });
     const refuted = makeEntry({ hypothesis_verdict: "refuted" });
-    wikiAdd(runId, confirmed);
-    wikiAdd(runId, refuted);
+    wikiAdd(runId, confirmed, "test-mission");
+    wikiAdd(runId, refuted, "test-mission");
 
     const results = wikiQuery("", { confirmedOnly: true });
     expect(results).toHaveLength(1);
@@ -185,7 +185,7 @@ describe("wikiQuery", () => {
   it("respects limit parameter", () => {
     const runId = "run-query-005";
     for (let i = 0; i < 5; i++) {
-      wikiAdd(runId, makeEntry({ observation: "keyword repeated" }));
+      wikiAdd(runId, makeEntry({ observation: "keyword repeated" }), "test-mission");
     }
     const results = wikiQuery("keyword", { limit: 2 });
     expect(results).toHaveLength(2);
@@ -197,8 +197,8 @@ describe("wikiQuery", () => {
     const high = makeEntry({
       observation: "learning rate learning rate learning rate decays over time",
     });
-    wikiAdd(runId, low);
-    wikiAdd(runId, high);
+    wikiAdd(runId, low, "test-mission");
+    wikiAdd(runId, high, "test-mission");
 
     const results = wikiQuery("learning rate");
     expect(results[0].lesson_id).toBe(high.lesson_id);
@@ -211,7 +211,7 @@ describe("wikiQuery", () => {
       actionable_lesson: "apply cosine_annealing warmup strategy",
       tags: ["cosine_annealing"],
     });
-    wikiAdd(runId, e);
+    wikiAdd(runId, e, "test-mission");
 
     const results = wikiQuery("cosine_annealing");
     expect(results).toHaveLength(1);

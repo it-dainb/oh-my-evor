@@ -103,7 +103,7 @@ line, and reconciling a guard/spec to contract intent (Step above) is NOT it.
    the frontier (score only the new items, combine with cached old-item scores) so all scores stay
    comparable within the run.
 
-If the contract has NO `autonomy_charter` (legacy), fall back to consent-gated behavior.
+
 </Autonomy_Charter>
 
 <Use_When>

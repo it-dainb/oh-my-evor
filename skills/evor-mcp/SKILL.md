@@ -83,7 +83,6 @@ if tel_path:
         f.write(json.dumps(record) + "\n")
 ```
 
-The legacy callback class (harness-internal back-compat only) is not for candidate use.
 Candidate code **must not** import from `evor.*`; use the env-path pattern above.
 
 ### State

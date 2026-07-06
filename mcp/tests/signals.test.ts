@@ -44,7 +44,7 @@ describe("emitSignal — new signal", () => {
       severity: "high",
       evidence: { batch_size: 256 },
       source: "evor-forge-analyst",
-    });
+    }, "test-mission");
 
     expect(signal.signal_id).toMatch(/^sig-[0-9a-f]{12}$/);
     expect(signal.kind).toBe("cuda-oom");
@@ -67,7 +67,7 @@ describe("emitSignal — new signal", () => {
       severity: "low",
       evidence: {},
       source: "test",
-    });
+    }, "test-mission");
     // same kind+signature on a fresh run should produce the same id
     process.env.EVOR_ROOT = mkdtempSync(join(tmpdir(), "evor-signals-sha-"));
     const s2 = emitSignal("run-id-sha", {
@@ -78,7 +78,7 @@ describe("emitSignal — new signal", () => {
       severity: "low",
       evidence: {},
       source: "test",
-    });
+    }, "test-mission");
     rmSync(process.env.EVOR_ROOT, { recursive: true, force: true });
     process.env.EVOR_ROOT = tmpRoot;
 
@@ -99,7 +99,7 @@ describe("emitSignal — dedup aggregation", () => {
       severity: "low",
       evidence: { throughput: 100 },
       source: "probe",
-    });
+    }, "test-mission");
     const second = emitSignal(runId, {
       kind: "training-slow",
       signature: "slow-train-cand-A",
@@ -108,7 +108,7 @@ describe("emitSignal — dedup aggregation", () => {
       severity: "low",
       evidence: { throughput: 80 },
       source: "probe",
-    });
+    }, "test-mission");
 
     expect(second.occurrences).toBe(2);
   });
@@ -123,7 +123,7 @@ describe("emitSignal — dedup aggregation", () => {
       severity: "low",
       evidence: {},
       source: "evor",
-    });
+    }, "test-mission");
     const escalated = emitSignal(runId, {
       kind: "accuracy-drop",
       signature: "acc-drop-v1",
@@ -132,7 +132,7 @@ describe("emitSignal — dedup aggregation", () => {
       severity: "high",
       evidence: {},
       source: "evor",
-    });
+    }, "test-mission");
 
     expect(escalated.severity).toBe("high");
 
@@ -145,7 +145,7 @@ describe("emitSignal — dedup aggregation", () => {
       severity: "low",
       evidence: {},
       source: "evor",
-    });
+    }, "test-mission");
     expect(third.severity).toBe("high");
   });
 
@@ -159,7 +159,7 @@ describe("emitSignal — dedup aggregation", () => {
       severity: "medium",
       evidence: {},
       source: "monitor",
-    });
+    }, "test-mission");
     const second = emitSignal(runId, {
       kind: "mem-pressure",
       signature: "mem-pressure-v1",
@@ -168,7 +168,7 @@ describe("emitSignal — dedup aggregation", () => {
       severity: "medium",
       evidence: {},
       source: "monitor",
-    });
+    }, "test-mission");
 
     // 0.5 + (1.0 - 0.5) * 0.4 = 0.5 + 0.2 = 0.7
     expect(second.confidence).toBeCloseTo(0.7, 4);
@@ -184,7 +184,7 @@ describe("emitSignal — dedup aggregation", () => {
       severity: "low",
       evidence: {},
       source: "test",
-    });
+    }, "test-mission");
     const merged = emitSignal(runId, {
       kind: "multi-facet",
       signature: "multi-v1",
@@ -193,7 +193,7 @@ describe("emitSignal — dedup aggregation", () => {
       severity: "low",
       evidence: {},
       source: "test",
-    });
+    }, "test-mission");
 
     expect(merged.shapes).toContain("limit");
     expect(merged.shapes).toContain("opportunity");
@@ -211,7 +211,7 @@ describe("emitSignal — dedup aggregation", () => {
       severity: "low",
       evidence: { a: 1, b: 2 },
       source: "test",
-    });
+    }, "test-mission");
     const merged = emitSignal(runId, {
       kind: "ev-merge",
       signature: "ev-merge-v1",
@@ -220,7 +220,7 @@ describe("emitSignal — dedup aggregation", () => {
       severity: "low",
       evidence: { b: 99, c: 3 },
       source: "test",
-    });
+    }, "test-mission");
 
     expect(merged.evidence).toMatchObject({ a: 1, b: 99, c: 3 });
   });
@@ -235,7 +235,7 @@ describe("emitSignal — dedup aggregation", () => {
       severity: "low",
       evidence: {},
       source: "test",
-    });
+    }, "test-mission");
     // Small delay to ensure last_seen changes
     await new Promise((r) => setTimeout(r, 10));
     const second = emitSignal(runId, {
@@ -246,7 +246,7 @@ describe("emitSignal — dedup aggregation", () => {
       severity: "low",
       evidence: {},
       source: "test",
-    });
+    }, "test-mission");
 
     expect(second.first_seen).toBe(first.first_seen);
     expect(second.last_seen >= first.last_seen).toBe(true);
@@ -268,7 +268,7 @@ describe("querySignals — facet filtering", () => {
       severity: "high",
       evidence: {},
       source: "test",
-    });
+    }, "test-mission");
     emitSignal(runId, {
       kind: "slow-train",
       signature: "sig-slow",
@@ -277,7 +277,7 @@ describe("querySignals — facet filtering", () => {
       severity: "medium",
       evidence: {},
       source: "test",
-    });
+    }, "test-mission");
     emitSignal(runId, {
       kind: "data-gap",
       signature: "sig-data",
@@ -286,11 +286,11 @@ describe("querySignals — facet filtering", () => {
       severity: "low",
       evidence: {},
       source: "test",
-    });
+    }, "test-mission");
   });
 
   it("no filters returns all signals sorted by (severity, confidence, last_seen) desc", () => {
-    const results = querySignals(runId, {});
+    const results = querySignals(runId, {}, "test-mission");
     expect(results).toHaveLength(3);
     // high > medium > low
     expect(results[0].severity).toBe("high");
@@ -299,7 +299,7 @@ describe("querySignals — facet filtering", () => {
   });
 
   it("shape filter is ANY-overlap — matches signals sharing >=1 shape", () => {
-    const results = querySignals(runId, { shapes: ["failure", "opportunity"] });
+    const results = querySignals(runId, { shapes: ["failure", "opportunity"] }, "test-mission");
     expect(results).toHaveLength(2);
     const sigs = results.map((r) => r.signature);
     expect(sigs).toContain("sig-oom");
@@ -308,13 +308,13 @@ describe("querySignals — facet filtering", () => {
   });
 
   it("axis filter is ANY-overlap — matches signals sharing >=1 axis", () => {
-    const results = querySignals(runId, { axes: ["generalization"] });
+    const results = querySignals(runId, { axes: ["generalization"] }, "test-mission");
     expect(results).toHaveLength(1);
     expect(results[0].signature).toBe("sig-data");
   });
 
   it("kind exact filter narrows to matching kind only", () => {
-    const results = querySignals(runId, { kind: "slow-train" });
+    const results = querySignals(runId, { kind: "slow-train" }, "test-mission");
     expect(results).toHaveLength(1);
     expect(results[0].kind).toBe("slow-train");
   });
@@ -324,13 +324,13 @@ describe("querySignals — facet filtering", () => {
     const results = querySignals(runId, {
       shapes: ["opportunity"],
       axes: ["generalization"],
-    });
+    }, "test-mission");
     expect(results).toHaveLength(1);
     expect(results[0].signature).toBe("sig-data");
   });
 
   it("returns empty list when nothing matches", () => {
-    const results = querySignals(runId, { kind: "nonexistent" });
+    const results = querySignals(runId, { kind: "nonexistent" }, "test-mission");
     expect(results).toHaveLength(0);
   });
 });
@@ -349,7 +349,7 @@ describe("querySignals — severity floor", () => {
       severity: "low",
       evidence: {},
       source: "test",
-    });
+    }, "test-mission");
     emitSignal(runId, {
       kind: "medium-sig",
       signature: "sev-medium",
@@ -358,7 +358,7 @@ describe("querySignals — severity floor", () => {
       severity: "medium",
       evidence: {},
       source: "test",
-    });
+    }, "test-mission");
     emitSignal(runId, {
       kind: "critical-sig",
       signature: "sev-critical",
@@ -367,34 +367,34 @@ describe("querySignals — severity floor", () => {
       severity: "critical",
       evidence: {},
       source: "test",
-    });
+    }, "test-mission");
   });
 
   it("min_severity=low returns all three signals", () => {
-    const results = querySignals(runId, { min_severity: "low" });
+    const results = querySignals(runId, { min_severity: "low" }, "test-mission");
     expect(results).toHaveLength(3);
   });
 
   it("min_severity=medium excludes low", () => {
-    const results = querySignals(runId, { min_severity: "medium" });
+    const results = querySignals(runId, { min_severity: "medium" }, "test-mission");
     expect(results).toHaveLength(2);
     expect(results.map((r) => r.severity)).not.toContain("low");
   });
 
   it("min_severity=high excludes low and medium", () => {
-    const results = querySignals(runId, { min_severity: "high" });
+    const results = querySignals(runId, { min_severity: "high" }, "test-mission");
     expect(results).toHaveLength(1);
     expect(results[0].severity).toBe("critical");
   });
 
   it("min_severity=critical returns only critical", () => {
-    const results = querySignals(runId, { min_severity: "critical" });
+    const results = querySignals(runId, { min_severity: "critical" }, "test-mission");
     expect(results).toHaveLength(1);
     expect(results[0].signature).toBe("sev-critical");
   });
 
   it("default min_severity is low (returns all)", () => {
-    const results = querySignals(runId, {});
+    const results = querySignals(runId, {}, "test-mission");
     expect(results).toHaveLength(3);
   });
 });
@@ -412,7 +412,7 @@ describe("querySignals — since_tick filter", () => {
       severity: "medium",
       evidence: {},
       source: "test",
-    });
+    }, "test-mission");
     emitSignal(runId, {
       kind: "ticked",
       signature: "with-tick",
@@ -422,9 +422,9 @@ describe("querySignals — since_tick filter", () => {
       evidence: {},
       source: "test",
       tick: 5,
-    });
+    }, "test-mission");
 
-    const results = querySignals(runId, { since_tick: 3 });
+    const results = querySignals(runId, { since_tick: 3 }, "test-mission");
     expect(results).toHaveLength(1);
     expect(results[0].signature).toBe("with-tick");
   });
@@ -440,7 +440,7 @@ describe("querySignals — since_tick filter", () => {
       evidence: {},
       source: "test",
       tick: 2,
-    });
+    }, "test-mission");
     emitSignal(runId, {
       kind: "recent",
       signature: "tick-recent",
@@ -450,9 +450,9 @@ describe("querySignals — since_tick filter", () => {
       evidence: {},
       source: "test",
       tick: 10,
-    });
+    }, "test-mission");
 
-    const results = querySignals(runId, { since_tick: 5 });
+    const results = querySignals(runId, { since_tick: 5 }, "test-mission");
     expect(results).toHaveLength(1);
     expect(results[0].signature).toBe("tick-recent");
   });

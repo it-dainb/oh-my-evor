@@ -158,8 +158,7 @@ try {
 
     if (treeData) {
       const nodesRaw = treeData.nodes ?? {};
-      // Support both DICT {id: node} and legacy LIST [{id, ...}]
-      const nodes = Array.isArray(nodesRaw) ? nodesRaw : Object.values(nodesRaw);
+      const nodes = Object.values(nodesRaw);
 
       for (const node of nodes) {
         if (!node || typeof node !== 'object') continue;

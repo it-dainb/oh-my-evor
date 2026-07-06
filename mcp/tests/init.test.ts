@@ -40,7 +40,6 @@ const VALID_ANSWERS: Record<string, unknown> = {
   mission_type: "fixed",
   task_description: "Maximise accuracy on CIFAR-10",
   dataset_ref: "cifar10-v1",
-  metrics: [{ name: "accuracy", direction: "higher", primary: true }],
   metric_specs: [
     {
       metric_name: "accuracy",

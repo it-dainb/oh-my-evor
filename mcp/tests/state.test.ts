@@ -35,7 +35,7 @@ afterEach(() => {
 
 describe("stateRead", () => {
   it("returns fresh default state when run-state.json absent", () => {
-    const state = stateRead("run-sr-001");
+    const state = stateRead("run-sr-001", "test-mission");
     expect(state.run_id).toBe("run-sr-001");
     expect(state.status).toBe("running");
     expect(state.tick_count).toBe(0);
@@ -44,7 +44,7 @@ describe("stateRead", () => {
 
   it("reads existing run-state.json", () => {
     const runId = "run-sr-002";
-    const paths = ensureRunDirs(runId);
+    const paths = ensureRunDirs(runId, "test-mission");
     writeFileSync(
       paths.runStatePath,
       JSON.stringify({
@@ -69,7 +69,7 @@ describe("stateRead", () => {
 
   it("returns fresh default when run-state.json is corrupt JSON", () => {
     const runId = "run-sr-003";
-    const paths = ensureRunDirs(runId);
+    const paths = ensureRunDirs(runId, "test-mission");
     writeFileSync(paths.runStatePath, "{ not valid json {{", "utf8");
 
     const state = stateRead(runId);
@@ -83,12 +83,12 @@ describe("stateRead", () => {
 describe("stateWrite", () => {
   it("creates run-state.json with patched fields", () => {
     const runId = "run-sw-001";
-    const updated = stateWrite(runId, { status: "running", tick_count: 3 });
+    const updated = stateWrite(runId, { status: "running", tick_count: 3 }, "test-mission");
 
     expect(updated.status).toBe("running");
     expect(updated.tick_count).toBe(3);
 
-    const paths = ensureRunDirs(runId);
+    const paths = ensureRunDirs(runId, "test-mission");
     const written = JSON.parse(readFileSync(paths.runStatePath, "utf8"));
     expect(written.tick_count).toBe(3);
   });
@@ -96,7 +96,7 @@ describe("stateWrite", () => {
   it("merges patch into existing state (non-patched fields preserved)", () => {
     const runId = "run-sw-002";
     // Write initial state
-    stateWrite(runId, { status: "initialized", tick_count: 0, best_score: 0.5 });
+    stateWrite(runId, { status: "initialized", tick_count: 0, best_score: 0.5 }, "test-mission");
     // Patch only best_score
     const updated = stateWrite(runId, { best_score: 0.95 });
 
@@ -107,7 +107,7 @@ describe("stateWrite", () => {
 
   it("updates pending_node_ids", () => {
     const runId = "run-sw-003";
-    stateWrite(runId, { pending_node_ids: ["node-x", "node-y"] });
+    stateWrite(runId, { pending_node_ids: ["node-x", "node-y"] }, "test-mission");
 
     const state = stateRead(runId);
     expect(state.pending_node_ids).toEqual(["node-x", "node-y"]);
@@ -115,7 +115,7 @@ describe("stateWrite", () => {
 
   it("writes strategy delta to strategy.json", () => {
     const runId = "run-sw-004";
-    const paths = ensureRunDirs(runId);
+    const paths = ensureRunDirs(runId, "test-mission");
 
     stateWrite(runId, {
       strategy: {
@@ -132,7 +132,7 @@ describe("stateWrite", () => {
 
   it("merges strategy delta into existing strategy.json", () => {
     const runId = "run-sw-005";
-    const paths = ensureRunDirs(runId);
+    const paths = ensureRunDirs(runId, "test-mission");
 
     // Write initial strategy
     writeFileSync(
@@ -151,7 +151,7 @@ describe("stateWrite", () => {
 
   it("skips strategy.json update when no strategy in patch", () => {
     const runId = "run-sw-006";
-    const paths = ensureRunDirs(runId);
+    const paths = ensureRunDirs(runId, "test-mission");
 
     stateWrite(runId, { tick_count: 1 });
 

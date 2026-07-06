@@ -21084,14 +21084,6 @@ var GoalContractSchema = external_exports.object({
   mission_type: external_exports.enum(["fixed", "open_ended"]),
   task_description: external_exports.string(),
   dataset_ref: external_exports.string(),
-  /** legacy flat metrics; retained for back-compat reading */
-  metrics: external_exports.array(
-    external_exports.object({
-      name: external_exports.string(),
-      direction: external_exports.enum(["higher", "lower"]),
-      primary: external_exports.boolean()
-    })
-  ),
   metric_specs: external_exports.array(MetricSpecSchema),
   fitness_mode: external_exports.enum(["aggregate", "worst-domain", "weighted"]),
   eval_version: external_exports.string(),
@@ -21130,9 +21122,9 @@ var GoalContractSchema = external_exports.object({
   evolution_bounds: EvolutionBoundsSchema.optional().describe(
     "escalate-mode bounds; None = fully frozen (no auto-adaptation)"
   ),
-  autonomy_charter: AutonomyCharterSchema.optional().describe(
-    "full-autonomy charter; None = legacy consent-gated (may ask mid-run)"
-  ),
+  autonomy_charter: AutonomyCharterSchema.default({
+    invariant: "Every autonomous decision MUST be monotonic: it may make the evaluation harder or more honest, never easier or comparability-shifting. Forbidden directions (softening the metric, shifting comparability to inflate a score, leaking test into train) are routed around \u2014 never executed, never halted on."
+  }).describe("full-autonomy charter; always present \u2014 charter is mandatory for all missions."),
   created_at: ISODate
 });
 var HypothesisSchema = external_exports.object({
@@ -21573,8 +21565,13 @@ function lookupMissionId(evorRoot, runId) {
 }
 function resolveRunPaths(runId, missionId) {
   const evorRoot = getEvorRoot();
-  const mission = missionId ?? lookupMissionId(evorRoot, runId) ?? void 0;
-  const runDir = mission ? (0, import_path.join)(evorRoot, "runs", mission, runId) : (0, import_path.join)(evorRoot, "runs", runId);
+  const mission = missionId ?? lookupMissionId(evorRoot, runId);
+  if (mission === null) {
+    throw new Error(
+      `resolveRunPaths: run "${runId}" not found under runs/<mission>/<run-id>/ layout \u2014 pass missionId explicitly or ensure active-run.json is present`
+    );
+  }
+  const runDir = (0, import_path.join)(evorRoot, "runs", mission, runId);
   return {
     runDir,
     runStatePath: (0, import_path.join)(runDir, "run-state.json"),
@@ -24062,7 +24059,7 @@ async function main() {
   const server = new McpServer(
     {
       name: "evor",
-      version: "0.6.0"
+      version: "1.0.0"
     },
     { instructions: EVOR_INSTRUCTIONS }
   );

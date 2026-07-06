@@ -93,7 +93,7 @@ function pythonEnv(): Record<string, string> {
 describe("writeArtifact — path resolution", () => {
   it("writes selector artifact to canonical path", () => {
     const runId = "run-art-001";
-    ensureRunDirs(runId);
+    ensureRunDirs(runId, "test-mission");
     const result = writeArtifact(runId, 1, "selector", { verdict: "approved" });
     expect(result.ok).toBe(true);
     const paths = resolveRunPaths(runId);
@@ -105,7 +105,7 @@ describe("writeArtifact — path resolution", () => {
 
   it("writes probe artifact to canonical path", () => {
     const runId = "run-art-002";
-    ensureRunDirs(runId);
+    ensureRunDirs(runId, "test-mission");
     const result = writeArtifact(runId, 3, "probe", { findings: [] });
     expect(result.ok).toBe(true);
     const paths = resolveRunPaths(runId);
@@ -115,7 +115,7 @@ describe("writeArtifact — path resolution", () => {
 
   it("writes partial artifact with -partial.json suffix", () => {
     const runId = "run-art-003";
-    ensureRunDirs(runId);
+    ensureRunDirs(runId, "test-mission");
     const result = writeArtifact(runId, 2, "mutagen", { proposals: [] }, undefined, true);
     expect(result.ok).toBe(true);
     expect(result.path).toMatch(/-partial\.json$/);
@@ -123,7 +123,7 @@ describe("writeArtifact — path resolution", () => {
 
   it("creates intermediate tick directories automatically", () => {
     const runId = "run-art-004";
-    ensureRunDirs(runId);
+    ensureRunDirs(runId, "test-mission");
     writeArtifact(runId, 9, "forge", { summary: "done" });
     const paths = resolveRunPaths(runId);
     expect(existsSync(join(paths.runDir, "ticks", "9", "forge"))).toBe(true);
@@ -139,7 +139,7 @@ describe("writeArtifact — pass-through agents", () => {
 
   it.skipIf(!hasHarness)("selector passes through without validation error", () => {
     const runId = "run-art-pt-001";
-    ensureRunDirs(runId);
+    ensureRunDirs(runId, "test-mission");
     const result = writeArtifact(
       runId, 1, "selector",
       { approved: ["p1"], rejected: ["p2"] },
@@ -151,7 +151,7 @@ describe("writeArtifact — pass-through agents", () => {
 
   it.skipIf(!hasHarness)("forge-architect passes through", () => {
     const runId = "run-art-pt-002";
-    ensureRunDirs(runId);
+    ensureRunDirs(runId, "test-mission");
     const result = writeArtifact(runId, 1, "forge-architect", { plan: "..." });
     expect(result.ok).toBe(true);
   });
@@ -164,7 +164,7 @@ describe("writeArtifact — validation via bridge", () => {
 
   it.skipIf(!hasHarness)("valid mutagen proposals pass", () => {
     const runId = "run-art-val-001";
-    ensureRunDirs(runId);
+    ensureRunDirs(runId, "test-mission");
     const result = writeArtifact(
       runId, 1, "mutagen",
       { proposals: [minimalProposal()] },
@@ -175,7 +175,7 @@ describe("writeArtifact — validation via bridge", () => {
 
   it.skipIf(!hasHarness)("invalid mutagen proposals return error", () => {
     const runId = "run-art-val-002";
-    ensureRunDirs(runId);
+    ensureRunDirs(runId, "test-mission");
     // Missing required 'idea' field
     const result = writeArtifact(
       runId, 1, "mutagen",
@@ -193,7 +193,7 @@ describe("readArtifact — not found", () => {
 
   it.skipIf(!hasHarness)("returns {error:'not found'} when artifact does not exist", () => {
     const runId = "run-read-001";
-    ensureRunDirs(runId);
+    ensureRunDirs(runId, "test-mission");
     const result = readArtifact(runId, 1, "selector");
     expect(result.ok).toBe(false);
     expect(result.error).toBe("not found");
@@ -201,7 +201,7 @@ describe("readArtifact — not found", () => {
 
   it.skipIf(!hasHarness)("returns not-found for a tick that has no ticks/ dir yet", () => {
     const runId = "run-read-002";
-    ensureRunDirs(runId);
+    ensureRunDirs(runId, "test-mission");
     const result = readArtifact(runId, 99, "probe");
     expect(result.ok).toBe(false);
     expect(result.error).toBe("not found");
@@ -213,7 +213,7 @@ describe("readArtifact — found", () => {
 
   it.skipIf(!hasHarness)("reads back payload written by writeArtifact", () => {
     const runId = "run-read-003";
-    ensureRunDirs(runId);
+    ensureRunDirs(runId, "test-mission");
     writeArtifact(runId, 1, "selector", { verdict: "approved" });
     const result = readArtifact(runId, 1, "selector");
     expect(result.ok).toBe(true);
@@ -223,7 +223,7 @@ describe("readArtifact — found", () => {
 
   it.skipIf(!hasHarness)("returns payload for probe pass-through agent", () => {
     const runId = "run-read-004";
-    ensureRunDirs(runId);
+    ensureRunDirs(runId, "test-mission");
     writeArtifact(runId, 2, "probe", { findings: [{ summary: "ok" }] });
     const result = readArtifact(runId, 2, "probe");
     expect(result.ok).toBe(true);
@@ -233,7 +233,7 @@ describe("readArtifact — found", () => {
 
   it.skipIf(!hasHarness)("reads sage-junior artifact with kind", () => {
     const runId = "run-read-005";
-    ensureRunDirs(runId);
+    ensureRunDirs(runId, "test-mission");
     // Write a minimal valid CitationBackedFinding via the write path
     writeArtifact(runId, 3, "forge-analyst", { summary: "analysis" });
     const result = readArtifact(runId, 3, "forge-analyst");

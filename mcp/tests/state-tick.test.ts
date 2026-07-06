@@ -37,7 +37,7 @@ afterEach(() => {
 describe("stateWrite — tick_state extension", () => {
   it("writes tick-state.json atomically when tick_state is provided", () => {
     const runId = "run-ts-001";
-    ensureRunDirs(runId);
+    ensureRunDirs(runId, "test-mission");
     const paths = resolveRunPaths(runId);
 
     stateWrite(runId, {
@@ -63,7 +63,7 @@ describe("stateWrite — tick_state extension", () => {
 
   it("does not write tick-state.json when tick_state is absent", () => {
     const runId = "run-ts-002";
-    ensureRunDirs(runId);
+    ensureRunDirs(runId, "test-mission");
     const paths = resolveRunPaths(runId);
 
     stateWrite(runId, { status: "running", tick_count: 2 });
@@ -73,7 +73,7 @@ describe("stateWrite — tick_state extension", () => {
 
   it("tick_state does not bleed into run-state.json", () => {
     const runId = "run-ts-003";
-    ensureRunDirs(runId);
+    ensureRunDirs(runId, "test-mission");
     const paths = resolveRunPaths(runId);
 
     stateWrite(runId, {
@@ -88,7 +88,7 @@ describe("stateWrite — tick_state extension", () => {
 
   it("overwrites tick-state.json on subsequent writes (atomic replace)", () => {
     const runId = "run-ts-004";
-    ensureRunDirs(runId);
+    ensureRunDirs(runId, "test-mission");
     const paths = resolveRunPaths(runId);
 
     stateWrite(runId, {
@@ -105,7 +105,7 @@ describe("stateWrite — tick_state extension", () => {
 
   it("sets updated_at automatically when not provided", () => {
     const runId = "run-ts-005";
-    ensureRunDirs(runId);
+    ensureRunDirs(runId, "test-mission");
     const paths = resolveRunPaths(runId);
 
     const before = new Date().toISOString();
@@ -125,7 +125,7 @@ describe("stateWrite — tick_state extension", () => {
 describe("stateRead — tick_state merging", () => {
   it("includes tick_state in the response when tick-state.json exists", () => {
     const runId = "run-ts-read-001";
-    ensureRunDirs(runId);
+    ensureRunDirs(runId, "test-mission");
     const paths = resolveRunPaths(runId);
 
     writeFileSync(
@@ -144,7 +144,7 @@ describe("stateRead — tick_state merging", () => {
 
   it("omits tick_state key when tick-state.json does not exist", () => {
     const runId = "run-ts-read-002";
-    ensureRunDirs(runId);
+    ensureRunDirs(runId, "test-mission");
 
     const state = stateRead(runId);
     expect(state).not.toHaveProperty("tick_state");
@@ -152,7 +152,7 @@ describe("stateRead — tick_state merging", () => {
 
   it("omits tick_state gracefully when tick-state.json is corrupt", () => {
     const runId = "run-ts-read-003";
-    ensureRunDirs(runId);
+    ensureRunDirs(runId, "test-mission");
     const paths = resolveRunPaths(runId);
 
     writeFileSync(join(paths.runDir, "tick-state.json"), "{ invalid json {{", "utf8");
@@ -165,6 +165,7 @@ describe("stateRead — tick_state merging", () => {
 
   it("round-trip: write tick_state then read returns the same values", () => {
     const runId = "run-ts-read-004";
+    ensureRunDirs(runId, "test-mission");
 
     stateWrite(runId, {
       status: "running",
@@ -192,7 +193,7 @@ describe("stateRead — tick_state merging", () => {
 describe("stateWrite — active_run job_id extension", () => {
   it("writes job_id into active-run.json when provided", () => {
     const runId = "run-ar-job-001";
-    ensureRunDirs(runId);
+    ensureRunDirs(runId, "test-mission");
 
     stateWrite(runId, {
       active_run: {
@@ -214,7 +215,7 @@ describe("stateWrite — active_run job_id extension", () => {
 
   it("active_run without job_id still writes active-run.json", () => {
     const runId = "run-ar-job-002";
-    ensureRunDirs(runId);
+    ensureRunDirs(runId, "test-mission");
 
     stateWrite(runId, {
       active_run: {
@@ -241,7 +242,6 @@ describe("readGoalContract", () => {
       mission_type: "fixed",
       task_description: "Classify images",
       dataset_ref: "data/",
-      metrics: [{ name: "accuracy", direction: "higher", primary: true }],
       metric_specs: [
         {
           metric_name: "accuracy",
@@ -273,7 +273,7 @@ describe("readGoalContract", () => {
 
   it("returns the validated contract when goal-contract.json exists and is valid", () => {
     const runId = "run-gc-001";
-    const paths = ensureRunDirs(runId);
+    const paths = ensureRunDirs(runId, "test-mission");
 
     writeFileSync(
       join(paths.runDir, "goal-contract.json"),
@@ -290,7 +290,7 @@ describe("readGoalContract", () => {
 
   it("returns error when goal-contract.json does not exist", () => {
     const runId = "run-gc-002";
-    ensureRunDirs(runId);
+    ensureRunDirs(runId, "test-mission");
 
     const result = readGoalContract(runId);
     expect(result.ok).toBe(false);
@@ -299,7 +299,7 @@ describe("readGoalContract", () => {
 
   it("returns error when goal-contract.json is corrupt JSON", () => {
     const runId = "run-gc-003";
-    const paths = ensureRunDirs(runId);
+    const paths = ensureRunDirs(runId, "test-mission");
 
     writeFileSync(join(paths.runDir, "goal-contract.json"), "{ bad json }", "utf8");
 
@@ -310,7 +310,7 @@ describe("readGoalContract", () => {
 
   it("returns error when contract fails Zod validation (missing required field)", () => {
     const runId = "run-gc-004";
-    const paths = ensureRunDirs(runId);
+    const paths = ensureRunDirs(runId, "test-mission");
 
     const partial = makeMinimalContract("mission-gc-004");
     delete (partial as Record<string, unknown>).mission_id;  // remove required field

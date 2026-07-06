@@ -66,7 +66,7 @@ describe("gotchaQuery", () => {
 describe("gotchaAdd + gotchaQuery round-trip", () => {
   it("adds a global gotcha and queries it back", () => {
     const runId = "run-ga-001";
-    ensureRunDirs(runId);
+    ensureRunDirs(runId, "test-mission");
 
     const addResult = gotchaAdd({
       runId,
@@ -100,7 +100,7 @@ describe("gotchaAdd + gotchaQuery round-trip", () => {
 
   it("deduplicates a repeated add (occurrences increments, confidence rises)", () => {
     const runId = "run-ga-002";
-    ensureRunDirs(runId);
+    ensureRunDirs(runId, "test-mission");
 
     const params = {
       runId,
@@ -125,7 +125,7 @@ describe("gotchaAdd + gotchaQuery round-trip", () => {
 
   it("filters by kind correctly", () => {
     const runId = "run-ga-003";
-    ensureRunDirs(runId);
+    ensureRunDirs(runId, "test-mission");
 
     gotchaAdd({
       runId,
@@ -163,7 +163,7 @@ describe("gotchaAdd + gotchaQuery round-trip", () => {
 describe("storeBlob", () => {
   it("stores text content and returns a sha256 content_ref", () => {
     const runId = "run-sb-001";
-    ensureRunDirs(runId);
+    ensureRunDirs(runId, "test-mission");
 
     const result = storeBlob({
       runId,
@@ -176,7 +176,7 @@ describe("storeBlob", () => {
 
   it("stores the same content twice and returns the same content_ref (dedup)", () => {
     const runId = "run-sb-002";
-    ensureRunDirs(runId);
+    ensureRunDirs(runId, "test-mission");
 
     const content = "deterministic blob content for dedup test";
     const r1 = storeBlob({ runId, content });
@@ -189,7 +189,7 @@ describe("storeBlob", () => {
 
   it("stores a file by path", () => {
     const runId = "run-sb-003";
-    ensureRunDirs(runId);
+    ensureRunDirs(runId, "test-mission");
 
     // Write a temp file outside run dir.
     const srcPath = join(tmpRoot, "test-genome.yaml");
@@ -202,7 +202,7 @@ describe("storeBlob", () => {
 
   it("returns error when neither path nor content is provided", () => {
     const runId = "run-sb-004";
-    ensureRunDirs(runId);
+    ensureRunDirs(runId, "test-mission");
 
     const result = storeBlob({ runId });
     expect(result.ok).toBe(false);
@@ -211,7 +211,7 @@ describe("storeBlob", () => {
 
   it("returns error when path does not exist", () => {
     const runId = "run-sb-005";
-    ensureRunDirs(runId);
+    ensureRunDirs(runId, "test-mission");
 
     const result = storeBlob({ runId, path: "/tmp/nonexistent-evor-test-file-xyz.yaml" });
     expect(result.ok).toBe(false);
@@ -220,7 +220,7 @@ describe("storeBlob", () => {
 
   it("stores a blob and registers it under an acquisition_id", () => {
     const runId = "run-sb-006";
-    ensureRunDirs(runId);
+    ensureRunDirs(runId, "test-mission");
 
     const result = storeBlob({
       runId,

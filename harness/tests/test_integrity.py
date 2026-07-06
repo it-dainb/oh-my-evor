@@ -216,9 +216,6 @@ def _write_eval_script(path: Path, content: str = "# eval") -> str:
 # ─────────────────────────────────────────────────────────────────────────────
 
 class TestCanonicalizeFamilyHelper:
-    def test_legacy_augmentation(self):
-        assert _canonicalize_family("augmentation") == "data-augmentation"
-
     def test_underscored_augmentation(self):
         assert _canonicalize_family("data_augmentation") == "data-augmentation"
 
@@ -588,44 +585,6 @@ class TestNearDupLeakage:
         )
 
         assert report.checks.near_dup_leakage is False
-
-    def test_legacy_augmentation_alias_triggers_check(self, tmp_path: Path):
-        """Legacy 'augmentation' alias resolves to 'data-augmentation' via _canonicalize_family.
-
-        The near-dup check must be activated for the canonicalized family.
-        """
-        gate = IntegrityGate()
-        samples = {"0": b"img"}
-        frozen_test = _make_frozen_split(tmp_path, samples)
-
-        eval_script = tmp_path / "evaluate.py"
-        eval_hash = _write_eval_script(eval_script)
-        tel_path = tmp_path / "nodes" / "node-test-001" / "telemetry.jsonl"
-        _write_telemetry(tel_path, [
-            {"step": 0, "train_loss": 1.0, "node_id": "n", "run_id": "r", "timestamp": "t"},
-            {"step": 1, "train_loss": 0.8, "node_id": "n", "run_id": "r", "timestamp": "t"},
-        ])
-
-        prov_path = tmp_path / "nodes" / "node-test-001" / "data-provenance.jsonl"
-        prov_path.parent.mkdir(parents=True, exist_ok=True)
-        prov_path.write_text("")
-
-        # Build node with legacy 'augmentation' locus
-        from evor.contracts import MutationLocusDataAugmentation
-        node = _make_node(tmp_path, family="data-augmentation")
-
-        goal = _make_goal(frozen_test.split_hash, eval_hash)
-
-        with patch.object(gate, "_load_aug_sample_bytes", return_value=[b"near_img"]), \
-             patch.object(gate._dpt, "check_near_dup", return_value=["0"]):
-            report = gate.check(
-                node=node, result=_make_result(), goal=goal,
-                telemetry_path=tel_path, eval_script_path=eval_script,
-                frozen_test=frozen_test, provenance_path=prov_path, run_dir=tmp_path,
-            )
-
-        # Near-dup was triggered because canonical family == 'data-augmentation'
-        assert report.checks.near_dup_leakage is True
 
 
 # ─────────────────────────────────────────────────────────────────────────────

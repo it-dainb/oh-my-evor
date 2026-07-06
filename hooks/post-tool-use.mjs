@@ -54,11 +54,8 @@ const toolInput = input?.tool_input ?? {};
 const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT ?? process.cwd();
 const evorRoot = process.env.EVOR_ROOT ?? join(pluginRoot, '.evor');
 
-// BUG H fix: mirror run-store.ts:lookupMissionId so inboxes always land at the
-// canonical nested path (runs/<mission>/<runId>/) the MCP drain expects.
-// When EVOR_MISSION_ID is set in the session env use it directly; otherwise
-// resolve it from disk — (1) active-run.json, then (2) directory scan — and
-// fall back to the flat layout only for truly bare/legacy runs.
+// Resolve missionId for the canonical nested path (runs/<mission>/<runId>/).
+// Priority: EVOR_MISSION_ID env → active-run.json → directory scan.
 let missionId = process.env.EVOR_MISSION_ID ?? '';
 if (!missionId) {
   try {
@@ -77,11 +74,9 @@ if (!missionId) {
   } catch { /* runs/ dir absent or unreadable — stay flat */ }
 }
 
-/** Derive the run's directory from a run ID. */
+/** Derive the run's directory from a run ID (nested layout only). */
 function runDir(runId) {
-  return missionId
-    ? join(evorRoot, 'runs', missionId, runId)
-    : join(evorRoot, 'runs', runId);
+  return join(evorRoot, 'runs', missionId, runId);
 }
 
 // BUG G fix: deterministic signature for SignalBus dedup.

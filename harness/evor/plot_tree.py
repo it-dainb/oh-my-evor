@@ -35,17 +35,17 @@ from typing import Any
 def _load_tree(run_dir: Path) -> dict[str, Any]:
     """Load tree.json as a dict of {node_id: node_dict}.
 
-    Handles both DICT format (from mcp/src/tree-store.ts) and legacy LIST format.
+    Expects DICT format: {"nodes": {"<id>": {...TreeNode...}}, "updated_at": "..."}
+    written by mcp/src/tree-store.ts::writeTree().
     """
     tree_path = run_dir / "tree.json"
     if not tree_path.exists():
         return {}
     data = json.loads(tree_path.read_text())
     nodes_val = data.get("nodes", {})
-    if isinstance(nodes_val, dict):
-        return nodes_val
-    # Legacy LIST format — index by id
-    return {n["id"]: n for n in nodes_val if isinstance(n, dict) and "id" in n}
+    if not isinstance(nodes_val, dict):
+        return {}
+    return nodes_val
 
 
 def _load_run_state(run_dir: Path) -> dict[str, Any]:

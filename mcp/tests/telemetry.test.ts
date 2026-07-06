@@ -55,7 +55,7 @@ describe("telemetryIngest", () => {
     const nodeId = randomUUID();
     const records = [makeRecord(1), makeRecord(2), makeRecord(3)];
 
-    const { telemetryPath, count } = telemetryIngest(runId, nodeId, records);
+    const { telemetryPath, count } = telemetryIngest(runId, nodeId, records, "test-mission");
 
     expect(count).toBe(3);
     expect(existsSync(telemetryPath)).toBe(true);
@@ -75,10 +75,10 @@ describe("telemetryIngest", () => {
     const runId = "run-tel-002";
     const nodeId = randomUUID();
 
-    telemetryIngest(runId, nodeId, [makeRecord(1)]);
-    telemetryIngest(runId, nodeId, [makeRecord(2), makeRecord(3)]);
+    telemetryIngest(runId, nodeId, [makeRecord(1)], "test-mission");
+    telemetryIngest(runId, nodeId, [makeRecord(2), makeRecord(3)], "test-mission");
 
-    const { telemetryPath } = telemetryIngest(runId, nodeId, [makeRecord(4)]);
+    const { telemetryPath } = telemetryIngest(runId, nodeId, [makeRecord(4)], "test-mission");
     const lines = readFileSync(telemetryPath, "utf8")
       .split("\n")
       .filter(Boolean);
@@ -88,14 +88,14 @@ describe("telemetryIngest", () => {
   it("creates node directory if absent", () => {
     const runId = "run-tel-003";
     const nodeId = randomUUID();
-    const { telemetryPath } = telemetryIngest(runId, nodeId, [makeRecord(1)]);
+    const { telemetryPath } = telemetryIngest(runId, nodeId, [makeRecord(1)], "test-mission");
     expect(existsSync(telemetryPath)).toBe(true);
   });
 
   it("each line is valid JSON with expected fields", () => {
     const runId = "run-tel-004";
     const nodeId = randomUUID();
-    const { telemetryPath } = telemetryIngest(runId, nodeId, [makeRecord(5)]);
+    const { telemetryPath } = telemetryIngest(runId, nodeId, [makeRecord(5)], "test-mission");
 
     const line = readFileSync(telemetryPath, "utf8").trim();
     const rec = JSON.parse(line);

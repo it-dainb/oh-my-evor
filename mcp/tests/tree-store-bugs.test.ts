@@ -120,7 +120,7 @@ describe("Bug A: upsertNode silent data loss after MAX_ATTEMPTS exhaustion", () 
     // Arrange: run directory exists; blocking tree.json renames simulates a concurrent
     // writer that always overwrites tree.json to remove our node after every writeTree.
     const runId = "run-upsert-silent-001";
-    ensureRunDirs(runId);
+    ensureRunDirs(runId, "test-mission");
 
     flags.blockTreeJsonRename = true;
 
@@ -137,7 +137,7 @@ describe("Bug A: upsertNode silent data loss after MAX_ATTEMPTS exhaustion", () 
   it("node is absent from tree.json after all MAX_ATTEMPTS are blocked", () => {
     // Additional evidence: the node really is missing, confirming the data loss.
     const runId = "run-upsert-absent-001";
-    ensureRunDirs(runId);
+    ensureRunDirs(runId, "test-mission");
 
     flags.blockTreeJsonRename = true;
 
@@ -161,7 +161,7 @@ describe("Bug A: upsertNode silent data loss after MAX_ATTEMPTS exhaustion", () 
 describe("Bug B: readTree error on corrupt tree.json lacks actionable context", () => {
   it("readTree error message contains the file path when tree.json is corrupt", () => {
     const runId = "run-corrupt-B-001";
-    const paths = ensureRunDirs(runId);
+    const paths = ensureRunDirs(runId, "test-mission");
 
     writeFileSync(paths.treePath, "NOT VALID JSON {{{", "utf8");
 
@@ -180,7 +180,7 @@ describe("Bug B: readTree error on corrupt tree.json lacks actionable context", 
 
   it("readTree error on corrupt ZodSchema (valid JSON, invalid schema) contains file path", () => {
     const runId = "run-corrupt-B-002";
-    const paths = ensureRunDirs(runId);
+    const paths = ensureRunDirs(runId, "test-mission");
 
     // Valid JSON but does NOT satisfy TreeFileSchema (missing `nodes` key).
     writeFileSync(paths.treePath, JSON.stringify({ wrong_key: {} }), "utf8");
@@ -197,7 +197,7 @@ describe("Bug B: readTree error on corrupt tree.json lacks actionable context", 
 
   it("upsertNode propagates the readTree error when tree.json is corrupt (first read, no try/catch)", () => {
     const runId = "run-corrupt-B-003";
-    const paths = ensureRunDirs(runId);
+    const paths = ensureRunDirs(runId, "test-mission");
 
     writeFileSync(paths.treePath, "{corrupt", "utf8");
 
@@ -215,7 +215,7 @@ describe("Bug B: readTree error on corrupt tree.json lacks actionable context", 
 describe("Bug C: writeRunState non-atomic write — original state lost when rename fails", () => {
   it("original run-state.json is preserved when renameSync is blocked (atomic-write contract)", () => {
     const runId = "run-atomic-state-001";
-    const paths = ensureRunDirs(runId);
+    const paths = ensureRunDirs(runId, "test-mission");
 
     // Write initial state that we care about preserving.
     writeRunState(paths.runStatePath, {
@@ -258,7 +258,7 @@ describe("Bug C: writeRunState non-atomic write — original state lost when ren
     // (renamed to the real file).  Before the fix there is no .tmp at all;
     // after the fix there IS a .tmp during the write but it's renamed away.
     const runId = "run-atomic-state-002";
-    const paths = ensureRunDirs(runId);
+    const paths = ensureRunDirs(runId, "test-mission");
 
     writeRunState(paths.runStatePath, { run_id: runId, tick_count: 1 });
 

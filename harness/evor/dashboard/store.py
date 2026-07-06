@@ -59,16 +59,16 @@ class RunStore:
     def all_nodes(self) -> list[dict[str, Any]]:
         """All TreeNode dicts from tree.json.
 
-        Handles the DICT format written by mcp/src/tree-store.ts::writeTree():
+        Expects DICT format written by mcp/src/tree-store.ts::writeTree():
           {"nodes": {"<id>": {...TreeNode...}}, "updated_at": "<ISO>"}
-        and the legacy LIST format for backward compatibility.
         """
         data = _read_json(self.run_dir / "tree.json")
         if not data:
             return []
         nodes_val = data.get("nodes", {})
-        # C4 fix: TS writeTree() stores nodes as a dict keyed by node ID.
-        return list(nodes_val.values()) if isinstance(nodes_val, dict) else nodes_val
+        if not isinstance(nodes_val, dict):
+            return []
+        return list(nodes_val.values())
 
     def frontier_nodes(self) -> list[dict[str, Any]]:
         """Nodes whose IDs appear in run-state.frontier_ids, in order."""

@@ -2,8 +2,7 @@
 harness/tests/test_contracts.py — L2 unit tests for harness/evor/contracts.py
 
 Tests Pydantic v2 strict-mode model construction, the 7-tag ApproachFamily
-literal, the legacy 'augmentation'→'data-augmentation' alias validator, and
-invalid-input rejection via ValidationError.
+literal, and invalid-input rejection via ValidationError.
 
 Only contracts.py is imported; no other harness module is touched.
 """
@@ -22,7 +21,6 @@ from evor.contracts import (
     CriticReview,
     GoalContract,
     Hypothesis,
-    LegacyMetric,
     LessonEntry,
     MetricSpec,
     MutationProposal,
@@ -59,7 +57,6 @@ VALID_GOAL_CONTRACT_KWARGS: dict = dict(
     mission_type="fixed",
     task_description="Train image classifier on CIFAR-10 subset",
     dataset_ref="s3://bucket/cifar10",
-    metrics=[LegacyMetric(name="accuracy", direction="higher", primary=True)],
     metric_specs=[VALID_METRIC_SPEC],
     fitness_mode="aggregate",
     eval_version="v1",
@@ -154,49 +151,12 @@ class TestApproachFamily:
         with pytest.raises(ValidationError):
             TreeNode(**{**VALID_TREE_NODE_KWARGS, "approach_family": "nlp"})
 
+    def test_augmentation_bare_tag_rejected(self) -> None:
+        """'augmentation' (no longer aliased) is not a valid ApproachFamily tag."""
+        with pytest.raises(ValidationError):
+            TreeNode(**{**VALID_TREE_NODE_KWARGS, "approach_family": "augmentation"})
 
-# ─── Legacy alias: 'augmentation' → 'data-augmentation' ─────────────────────
-
-
-class TestLegacyAugmentationAlias:
-    """The @field_validator(mode='before') on approach_family normalises the
-    legacy 'augmentation' tag to 'data-augmentation' at parse time."""
-
-    def test_alias_on_tree_node(self) -> None:
-        node = TreeNode(**{**VALID_TREE_NODE_KWARGS, "approach_family": "augmentation"})
-        assert node.approach_family == "data-augmentation"
-
-    def test_alias_on_mutation_proposal(self) -> None:
-        prop = MutationProposal(
-            proposal_id="prop-alias",
-            parent_node_ids=[],
-            approach_family="augmentation",  # legacy value
-            idea="augment with random crop",
-            hypothesis=Hypothesis(id="h-a", statement="s", prediction="p"),
-            citations=[],
-            wildness=0.2,
-            critic_approved=True,
-            critic_review=VALID_CRITIC_REVIEW,
-        )
-        assert prop.approach_family == "data-augmentation"
-
-    def test_alias_on_lesson_entry(self) -> None:
-        entry = LessonEntry(
-            lesson_id="l-001",
-            node_id=UUID_A,
-            run_id="run-001",
-            mission_id="m-001",
-            approach_family="augmentation",  # legacy value
-            hypothesis_verdict="confirmed",
-            observation="rand crop helped",
-            actionable_lesson="use rand crop by default",
-            citations=[],
-            tags=[],
-            created_at=ISO_TS,
-        )
-        assert entry.approach_family == "data-augmentation"
-
-    def test_canonical_data_augmentation_still_accepted(self) -> None:
+    def test_canonical_data_augmentation_accepted(self) -> None:
         node = TreeNode(**{**VALID_TREE_NODE_KWARGS, "approach_family": "data-augmentation"})
         assert node.approach_family == "data-augmentation"
 

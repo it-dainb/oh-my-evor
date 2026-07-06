@@ -2718,7 +2718,7 @@ describe("post-tool-use hook — reflex advisor", () => {
 // ─── pre-tool-use hook — .evor write-guard (EVOR_GUARD_DIRECT_WRITES) ─────────
 
 describe("pre-tool-use hook — .evor write-guard", () => {
-  const ACTIVE_ENV = { EVOR_ACTIVE_RUN_ID: "run-guard-001", EVOR_GUARD_DIRECT_WRITES: "1" };
+  const ACTIVE_ENV = { EVOR_ACTIVE_RUN_ID: "run-guard-001" };
 
   it("denies Write targeting .evor/runs/** when guard is ON", () => {
     const result = runHookWithStdin(
@@ -2804,21 +2804,6 @@ describe("pre-tool-use hook — .evor write-guard", () => {
     expect(out.hookSpecificOutput.permissionDecisionReason).toMatch(/evor_state_write/i);
   });
 
-  it("EVOR_GUARD_DIRECT_WRITES=0 disables the guard (escape hatch)", () => {
-    // Setting the env var to a falsy value ('0', 'off', 'false', 'no') must
-    // restore the old allow-through behaviour for scripts that need it.
-    const result = runHookWithStdin(
-      PRE_TOOL_USE,
-      { EVOR_ACTIVE_RUN_ID: "run-guard-003", EVOR_GUARD_DIRECT_WRITES: "0" },
-      JSON.stringify({
-        tool_name: "Write",
-        tool_input: { file_path: "/workspace/.evor/runs/r1/tick-state.json" },
-      }),
-    );
-    expect(result.status).toBe(0);
-    // Guard disabled — no denial from the write-guard path
-    expect(result.stdout.trim()).toBe("");
-  });
 });
 
 // ─── pre-tool-use hook — updatedInput injection ───────────────────────────────

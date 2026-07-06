@@ -285,7 +285,7 @@ describe("Bug G: recordEval does not backwrite integrity_status to tree.json", (
   it('node integrity_status updated to "passed" in tree.json after bridge returns passed', () => {
     const runId = "run-backwrite-passed";
     const nodeId = randomUUID();
-    const paths = ensureRunDirs(runId);
+    const paths = ensureRunDirs(runId, "test-mission");
 
     // Pre-write node to tree.json with integrity_status: "pending"
     const node = makeNode(nodeId, { integrity_status: "pending" });
@@ -305,7 +305,7 @@ describe("Bug G: recordEval does not backwrite integrity_status to tree.json", (
   it('node integrity_status updated to "failed" in tree.json after bridge returns failed', () => {
     const runId = "run-backwrite-failed";
     const nodeId = randomUUID();
-    ensureRunDirs(runId);
+    ensureRunDirs(runId, "test-mission");
 
     const node = makeNode(nodeId, { integrity_status: "pending" });
     writeTree(runId, { [nodeId]: node });
@@ -323,7 +323,7 @@ describe("Bug G: recordEval does not backwrite integrity_status to tree.json", (
     // Node should remain "pending" and recordEval should not throw.
     const runId = "run-backwrite-unavail";
     const nodeId = randomUUID();
-    ensureRunDirs(runId);
+    ensureRunDirs(runId, "test-mission");
 
     const node = makeNode(nodeId, { integrity_status: "pending" });
     writeTree(runId, { [nodeId]: node });
@@ -341,7 +341,7 @@ describe("Bug G: recordEval does not backwrite integrity_status to tree.json", (
     // The backwrite should not throw when the node is absent from tree.json.
     const runId = "run-backwrite-no-node";
     const nodeId = randomUUID();
-    ensureRunDirs(runId);
+    ensureRunDirs(runId, "test-mission");
     // Do NOT write the node to tree.json (absent)
 
     bridgeMock.verdict = "passed";

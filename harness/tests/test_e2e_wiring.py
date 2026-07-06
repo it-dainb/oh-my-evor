@@ -76,7 +76,6 @@ def _goal_contract() -> dict:
         "mission_type": "fixed",
         "task_description": "Wiring test task",
         "dataset_ref": "/data/wiring-test",
-        "metrics": [{"name": "accuracy", "direction": "higher", "primary": True}],
         "metric_specs": [
             {
                 "metric_name": "accuracy",
@@ -161,6 +160,18 @@ def _build_fixture_run_dir(tmp_path: Path) -> tuple[Path, Path]:
 
     # strategy.json
     (run_dir / "strategy.json").write_text(json.dumps(_strategy(), indent=2))
+
+    # mission-state.json — must be "locked" for `evor run` to proceed
+    (run_dir / "mission-state.json").write_text(json.dumps({
+        "status": "locked",
+        "objective": "Wiring test task",
+        "current_tick": 0,
+        "max_ticks": 20,
+        "best_score": None,
+        "best_node_id": None,
+        "started_at": None,
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }, indent=2))
 
     # run-state.json (needed by plot_tree for frontier_ids)
     (run_dir / "run-state.json").write_text(json.dumps({
@@ -634,10 +645,10 @@ def test_evor_run_c3_dict_format_node_found(tmp_path: Path) -> None:
         f"ValidationError present — DICT-format TreeNode parsing failed:\n{result.stderr}"
     )
 
-    # Phase-2 lock guard should warn (not hard-block) when mission-state.json
-    # is absent (pre-phase-2 fixture).
-    if "mission-state.json not found" in result.stderr:
-        pass  # expected — fixture is pre-phase-2
+    # Phase-2 lock guard must not block (mission-state.json is locked in fixture)
+    assert "mission-state.json not found" not in result.stderr, (
+        f"mission-state.json not found — fixture must include locked mission-state:\n{result.stderr}"
+    )
 
     # Exit code must NOT be 1 due to node-lookup failure specifically;
     # evaluator / scheduler failures return 1 which is acceptable here.

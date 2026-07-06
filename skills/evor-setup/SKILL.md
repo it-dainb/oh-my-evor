@@ -481,9 +481,6 @@ After consent:
      "mission_type": "fixed",
      "task_description": "<full task description>",
      "dataset_ref": "<path or URI>",
-     "metrics": [
-       {"name": "<metric>", "direction": "higher", "primary": true}
-     ],
      "metric_specs": [
        {
          "metric_name": "<metric>",

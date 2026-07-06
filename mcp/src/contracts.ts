@@ -116,8 +116,8 @@ export type EvolutionBounds = z.infer<typeof EvolutionBoundsSchema>;
 
 /**
  * Full-autonomy charter — after setup, the mission runs to the goal with
- * ZERO human-in-the-loop. None on a contract = legacy consent-gated behavior.
- * Mirrors Python AutonomyCharter exactly.
+ * ZERO human-in-the-loop. Every mid-run decision is auto-resolved by the
+ * Monotonic-Honesty Invariant. Mirrors Python AutonomyCharter exactly.
  */
 export const AutonomyCharterSchema = z.object({
   posture: z.literal("aggressive-never-halt").default("aggressive-never-halt").describe("The only posture: never stop for a human; always take the monotonic move"),
@@ -138,14 +138,6 @@ export const GoalContractSchema = z.object({
   mission_type: z.enum(["fixed", "open_ended"]),
   task_description: z.string(),
   dataset_ref: z.string(),
-  /** legacy flat metrics; retained for back-compat reading */
-  metrics: z.array(
-    z.object({
-      name: z.string(),
-      direction: z.enum(["higher", "lower"]),
-      primary: z.boolean(),
-    })
-  ),
   metric_specs: z.array(MetricSpecSchema),
   fitness_mode: z.enum(["aggregate", "worst-domain", "weighted"]),
   eval_version: z.string(),
@@ -184,9 +176,13 @@ export const GoalContractSchema = z.object({
   evolution_bounds: EvolutionBoundsSchema.optional().describe(
     "escalate-mode bounds; None = fully frozen (no auto-adaptation)"
   ),
-  autonomy_charter: AutonomyCharterSchema.optional().describe(
-    "full-autonomy charter; None = legacy consent-gated (may ask mid-run)"
-  ),
+  autonomy_charter: AutonomyCharterSchema.default({
+    invariant:
+      "Every autonomous decision MUST be monotonic: it may make the evaluation harder " +
+      "or more honest, never easier or comparability-shifting. Forbidden directions " +
+      "(softening the metric, shifting comparability to inflate a score, leaking test " +
+      "into train) are routed around — never executed, never halted on.",
+  }).describe("full-autonomy charter; always present — charter is mandatory for all missions."),
   created_at: ISODate,
 });
 export type GoalContract = z.infer<typeof GoalContractSchema>;

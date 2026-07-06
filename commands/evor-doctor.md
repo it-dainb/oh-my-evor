@@ -1,11 +1,11 @@
 ---
-description: Check environment health and .evor integrity; auto-repair list-format tree.json
+description: Check environment health and .evor integrity; auto-repair obvious issues
 ---
 
 # /evor-doctor
 
 This command runs environment and .evor integrity diagnostics (doctor.py) and optionally
-auto-repairs repairable issues such as legacy list-format tree.json.
+auto-repairs repairable issues.
 
 ## Dispatch
 
@@ -33,5 +33,5 @@ find "$HOME/.claude/plugins" -path "*oh-my-evor*/skills/evor-doctor/SKILL.md" 2>
 - Usage: `/evor-doctor [run-dir] [--repair]`
 - No argument: environment-only checks (Python version, torch, Node.js, patch tool, env vars)
 - With run-dir: adds .evor integrity checks (tree format, mission-state, orphan pending nodes, split hash)
-- With `--repair`: auto-converts legacy list-format tree.json to DICT format
+- With `--repair`: auto-fixes repairable issues
 - After repair: re-run `/evor-validate` to confirm contract validity

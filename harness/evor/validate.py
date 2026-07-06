@@ -624,15 +624,6 @@ def _check_tree(run_dir: Path) -> list[CheckResult]:
             ok=True,
             detail=f"DICT format confirmed ({len(nodes_val)} nodes)",
         ))
-    elif isinstance(nodes_val, list):
-        checks.append(CheckResult(
-            name="tree_json_dict_format",
-            ok=False,
-            detail=(
-                f"tree.json uses legacy LIST format ({len(nodes_val)} node entries). "
-                "Run `python -m evor doctor --run-id <dir>` to repair to DICT format."
-            ),
-        ))
     else:
         checks.append(CheckResult(
             name="tree_json_dict_format",

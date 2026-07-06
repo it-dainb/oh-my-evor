@@ -62,7 +62,7 @@ function pythonEnv(): Record<string, string> {
 describe("readHandoff — not found cases", () => {
   it("returns {error:'not found'} when no handoffs exist (latest-tick route)", () => {
     const runId = "run-rh-001";
-    ensureRunDirs(runId);
+    ensureRunDirs(runId, "test-mission");
 
     const result = readHandoff(runId, {});
     expect(result.ok).toBe(false);
@@ -71,7 +71,7 @@ describe("readHandoff — not found cases", () => {
 
   it("returns {error:'not found'} for a missing within-tick pair", () => {
     const runId = "run-rh-002";
-    ensureRunDirs(runId);
+    ensureRunDirs(runId, "test-mission");
     // Create handoffs dir but no specific pair file.
     const paths = resolveRunPaths(runId);
     mkdirSync(join(paths.runDir, "handoffs"), { recursive: true });
@@ -83,7 +83,7 @@ describe("readHandoff — not found cases", () => {
 
   it("returns {error:'not found'} for a missing tick markdown", () => {
     const runId = "run-rh-003";
-    ensureRunDirs(runId);
+    ensureRunDirs(runId, "test-mission");
 
     const result = readHandoff(runId, { tick: 99 });
     expect(result.ok).toBe(false);
@@ -94,7 +94,7 @@ describe("readHandoff — not found cases", () => {
 describe("readHandoff — successful reads (Python harness required)", () => {
   it("reads a within-tick JSON handoff written by evor.handoff.write_handoff", () => {
     const runId = "run-rh-pair-001";
-    ensureRunDirs(runId);
+    ensureRunDirs(runId, "test-mission");
     const paths = resolveRunPaths(runId);
 
     // Write the handoff file directly (mirrors write_handoff output format).
@@ -123,7 +123,7 @@ describe("readHandoff — successful reads (Python harness required)", () => {
 
   it("reads the latest tick markdown handoff", () => {
     const runId = "run-rh-latest-001";
-    ensureRunDirs(runId);
+    ensureRunDirs(runId, "test-mission");
     const paths = resolveRunPaths(runId);
 
     const handoffsDir = join(paths.runDir, "handoffs");
@@ -141,7 +141,7 @@ describe("readHandoff — successful reads (Python harness required)", () => {
 
   it("reads a specific tick markdown handoff by tick number", () => {
     const runId = "run-rh-tick-001";
-    ensureRunDirs(runId);
+    ensureRunDirs(runId, "test-mission");
     const paths = resolveRunPaths(runId);
 
     const handoffsDir = join(paths.runDir, "handoffs");

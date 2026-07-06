@@ -113,7 +113,6 @@ describe("GoalContract", () => {
     mission_type: "fixed",
     task_description: "Train image classifier on CIFAR-10 subset",
     dataset_ref: "s3://bucket/cifar10",
-    metrics: [{ name: "accuracy", direction: "higher", primary: true }],
     metric_specs: [VALID_METRIC_SPEC],
     fitness_mode: "aggregate",
     eval_version: "v1",
@@ -670,13 +669,13 @@ describe("tree-store", () => {
   });
 
   it("readTree returns an empty map when tree.json does not exist", () => {
-    const nodes = readTree("run-nonexistent");
+    const nodes = readTree("run-nonexistent", "test-mission");
     expect(nodes).toEqual({});
   });
 
   it("writeTree + readTree round-trips a node map", () => {
     const node = TreeNodeSchema.parse(VALID_NODE_RAW);
-    writeTree("run-rw", { [node.id]: node });
+    writeTree("run-rw", { [node.id]: node }, "test-mission");
     const result = readTree("run-rw");
     expect(result[UUID_A]).toBeDefined();
     expect(result[UUID_A].approach_family).toBe("arch");
@@ -686,7 +685,7 @@ describe("tree-store", () => {
   it("upsertNode adds a second node without overwriting the first", () => {
     const node1 = TreeNodeSchema.parse(VALID_NODE_RAW);
     const node2 = TreeNodeSchema.parse({ ...VALID_NODE_RAW, id: UUID_B, depth: 1 });
-    writeTree("run-upsert", { [node1.id]: node1 });
+    writeTree("run-upsert", { [node1.id]: node1 }, "test-mission");
     upsertNode("run-upsert", node2);
     const result = readTree("run-upsert");
     expect(Object.keys(result)).toHaveLength(2);
@@ -696,8 +695,8 @@ describe("tree-store", () => {
 
   it("writeTree is idempotent on repeated writes to the same run", () => {
     const node = TreeNodeSchema.parse(VALID_NODE_RAW);
-    writeTree("run-idempotent", { [node.id]: node });
-    writeTree("run-idempotent", { [node.id]: node });
+    writeTree("run-idempotent", { [node.id]: node }, "test-mission");
+    writeTree("run-idempotent", { [node.id]: node }, "test-mission");
     const result = readTree("run-idempotent");
     expect(Object.keys(result)).toHaveLength(1);
     expect(result[UUID_A].id).toBe(UUID_A);
@@ -705,7 +704,7 @@ describe("tree-store", () => {
 
   it("upsertNode overwrites a node with the same id", () => {
     const node = TreeNodeSchema.parse(VALID_NODE_RAW);
-    writeTree("run-overwrite", { [node.id]: node });
+    writeTree("run-overwrite", { [node.id]: node }, "test-mission");
     const updated = TreeNodeSchema.parse({ ...VALID_NODE_RAW, visit_count: 5 });
     upsertNode("run-overwrite", updated);
     const result = readTree("run-overwrite");
