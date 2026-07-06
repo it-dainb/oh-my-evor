@@ -22649,12 +22649,73 @@ function registerSignalTools(server) {
   );
 }
 
+// src/tools/init.ts
+var import_fs9 = require("fs");
+var import_path9 = require("path");
+var import_os = require("os");
+var import_crypto2 = require("crypto");
+function initRun(answers, opts) {
+  const tmpFile = (0, import_path9.join)((0, import_os.tmpdir)(), `evor-init-answers-${(0, import_crypto2.randomUUID)()}.json`);
+  try {
+    (0, import_fs9.writeFileSync)(tmpFile, JSON.stringify(answers), "utf8");
+    const args = ["init-run", "--answers", tmpFile];
+    if (opts?.runId) args.push("--run-id", opts.runId);
+    if (opts?.missionId) args.push("--mission-id", opts.missionId);
+    if (opts?.runDir) args.push("--run-dir", opts.runDir);
+    const result = callPythonModule("evor", args);
+    if (!result.ok) {
+      return { ok: false, error: result.error ?? "evor init-run failed" };
+    }
+    if (result.data == null) {
+      return { ok: false, error: "evor init-run produced no JSON output" };
+    }
+    return result.data;
+  } finally {
+    try {
+      (0, import_fs9.unlinkSync)(tmpFile);
+    } catch {
+    }
+  }
+}
+function registerInitTools(server) {
+  server.tool(
+    "evor_init_run",
+    [
+      "Construct, validate, and atomically write all run artifacts for a new mission run:",
+      "goal-contract.json, run-state.json, strategy.json, tree.json, mission-state.json,",
+      "decision-log.md (into run_dir) and active-run.json (into evor_root).",
+      "Returns {ok:true, mission_id, run_id, run_dir, goal_contract_path} on success,",
+      "or {ok:false, error:<validation message>} on GoalContract validation failure.",
+      "Replaces the hand-authored python <<'PY' GoalContract heredoc in evor-setup."
+    ].join(" "),
+    {
+      answers: external_exports.record(external_exports.string(), external_exports.unknown()).describe(
+        "GoalContract fields as a plain JSON object (nested models as plain dicts). See contracts.ts GoalContractSchema for required fields. created_at is auto-set (UTC ISO) if absent; autonomy_charter defaults to aggressive-never-halt."
+      ),
+      run_id: external_exports.string().optional().describe("Override the auto-generated run ID (default: <mission_id>-<UTC compact timestamp>)"),
+      mission_id: external_exports.string().optional().describe("Override the mission_id from answers (takes precedence over answers.mission_id)"),
+      run_dir: external_exports.string().optional().describe("Override the run directory path (default: <evor_root>/runs/<mission_id>/<run_id>)")
+    },
+    async ({ answers, run_id, mission_id, run_dir }) => {
+      const outcome = initRun(answers, {
+        runId: run_id,
+        missionId: mission_id,
+        runDir: run_dir
+      });
+      return {
+        content: [{ type: "text", text: JSON.stringify(outcome) }]
+      };
+    }
+  );
+}
+
 // src/index.ts
 async function main() {
   const server = new McpServer({
     name: "evor",
-    version: "0.1.0"
+    version: "0.5.0"
   });
+  registerInitTools(server);
   registerRecordTools(server);
   registerTreeTools(server);
   registerScheduleTools(server);

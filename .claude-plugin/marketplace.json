@@ -9,7 +9,7 @@
     {
       "name": "oh-my-evor",
       "description": "Autonomous ML research evolution engine: 11 specialized agents (Sage/Mutagen/Probe/Selector/Forge + sub-teams), MCP tools, a hook-enforced capability governor, a signal telemetry bus, and integrity/anti-gaming gates. The MCP server bundle ships prebuilt; the Python harness needs its deps (run ./install.sh once, or pip install -e harness).",
-      "version": "0.4.4",
+      "version": "0.5.0",
       "author": {
         "name": "oh-my-evor contributors"
       },
@@ -25,5 +25,5 @@
       ]
     }
   ],
-  "version": "0.4.4"
+  "version": "0.5.0"
 }

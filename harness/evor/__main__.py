@@ -180,6 +180,32 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Workspace root directory",
     )
 
+    # init-run subcommand — write all 7 mission run artifacts
+    init_p = sub.add_parser(
+        "init-run",
+        help="Initialise a mission run: validate GoalContract and write all 7 artifacts",
+    )
+    init_p.add_argument(
+        "--answers", required=True, metavar="ANSWERS_JSON",
+        help="Path to a JSON file containing GoalContract fields (nested models as plain dicts)",
+    )
+    init_p.add_argument(
+        "--run-dir", default=None, metavar="RUN_DIR",
+        help="Path to the run directory (default: <evor-root>/runs/<mission-id>/<run-id>)",
+    )
+    init_p.add_argument(
+        "--run-id", default=None, metavar="RUN_ID",
+        help="Run identifier (default: <mission-id>-<UTC compact timestamp>)",
+    )
+    init_p.add_argument(
+        "--mission-id", default=None, metavar="MISSION_ID",
+        help="Mission identifier (overrides answers.mission_id)",
+    )
+    init_p.add_argument(
+        "--evor-root", type=Path, default=None,
+        help="Path to .evor/ root (default: EVOR_ROOT env var or .evor in cwd)",
+    )
+
     # signals subcommand — manage the run's SignalBus
     sig_p = sub.add_parser("signals", help="Manage the run's SignalBus")
     sig_sub = sig_p.add_subparsers(dest="signals_action", required=True)
@@ -644,6 +670,26 @@ def _cmd_distill(args: argparse.Namespace) -> int:
     return 1
 
 
+def _cmd_init_run(args: argparse.Namespace) -> int:
+    """Execute the init-run subcommand.
+
+    Delegates all logic to evor.init_run.run_init_run — validates GoalContract
+    and writes all 7 mission run artifacts atomically.
+
+    Exit 0 on success; exit 1 on validation or I/O failure.
+    Prints a JSON object to stdout in both cases.
+    """
+    from evor.init_run import run_init_run
+
+    return run_init_run(
+        args.answers,
+        run_dir_arg=str(args.run_dir) if args.run_dir else None,
+        run_id_arg=args.run_id,
+        mission_id_arg=args.mission_id,
+        evor_root_arg=str(args.evor_root) if args.evor_root else None,
+    )
+
+
 def _cmd_signals(args: argparse.Namespace) -> int:
     from evor.signals import SignalBus, drain_inbox  # local import — keep startup fast
     if args.signals_action == "drain":
@@ -662,6 +708,8 @@ def main(argv: list[str] | None = None) -> int:
     parser = _build_parser()
     args = parser.parse_args(argv)
 
+    if args.subcommand == "init-run":
+        return _cmd_init_run(args)
     if args.subcommand == "run":
         return _cmd_run(args)
     if args.subcommand == "capability":

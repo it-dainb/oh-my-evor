@@ -18,14 +18,16 @@ import { registerIntegrityTools } from "./tools/integrity.js";
 import { registerCiteTools } from "./tools/cite.js";
 import { registerTelemetryTools } from "./tools/telemetry.js";
 import { registerSignalTools } from "./tools/signals.js";
+import { registerInitTools } from "./tools/init.js";
 
 async function main(): Promise<void> {
   const server = new McpServer({
     name: "evor",
-    version: "0.1.0",
+    version: "0.5.0",
   });
 
-  // Register all 14 tools across 9 tool modules
+  // Register all 15 tools across 10 tool modules
+  registerInitTools(server);      // evor_init_run
   registerRecordTools(server);    // evor_record_node, evor_record_eval
   registerTreeTools(server);      // evor_tree_read, evor_select
   registerScheduleTools(server);  // evor_schedule

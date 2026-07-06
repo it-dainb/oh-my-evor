@@ -443,63 +443,91 @@ Print: "Type 'start' to launch the mission, or 'abort' to cancel."
 After consent:
 
 1. Generate `run_id` = `<mission_id>-<timestamp>` (e.g., "cifar10-improve-2026-07-20260703T142300").
-2. Create run directory: `.evor/runs/<mission-slug>/<run-id>/`.
-3. Write `GoalContract` to `.evor/runs/<mission-slug>/<run-id>/goal-contract.json`.
-   Before writing, set the autonomy charter on the contract:
-   ```python
-   goal_contract.autonomy_charter = AutonomyCharter(
-       posture="aggressive-never-halt",
-       license_gate=False,
-       data_acquisition_enabled=True,
-   )
+
+2. Assemble all GoalContract fields collected during the interview into `answers.json` under the run scratch directory. Every field must be plain JSON — nested models (Budget, StopCondition, MetricSpec, ExpansionPolicy, etc.) are plain dicts, not Python objects:
+
+   ```json
+   {
+     "mission_id": "<kebab-slug>",
+     "mode": "seed-repo",
+     "mission_type": "fixed",
+     "task_description": "<full task description>",
+     "dataset_ref": "<path or URI>",
+     "metrics": [
+       {"name": "<metric>", "direction": "higher", "primary": true}
+     ],
+     "metric_specs": [
+       {
+         "metric_name": "<metric>",
+         "direction": "higher",
+         "domain_applicability": "all",
+         "aggregation_rule": "macro_avg",
+         "role": "primary_fitness",
+         "fitness_formula": null,
+         "fbeta": null,
+         "constraints": [],
+         "custom_metrics": []
+       }
+     ],
+     "fitness_mode": "aggregate",
+     "eval_version": "v1",
+     "baseline_value": 0.85,
+     "target_value": null,
+     "coverage_target": null,
+     "stop_condition": {"type": "maximize-under-budget"},
+     "wildness": 0.5,
+     "budget": {
+       "max_iterations": 50,
+       "plateau_window": 8,
+       "circuit_breaker": 5,
+       "max_cost_usd": 0,
+       "max_wall_clock_hours": null,
+       "max_gpu_hours": null
+     },
+     "framework": "pytorch",
+     "seed_repo_path": null,
+     "locked_split_hash": "<64-hex-char sha256 from Frozen_Split_Setup>",
+     "eval_script_hash": "<64-hex-char sha256 from Materialize_Anchors>",
+     "expansion_policy": null,
+     "allowed_licenses": ["MIT", "Apache-2.0", "BSD-2-Clause", "BSD-3-Clause", "CC-BY-4.0", "CC0-1.0"]
+   }
    ```
+
+   `autonomy_charter` may be omitted — the tool defaults it to `AutonomyCharter(posture="aggressive-never-halt", license_gate=False, data_acquisition_enabled=True)`.
+
    Print: "Mission will run FULLY AUTONOMOUS to the goal — the monotonic-honesty invariant auto-decides every mid-run choice with no human questions."
-4. Initialize `run-state.json`:
-   ```json
-   {
-     "status": "initialized",
-     "tick_count": 0,
-     "best_score": null,
-     "frontier_ids": [],
-     "current_eval_version": "v1",
-     "hypotheses": []
-   }
+
+3. Call `evor_init_run` to write all run artifacts atomically.
+
+   **Preferred — MCP tool:**
    ```
-5. Initialize `strategy.json` with defaults:
-   ```json
-   {
-     "meta_iteration": 0,
-     "selection_policy": "ucb1",
-     "ucb1_c": 1.41,
-     "wildness": <from GoalContract>,
-     "family_mix": {"arch": 0.2, "training": 0.2, "data-curation": 0.15, "data-augmentation": 0.15, "data-acquisition": 0.1, "algo": 0.15, "other": 0.05},
-     "winning_families": [],
-     "wins_by_family": {},
-     "meta_loop_interval": 5,
-     "post_upgrade_exploration_boost": null,
-     "post_upgrade_exploration_ticks": 0,
-     "rescore_mode": "sync",
-     "updated_at": "<ISO 8601>"
-   }
+   evor_init_run({ "answers": <answers object>, "run_id": "<run_id>", "mission_id": "<mission_id>" })
    ```
-6. Write `.evor/active-run.json`: `{"mission_id": "<id>", "run_id": "<id>", "run_dir": "<path>"}`.
-7. Set environment variable `EVOR_ACTIVE_RUN_ID=<run_id>`.
-8. Initialize empty `tree.json`: `{"nodes": {}, "updated_at": "<ISO 8601>"}`.
-   (M2 fix: matches the DICT format written by mcp/src/tree-store.ts::writeTree())
-9. Initialize `decision-log.md` with a header entry recording this setup session.
-10. Write `mission-state.json` (Phase-2 gate — status starts as "draft", locked only after validate passes):
-   ```json
-   {
-     "status": "draft",
-     "objective": "<task_description from the GoalContract>",
-     "current_tick": 0,
-     "max_ticks": <budget.max_iterations>,
-     "best_score": null,
-     "best_node_id": null,
-     "started_at": null,
-     "updated_at": "<ISO 8601>"
-   }
+
+   **Shell fallback** (if calling via subprocess instead of MCP):
+   ```bash
+   PYTHONPATH="${EVOR_PLUGIN_ROOT:-$CLAUDE_PLUGIN_ROOT}/harness${PYTHONPATH:+:$PYTHONPATH}" \
+     python -m evor init-run \
+       --answers answers.json \
+       --run-dir .evor/runs/<mission-slug>/<run-id> \
+       --run-id <run_id>
    ```
+
+   This ONE call writes — atomically — all seven run artifacts into `<run_dir>` (and `active-run.json` at `<evor_root>`):
+
+   | Artifact | Notes |
+   |---|---|
+   | `goal-contract.json` | Pydantic-validated; exits non-zero with `{"error":"..."}` on any field violation |
+   | `run-state.json` | status: "initialized", tick_count: 0 |
+   | `strategy.json` | UCB1 defaults, wildness from contract |
+   | `tree.json` | empty nodes dict (matches mcp/src/tree-store.ts::writeTree() DICT format) |
+   | `mission-state.json` | status: "draft" — locked only after validate passes |
+   | `decision-log.md` | header with timestamp + mission_id + run_id + objective |
+   | `<evor_root>/active-run.json` | {mission_id, run_id, run_dir} |
+
+   **Do NOT hand-write any of these files.** The tool constructs them from the validated GoalContract; manual writes will produce schema drift. On success the tool prints `{"ok": true, "mission_id": "...", "run_id": "...", "run_dir": "...", "goal_contract_path": "..."}` — surface any error to the user if it exits non-zero.
+
+4. Set environment variable `EVOR_ACTIVE_RUN_ID=<run_id>`.
 
 Print: "Mission initialized. Run ID: <run_id>. Running Phase-2 validation gate..."
 Then proceed to Validate_And_Lock.
@@ -545,6 +573,6 @@ Setup CANNOT complete with a draft/invalid contract. `/evor-run` will refuse to 
 <Tool_Usage>
 - python_repl — run freeze.py, benchmark init, preflight
 - Bash — nvidia-smi, free, df, sha256sum
-- Read / Write — goal-contract.json, run-state.json, strategy.json, tree.json
+- evor_init_run (MCP) — atomically write goal-contract.json + all six run artifacts (preferred); shell fallback: `python -m evor init-run`
 - evor_state_write — update run state after initialization
 </Tool_Usage>
