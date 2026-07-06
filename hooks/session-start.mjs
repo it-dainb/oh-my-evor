@@ -17,7 +17,7 @@
  *   - Python wiki unavailable   → skip priming, still emit env JSON
  */
 
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
+import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync, statSync } from 'fs';
 import { join, dirname, delimiter } from 'path';
 import { spawnSync } from 'child_process';
 import { fileURLToPath } from 'url';
@@ -103,6 +103,101 @@ function checkHarnessDeps(pRoot, eRoot) {
   }
 }
 
+/**
+ * Cheap, bounded workspace classification for brownfield ML detection.
+ * Honors the contract IGNORE list; caps entries per directory and depth.
+ * Never throws — returns greenfield on any error.
+ *
+ * @param {string} rootDir  Workspace root to scan (typically dirname(evorRoot))
+ * @returns {{ class: "greenfield"|"brownfield"|"possibly-training", counts: {models:number,datasets:number,configs:number,logs:number} }}
+ */
+function classifyWorkspace(rootDir) {
+  const IGNORE      = new Set(['.git', '.evor', 'node_modules', '.venv', 'venv', '__pycache__', 'refs', 'dist', 'build', '.omc', 'site-packages']);
+  const MODEL_STRONG = new Set(['.pt', '.pth', '.ckpt', '.safetensors', '.onnx', '.h5']);
+  const DATASET_DIRS = new Set(['data', 'datasets', 'dataset']);
+  const DATASET_EXTS = new Set(['.csv', '.parquet', '.tfrecord']);
+  const CONFIG_DIRS  = new Set(['conf', 'config', 'configs']);
+  const LOG_DIRS     = new Set(['wandb', 'mlruns', 'lightning_logs', 'runs', 'tb_logs', 'outputs']);
+  const MAX_PER_DIR  = 150;
+  const MAX_DEPTH    = 3;
+  const RECENT_SECS  = 600;
+  const now          = Date.now() / 1000;
+
+  const counts = { models: 0, datasets: 0, configs: 0, logs: 0 };
+  let latestMtime = 0;
+
+  function extOf(name) {
+    const i = name.lastIndexOf('.');
+    return i > 0 ? name.slice(i).toLowerCase() : '';
+  }
+
+  function mtimeOf(p) {
+    try { return statSync(p).mtimeMs / 1000; } catch { return 0; }
+  }
+
+  function scanDir(dir, depth, inConfigDir) {
+    if (depth > MAX_DEPTH) return;
+    let entries;
+    try { entries = readdirSync(dir, { withFileTypes: true }); } catch { return; }
+
+    let n = 0;
+    let dirHasStrongModel = false;
+    const pklPaths = [];
+
+    for (const ent of entries) {
+      if (++n > MAX_PER_DIR) break;
+      const name  = ent.name;
+      const lname = name.toLowerCase();
+      if (IGNORE.has(lname)) continue;
+
+      if (ent.isDirectory()) {
+        if (DATASET_DIRS.has(lname)) counts.datasets++;
+        if (LOG_DIRS.has(lname)) {
+          counts.logs++;
+          const mt = mtimeOf(join(dir, name));
+          if (mt > latestMtime) latestMtime = mt;
+        }
+        scanDir(join(dir, name), depth + 1, CONFIG_DIRS.has(lname));
+      } else if (ent.isFile()) {
+        const ext = extOf(name);
+        if (MODEL_STRONG.has(ext)) {
+          counts.models++;
+          dirHasStrongModel = true;
+          const mt = mtimeOf(join(dir, name));
+          if (mt > latestMtime) latestMtime = mt;
+        } else if (ext === '.pkl') {
+          pklPaths.push(join(dir, name));
+        } else if (DATASET_EXTS.has(ext)) {
+          counts.datasets++;
+        } else if ((ext === '.yaml' || ext === '.yml') && (inConfigDir || lname === 'params.yaml')) {
+          counts.configs++;
+        }
+      }
+    }
+
+    // .pkl counts only when a sibling strong-model file exists in the same dir
+    if (pklPaths.length > 0 && dirHasStrongModel) {
+      counts.models += pklPaths.length;
+      for (const p of pklPaths) {
+        const mt = mtimeOf(p);
+        if (mt > latestMtime) latestMtime = mt;
+      }
+    }
+  }
+
+  try {
+    scanDir(rootDir, 1, false);
+  } catch {
+    return { class: 'greenfield', counts: { models: 0, datasets: 0, configs: 0, logs: 0 } };
+  }
+
+  const isBrownfield = counts.models > 0 || counts.datasets > 0 || counts.configs > 0 || counts.logs > 0;
+  if (!isBrownfield) return { class: 'greenfield', counts };
+
+  const isPossiblyTraining = latestMtime > 0 && (now - latestMtime) <= RECENT_SECS;
+  return { class: isPossiblyTraining ? 'possibly-training' : 'brownfield', counts };
+}
+
 // ── Kill switches ─────────────────────────────────────────────────────────────
 if (process.env.DISABLE_EVOR) process.exit(0);
 
@@ -137,10 +232,37 @@ function clearEnvAndExit(reason) {
 
 // No active run — normal state when no mission is in flight. Still export the
 // plugin root so slash commands can resolve their SKILL.md without searching.
+// Also do a cheap workspace classification to nudge users with existing ML repos.
 if (!existsSync(activeRunFile)) {
+  // Workspace root is the parent of the EVOR state dir (cwd's .evor sibling).
+  const workspaceRoot  = dirname(evorRoot);
+  const wsClassCache   = join(evorRoot, '.workspace-class');
+  let wsClass;
+
+  try {
+    const cached = JSON.parse(readFileSync(wsClassCache, 'utf8'));
+    if (cached?.class) wsClass = cached;
+  } catch { /* cache miss — will scan below */ }
+
+  if (!wsClass) {
+    wsClass = classifyWorkspace(workspaceRoot);
+    try { writeFileSync(wsClassCache, JSON.stringify(wsClass)); } catch { /* read-only evorRoot — fine, re-scan next session */ }
+  }
+
+  let nudge = '';
+  const wc = wsClass.class;
+  if (wc === 'brownfield' || wc === 'possibly-training') {
+    const { models, configs, datasets } = wsClass.counts;
+    nudge = `[oh-my-evor] This looks like an existing ML project (${models} checkpoints, ${configs} configs, ${datasets} datasets). Run /oh-my-evor:evor-distill to import it as a starting point, then /oh-my-evor:evor-setup. (Nothing has been changed.)`;
+    if (wc === 'possibly-training') {
+      nudge += ` A checkpoint/log was modified in the last 10 min — a run may be active; EVOR will not touch it.`;
+    }
+  }
+
+  const parts = [depWarning, nudge].filter(Boolean);
   process.stdout.write(JSON.stringify({
     env: { EVOR_PLUGIN_ROOT: pluginRoot },
-    ...(depWarning ? { message: depWarning } : {}),
+    ...(parts.length ? { message: parts.join('\n\n') } : {}),
   }) + '\n');
   process.exit(0);
 }

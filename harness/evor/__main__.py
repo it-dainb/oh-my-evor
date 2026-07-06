@@ -149,6 +149,37 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Optional run directory for mission-scoped gotcha writes.",
     )
 
+    # distill subcommand — brownfield workspace classification and deep scan
+    dist_p = sub.add_parser(
+        "distill",
+        help="Classify and deep-scan a workspace for brownfield onboarding",
+    )
+    dist_sub = dist_p.add_subparsers(dest="distill_action", required=True)
+
+    dist_scan_p = dist_sub.add_parser(
+        "scan", help="Deep-scan workspace → StartingPointReport",
+    )
+    dist_scan_p.add_argument(
+        "--root", required=True, type=Path,
+        help="Workspace root directory to scan",
+    )
+    dist_scan_p.add_argument(
+        "--evor-root", type=Path, default=None,
+        help="EVOR root (.evor/ dir). Defaults to <root>/.evor/",
+    )
+    dist_scan_p.add_argument(
+        "--json", action="store_true",
+        help="Print JSON report to stdout (default: human summary)",
+    )
+
+    dist_cls_p = dist_sub.add_parser(
+        "classify", help="Fast workspace classification (globs only)",
+    )
+    dist_cls_p.add_argument(
+        "--root", required=True, type=Path,
+        help="Workspace root directory",
+    )
+
     # signals subcommand — manage the run's SignalBus
     sig_p = sub.add_parser("signals", help="Manage the run's SignalBus")
     sig_sub = sig_p.add_subparsers(dest="signals_action", required=True)
@@ -574,6 +605,45 @@ def _cmd_capability(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_distill(args: argparse.Namespace) -> int:
+    """Execute the distill subcommand (classify or scan).
+
+    Delegates to evor.distill for the actual logic so both
+    ``python -m evor distill ...`` and ``python -m evor.distill ...`` work.
+    """
+    from evor.distill import classify_workspace, scan_workspace, _format_summary
+
+    if args.distill_action == "classify":
+        root = Path(args.root).resolve()
+        wclass, counts = classify_workspace(root)
+        print(json.dumps({"workspace_class": wclass, "counts": counts}))
+        return 0
+
+    if args.distill_action == "scan":
+        root = Path(args.root).resolve()
+        evor_root = (
+            Path(args.evor_root).resolve() if args.evor_root else root / ".evor"
+        )
+        report = scan_workspace(root)
+        try:
+            evor_root.mkdir(parents=True, exist_ok=True)
+            out_path = evor_root / "starting-point.json"
+            out_path.write_text(report.model_dump_json(indent=2))
+            print(f"[evor-distill] wrote {out_path}", file=sys.stderr)
+        except (PermissionError, OSError) as exc:
+            print(
+                f"[evor-distill] WARNING: could not write starting-point.json: {exc}",
+                file=sys.stderr,
+            )
+        if args.json:
+            print(report.model_dump_json(indent=2))
+        else:
+            print(_format_summary(report))
+        return 0
+
+    return 1
+
+
 def _cmd_signals(args: argparse.Namespace) -> int:
     from evor.signals import SignalBus, drain_inbox  # local import — keep startup fast
     if args.signals_action == "drain":
@@ -606,6 +676,8 @@ def main(argv: list[str] | None = None) -> int:
         return _cmd_gotchas(args)
     if args.subcommand == "signals":
         return _cmd_signals(args)
+    if args.subcommand == "distill":
+        return _cmd_distill(args)
 
     parser.print_help()
     return 1

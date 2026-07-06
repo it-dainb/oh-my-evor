@@ -1025,6 +1025,107 @@ class CapabilityProfile(BaseModel):
 # Schema registry (all models, for validation tooling / test iteration)
 # ────────────────────────────────────────────────────────────────────────────
 
+# ────────────────────────────────────────────────────────────────────────────
+# Distill contracts (evor-distill workspace scanner / brownfield onboarding)
+# ────────────────────────────────────────────────────────────────────────────
+
+WorkspaceClass = Literal["greenfield", "brownfield", "evor-active", "possibly-training"]
+"""Workspace classification produced by classify_workspace() / evor-distill."""
+
+
+class DetectedDataset(BaseModel):
+    """A dataset directory or file found by the distill scanner."""
+
+    model_config = ConfigDict(strict=True)
+
+    path: str
+    kind: Literal["images-dir", "csv", "parquet", "tfrecord", "hf-cache", "unknown"]
+    approx_size_bytes: Optional[int] = None
+    notes: Optional[str] = None
+
+
+class DetectedModel(BaseModel):
+    """A model checkpoint found by the distill scanner."""
+
+    model_config = ConfigDict(strict=True)
+
+    path: str
+    format: Literal["torch", "checkpoint", "safetensors", "onnx", "h5", "pickle", "unknown"]
+    approx_param_count: Optional[int] = None
+    """None — computing param count requires loading the model (GPU-gated)."""
+    arch_guess: Optional[str] = None
+    """Best-effort architecture family inferred from filename/parent dir."""
+    mtime: str
+    """ISO 8601 last-modified timestamp."""
+
+
+class DetectedConfig(BaseModel):
+    """A config file found by the distill scanner."""
+
+    model_config = ConfigDict(strict=True)
+
+    path: str
+    format: Literal["yaml", "json", "toml", "hydra"]
+    key_hyperparams: dict[str, Any] = Field(default_factory=dict)
+    """Best-effort extraction of lr/batch_size/epochs/model/optimizer."""
+
+
+class ScrapedMetric(BaseModel):
+    """A metric/value pair scraped from documentation or experiment logs.
+
+    INVARIANT: verified is ALWAYS False at distill time. EVOR must re-measure
+    on the frozen split before trusting any claimed number.
+    """
+
+    model_config = ConfigDict(strict=True)
+
+    source: Literal["readme", "wandb", "tensorboard", "log", "json", "csv"]
+    source_path: str
+    metric: str
+    value: float
+    split_hint: Optional[str] = None
+    """Inferred split context: 'val', 'test', 'train', or None."""
+    verified: bool = False
+    """ALWAYS False at distill — distill never trusts a repo's claimed number."""
+
+
+class BaselineCandidate(BaseModel):
+    """Best baseline candidate extracted from the distill scan.
+
+    INVARIANT: verified is ALWAYS False. The distilled value becomes the
+    mission baseline ONLY as ``claimed``; EVOR's measured value is whatever
+    the evaluator computes on the frozen split.
+    """
+
+    model_config = ConfigDict(strict=True)
+
+    model_path: Optional[str] = None
+    metric_name: Optional[str] = None
+    claimed_value: Optional[float] = None
+    source: Optional[str] = None
+    verified: bool = False
+    """ALWAYS False — EVOR must re-measure before trusting this number."""
+
+
+class StartingPointReport(BaseModel):
+    """Full distill scan result written to ``<evorRoot>/starting-point.json``."""
+
+    model_config = ConfigDict(strict=True)
+
+    workspace_class: WorkspaceClass
+    root: str
+    framework: Optional[Literal["pytorch", "tensorflow", "sklearn", "jax", "unknown"]] = None
+    task_guess: Optional[str] = None
+    datasets: list[DetectedDataset]
+    models: list[DetectedModel]
+    configs: list[DetectedConfig]
+    scraped_metrics: list[ScrapedMetric]
+    entry_points: list[str]
+    baseline_candidate: Optional[BaselineCandidate] = None
+    warnings: list[str] = Field(default_factory=list)
+    generated_at: str
+
+
 ALL_MODELS: dict[str, type[BaseModel]] = {
     # Base 11 (+ Hypothesis)
     "GoalContract": GoalContract,
@@ -1066,4 +1167,11 @@ ALL_MODELS: dict[str, type[BaseModel]] = {
     # Gotcha knowledge layer
     "GotchaEntry": GotchaEntry,
     "CapabilityProfile": CapabilityProfile,
+    # Distill contracts
+    "DetectedDataset": DetectedDataset,
+    "DetectedModel": DetectedModel,
+    "DetectedConfig": DetectedConfig,
+    "ScrapedMetric": ScrapedMetric,
+    "BaselineCandidate": BaselineCandidate,
+    "StartingPointReport": StartingPointReport,
 }

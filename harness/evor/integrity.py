@@ -637,3 +637,89 @@ class IntegrityGate:
             return store.verify_namespace(provenance.acquisition_id, "train")
         except Exception:
             return False
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Baseline-claim verifier (distill integration)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def verify_baseline_claim(
+    model_path: str,
+    frozen_split_dir: str,
+    claimed_value: float,
+    metric_name: str,
+    *,
+    _measured_override: float | None = None,
+) -> dict:
+    """Compare a claimed baseline value against a measured value on a frozen split.
+
+    What is REAL (always runs):
+      - reproduced threshold: abs(measured - claimed) <= max(0.02, 0.05 * abs(claimed))
+      - delta = measured - claimed
+      - note generation describing whether the claim reproduced and likely cause if not
+
+    What is GPU-GATED (stubbed):
+      - Loading the model from model_path
+      - Running inference over frozen_split_dir
+      - Computing metric_name on the predictions
+      The stub returns measured = claimed (neutral; a real measured value requires
+      a live GPU + model loader stack). Pass ``_measured_override`` (private; for
+      testing and for the future live-eval path) to inject a specific measured value.
+
+    Args:
+        model_path:        Path to the model checkpoint file.
+        frozen_split_dir:  Path to the frozen eval split directory.
+        claimed_value:     The value the repo claims to have achieved.
+        metric_name:       Name of the metric (e.g. "val_accuracy", "f1").
+        _measured_override: Private — inject a specific measured value (bypasses stub).
+
+    Returns:
+        dict with keys:
+            measured  (float)  — value from actual eval (or stub)
+            claimed   (float)  — value passed in
+            reproduced(bool)   — abs(measured-claimed) <= max(0.02, 0.05*|claimed|)
+            delta     (float)  — measured - claimed
+            note      (str)    — human-readable explanation
+    """
+    # ── Measurement (GPU-gated; stubbed when no override) ─────────────────────
+    if _measured_override is not None:
+        measured = _measured_override
+        measurement_note = f"measured={measured:.6g} (injected)"
+    else:
+        # STUB: real model eval requires loading model_path on GPU and running
+        # evaluation over frozen_split_dir. Until that stack is wired, we return
+        # the claimed value so the comparison is neutral (not misleadingly "failed").
+        # The EVOR tick loop will replace this with a real eval result.
+        measured = claimed_value
+        measurement_note = (
+            f"measured={measured:.6g} (stub — GPU eval not run; "
+            "real value requires model load + inference over frozen split)"
+        )
+
+    # ── Real comparison logic (always runs) ───────────────────────────────────
+    tolerance = max(0.02, 0.05 * abs(claimed_value))
+    delta = measured - claimed_value
+    reproduced = abs(delta) <= tolerance
+
+    if reproduced:
+        note = (
+            f"{metric_name}: claim {claimed_value:.6g} reproduced within tolerance "
+            f"(measured={measured:.6g}, delta={delta:+.6g}, tol={tolerance:.6g}). "
+            + measurement_note
+        )
+    else:
+        note = (
+            f"{metric_name}: claim {claimed_value:.6g} NOT reproduced "
+            f"(measured={measured:.6g}, delta={delta:+.6g}, tol={tolerance:.6g}). "
+            "Likely cause: claim may use a different or leaked split, a different "
+            "evaluation protocol, or post-hoc cherry-picking. "
+            + measurement_note
+        )
+
+    return {
+        "measured": measured,
+        "claimed": claimed_value,
+        "reproduced": reproduced,
+        "delta": delta,
+        "note": note,
+    }

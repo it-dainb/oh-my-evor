@@ -26,7 +26,7 @@
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { spawnSync } from "child_process";
-import { mkdtempSync, rmSync, writeFileSync, mkdirSync, readdirSync, readFileSync, existsSync } from "fs";
+import { mkdtempSync, rmSync, writeFileSync, mkdirSync, readdirSync, readFileSync, existsSync, utimesSync } from "fs";
 import { join, resolve } from "path";
 import { tmpdir } from "os";
 
@@ -88,6 +88,9 @@ describe("session-start hook", () => {
 
   it("exports EVOR_PLUGIN_ROOT (but no active-run env) when active-run.json is absent", () => {
     writeFileSync(join(tmpDir, ".deps-ok"), "cached"); // skip the env-dependent dep-check
+    // Pre-seed workspace-class cache so the scan never touches the OS temp parent,
+    // keeping this test deterministic regardless of what sits above tmpDir.
+    writeFileSync(join(tmpDir, ".workspace-class"), JSON.stringify({ class: "greenfield", counts: { models: 0, datasets: 0, configs: 0, logs: 0 } }));
     const result = runHook(SESSION_START, { EVOR_ROOT: tmpDir });
     expect(result.status).toBe(0);
     expect(result.stderr).toBe("");
@@ -2153,5 +2156,98 @@ describe("post-tool-use — signal inbox path resolution (BUG H)", () => {
       }),
     );
     expect(result.status).toBe(0);
+  });
+});
+
+// ─── session-start hook — workspace classification (distill nudge) ────────────
+//
+// Each test builds a controlled workspace dir and sets EVOR_ROOT to its .evor/
+// subdirectory.  The hook derives workspaceRoot = dirname(evorRoot) so the scan
+// lands exactly where the test places ML artifacts.
+// .deps-ok is pre-seeded in each evorRoot so the dep-check doesn't interfere.
+
+describe("session-start hook — workspace classification (distill nudge)", () => {
+  let workspaceDir: string;
+  let evorRootDir: string;
+
+  beforeEach(() => {
+    workspaceDir = mkdtempSync(join(tmpdir(), "evor-ws-test-"));
+    evorRootDir  = join(workspaceDir, ".evor");
+    mkdirSync(evorRootDir, { recursive: true });
+    // Skip dep-check so only workspace classification logic is exercised.
+    writeFileSync(join(evorRootDir, ".deps-ok"), "cached");
+    // No active-run.json → hook takes the no-active-run / classification path.
+  });
+
+  afterEach(() => {
+    rmSync(workspaceDir, { recursive: true, force: true });
+  });
+
+  it("emits distill nudge for a brownfield workspace (model.pt + data/ + config.yaml)", () => {
+    // model.pt with an old mtime so it is NOT in the "recent" window → brownfield, not possibly-training.
+    writeFileSync(join(workspaceDir, "model.pt"), "fake weights");
+    const oldDate = new Date(Date.now() - 2 * 3600 * 1000); // 2 hours ago
+    utimesSync(join(workspaceDir, "model.pt"), oldDate, oldDate);
+
+    mkdirSync(join(workspaceDir, "data"), { recursive: true });
+    writeFileSync(join(workspaceDir, "data", "train.csv"), "label,x\n1,0.5\n");
+    writeFileSync(join(workspaceDir, "config.yaml"), "lr: 0.001\nbatch_size: 32\n");
+
+    const result = runHook(SESSION_START, { EVOR_ROOT: evorRootDir });
+    expect(result.status).toBe(0);
+    expect(result.stderr).toBe("");
+
+    const output = JSON.parse(result.stdout.trim());
+    expect(output.message).toBeDefined();
+    expect(output.message).toMatch(/oh-my-evor/);
+    expect(output.message).toMatch(/existing ML project/);
+    expect(output.message).toMatch(/evor-distill/);
+    expect(output.message).toMatch(/evor-setup/);
+    expect(output.message).toMatch(/Nothing has been changed/);
+    // Must NOT include the possibly-training warning
+    expect(output.message).not.toMatch(/run may be active/);
+  });
+
+  it("stays silent (no nudge) for a greenfield workspace with no ML artifacts", () => {
+    mkdirSync(join(workspaceDir, "src"), { recursive: true });
+    writeFileSync(join(workspaceDir, "src", "app.py"), "print('hello')\n");
+    writeFileSync(join(workspaceDir, "README.md"), "# My App\n");
+
+    const result = runHook(SESSION_START, { EVOR_ROOT: evorRootDir });
+    expect(result.status).toBe(0);
+    expect(result.stderr).toBe("");
+
+    const output = JSON.parse(result.stdout.trim());
+    // Greenfield: no nudge, no message at all (dep-check also skipped)
+    const msg = output.message ?? "";
+    expect(msg).not.toMatch(/evor-distill/);
+    expect(msg).not.toMatch(/existing ML project/);
+  });
+
+  it("includes 'run may be active' warning for possibly-training workspace (recent checkpoint)", () => {
+    // checkpoint.pt written right now → mtime is within the 600 s window → possibly-training
+    writeFileSync(join(workspaceDir, "checkpoint.pt"), "fake ckpt data");
+    mkdirSync(join(workspaceDir, "data"), { recursive: true });
+
+    const result = runHook(SESSION_START, { EVOR_ROOT: evorRootDir });
+    expect(result.status).toBe(0);
+
+    const output = JSON.parse(result.stdout.trim());
+    expect(output.message).toBeDefined();
+    expect(output.message).toMatch(/existing ML project/);
+    expect(output.message).toMatch(/run may be active/);
+    expect(output.message).toMatch(/EVOR will not touch it/);
+  });
+
+  it("exits 0 and emits valid JSON on a totally missing EVOR_ROOT (fail-open)", () => {
+    // EVOR_ROOT points to a path that does not exist — nothing should throw.
+    const missingRoot = join(tmpdir(), `evor-missing-${Date.now()}`);
+
+    const result = runHook(SESSION_START, { EVOR_ROOT: missingRoot });
+    expect(result.status).toBe(0);
+    // Must still emit valid JSON with env
+    const output = JSON.parse(result.stdout.trim());
+    expect(output.env).toBeDefined();
+    expect(output.env.EVOR_PLUGIN_ROOT).toBeTruthy();
   });
 });

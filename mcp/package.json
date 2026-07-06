@@ -1,6 +1,6 @@
 {
   "name": "@oh-my-evor/mcp",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "MCP server for oh-my-evor",
   "type": "module",
   "main": "dist/index.cjs",

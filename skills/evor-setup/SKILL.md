@@ -21,6 +21,81 @@ evor-setup conducts a 14-question Socratic interview to elicit all GoalContract 
 - The user wants the dashboard or report only
 </Do_Not_Use_When>
 
+<Phase_0_Distillation>
+## Phase 0 — Workspace distillation (runs BEFORE the interview)
+
+Determine evorRoot: use `$EVOR_ROOT` if set, else `<cwd>/.evor`.
+
+**Case A — `<evorRoot>/starting-point.json` already exists** (written by a prior `/evor-distill`):
+  Read it. Proceed to "Pre-fill" below.
+
+**Case B — No starting-point.json, but workspace looks brownfield** (any `*.pt`, `*.pth`,
+`*.ckpt`, or `*.safetensors` file found, OR a `data/` or `datasets/` directory exists, OR
+`train.py` / `trainer.py` is present in the working tree):
+  Offer the user a choice before continuing:
+  ```
+  This workspace has existing ML artifacts. Run /oh-my-evor:evor-distill first for a
+  detailed scan, or type 'skip' to continue the interview without pre-filling.
+  ```
+  - If the user agrees to distill: read and execute the evor-distill skill (equivalent to
+    running `/evor-distill`), then read the resulting `starting-point.json`. Proceed to
+    "Pre-fill" below.
+  - If the user types 'skip': proceed directly to the interview with no pre-fill.
+
+**Case C — `<evorRoot>/active-run.json` exists** (workspace_class = evor-active):
+  Stop. Print:
+  ```
+  An active EVOR run was found in <evorRoot>/active-run.json.
+  Use /evor-run to resume it, or delete active-run.json to start a new mission.
+  ```
+
+**Case D — Greenfield and no starting-point.json**:
+  Proceed directly to the interview with no pre-fill.
+
+---
+
+### Pre-fill (applies when starting-point.json is available)
+
+Read these fields from the report and present them to the user before question 1:
+
+```
+Pre-filled from starting-point.json — confirm each answer or type a new value:
+
+  Q3  Mode:        seed-repo  (existing codebase detected at <root>)
+  Q3a Seed path:   <root>
+  Q2  Dataset:     <datasets[0].path>  [<datasets[0].kind>]
+  Q7  Framework:   <framework or "unknown">
+  Q5  Baseline:    <baseline_candidate.metric_name>=<baseline_candidate.claimed_value>
+                   ** UNVERIFIED — scraped from repo; EVOR will re-measure on frozen split **
+  Hint — Model:    <models[0].arch_guess> (<models[0].format>)  (if detected; not locked here)
+```
+
+If `baseline_candidate` is null or absent, omit the Q5 pre-fill row; the user will supply a
+baseline value during Q5 as normal.
+
+When conducting each pre-filled question in the interview, present it as:
+
+  > "Q2 — Dataset [pre-filled: `<path>`]: Press Enter to accept, or provide a new path."
+
+The user presses Enter to accept the pre-filled value or types a replacement. All other
+(non-pre-filled) questions are asked exactly as specified in the interview below.
+
+**Baseline integrity note** — display whenever a baseline_candidate is pre-filled:
+
+```
+Note on baseline: <metric>=<claimed_value> is a scraped claim with verified=false.
+It has NOT been measured on a controlled evaluation split. The official baseline_value
+written into the GoalContract will be whatever EVOR measures on the frozen split during
+setup — not this scraped number. Both the claimed value and the EVOR-measured value are
+recorded; if they diverge by more than the tolerance threshold, EVOR will flag the
+discrepancy in the decision log.
+```
+
+This is consistent with the Integrity Model: `BaselineCandidate.verified` stays `false`
+until `verify_baseline_claim()` runs during setup / the first tick and produces the
+measured value that becomes `GoalContract.baseline_value`.
+</Phase_0_Distillation>
+
 <Interview>
 Conduct the following 14 questions in order. Ask Q1–Q8 sequentially (Q4a is always asked after Q4). Ask Q9 after Q8. Ask Q10–Q11 only if mission_type=open_ended. Always ask Q12. Ask Q13 only if mission_type=open_ended.
 

@@ -1,6 +1,6 @@
 {
   "name": "oh-my-evor",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Autonomous ML research evolution engine for Claude Code",
   "author": {
     "name": "oh-my-evor contributors"
@@ -24,7 +24,8 @@
     "./skills/evor-report/",
     "./skills/evor-validate/",
     "./skills/evor-doctor/",
-    "./skills/evor-gotchas/"
+    "./skills/evor-gotchas/",
+    "./skills/evor-distill/"
   ],
   "agents": [
     "./agents/evor-sage.md",
