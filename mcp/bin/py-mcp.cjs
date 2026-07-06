@@ -25,9 +25,10 @@
 const { existsSync, mkdirSync, writeFileSync, readFileSync, rmdirSync } = require("fs");
 const { join } = require("path");
 const { spawnSync, spawn } = require("child_process");
+const os = require("os");
 
 const isWin = process.platform === "win32";
-const HOME = process.env.HOME || process.env.USERPROFILE || "";
+const HOME = os.homedir();
 const PY_VER = process.env.EVOR_MCP_PYTHON || "3.11";
 
 const pkg = process.argv[2];
@@ -36,7 +37,16 @@ if (!pkg) { process.stderr.write("[oh-my-evor:py-mcp] missing package argument\n
 
 const log = (m) => process.stderr.write(`[oh-my-evor:py-mcp] ${m}\n`); // stdout is the MCP channel
 
-const venvDir = join(__dirname, "..", ".venvs", pkg);
+// Cache venvs in a STABLE, home-based location — NOT under the plugin dir. The plugin's
+// install path (CLAUDE_PLUGIN_ROOT) varies with scope (project vs user) and may be
+// read-only, so pre-warm and runtime could resolve to different dirs and never share the
+// built venv. A home cache is identical no matter how/where the launcher is invoked.
+function cacheBase() {
+  if (process.env.EVOR_MCP_VENV_DIR) return process.env.EVOR_MCP_VENV_DIR;
+  const base = process.env.XDG_CACHE_HOME || (isWin ? join(HOME, "AppData", "Local") : join(HOME, ".cache"));
+  return join(base, "oh-my-evor", "mcp-venvs");
+}
+const venvDir = join(cacheBase(), pkg);
 const venvPy = isWin ? join(venvDir, "Scripts", "python.exe") : join(venvDir, "bin", "python");
 const marker = join(venvDir, ".script");
 
