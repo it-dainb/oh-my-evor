@@ -162,10 +162,24 @@ try {
 
   const surfaces = [];
   if (typeof toolInput?.content === 'string') surfaces.push(toolInput.content);
-  // tool_response may be a string OR an object ({stdout, stderr, content}).
+  // toolInput.payload — evor_write_artifact agents embed <evor-remember> here
+  if (typeof toolInput?.payload === 'string') surfaces.push(toolInput.payload);
+  else if (toolInput?.payload && typeof toolInput.payload === 'object') {
+    surfaces.push(JSON.stringify(toolInput.payload));
+  }
+  // toolInput.text — secondary fallback surface
+  if (typeof toolInput?.text === 'string') surfaces.push(toolInput.text);
+  // tool_response may be a string OR an object ({stdout, stderr, content})
+  // OR a top-level MCP content array [{type:"text", text:"..."}]
   const tr = input?.tool_response;
-  if (typeof tr === 'string') surfaces.push(tr);
-  else if (tr && typeof tr === 'object') {
+  if (Array.isArray(tr)) {
+    // Top-level MCP content array format
+    for (const part of tr) {
+      if (part && typeof part.text === 'string') surfaces.push(part.text);
+    }
+  } else if (typeof tr === 'string') {
+    surfaces.push(tr);
+  } else if (tr && typeof tr === 'object') {
     if (typeof tr.stdout === 'string') surfaces.push(tr.stdout);
     if (typeof tr.content === 'string') surfaces.push(tr.content);
     if (Array.isArray(tr.content)) {

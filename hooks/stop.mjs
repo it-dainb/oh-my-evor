@@ -96,15 +96,32 @@ try {
 } catch { /* no file yet — first block */ }
 
 if (stopHookActive) {
-  // Model is already stopped and trying again — increment and potentially release
+  // Model is already stopped and trying again — increment and potentially release.
+  // For drift-only debt: release after 8 consecutive blocks (match [Attempt X/8] message).
+  // For pending_node_ids violations: NEVER release — broken tree state is a structural
+  // invariant that cannot be overridden by repeated stopping.
   blockCount++;
   try {
     mkdirSync(runDir, { recursive: true });
     writeFileSync(blockCountPath, JSON.stringify({ count: blockCount, updated_at: new Date().toISOString() }));
   } catch { /* state write failure is non-fatal */ }
 
-  if (blockCount >= 2) {
-    process.exit(0); // don't fight the user — release after 2 consecutive blocks
+  // Check pending_node_ids before releasing — if non-empty, never release
+  if (blockCount >= 8) {
+    // Only release if there are no pending nodes (structural invariant takes priority)
+    let hasPendingNodes = false;
+    try {
+      if (existsSync(runStatePath)) {
+        const rs = JSON.parse(readFileSync(runStatePath, 'utf8'));
+        const pids = Array.isArray(rs?.pending_node_ids) ? rs.pending_node_ids : [];
+        hasPendingNodes = pids.length > 0;
+      }
+    } catch { /* fail-open — treat as no pending nodes */ }
+
+    if (!hasPendingNodes) {
+      process.exit(0); // drift-only debt: release after 8 consecutive blocks
+    }
+    // else: pending nodes present — fall through and let continuation guard block
   }
 }
 
@@ -268,6 +285,30 @@ try {
         );
       }
     }
+  }
+
+  // (e) Sub-agent tasks still running within this tick — forward-compatible check.
+  // If the orchestrator writes pending_subagent_ids[] to tick-state.json when spawning
+  // Task sub-agents, the stop hook blocks until they complete.
+  // If the field is absent (old tick-state format) this guard is a no-op (fail-open).
+  if (runState?.status === 'running') {
+    try {
+      const tsPathE = join(runDir, 'tick-state.json');
+      if (existsSync(tsPathE)) {
+        const tickStateE = JSON.parse(readFileSync(tsPathE, 'utf8'));
+        const pendingSubagentIds = Array.isArray(tickStateE?.pending_subagent_ids)
+          ? tickStateE.pending_subagent_ids
+          : [];
+        if (pendingSubagentIds.length > 0) {
+          const shown = pendingSubagentIds.slice(0, 3).join(', ');
+          const ellipsis = pendingSubagentIds.length > 3 ? '...' : '';
+          debtReasons.push(
+            `tick ${tickStateE?.tick ?? '?'} has ${pendingSubagentIds.length} sub-agent task(s) still pending: ` +
+              `${shown}${ellipsis}. Wait for sub-agents to complete before stopping.`
+          );
+        }
+      }
+    } catch (_) { /* fail-open — tick-state absent or corrupt */ }
   }
 
   if (debtReasons.length > 0) {

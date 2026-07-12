@@ -2918,23 +2918,36 @@ describe("stop hook — stop_hook_active escalation (§17D)", () => {
     expect(result.stdout).toMatch(/EVOR_SKIP_HOOKS=stop/);
   });
 
-  it("releases on second attempt (stop_hook_active=true, count≥2)", () => {
-    const runDir = join(tmpDir, "runs", "run-esc-002");
-    makeRunWithPendingNodes(runDir);
+  it("releases on 8th attempt (stop_hook_active=true, count≥8, drift-only debt)", () => {
+    // P0-9: threshold raised from 2 to 8. Pending nodes NEVER release (structural
+    // invariant); for drift-only debt the hook releases after 8 consecutive blocks.
+    // Use a run with no pending nodes but drift debt (missing eval for done node).
+    const runId = "run-esc-002";
+    const runDir = join(tmpDir, "runs", runId);
+    mkdirSync(join(runDir, "evaluations"), { recursive: true });
+    writeFileSync(
+      join(runDir, "run-state.json"),
+      JSON.stringify({ tick_count: 3, pending_node_ids: [], status: "running" }),
+    );
+    writeFileSync(
+      join(runDir, "tree.json"),
+      JSON.stringify({ nodes: { "node-drift-esc": { id: "node-drift-esc", status: "done" } }, updated_at: new Date().toISOString() }),
+    );
+    // No evaluations/node-drift-esc.json → drift debt present
 
-    // Simulate a prior block by pre-seeding the block-count file at count=1
-    const sessionId = "nosession"; // CLAUDE_SESSION_ID not set in test env
+    // Seed at 7: after increment to 8 the hook releases (drift-only, no pending nodes)
+    const sessionId = "nosession";
     writeFileSync(
       join(runDir, `stop-blocks-${sessionId}.json`),
-      JSON.stringify({ count: 1 }),
+      JSON.stringify({ count: 7 }),
     );
 
     const result = runHookWithStdin(
       STOP,
-      { EVOR_ACTIVE_RUN_ID: "run-esc-002", EVOR_ROOT: tmpDir },
+      { EVOR_ACTIVE_RUN_ID: runId, EVOR_ROOT: tmpDir },
       JSON.stringify({ stop_hook_active: true }),
     );
-    // count becomes 2 → release (exit 0) so we don't fight the user
+    // count becomes 8 → release for drift-only debt
     expect(result.status).toBe(0);
   });
 
@@ -3098,5 +3111,488 @@ describe("post-compact hook", () => {
     });
     expect(result.status).toBe(0);
     expect(result.stdout.trim()).toBe("");
+  });
+});
+
+// ─── P2-4: <evor-remember> capture via toolInput.payload ─────────────────────
+//
+// Agents use evor_write_artifact (not the Write file tool) to write outputs.
+// The artifact content is in toolInput.payload, not toolInput.content.
+// The remember-scan must also cover toolInput.payload and toolInput.text,
+// plus a top-level tool_response array (MCP content array format).
+
+describe("post-tool-use — <evor-remember> capture via toolInput.payload (P2-4)", () => {
+  let tmpDir: string;
+  const RUN_ID = "run-remember-p24-001";
+  const MISSION_ID = "mission-remember-p24-001";
+
+  beforeEach(() => {
+    tmpDir = mkdtempSync(join(tmpdir(), "evor-remember-p24-"));
+    mkdirSync(join(tmpDir, "runs", MISSION_ID, RUN_ID), { recursive: true });
+    writeFileSync(
+      join(tmpDir, "active-run.json"),
+      JSON.stringify({ run_id: RUN_ID, mission_id: MISSION_ID }),
+    );
+  });
+  afterEach(() => {
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it("captures <evor-remember> from toolInput.payload and writes to remember-inbox.jsonl", () => {
+    const result = runHookWithStdin(
+      POST_TOOL_USE,
+      { EVOR_ACTIVE_RUN_ID: RUN_ID, EVOR_MISSION_ID: MISSION_ID, EVOR_ROOT: tmpDir },
+      JSON.stringify({
+        tool_name: "evor_write_artifact",
+        tool_input: {
+          agent: "sage",
+          payload: "<evor-remember>batch_size=256 is optimal for this dataset</evor-remember>",
+        },
+        tool_response: { ok: true },
+      }),
+    );
+    expect(result.status).toBe(0);
+
+    const inboxPath = join(tmpDir, "runs", MISSION_ID, RUN_ID, "remember-inbox.jsonl");
+    expect(existsSync(inboxPath)).toBe(true);
+    const entry = JSON.parse(readFileSync(inboxPath, "utf8").trim());
+    expect(entry.type).toBe("wiki");
+    expect(entry.content).toContain("batch_size=256");
+    expect(entry.run_id).toBe(RUN_ID);
+  });
+
+  it("captures <evor-remember gotcha> from toolInput.payload and writes gotcha type", () => {
+    const result = runHookWithStdin(
+      POST_TOOL_USE,
+      { EVOR_ACTIVE_RUN_ID: RUN_ID, EVOR_MISSION_ID: MISSION_ID, EVOR_ROOT: tmpDir },
+      JSON.stringify({
+        tool_name: "evor_write_artifact",
+        tool_input: {
+          agent: "forge",
+          payload: "<evor-remember gotcha>batch_norm fails with batch_size=1</evor-remember>",
+        },
+        tool_response: { ok: true },
+      }),
+    );
+    expect(result.status).toBe(0);
+
+    const inboxPath = join(tmpDir, "runs", MISSION_ID, RUN_ID, "remember-inbox.jsonl");
+    expect(existsSync(inboxPath)).toBe(true);
+    const entry = JSON.parse(readFileSync(inboxPath, "utf8").trim());
+    expect(entry.type).toBe("gotcha");
+    expect(entry.content).toContain("batch_norm fails");
+  });
+
+  it("captures <evor-remember> from toolInput.text fallback", () => {
+    const result = runHookWithStdin(
+      POST_TOOL_USE,
+      { EVOR_ACTIVE_RUN_ID: RUN_ID, EVOR_MISSION_ID: MISSION_ID, EVOR_ROOT: tmpDir },
+      JSON.stringify({
+        tool_name: "evor_write_artifact",
+        tool_input: {
+          text: "Summary: <evor-remember>lr=1e-3 works best for this task</evor-remember>",
+        },
+        tool_response: { ok: true },
+      }),
+    );
+    expect(result.status).toBe(0);
+
+    const inboxPath = join(tmpDir, "runs", MISSION_ID, RUN_ID, "remember-inbox.jsonl");
+    expect(existsSync(inboxPath)).toBe(true);
+    const entry = JSON.parse(readFileSync(inboxPath, "utf8").trim());
+    expect(entry.type).toBe("wiki");
+    expect(entry.content).toContain("lr=1e-3");
+  });
+
+  it("captures <evor-remember> from top-level MCP content array in tool_response", () => {
+    const result = runHookWithStdin(
+      POST_TOOL_USE,
+      { EVOR_ACTIVE_RUN_ID: RUN_ID, EVOR_MISSION_ID: MISSION_ID, EVOR_ROOT: tmpDir },
+      JSON.stringify({
+        tool_name: "evor_record_eval",
+        tool_input: { run_id: RUN_ID, node_id: "node-abc" },
+        tool_response: [
+          { type: "text", text: "eval done. <evor-remember>val_acc peaked at epoch 12</evor-remember>" },
+        ],
+      }),
+    );
+    expect(result.status).toBe(0);
+
+    const inboxPath = join(tmpDir, "runs", MISSION_ID, RUN_ID, "remember-inbox.jsonl");
+    expect(existsSync(inboxPath)).toBe(true);
+    const entry = JSON.parse(readFileSync(inboxPath, "utf8").trim());
+    expect(entry.type).toBe("wiki");
+    expect(entry.content).toContain("val_acc peaked");
+  });
+
+  it("does not write remember-inbox.jsonl when payload has no tags", () => {
+    const result = runHookWithStdin(
+      POST_TOOL_USE,
+      { EVOR_ACTIVE_RUN_ID: RUN_ID, EVOR_MISSION_ID: MISSION_ID, EVOR_ROOT: tmpDir },
+      JSON.stringify({
+        tool_name: "evor_write_artifact",
+        tool_input: { agent: "sage", payload: "no remember tags here" },
+        tool_response: { ok: true },
+      }),
+    );
+    expect(result.status).toBe(0);
+
+    const inboxPath = join(tmpDir, "runs", MISSION_ID, RUN_ID, "remember-inbox.jsonl");
+    expect(existsSync(inboxPath)).toBe(false);
+  });
+
+  it("does not crash when toolInput.payload is an object (stringified scan)", () => {
+    const result = runHookWithStdin(
+      POST_TOOL_USE,
+      { EVOR_ACTIVE_RUN_ID: RUN_ID, EVOR_MISSION_ID: MISSION_ID, EVOR_ROOT: tmpDir },
+      JSON.stringify({
+        tool_name: "evor_write_artifact",
+        tool_input: {
+          agent: "sage",
+          payload: { nested: "<evor-remember>from object payload</evor-remember>" },
+        },
+        tool_response: { ok: true },
+      }),
+    );
+    expect(result.status).toBe(0);
+  });
+});
+
+// ─── P1-6: subagent-start context injection ───────────────────────────────────
+
+describe("subagent-start hook — run-state context injection (P1-6)", () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = mkdtempSync(join(tmpdir(), "evor-substart-ctx-"));
+  });
+  afterEach(() => {
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it("includes [CONTEXT] block with run_id when active-run.json + run-state.json exist", () => {
+    const runId = "run-ctx-001";
+    const missionId = "mission-ctx-001";
+    const runDir = join(tmpDir, "runs", missionId, runId);
+    mkdirSync(runDir, { recursive: true });
+
+    writeFileSync(
+      join(tmpDir, "active-run.json"),
+      JSON.stringify({ run_id: runId, mission_id: missionId }),
+    );
+    writeFileSync(
+      join(runDir, "run-state.json"),
+      JSON.stringify({ tick_count: 4, best_score: 0.87, best_node_id: "node-best-01", pending_node_ids: [] }),
+    );
+    writeFileSync(
+      join(runDir, "tick-state.json"),
+      JSON.stringify({ tick: 4, current_step: 3 }),
+    );
+
+    const result = runHookWithStdin(
+      SUBAGENT_START,
+      { EVOR_ROOT: tmpDir },
+      JSON.stringify({ agent_type: "oh-my-evor:evor-sage" }),
+    );
+    expect(result.status).toBe(0);
+    const out = JSON.parse(result.stdout.trim());
+    const ctx = out.hookSpecificOutput.additionalContext;
+    expect(ctx).toContain("[CONTEXT]");
+    expect(ctx).toContain(runId);
+  });
+
+  it("context block includes tick and step info", () => {
+    const runId = "run-ctx-002";
+    const runDir = join(tmpDir, "runs", runId);
+    mkdirSync(runDir, { recursive: true });
+
+    writeFileSync(
+      join(tmpDir, "active-run.json"),
+      JSON.stringify({ run_id: runId }),
+    );
+    writeFileSync(
+      join(runDir, "run-state.json"),
+      JSON.stringify({ tick_count: 7, best_score: 0.91, best_node_id: "node-best-02" }),
+    );
+    writeFileSync(
+      join(runDir, "tick-state.json"),
+      JSON.stringify({ tick: 7, current_step: 5 }),
+    );
+
+    const result = runHookWithStdin(
+      SUBAGENT_START,
+      { EVOR_ROOT: tmpDir },
+      JSON.stringify({ agent_type: "oh-my-evor:evor-mutagen" }),
+    );
+    expect(result.status).toBe(0);
+    const out = JSON.parse(result.stdout.trim());
+    const ctx = out.hookSpecificOutput.additionalContext;
+    expect(ctx).toContain("[CONTEXT]");
+    expect(ctx).toMatch(/tick=7/);
+    expect(ctx).toMatch(/step=5/);
+  });
+
+  it("omits [CONTEXT] block when active-run.json is missing", () => {
+    const result = runHookWithStdin(
+      SUBAGENT_START,
+      { EVOR_ROOT: tmpDir },
+      JSON.stringify({ agent_type: "oh-my-evor:evor-sage" }),
+    );
+    expect(result.status).toBe(0);
+    const out = JSON.parse(result.stdout.trim());
+    const ctx = out.hookSpecificOutput.additionalContext;
+    expect(ctx).toContain("[EVOR LAW]");
+    expect(ctx).not.toContain("[CONTEXT]");
+  });
+
+  it("omits [CONTEXT] block when run-state.json is corrupt (fail-open)", () => {
+    const runId = "run-ctx-corrupt";
+    const runDir = join(tmpDir, "runs", runId);
+    mkdirSync(runDir, { recursive: true });
+
+    writeFileSync(
+      join(tmpDir, "active-run.json"),
+      JSON.stringify({ run_id: runId }),
+    );
+    writeFileSync(join(runDir, "run-state.json"), "{corrupt json,,}");
+
+    const result = runHookWithStdin(
+      SUBAGENT_START,
+      { EVOR_ROOT: tmpDir },
+      JSON.stringify({ agent_type: "oh-my-evor:evor-forge" }),
+    );
+    expect(result.status).toBe(0);
+    const out = JSON.parse(result.stdout.trim());
+    const ctx = out.hookSpecificOutput.additionalContext;
+    expect(ctx).not.toContain("[CONTEXT]");
+  });
+});
+
+// ─── P0-9: never-halt — stop.mjs blockCount escalation threshold ──────────────
+
+describe("stop hook — P0-9 never-halt blockCount escalation", () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = mkdtempSync(join(tmpdir(), "evor-stop-halt-"));
+  });
+  afterEach(() => {
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  function makeRunWithDrift(runDir: string) {
+    mkdirSync(join(runDir, "evaluations"), { recursive: true });
+    writeFileSync(
+      join(runDir, "run-state.json"),
+      JSON.stringify({ tick_count: 3, pending_node_ids: [], status: "running" }),
+    );
+    writeFileSync(
+      join(runDir, "tree.json"),
+      JSON.stringify({
+        nodes: { "node-drift-x": { id: "node-drift-x", status: "done" } },
+        updated_at: new Date().toISOString(),
+      }),
+    );
+    // No evaluations/node-drift-x.json → drift debt present
+  }
+
+  it("blocks at blockCount=7 with drift debt (threshold not yet reached)", () => {
+    const runId = "run-halt-007";
+    const runDir = join(tmpDir, "runs", runId);
+    makeRunWithDrift(runDir);
+
+    // Seed at 6: stop_hook_active increments to 7, which is < 8 → block
+    const sessionId = "nosession";
+    writeFileSync(
+      join(runDir, `stop-blocks-${sessionId}.json`),
+      JSON.stringify({ count: 6 }),
+    );
+
+    const result = runHookWithStdin(
+      STOP,
+      { EVOR_ACTIVE_RUN_ID: runId, EVOR_ROOT: tmpDir },
+      JSON.stringify({ stop_hook_active: true }),
+    );
+    expect(result.status).toBe(2);
+    expect(result.stdout).toMatch(/EVOR DRIFT GUARD/);
+  });
+
+  it("releases at blockCount=8 with drift debt only", () => {
+    const runId = "run-halt-008";
+    const runDir = join(tmpDir, "runs", runId);
+    makeRunWithDrift(runDir);
+
+    // Seed at 7: stop_hook_active increments to 8, which is >= 8 → release
+    const sessionId = "nosession";
+    writeFileSync(
+      join(runDir, `stop-blocks-${sessionId}.json`),
+      JSON.stringify({ count: 7 }),
+    );
+
+    const result = runHookWithStdin(
+      STOP,
+      { EVOR_ACTIVE_RUN_ID: runId, EVOR_ROOT: tmpDir },
+      JSON.stringify({ stop_hook_active: true }),
+    );
+    expect(result.status).toBe(0);
+  });
+
+  it("still blocks at blockCount=8 when pending_node_ids is non-empty (never release)", () => {
+    const runId = "run-halt-pending-008";
+    const runDir = join(tmpDir, "runs", runId);
+    mkdirSync(runDir, { recursive: true });
+    writeFileSync(
+      join(runDir, "run-state.json"),
+      JSON.stringify({ tick_count: 5, pending_node_ids: ["n1", "n2"], status: "running" }),
+    );
+
+    const sessionId = "nosession";
+    writeFileSync(
+      join(runDir, `stop-blocks-${sessionId}.json`),
+      JSON.stringify({ count: 7 }),
+    );
+
+    const result = runHookWithStdin(
+      STOP,
+      { EVOR_ACTIVE_RUN_ID: runId, EVOR_ROOT: tmpDir },
+      JSON.stringify({ stop_hook_active: true }),
+    );
+    expect(result.status).toBe(2);
+    expect(result.stdout).toMatch(/EVOR CONTINUATION GUARD/);
+  });
+
+  it("still blocks at blockCount=20 when pending_node_ids is non-empty", () => {
+    const runId = "run-halt-pending-020";
+    const runDir = join(tmpDir, "runs", runId);
+    mkdirSync(runDir, { recursive: true });
+    writeFileSync(
+      join(runDir, "run-state.json"),
+      JSON.stringify({ tick_count: 2, pending_node_ids: ["n1"], status: "running" }),
+    );
+
+    const sessionId = "nosession";
+    writeFileSync(
+      join(runDir, `stop-blocks-${sessionId}.json`),
+      JSON.stringify({ count: 19 }),
+    );
+
+    const result = runHookWithStdin(
+      STOP,
+      { EVOR_ACTIVE_RUN_ID: runId, EVOR_ROOT: tmpDir },
+      JSON.stringify({ stop_hook_active: true }),
+    );
+    expect(result.status).toBe(2);
+    expect(result.stdout).toMatch(/EVOR CONTINUATION GUARD/);
+  });
+});
+
+// ─── P0-4: pause semantics — pending_subagent_ids guard in stop.mjs ───────────
+
+describe("stop hook — P0-4 pending_subagent_ids guard", () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = mkdtempSync(join(tmpdir(), "evor-stop-subagent-"));
+  });
+  afterEach(() => {
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  function makeCleanRun(runDir: string, tick: number = 2) {
+    mkdirSync(join(runDir, "evaluations"), { recursive: true });
+    writeFileSync(
+      join(runDir, "run-state.json"),
+      JSON.stringify({ tick_count: tick, pending_node_ids: [], status: "running" }),
+    );
+    writeFileSync(
+      join(runDir, "tree.json"),
+      JSON.stringify({ nodes: {}, updated_at: new Date().toISOString() }),
+    );
+    mkdirSync(join(runDir, "ticks", String(tick), "mutagen"), { recursive: true });
+    mkdirSync(join(runDir, "ticks", String(tick), "selector"), { recursive: true });
+    writeFileSync(
+      join(runDir, "ticks", String(tick), "mutagen", "proposals.json"),
+      JSON.stringify({ proposals: [] }),
+    );
+    writeFileSync(
+      join(runDir, "ticks", String(tick), "selector", "verdict.json"),
+      JSON.stringify({ verdict: "rejected" }),
+    );
+  }
+
+  it("blocks with debt message when pending_subagent_ids is non-empty", () => {
+    const runId = "run-sub-p04-001";
+    const runDir = join(tmpDir, "runs", runId);
+    makeCleanRun(runDir);
+    writeFileSync(
+      join(runDir, "tick-state.json"),
+      JSON.stringify({ tick: 2, current_step: 9, pending_subagent_ids: ["abc-forge", "def-sage"] }),
+    );
+
+    const result = runHook(STOP, {
+      EVOR_ACTIVE_RUN_ID: runId,
+      EVOR_ROOT: tmpDir,
+    });
+    expect(result.status).toBe(2);
+    expect(result.stdout).toMatch(/EVOR DRIFT GUARD/);
+    expect(result.stdout).toMatch(/sub-agent/i);
+    expect(result.stdout).toMatch(/abc-forge/);
+  });
+
+  it("does not block when pending_subagent_ids is empty", () => {
+    const runId = "run-sub-p04-002";
+    const runDir = join(tmpDir, "runs", runId);
+    makeCleanRun(runDir);
+    writeFileSync(
+      join(runDir, "tick-state.json"),
+      JSON.stringify({ tick: 2, current_step: 9, pending_subagent_ids: [] }),
+    );
+
+    const result = runHook(STOP, {
+      EVOR_ACTIVE_RUN_ID: runId,
+      EVOR_ROOT: tmpDir,
+    });
+    expect(result.status).toBe(0);
+  });
+
+  it("does not block when pending_subagent_ids is absent (backward compat)", () => {
+    const runId = "run-sub-p04-003";
+    const runDir = join(tmpDir, "runs", runId);
+    makeCleanRun(runDir);
+    writeFileSync(
+      join(runDir, "tick-state.json"),
+      JSON.stringify({ tick: 2, current_step: 9 }),
+    );
+
+    const result = runHook(STOP, {
+      EVOR_ACTIVE_RUN_ID: runId,
+      EVOR_ROOT: tmpDir,
+    });
+    expect(result.status).toBe(0);
+  });
+
+  it("message names up to 3 pending sub-agent ids and shows truncation", () => {
+    const runId = "run-sub-p04-004";
+    const runDir = join(tmpDir, "runs", runId);
+    makeCleanRun(runDir);
+    writeFileSync(
+      join(runDir, "tick-state.json"),
+      JSON.stringify({
+        tick: 2,
+        current_step: 9,
+        pending_subagent_ids: ["id-a", "id-b", "id-c", "id-d"],
+      }),
+    );
+
+    const result = runHook(STOP, {
+      EVOR_ACTIVE_RUN_ID: runId,
+      EVOR_ROOT: tmpDir,
+    });
+    expect(result.status).toBe(2);
+    expect(result.stdout).toMatch(/4/);
+    expect(result.stdout).toMatch(/id-a/);
+    expect(result.stdout).toMatch(/id-b/);
+    expect(result.stdout).toMatch(/id-c/);
+    expect(result.stdout).toMatch(/\.\.\./);
   });
 });

@@ -21,7 +21,8 @@
  * §19: NO `python -m evor` in any agent-facing string. Timeless voice.
  */
 
-import { readFileSync } from 'fs';
+import { readFileSync, existsSync } from 'fs';
+import { join } from 'path';
 
 // ── Kill switches ─────────────────────────────────────────────────────────────
 if (process.env.DISABLE_EVOR) process.exit(0);
@@ -117,9 +118,55 @@ if (!agentType.startsWith('oh-my-evor:evor-') && bareRole === agentType) {
 }
 
 const addendum = ROLE_ADDENDA[bareRole] ?? null;
-const additionalContext = addendum
+let baseContext = addendum
   ? `${COMMON_HEADER}\n[ROLE: ${bareRole.toUpperCase()}] ${addendum}`
   : COMMON_HEADER;
+
+// ── P1-6: Best-effort run-state context injection ─────────────────────────────
+// Append a [CONTEXT] block so spawned agents know where in the run they are,
+// avoiding the orchestrator having to duplicate this in every spawn prompt.
+// Any read failure → skip silently (fail-open; never block agent spawn).
+let contextBlock = '';
+try {
+  const pluginRootSA = process.env.CLAUDE_PLUGIN_ROOT ?? process.cwd();
+  const evorRootSA = process.env.EVOR_ROOT ?? join(pluginRootSA, '.evor');
+
+  const activeRunPath = join(evorRootSA, 'active-run.json');
+  if (existsSync(activeRunPath)) {
+    const ar = JSON.parse(readFileSync(activeRunPath, 'utf8'));
+    const runId = String(ar?.run_id ?? '');
+    if (runId) {
+      const missionIdSA = String(ar?.mission_id ?? '');
+      const runDirSA = missionIdSA
+        ? join(evorRootSA, 'runs', missionIdSA, runId)
+        : join(evorRootSA, 'runs', runId);
+
+      const runStateSA = JSON.parse(readFileSync(join(runDirSA, 'run-state.json'), 'utf8'));
+      const bestScore = runStateSA?.best_score ?? '?';
+      const bestNodeId = runStateSA?.best_node_id ?? '?';
+
+      let tick = '?';
+      let currentStep = '?';
+      try {
+        const tsPath = join(runDirSA, 'tick-state.json');
+        if (existsSync(tsPath)) {
+          const ts = JSON.parse(readFileSync(tsPath, 'utf8'));
+          tick = ts?.tick ?? '?';
+          currentStep = ts?.current_step ?? '?';
+        }
+      } catch { /* tick-state absent or corrupt — skip */ }
+
+      const runDirRelative = missionIdSA
+        ? `runs/${missionIdSA}/${runId}`
+        : `runs/${runId}`;
+      contextBlock =
+        `\n[CONTEXT] run_id=${runId} | tick=${tick} | step=${currentStep}/9 | ` +
+        `best=${bestScore} (${bestNodeId}) | Read .evor/${runDirRelative}/ for full state.`;
+    }
+  }
+} catch { /* fail-open — any error → no context block */ }
+
+const additionalContext = baseContext + contextBlock;
 
 process.stdout.write(
   JSON.stringify({
