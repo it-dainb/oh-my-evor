@@ -237,9 +237,11 @@ class TestCitationBackedFindingRoundTrip:
         assert f2.libraries == ["timm"]
 
     def test_json_blob_contains_all_new_keys(self) -> None:
-        """The serialised JSON must carry all three new fields even at their defaults."""
+        """The model must declare all three new fields (schema completeness check).
+        Uses exclude_none=False so that None-default optional fields appear; the
+        default serialisation omits them per P0-6 exclude_none behaviour."""
         f = CitationBackedFinding(**_REQUIRED_KWARGS)
-        parsed = json.loads(f.model_dump_json())
+        parsed = json.loads(f.model_dump_json(exclude_none=False))
         assert "implementation_spec" in parsed
         assert "key_hyperparams" in parsed
         assert "libraries" in parsed

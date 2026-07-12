@@ -482,9 +482,14 @@ class IntegrityGate:
         LEAK_FLOOR   = 0.02   # near-perfect for lower-is-better  metrics (MSE, loss)
         SPIKE_THRESH = 0.30   # per-step magnitude threshold (both directions)
 
-        if direction == "higher" and candidate_val >= LEAK_CEILING:
+        # P0-7: normalise to [0,1] using metric_scale before ceiling comparison.
+        # metric_scale=1.0 (default) is a no-op for existing [0,1]-range metrics.
+        metric_scale = getattr(goal, "metric_scale", 1.0) or 1.0
+        normalised_val = candidate_val / metric_scale
+
+        if direction == "higher" and normalised_val >= LEAK_CEILING:
             return True
-        if direction == "lower"  and candidate_val <= LEAK_FLOOR:
+        if direction == "lower"  and normalised_val <= LEAK_FLOOR:
             return True
 
         # Best-effort per-step spike check when a val series is present in telemetry.

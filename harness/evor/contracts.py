@@ -2,13 +2,15 @@
 oh-my-evor data contracts — Pydantic v2 strict models.
 
 All 27+ schemas mirroring mcp/src/contracts.ts exactly.
-Field names match the TypeScript interfaces; model_config = ConfigDict(strict=True) on all.
+Field names match the TypeScript interfaces; model_config = ConfigDict(strict=True, exclude_none=True) on all.
 
 ApproachFamily: 7-tag literal taxonomy per R-12.
 """
 
 from __future__ import annotations
 
+import hashlib
+import json
 from typing import Any, Literal, Optional, Union
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -29,11 +31,35 @@ ApproachFamily = Literal[
 
 
 # ────────────────────────────────────────────────────────────────────────────
+# Base model — exclude_none=True by default on all serialisation calls (P0-6)
+# ────────────────────────────────────────────────────────────────────────────
+
+
+class BaseEvorModel(BaseModel):
+    """Shared base for all evor contracts.
+
+    Overrides model_dump / model_dump_json so that optional fields whose value
+    is None are omitted from serialised output by default.  This keeps Pydantic
+    output compatible with Zod schemas that use .optional() (not .nullish()),
+    which reject explicit null values.
+
+    The exclude_none default can still be overridden by passing
+    ``model_dump(exclude_none=False)`` explicitly.
+    """
+
+    def model_dump(self, *, exclude_none: bool = True, **kwargs) -> dict:  # type: ignore[override]
+        return super().model_dump(exclude_none=exclude_none, **kwargs)
+
+    def model_dump_json(self, *, exclude_none: bool = True, **kwargs) -> str:  # type: ignore[override]
+        return super().model_dump_json(exclude_none=exclude_none, **kwargs)
+
+
+# ────────────────────────────────────────────────────────────────────────────
 # MetricSpec / MetricRegistry (Pillar 3)
 # ────────────────────────────────────────────────────────────────────────────
 
 
-class MetricConstraint(BaseModel):
+class MetricConstraint(BaseEvorModel):
     """Hard constraint on a secondary metric used as a gamability guard.
 
     A candidate violating ANY constraint on the primary MetricSpec receives
@@ -45,7 +71,7 @@ class MetricConstraint(BaseModel):
     prevents recall-gaming when recall is the primary metric.
     """
 
-    model_config = ConfigDict(strict=True)
+    model_config = ConfigDict(strict=True, exclude_none=True)
 
     metric: str
     """Name of the metric to constrain (must appear in EvaluationResult.metrics)."""
@@ -55,7 +81,7 @@ class MetricConstraint(BaseModel):
     """Threshold value for the constraint."""
 
 
-class MetricSpec(BaseModel):
+class MetricSpec(BaseEvorModel):
     """Specification for a single tracked metric.
 
     Supports scalar, composite-weighted, F-beta, preference-with-constraint,
@@ -68,7 +94,7 @@ class MetricSpec(BaseModel):
     * Custom:          custom_metrics=["my_ndcg"] instructs the evaluator to emit it
     """
 
-    model_config = ConfigDict(strict=True)
+    model_config = ConfigDict(strict=True, exclude_none=True)
 
     metric_name: str
     direction: Literal["higher", "lower"]
@@ -113,8 +139,8 @@ MetricRegistry = dict[str, MetricSpec]
 # ────────────────────────────────────────────────────────────────────────────
 
 
-class SotaSource(BaseModel):
-    model_config = ConfigDict(strict=True)
+class SotaSource(BaseEvorModel):
+    model_config = ConfigDict(strict=True, exclude_none=True)
 
     source_id: str
     name: str
@@ -128,15 +154,15 @@ class SotaSource(BaseModel):
 # ────────────────────────────────────────────────────────────────────────────
 
 
-class MaxUpgradesPerNTicks(BaseModel):
-    model_config = ConfigDict(strict=True)
+class MaxUpgradesPerNTicks(BaseEvorModel):
+    model_config = ConfigDict(strict=True, exclude_none=True)
 
     max_upgrades: int
     per_ticks: int
 
 
-class ExpansionPolicy(BaseModel):
-    model_config = ConfigDict(strict=True)
+class ExpansionPolicy(BaseEvorModel):
+    model_config = ConfigDict(strict=True, exclude_none=True)
 
     auto_add_within_families: list[str]
     require_consent_for: list[str]
@@ -153,8 +179,8 @@ class ExpansionPolicy(BaseModel):
 # ────────────────────────────────────────────────────────────────────────────
 
 
-class StopCondition(BaseModel):
-    model_config = ConfigDict(strict=True)
+class StopCondition(BaseEvorModel):
+    model_config = ConfigDict(strict=True, exclude_none=True)
 
     type: Literal[
         "beat-baseline",
@@ -170,8 +196,8 @@ class StopCondition(BaseModel):
     n: Optional[int] = None
 
 
-class Budget(BaseModel):
-    model_config = ConfigDict(strict=True)
+class Budget(BaseEvorModel):
+    model_config = ConfigDict(strict=True, exclude_none=True)
 
     max_iterations: int
     plateau_window: int
@@ -181,7 +207,7 @@ class Budget(BaseModel):
     max_gpu_hours: Optional[float] = None
 
 
-class EvolutionBounds(BaseModel):
+class EvolutionBounds(BaseEvorModel):
     """How far escalate-mode may adapt the otherwise-locked GoalContract.
 
     Escalation is MONOTONIC — it may only make the objective harder or more
@@ -190,7 +216,7 @@ class EvolutionBounds(BaseModel):
     is frozen. ``None`` on a contract = fully frozen (no auto-adaptation).
     """
 
-    model_config = ConfigDict(strict=True)
+    model_config = ConfigDict(strict=True, exclude_none=True)
 
     benchmark_may_harden: bool = True
     """auto: add harder eval domains / worst-case slices (can only lower scores)."""
@@ -204,7 +230,7 @@ class EvolutionBounds(BaseModel):
     """any change to what the primary number MEANS is gated on human consent."""
 
 
-class AutonomyCharter(BaseModel):
+class AutonomyCharter(BaseEvorModel):
     """Principle-based FULL autonomy: after setup, the mission runs to the goal with
     ZERO human-in-the-loop. Every mid-run decision is auto-resolved by the
     Monotonic-Honesty Invariant — it must move the evaluation toward *harder / more
@@ -213,7 +239,7 @@ class AutonomyCharter(BaseModel):
     asked about. Setup is the sole HITL.
     """
 
-    model_config = ConfigDict(strict=True)
+    model_config = ConfigDict(strict=True, exclude_none=True)
 
     posture: Literal["aggressive-never-halt"] = "aggressive-never-halt"
     """The only posture: never stop for a human; always take the monotonic move."""
@@ -231,8 +257,8 @@ class AutonomyCharter(BaseModel):
     """The two checks that ARE the invariant — enforced automatically, never HITL, never bypassed."""
 
 
-class GoalContract(BaseModel):
-    model_config = ConfigDict(strict=True)
+class GoalContract(BaseEvorModel):
+    model_config = ConfigDict(strict=True, exclude_none=True)
 
     mission_id: str
     mode: Literal["seed-repo", "from-scratch"]
@@ -262,14 +288,66 @@ class GoalContract(BaseModel):
     """full-autonomy charter; always present — charter is mandatory for all missions."""
     created_at: str
 
+    # ── P0-7: metric scale ────────────────────────────────────────────────────
+    metric_scale: float = 1.0
+    """Divisor to normalise reported scores to [0,1] before integrity ceiling checks.
+    Default 1.0 = scores already in [0,1] (accuracy, F1, …).
+    Set to 100.0 for metrics reported on a 0-100 scale (DIBCO, COCO mAP %, …).
+    reward_hacking_probe divides candidate_val by metric_scale before the ≥0.98 check.
+    """
+
+    # ── P0-2: contract seal ───────────────────────────────────────────────────
+    contract_seal: Optional[str] = None
+    """sha256 hex digest of the contract's own content (excluding this field).
+    Set by seal_contract(); verified by verify_contract_seal().
+    Absent (None) on legacy contracts → backward-compat pass with a warning.
+    """
+
+
+# ── P0-2: seal helpers ────────────────────────────────────────────────────────
+
+
+def seal_contract(contract: "GoalContract") -> "GoalContract":
+    """Return a copy of *contract* with contract_seal set to the sha256 of its content.
+
+    The seal is computed over model_dump(exclude={'contract_seal'}) serialised
+    with sorted keys so it is deterministic regardless of field insertion order.
+    """
+    payload = contract.model_dump(exclude={"contract_seal"})
+    digest = hashlib.sha256(
+        json.dumps(payload, sort_keys=True, default=str).encode()
+    ).hexdigest()
+    return contract.model_copy(update={"contract_seal": digest})
+
+
+def verify_contract_seal(contract: "GoalContract") -> bool:
+    """Return True if the contract seal is valid or absent (backward compat).
+
+    * Seal absent (None) → True with a warning (legacy contracts pre-P0-2).
+    * Seal present → recompute and compare; return True only on match.
+    """
+    if contract.contract_seal is None:
+        import warnings
+        warnings.warn(
+            f"GoalContract {contract.mission_id!r} has no contract_seal — "
+            "consider sealing with seal_contract() to detect post-lock mutations.",
+            stacklevel=2,
+        )
+        return True
+    payload = contract.model_dump(exclude={"contract_seal"})
+    expected = hashlib.sha256(
+        json.dumps(payload, sort_keys=True, default=str).encode()
+    ).hexdigest()
+    return expected == contract.contract_seal
+
 
 # ────────────────────────────────────────────────────────────────────────────
 # Hypothesis
 # ────────────────────────────────────────────────────────────────────────────
 
 
-class Hypothesis(BaseModel):
-    model_config = ConfigDict(strict=True)
+class Hypothesis(BaseEvorModel):
+    model_config = ConfigDict(strict=True, exclude_none=True)
 
     id: str
     statement: str
@@ -283,39 +361,39 @@ class Hypothesis(BaseModel):
 # ────────────────────────────────────────────────────────────────────────────
 
 
-class MutationLocusArch(BaseModel):
-    model_config = ConfigDict(strict=True)
+class MutationLocusArch(BaseEvorModel):
+    model_config = ConfigDict(strict=True, exclude_none=True)
     family: Literal["arch"]
     path: Literal["model/"]
 
 
-class MutationLocusTraining(BaseModel):
-    model_config = ConfigDict(strict=True)
+class MutationLocusTraining(BaseEvorModel):
+    model_config = ConfigDict(strict=True, exclude_none=True)
     family: Literal["training"]
     path: Literal["train/"]
 
 
-class MutationLocusDataCuration(BaseModel):
-    model_config = ConfigDict(strict=True)
+class MutationLocusDataCuration(BaseEvorModel):
+    model_config = ConfigDict(strict=True, exclude_none=True)
     family: Literal["data-curation"]
     path: Literal["data/builder"]
 
 
-class MutationLocusDataAugmentation(BaseModel):
-    model_config = ConfigDict(strict=True)
+class MutationLocusDataAugmentation(BaseEvorModel):
+    model_config = ConfigDict(strict=True, exclude_none=True)
     family: Literal["data-augmentation"]
     path: Literal["data/aug"]
 
 
-class MutationLocusDataAcquisition(BaseModel):
-    model_config = ConfigDict(strict=True)
+class MutationLocusDataAcquisition(BaseEvorModel):
+    model_config = ConfigDict(strict=True, exclude_none=True)
     family: Literal["data-acquisition"]
     path: Literal["data/acquisition"]
     acquisition_type: Literal["external", "synthetic"]
 
 
-class MutationLocusAlgo(BaseModel):
-    model_config = ConfigDict(strict=True)
+class MutationLocusAlgo(BaseEvorModel):
+    model_config = ConfigDict(strict=True, exclude_none=True)
     family: Literal["algo"]
     path: str
     genome_extension: str
@@ -336,8 +414,8 @@ MutationLocus = Union[
 # ────────────────────────────────────────────────────────────────────────────
 
 
-class TreeNode(BaseModel):
-    model_config = ConfigDict(strict=True)
+class TreeNode(BaseEvorModel):
+    model_config = ConfigDict(strict=True, exclude_none=True)
 
     id: str
     parent_ids: list[str]
@@ -372,8 +450,8 @@ class TreeNode(BaseModel):
 # ────────────────────────────────────────────────────────────────────────────
 
 
-class CriticReview(BaseModel):
-    model_config = ConfigDict(strict=True)
+class CriticReview(BaseEvorModel):
+    model_config = ConfigDict(strict=True, exclude_none=True)
 
     h001_one_hypothesis: Literal["pass", "fail"]
     h002_family_streak: Literal["pass", "fail"]
@@ -385,8 +463,8 @@ class CriticReview(BaseModel):
     rejection_reason: Optional[str] = None
 
 
-class MutationProposal(BaseModel):
-    model_config = ConfigDict(strict=True)
+class MutationProposal(BaseEvorModel):
+    model_config = ConfigDict(strict=True, exclude_none=True)
 
     proposal_id: str
     parent_node_ids: list[str]
@@ -404,8 +482,8 @@ class MutationProposal(BaseModel):
 # ────────────────────────────────────────────────────────────────────────────
 
 
-class TelemetrySummary(BaseModel):
-    model_config = ConfigDict(strict=True)
+class TelemetrySummary(BaseEvorModel):
+    model_config = ConfigDict(strict=True, exclude_none=True)
 
     final_train_loss: Optional[float] = None
     best_val_metric: Optional[float] = None
@@ -418,17 +496,17 @@ class TelemetrySummary(BaseModel):
     Eval scripts should emit this under telemetry_summary.val_series."""
 
 
-class AngleVsSOTAInline(BaseModel):
+class AngleVsSOTAInline(BaseEvorModel):
     """Inline per-angle result embedded in EvaluationResult.per_angle_vs_sota."""
-    model_config = ConfigDict(strict=True)
+    model_config = ConfigDict(strict=True, exclude_none=True)
 
     value: float
     sota_bar: float
     above_sota: bool
 
 
-class EvaluationResult(BaseModel):
-    model_config = ConfigDict(strict=True)
+class EvaluationResult(BaseEvorModel):
+    model_config = ConfigDict(strict=True, exclude_none=True)
 
     node_id: str
     run_id: str
@@ -449,8 +527,8 @@ class EvaluationResult(BaseModel):
 # ────────────────────────────────────────────────────────────────────────────
 
 
-class IntegrityChecks(BaseModel):
-    model_config = ConfigDict(strict=True)
+class IntegrityChecks(BaseEvorModel):
+    model_config = ConfigDict(strict=True, exclude_none=True)
 
     split_hash_match: bool
     frozen_split_read_only: bool
@@ -470,8 +548,8 @@ class IntegrityChecks(BaseModel):
     None = gate not run (candidate_dir not provided to IntegrityGate.check())."""
 
 
-class IntegrityReport(BaseModel):
-    model_config = ConfigDict(strict=True)
+class IntegrityReport(BaseEvorModel):
+    model_config = ConfigDict(strict=True, exclude_none=True)
 
     node_id: str
     eval_version: str
@@ -486,8 +564,8 @@ class IntegrityReport(BaseModel):
 # ────────────────────────────────────────────────────────────────────────────
 
 
-class TelemetryRecord(BaseModel):
-    model_config = ConfigDict(strict=True)
+class TelemetryRecord(BaseEvorModel):
+    model_config = ConfigDict(strict=True, exclude_none=True)
 
     step: int
     epoch: Optional[float] = None
@@ -511,8 +589,8 @@ class TelemetryRecord(BaseModel):
 # ────────────────────────────────────────────────────────────────────────────
 
 
-class LessonEntry(BaseModel):
-    model_config = ConfigDict(strict=True)
+class LessonEntry(BaseEvorModel):
+    model_config = ConfigDict(strict=True, exclude_none=True)
 
     lesson_id: str
     node_id: str
@@ -534,8 +612,8 @@ class LessonEntry(BaseModel):
 # ────────────────────────────────────────────────────────────────────────────
 
 
-class StrategyState(BaseModel):
-    model_config = ConfigDict(strict=True)
+class StrategyState(BaseEvorModel):
+    model_config = ConfigDict(strict=True, exclude_none=True)
 
     meta_iteration: int
     selection_policy: Literal["ucb1", "mcts", "beam"]
@@ -560,8 +638,8 @@ class StrategyState(BaseModel):
 # ────────────────────────────────────────────────────────────────────────────
 
 
-class ResourcePlan(BaseModel):
-    model_config = ConfigDict(strict=True)
+class ResourcePlan(BaseEvorModel):
+    model_config = ConfigDict(strict=True, exclude_none=True)
 
     concurrency: int
     gpu_ids: list[int]
@@ -577,8 +655,8 @@ class ResourcePlan(BaseModel):
 # ────────────────────────────────────────────────────────────────────────────
 
 
-class DecisionLogEntry(BaseModel):
-    model_config = ConfigDict(strict=True)
+class DecisionLogEntry(BaseEvorModel):
+    model_config = ConfigDict(strict=True, exclude_none=True)
 
     timestamp: str
     tick: int
@@ -604,8 +682,8 @@ class DecisionLogEntry(BaseModel):
 # ────────────────────────────────────────────────────────────────────────────
 
 
-class GenomeConfig(BaseModel):
-    model_config = ConfigDict(strict=True)
+class GenomeConfig(BaseEvorModel):
+    model_config = ConfigDict(strict=True, exclude_none=True)
 
     genome_version: str
     model_family: Optional[str] = None
@@ -634,8 +712,8 @@ class GenomeConfig(BaseModel):
 # ────────────────────────────────────────────────────────────────────────────
 
 
-class AcquisitionProvenance(BaseModel):
-    model_config = ConfigDict(strict=True)
+class AcquisitionProvenance(BaseEvorModel):
+    model_config = ConfigDict(strict=True, exclude_none=True)
 
     acquisition_id: str
     acquisition_type: Literal["external", "synthetic"]
@@ -657,8 +735,8 @@ class AcquisitionProvenance(BaseModel):
 # ────────────────────────────────────────────────────────────────────────────
 
 
-class FrozenSplit(BaseModel):
-    model_config = ConfigDict(strict=True)
+class FrozenSplit(BaseEvorModel):
+    model_config = ConfigDict(strict=True, exclude_none=True)
 
     split_id: str
     mission_id: str
@@ -676,8 +754,8 @@ class FrozenSplit(BaseModel):
 # ────────────────────────────────────────────────────────────────────────────
 
 
-class DataProvenance(BaseModel):
-    model_config = ConfigDict(strict=True)
+class DataProvenance(BaseEvorModel):
+    model_config = ConfigDict(strict=True, exclude_none=True)
 
     sample_id: str
     source_sample_id: str
@@ -693,8 +771,8 @@ class DataProvenance(BaseModel):
 # ────────────────────────────────────────────────────────────────────────────
 
 
-class Domain(BaseModel):
-    model_config = ConfigDict(strict=True)
+class Domain(BaseEvorModel):
+    model_config = ConfigDict(strict=True, exclude_none=True)
 
     domain_id: str
     description: str
@@ -708,8 +786,8 @@ class Domain(BaseModel):
 # ────────────────────────────────────────────────────────────────────────────
 
 
-class EvalSuite(BaseModel):
-    model_config = ConfigDict(strict=True)
+class EvalSuite(BaseEvorModel):
+    model_config = ConfigDict(strict=True, exclude_none=True)
 
     eval_version: str
     mission_id: str
@@ -731,8 +809,8 @@ EvalVersion = EvalSuite
 # ────────────────────────────────────────────────────────────────────────────
 
 
-class BenchmarkUpgrade(BaseModel):
-    model_config = ConfigDict(strict=True)
+class BenchmarkUpgrade(BaseEvorModel):
+    model_config = ConfigDict(strict=True, exclude_none=True)
 
     upgrade_id: str
     mission_id: str
@@ -757,8 +835,8 @@ class BenchmarkUpgrade(BaseModel):
 # ────────────────────────────────────────────────────────────────────────────
 
 
-class BenchmarkUpgradeProposal(BaseModel):
-    model_config = ConfigDict(strict=True)
+class BenchmarkUpgradeProposal(BaseEvorModel):
+    model_config = ConfigDict(strict=True, exclude_none=True)
 
     proposed_by: Literal["probe", "sage"]
     new_domains: list[str]
@@ -771,8 +849,8 @@ class BenchmarkUpgradeProposal(BaseModel):
 # ────────────────────────────────────────────────────────────────────────────
 
 
-class AngleEntry(BaseModel):
-    model_config = ConfigDict(strict=True)
+class AngleEntry(BaseEvorModel):
+    model_config = ConfigDict(strict=True, exclude_none=True)
 
     angle_id: str
     eval_version_added: str
@@ -789,8 +867,8 @@ class AngleEntry(BaseModel):
     pretraining_contamination_risk: Literal["low", "medium", "high", "unknown"]
 
 
-class AngleRegistry(BaseModel):
-    model_config = ConfigDict(strict=True)
+class AngleRegistry(BaseEvorModel):
+    model_config = ConfigDict(strict=True, exclude_none=True)
 
     mission_id: str
     angles: list[AngleEntry]
@@ -802,8 +880,8 @@ class AngleRegistry(BaseModel):
 # ────────────────────────────────────────────────────────────────────────────
 
 
-class CoverageTarget(BaseModel):
-    model_config = ConfigDict(strict=True)
+class CoverageTarget(BaseEvorModel):
+    model_config = ConfigDict(strict=True, exclude_none=True)
 
     target_fraction: float
     current_worst_angle_id: Optional[str] = None
@@ -815,8 +893,8 @@ class CoverageTarget(BaseModel):
 # ────────────────────────────────────────────────────────────────────────────
 
 
-class BenchmarkRescore(BaseModel):
-    model_config = ConfigDict(strict=True)
+class BenchmarkRescore(BaseEvorModel):
+    model_config = ConfigDict(strict=True, exclude_none=True)
 
     upgrade_id: str
     node_id: str
@@ -831,8 +909,8 @@ class BenchmarkRescore(BaseModel):
 # ────────────────────────────────────────────────────────────────────────────
 
 
-class AngleVsSOTA(BaseModel):
-    model_config = ConfigDict(strict=True)
+class AngleVsSOTA(BaseEvorModel):
+    model_config = ConfigDict(strict=True, exclude_none=True)
 
     angle_id: str
     value: float
@@ -848,16 +926,16 @@ class AngleVsSOTA(BaseModel):
 # ────────────────────────────────────────────────────────────────────────────
 
 
-class DetectedSeam(BaseModel):
-    model_config = ConfigDict(strict=True)
+class DetectedSeam(BaseEvorModel):
+    model_config = ConfigDict(strict=True, exclude_none=True)
 
     kind: Literal["model_def", "training_loop", "data_pipeline"]
     file: str
     symbol: str
 
 
-class GenomeSeedAdapterReport(BaseModel):
-    model_config = ConfigDict(strict=True)
+class GenomeSeedAdapterReport(BaseEvorModel):
+    model_config = ConfigDict(strict=True, exclude_none=True)
 
     seed_repo_path: str
     detected_seams: list[DetectedSeam]
@@ -873,7 +951,7 @@ class GenomeSeedAdapterReport(BaseModel):
 # ────────────────────────────────────────────────────────────────────────────
 
 
-class GotchaEntry(BaseModel):
+class GotchaEntry(BaseEvorModel):
     """A single recorded failure/constraint that future agents should avoid.
 
     Stored under .evor/wiki/gotchas/ (global scope) or per run-dir (mission
@@ -884,7 +962,7 @@ class GotchaEntry(BaseModel):
     ``occurrences``, bump ``last_seen``, and raise ``confidence`` toward 1.0.
     """
 
-    model_config = ConfigDict(strict=True)
+    model_config = ConfigDict(strict=True, exclude_none=True)
 
     gotcha_id: str
     """Unique ID \u2014 typically ``<kind>-<signature>-<hash>``."""
@@ -919,7 +997,7 @@ SignalAxis = Literal[
 SignalSeverity = Literal["low", "medium", "high", "critical"]
 
 
-class Signal(BaseModel):
+class Signal(BaseEvorModel):
     """A neutral, self-describing observation on the run's signal bus.
 
     Producers emit signals; consumers read them through their own lens (see each
@@ -933,7 +1011,7 @@ class Signal(BaseModel):
     the storm/dedup + oscillation damper (recurrence x confidence).
     """
 
-    model_config = ConfigDict(strict=True)
+    model_config = ConfigDict(strict=True, exclude_none=True)
 
     signal_id: str
     kind: str
@@ -959,14 +1037,14 @@ class Signal(BaseModel):
     last_seen: str
 
 
-class CapabilityProfile(BaseModel):
+class CapabilityProfile(BaseEvorModel):
     """Hardware capability profile probed at preflight time.
 
     Written to ``.evor/capability.json`` (global) so all agents can read it.
     When no GPU is available, ``cpu_only=True`` and GPU fields are None.
     """
 
-    model_config = ConfigDict(strict=True)
+    model_config = ConfigDict(strict=True, exclude_none=True)
 
     gpu_arch: Optional[str] = None
     """CUDA capability string, e.g. 'sm_80', 'sm_90'. None on CPU-only box."""
@@ -992,7 +1070,7 @@ class CapabilityProfile(BaseModel):
 # ────────────────────────────────────────────────────────────────────────────
 
 
-class CitationBackedFinding(BaseModel):
+class CitationBackedFinding(BaseEvorModel):
     """A single research finding backed by ≥1 citation, with an optional full
     implementation blueprint.
 
@@ -1004,7 +1082,7 @@ class CitationBackedFinding(BaseModel):
     Paraphrasing is forbidden for verbatim math inside implementation_spec.
     """
 
-    model_config = ConfigDict(strict=True)
+    model_config = ConfigDict(strict=True, exclude_none=True)
 
     title: str
     """Short descriptive title of the finding."""
@@ -1056,10 +1134,10 @@ WorkspaceClass = Literal["greenfield", "brownfield", "evor-active", "possibly-tr
 """Workspace classification produced by classify_workspace() / evor-distill."""
 
 
-class DetectedDataset(BaseModel):
+class DetectedDataset(BaseEvorModel):
     """A dataset directory or file found by the distill scanner."""
 
-    model_config = ConfigDict(strict=True)
+    model_config = ConfigDict(strict=True, exclude_none=True)
 
     path: str
     kind: Literal["images-dir", "csv", "parquet", "tfrecord", "hf-cache", "unknown"]
@@ -1067,10 +1145,10 @@ class DetectedDataset(BaseModel):
     notes: Optional[str] = None
 
 
-class DetectedModel(BaseModel):
+class DetectedModel(BaseEvorModel):
     """A model checkpoint found by the distill scanner."""
 
-    model_config = ConfigDict(strict=True)
+    model_config = ConfigDict(strict=True, exclude_none=True)
 
     path: str
     format: Literal["torch", "checkpoint", "safetensors", "onnx", "h5", "pickle", "unknown"]
@@ -1082,10 +1160,10 @@ class DetectedModel(BaseModel):
     """ISO 8601 last-modified timestamp."""
 
 
-class DetectedConfig(BaseModel):
+class DetectedConfig(BaseEvorModel):
     """A config file found by the distill scanner."""
 
-    model_config = ConfigDict(strict=True)
+    model_config = ConfigDict(strict=True, exclude_none=True)
 
     path: str
     format: Literal["yaml", "json", "toml", "hydra"]
@@ -1093,14 +1171,14 @@ class DetectedConfig(BaseModel):
     """Best-effort extraction of lr/batch_size/epochs/model/optimizer."""
 
 
-class ScrapedMetric(BaseModel):
+class ScrapedMetric(BaseEvorModel):
     """A metric/value pair scraped from documentation or experiment logs.
 
     INVARIANT: verified is ALWAYS False at distill time. EVOR must re-measure
     on the frozen split before trusting any claimed number.
     """
 
-    model_config = ConfigDict(strict=True)
+    model_config = ConfigDict(strict=True, exclude_none=True)
 
     source: Literal["readme", "wandb", "tensorboard", "log", "json", "csv"]
     source_path: str
@@ -1112,7 +1190,7 @@ class ScrapedMetric(BaseModel):
     """ALWAYS False at distill — distill never trusts a repo's claimed number."""
 
 
-class BaselineCandidate(BaseModel):
+class BaselineCandidate(BaseEvorModel):
     """Best baseline candidate extracted from the distill scan.
 
     INVARIANT: verified is ALWAYS False. The distilled value becomes the
@@ -1120,7 +1198,7 @@ class BaselineCandidate(BaseModel):
     the evaluator computes on the frozen split.
     """
 
-    model_config = ConfigDict(strict=True)
+    model_config = ConfigDict(strict=True, exclude_none=True)
 
     model_path: Optional[str] = None
     metric_name: Optional[str] = None
@@ -1130,10 +1208,10 @@ class BaselineCandidate(BaseModel):
     """ALWAYS False — EVOR must re-measure before trusting this number."""
 
 
-class StartingPointReport(BaseModel):
+class StartingPointReport(BaseEvorModel):
     """Full distill scan result written to ``<evorRoot>/starting-point.json``."""
 
-    model_config = ConfigDict(strict=True)
+    model_config = ConfigDict(strict=True, exclude_none=True)
 
     workspace_class: WorkspaceClass
     root: str

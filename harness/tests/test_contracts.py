@@ -27,6 +27,8 @@ from evor.contracts import (
     StrategyState,
     StopCondition,
     TreeNode,
+    seal_contract,
+    verify_contract_seal,
 )
 
 # ─── Shared fixtures ──────────────────────────────────────────────────────────
@@ -506,3 +508,208 @@ class TestBenchmarkUpgrade:
         # zero deadline = demote immediately (valid edge case)
         upg = self._make(rescore_deadline_ticks=0)
         assert upg.rescore_deadline_ticks == 0
+
+
+# ─── P0-6: exclude_none ───────────────────────────────────────────────────────
+
+
+class TestExcludeNone:
+    """P0-6: Pydantic serializes optional=None fields as null by default; Zod
+    .optional() rejects explicit null.  All models with optional fields must
+    suppress null keys in model_dump() output."""
+
+    def test_goal_contract_dump_has_no_null_keys(self) -> None:
+        """GoalContract with only required fields must produce zero null values."""
+        gc = GoalContract(**VALID_GOAL_CONTRACT_KWARGS)
+        data = gc.model_dump()
+        null_keys = [k for k, v in data.items() if v is None]
+        assert null_keys == [], f"model_dump() contains null keys: {null_keys}"
+
+    def test_goal_contract_optional_none_absent_from_dump(self) -> None:
+        """target_value=None must be absent (not present as null) in the dump."""
+        gc = GoalContract(**VALID_GOAL_CONTRACT_KWARGS)
+        assert gc.target_value is None
+        data = gc.model_dump()
+        assert "target_value" not in data, (
+            "target_value=None must be excluded from model_dump(); "
+            "add exclude_none=True to ConfigDict"
+        )
+
+    def test_metric_spec_dump_has_no_null_keys(self) -> None:
+        """MetricSpec optional fields (sota_bar, fitness_formula, fbeta) absent when None."""
+        spec = MetricSpec(
+            metric_name="f1",
+            direction="higher",
+            domain_applicability="all",
+            aggregation_rule="macro_avg",
+            role="primary_fitness",
+        )
+        data = spec.model_dump()
+        null_keys = [k for k, v in data.items() if v is None]
+        assert null_keys == [], f"MetricSpec.model_dump() contains null keys: {null_keys}"
+
+    def test_strategy_state_dump_has_no_null_keys(self) -> None:
+        """StrategyState with post_upgrade_exploration_boost=None must not emit null."""
+        state = StrategyState(
+            meta_iteration=0,
+            selection_policy="ucb1",
+            ucb1_c=1.41,
+            wildness=0.5,
+            family_mix={"arch": 0.5, "training": 0.5},
+            winning_families=[],
+            wins_by_family={},
+            meta_loop_interval=5,
+            post_upgrade_exploration_boost=None,
+            post_upgrade_exploration_ticks=0,
+            rescore_mode="sync",
+            updated_at=ISO_TS,
+        )
+        data = state.model_dump()
+        null_keys = [k for k, v in data.items() if v is None]
+        assert null_keys == [], f"StrategyState.model_dump() contains null keys: {null_keys}"
+
+
+# ─── P0-7: GoalContract.metric_scale ─────────────────────────────────────────
+
+
+class TestMetricScale:
+    """P0-7: DIBCO and other 0-100 scale metrics need metric_scale on GoalContract
+    so reward_hacking_probe normalises before the ≥0.98 ceiling check."""
+
+    def test_metric_scale_defaults_to_1(self) -> None:
+        gc = GoalContract(**VALID_GOAL_CONTRACT_KWARGS)
+        assert gc.metric_scale == 1.0
+
+    def test_metric_scale_accepts_100(self) -> None:
+        gc = GoalContract(**{**VALID_GOAL_CONTRACT_KWARGS, "metric_scale": 100.0})
+        assert gc.metric_scale == 100.0
+
+    def test_metric_scale_roundtrip(self) -> None:
+        gc = GoalContract(**{**VALID_GOAL_CONTRACT_KWARGS, "metric_scale": 100.0})
+        data = gc.model_dump()
+        gc2 = GoalContract.model_validate(data)
+        assert gc2.metric_scale == 100.0
+
+    def test_metric_scale_absent_from_dump_when_default(self) -> None:
+        """metric_scale=1.0 is the default; when exclude_none is active and the value
+        equals the default, it may or may not appear — but it must never be None."""
+        gc = GoalContract(**VALID_GOAL_CONTRACT_KWARGS)
+        data = gc.model_dump()
+        # It must not be None; if present, value must be 1.0
+        if "metric_scale" in data:
+            assert data["metric_scale"] == 1.0
+
+
+class TestRewardHackingProbeMetricScale:
+    """P0-7: reward_hacking_probe must normalise score by metric_scale before ceiling check."""
+
+    def _make_result(self, score: float) -> object:
+        from evor.contracts import EvaluationResult, TelemetrySummary
+        return EvaluationResult(
+            node_id="n-001",
+            run_id="r-001",
+            eval_version="v1",
+            metrics={"accuracy": score},
+            per_domain={},
+            fitness_value=score,
+            telemetry_summary=TelemetrySummary(total_steps=100),
+            status="success",
+            benchmark_raw="{}",
+            timestamp=ISO_TS,
+        )
+
+    def _make_goal(self, metric_scale: float = 1.0) -> GoalContract:
+        return GoalContract(**{**VALID_GOAL_CONTRACT_KWARGS, "metric_scale": metric_scale})
+
+    def test_score_98_scale_100_triggers_at_ceiling(self) -> None:
+        """98.0 / 100.0 = 0.98 — exactly at the ceiling (LEAK_CEILING = 0.98).
+        The check uses >=, so the exact ceiling fires just like raw 0.98 with scale=1.0.
+        This confirms normalisation is applied before the ceiling comparison."""
+        from evor.integrity import IntegrityGate
+        gate = IntegrityGate()
+        result = self._make_result(98.0)
+        goal = self._make_goal(metric_scale=100.0)
+        # reward_hacking_probe returns True when hacking detected (bad)
+        flagged = gate._check_reward_hacking(result, goal)
+        # 98/100 == 0.98 == LEAK_CEILING → triggers (>= is inclusive)
+        assert flagged, "98/100 = 0.98 at the ceiling should be flagged (>= is inclusive)"
+
+    def test_score_97_scale_100_does_not_trigger(self) -> None:
+        """97.0 / 100.0 = 0.97 — clearly below ceiling; must not trigger."""
+        from evor.integrity import IntegrityGate
+        gate = IntegrityGate()
+        result = self._make_result(97.0)
+        goal = self._make_goal(metric_scale=100.0)
+        flagged = gate._check_reward_hacking(result, goal)
+        assert not flagged, "97/100 = 0.97 should not be flagged"
+
+    def test_score_99_scale_100_triggers(self) -> None:
+        """99.0 / 100.0 = 0.99 > 0.98 — above ceiling; must trigger."""
+        from evor.integrity import IntegrityGate
+        gate = IntegrityGate()
+        result = self._make_result(99.0)
+        goal = self._make_goal(metric_scale=100.0)
+        flagged = gate._check_reward_hacking(result, goal)
+        assert flagged, "99/100 = 0.99 should be flagged as reward hacking ceiling"
+
+    def test_score_0_98_scale_1_triggers(self) -> None:
+        """Legacy scale=1.0: raw score 0.98 still triggers (no change to existing behaviour)."""
+        from evor.integrity import IntegrityGate
+        gate = IntegrityGate()
+        result = self._make_result(0.98)
+        goal = self._make_goal(metric_scale=1.0)
+        flagged = gate._check_reward_hacking(result, goal)
+        assert flagged, "0.98 with scale=1.0 must still trigger (backward compat)"
+
+
+# ─── P0-2: Contract seal ──────────────────────────────────────────────────────
+
+
+class TestContractSeal:
+    """P0-2: seal_contract() stamps GoalContract with a sha256 of its own content;
+    verify_contract_seal() detects any post-lock mutation."""
+
+    def _base_gc(self) -> GoalContract:
+        return GoalContract(**VALID_GOAL_CONTRACT_KWARGS)
+
+    def test_seal_sets_contract_seal_field(self) -> None:
+        gc = self._base_gc()
+        sealed = seal_contract(gc)
+        assert sealed.contract_seal is not None
+        assert len(sealed.contract_seal) == 64  # sha256 hex digest
+
+    def test_verify_sealed_contract_passes(self) -> None:
+        gc = seal_contract(self._base_gc())
+        assert verify_contract_seal(gc) is True
+
+    def test_verify_unsealed_contract_passes(self) -> None:
+        """Backward compat: no seal → verify returns True (warning only, not failure)."""
+        gc = self._base_gc()
+        assert gc.contract_seal is None
+        assert verify_contract_seal(gc) is True
+
+    def test_verify_detects_field_mutation(self) -> None:
+        """After sealing, changing any field must make verify return False."""
+        gc = seal_contract(self._base_gc())
+        # Mutate a field on a fresh copy (Pydantic v2 models are immutable by default,
+        # so use model_copy with update)
+        tampered = gc.model_copy(update={"baseline_value": 0.99})
+        assert verify_contract_seal(tampered) is False
+
+    def test_verify_detects_mission_id_change(self) -> None:
+        gc = seal_contract(self._base_gc())
+        tampered = gc.model_copy(update={"mission_id": "m-TAMPERED"})
+        assert verify_contract_seal(tampered) is False
+
+    def test_seal_is_deterministic(self) -> None:
+        """Same contract → same seal on repeated calls."""
+        gc = self._base_gc()
+        s1 = seal_contract(gc)
+        s2 = seal_contract(gc)
+        assert s1.contract_seal == s2.contract_seal
+
+    def test_contract_seal_excluded_from_dump_when_none(self) -> None:
+        """With exclude_none, unsealed contract's contract_seal=None must not appear."""
+        gc = self._base_gc()
+        data = gc.model_dump()
+        assert "contract_seal" not in data
