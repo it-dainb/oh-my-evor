@@ -438,7 +438,8 @@ class IntegrityGate:
         # grad_norm check — ONLY when the field is present in any record (R6)
         grad_norms = [r["grad_norm"] for r in records if r.get("grad_norm") is not None]
         if grad_norms:
-            if any(_is_bad_float(v) or v <= 0 for v in grad_norms):
+            # 0.0 is valid (epoch 0 / tabular); only negative values are corrupt
+            if any(_is_bad_float(v) or v < 0 for v in grad_norms):
                 return False
 
         return True
@@ -613,12 +614,18 @@ class IntegrityGate:
             return False
 
         if provenance.acquisition_type == "external":
-            if not provenance.license_identifier:
-                return False
-            if provenance.license_identifier not in goal.allowed_licenses:
-                return False
-            if not provenance.license_in_allowlist:
-                return False
+            # When license_gate is False the operator has disabled license enforcement
+            # (e.g. private/proprietary datasets). Still require citation and namespace.
+            license_gate: bool = True
+            if goal.autonomy_charter is not None:
+                license_gate = bool(getattr(goal.autonomy_charter, "license_gate", True))
+            if license_gate:
+                if not provenance.license_identifier:
+                    return False
+                if provenance.license_identifier not in goal.allowed_licenses:
+                    return False
+                if not provenance.license_in_allowlist:
+                    return False
         elif provenance.acquisition_type == "synthetic":
             if not provenance.generator_config:
                 return False

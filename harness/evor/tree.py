@@ -605,6 +605,15 @@ class TreeEngine:
             updated_at=datetime.now(timezone.utc).isoformat(),
         )
         self._strategy = updated
+
+        # P0-8: atomically persist updated strategy to disk so _load_engine()
+        # always sees the latest state (tmp + os.replace for crash-safety).
+        if self._run_dir is not None:
+            strategy_path = Path(self._run_dir) / "strategy.json"
+            tmp_path = strategy_path.with_suffix(".json.tmp")
+            tmp_path.write_text(updated.model_dump_json(indent=2))
+            os.replace(tmp_path, strategy_path)
+
         return updated
 
     # ------------------------------------------------------------------

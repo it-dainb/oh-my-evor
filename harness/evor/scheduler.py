@@ -211,19 +211,21 @@ class ResourceScheduler:
         run_id: str,
         eval_script: "Path | None" = None,
         worktree: "Path | None" = None,
+        mode: str = "full",
     ) -> dict[str, "bool | None"]:
         """Environment smoke-test (spec R3, §evor-setup), plus a 5-step micro-train
         loss-decreasing check when a candidate worktree is supplied.
 
-        Checks:
-          1. import_ok       — torch importable
-          2. gpu_active      — a GPU is detected
-          3. loss_decreasing — loss at step 5 < loss at step 1, evaluated ONLY when
-                               ``eval_script`` and ``worktree`` are supplied (a
-                               materialised candidate). At setup time — before any
-                               candidate exists — this is reported as ``None``
-                               (deferred to the first real training run), never a
-                               failure.
+        Args:
+            run_id:      Active run identifier.
+            eval_script: Locked eval script path (needed for micro-train only).
+            worktree:    Candidate worktree path (needed for micro-train only).
+            mode:        ``"env_only"`` — run only import_ok + gpu_active; skip
+                         loss_decreasing entirely (no key in result). Use at
+                         setup time before any candidate worktree is materialised.
+                         ``"full"`` (default) — run all checks; loss_decreasing is
+                         ``None`` when no worktree supplied, else the micro-train
+                         result.
 
         Raises NotImplementedError only when torch itself is unavailable; the caller
         gates on that and prompts the user to install it or override.
@@ -231,8 +233,10 @@ class ResourceScheduler:
         checks: dict[str, "bool | None"] = {
             "import_ok": False,
             "gpu_active": False,
-            "loss_decreasing": None,
         }
+        if mode != "env_only":
+            checks["loss_decreasing"] = None
+
         try:
             import importlib
             importlib.import_module("torch")
@@ -246,13 +250,13 @@ class ResourceScheduler:
         gpus = query_gpus()
         checks["gpu_active"] = len(gpus) > 0
 
-        if eval_script is not None and worktree is not None:
+        if mode != "env_only" and eval_script is not None and worktree is not None:
             # Candidate worktree materialised — run the real 5-step micro-train and
             # report whether the loss decreased (loss[step5] < loss[step1]).
             checks["loss_decreasing"] = self._preflight_micro_train(
                 run_id, eval_script, worktree
             )
-        # else: no candidate yet — loss_decreasing stays None (deferred, not failed).
+        # else: env_only → no loss_decreasing; or no candidate yet → stays None.
         return checks
 
     def _preflight_micro_train(
@@ -379,3 +383,82 @@ class ResourceScheduler:
         )
         thread.start()
         return future
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# P1-10 / P2-12: Setup preflight gate helpers (pure, no I/O side-effects)
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def check_corpus_layout(split_dir: "Path | str") -> tuple[bool, str]:
+    """Verify that a corpus split directory has matching image/gt pair counts.
+
+    Expects ``<split_dir>/images/`` and ``<split_dir>/gt/`` subdirectories.
+    Returns ``(ok, detail)`` where detail is human-readable.
+
+    Args:
+        split_dir: Root of the split (e.g. ``runs/<run>/data/train``).
+
+    Returns:
+        ``(True, "<n> matched pairs")`` when counts match and n > 0.
+        ``(False, "<reason>")`` on mismatch, missing dirs, or empty split.
+    """
+    split_dir = Path(split_dir)
+    img_dir = split_dir / "images"
+    gt_dir = split_dir / "gt"
+
+    if not img_dir.is_dir():
+        return False, f"images/ directory missing under {split_dir}"
+    if not gt_dir.is_dir():
+        return False, f"gt/ directory missing under {split_dir}"
+
+    img_files = sorted(
+        f for f in img_dir.iterdir() if f.is_file()
+    )
+    gt_files = sorted(
+        f for f in gt_dir.iterdir() if f.is_file()
+    )
+    n_img = len(img_files)
+    n_gt = len(gt_files)
+
+    if n_img == 0:
+        return False, f"images/ is empty (0 files) under {split_dir}"
+    if n_img != n_gt:
+        return False, (
+            f"image/gt count mismatch: {n_img} images vs {n_gt} gt files "
+            f"under {split_dir}"
+        )
+    return True, f"{n_img} matched image/gt pairs"
+
+
+def check_config_drift(
+    declared_arch: str,
+    checkpoint_hparams: "dict | None",
+) -> tuple[bool, str]:
+    """Detect architecture drift between the declared config and a checkpoint.
+
+    Args:
+        declared_arch:       Architecture name from the active GoalContract / config.
+        checkpoint_hparams:  Hyperparameters dict loaded from the checkpoint (e.g.
+                             ``torch.load(ckpt)["hparams"]``). Must contain an
+                             ``"arch"`` key matching ``declared_arch``.
+
+    Returns:
+        ``(True, "arch matches: <arch>")`` on agreement.
+        ``(False, "<reason>")`` on any mismatch or missing/null hparams.
+    """
+    if not checkpoint_hparams:
+        return False, (
+            "checkpoint_hparams is None or empty — cannot verify arch"
+        )
+    ckpt_arch = checkpoint_hparams.get("arch")
+    if ckpt_arch is None:
+        return False, (
+            "checkpoint_hparams missing 'arch' key — cannot verify config drift"
+        )
+    if declared_arch != ckpt_arch:
+        return False, (
+            f"config drift detected: declared '{declared_arch}' "
+            f"but checkpoint reports '{ckpt_arch}'"
+        )
+    return True, f"arch matches: {declared_arch}"

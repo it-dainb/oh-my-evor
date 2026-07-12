@@ -21,6 +21,7 @@ Each line is a valid TelemetryRecord serialised to JSON.
 
 from __future__ import annotations
 
+import csv
 import json
 from pathlib import Path
 from typing import Any
@@ -83,3 +84,78 @@ class TelemetryCallback:
                     except json.JSONDecodeError:
                         pass
         return records
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# P2-11: wandb → CSV export helper
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def export_wandb_to_csv(run_finish_dir: "Path | str") -> "Path | None":
+    """Export wandb run data to ``telemetry.csv`` inside ``run_finish_dir``.
+
+    Discovery order:
+      1. ``.wandb/history.jsonl`` — JSONL per-step history (one CSV row each).
+      2. ``.wandb/wandb-summary.json`` — single-record summary (one CSV row).
+
+    The real ``wandb`` package is NOT imported; this reads the on-disk files
+    directly so it works in environments where wandb is not installed.
+
+    Args:
+        run_finish_dir: Directory that contains (or should contain) a
+                        ``.wandb/`` subdirectory written by the training job.
+
+    Returns:
+        Path to the written ``telemetry.csv``, or ``None`` when no wandb data
+        is found (``run_finish_dir/.wandb/`` absent or empty of recognised files).
+    """
+    run_finish_dir = Path(run_finish_dir)
+    wandb_dir = run_finish_dir / ".wandb"
+
+    if not wandb_dir.is_dir():
+        return None
+
+    records: list[dict[str, Any]] = []
+
+    # Prefer JSONL history (multi-step)
+    history_path = wandb_dir / "history.jsonl"
+    if history_path.exists():
+        with open(history_path) as fh:
+            for line in fh:
+                line = line.strip()
+                if line:
+                    try:
+                        records.append(json.loads(line))
+                    except json.JSONDecodeError:
+                        pass
+
+    # Fallback: single-record summary JSON
+    if not records:
+        summary_path = wandb_dir / "wandb-summary.json"
+        if summary_path.exists():
+            try:
+                obj = json.loads(summary_path.read_text())
+                if isinstance(obj, dict):
+                    records.append(obj)
+            except (json.JSONDecodeError, OSError):
+                pass
+
+    if not records:
+        return None
+
+    # Collect all keys (union across records) for a stable header
+    all_keys: list[str] = []
+    seen: set[str] = set()
+    for rec in records:
+        for k in rec:
+            if k not in seen:
+                all_keys.append(k)
+                seen.add(k)
+
+    csv_path = run_finish_dir / "telemetry.csv"
+    with open(csv_path, "w", newline="") as fh:
+        writer = csv.DictWriter(fh, fieldnames=all_keys, extrasaction="ignore")
+        writer.writeheader()
+        writer.writerows(records)
+
+    return csv_path

@@ -701,6 +701,60 @@ def test_meta_evolve_increments_iteration(tmp_path: Path) -> None:
     assert updated.meta_iteration == strategy.meta_iteration + 1
 
 
+def test_meta_evolve_persists_to_disk(tmp_path: Path) -> None:
+    """meta_evolve must atomically write updated strategy to <run_dir>/strategy.json.
+
+    After the call, the on-disk JSON must reflect the new meta_iteration,
+    wildness, and family_mix so that _load_engine() round-trips correctly.
+    """
+    import json as _json
+    strategy = _make_strategy(wildness=0.2, winning_families=["arch", "arch", "arch"],
+                              wins_by_family={"arch": 3})
+    engine = TreeEngine(nodes=[], goal=_make_goal(), strategy=strategy, run_dir=tmp_path)
+
+    updated = engine.meta_evolve([])
+
+    # strategy.json must exist after the call
+    strategy_path = tmp_path / "strategy.json"
+    assert strategy_path.exists(), "meta_evolve did not write strategy.json to disk"
+
+    on_disk = _json.loads(strategy_path.read_text())
+
+    # meta_iteration must be persisted
+    assert on_disk["meta_iteration"] == updated.meta_iteration, (
+        f"on-disk meta_iteration {on_disk['meta_iteration']} != in-memory {updated.meta_iteration}"
+    )
+    # family_mix for 'arch' must be persisted (H002 reduction)
+    assert "arch" in on_disk.get("family_mix", {}), "family_mix not persisted"
+    assert on_disk["family_mix"]["arch"] == pytest.approx(updated.family_mix["arch"]), (
+        "on-disk arch weight does not match in-memory value"
+    )
+
+
+def test_meta_evolve_load_engine_round_trips(tmp_path: Path) -> None:
+    """_load_engine reads the strategy.json written by meta_evolve correctly."""
+    import json as _json
+    from evor.tree import _load_engine
+    from evor.contracts import GoalContract, MetricSpec
+
+    strategy = _make_strategy(wildness=0.3)
+    goal = _make_goal()
+
+    # _load_engine needs tree.json (dict format) and goal-contract.json present
+    nodes_path = tmp_path / "tree.json"
+    nodes_path.write_text('{"nodes": {}}')
+    goal_path = tmp_path / "goal-contract.json"
+    goal_path.write_text(goal.model_dump_json())
+
+    engine = TreeEngine(nodes=[], goal=goal, strategy=strategy, run_dir=tmp_path)
+    updated = engine.meta_evolve([])
+
+    # Now _load_engine should recover the updated strategy
+    engine2 = _load_engine(tmp_path)
+    assert engine2._strategy.meta_iteration == updated.meta_iteration
+    assert engine2._strategy.wildness == pytest.approx(updated.wildness)
+
+
 # ── Tests: compute_fitness() with formula / constraints ────────────────────────
 
 

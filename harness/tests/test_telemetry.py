@@ -97,3 +97,79 @@ class TestNullRunDir:
     def test_telemetry_path_property(self, tmp_path: Path):
         cb = TelemetryCallback("n1", "r1", run_dir=tmp_path)
         assert cb.telemetry_path == tmp_path / "nodes" / "n1" / "telemetry.jsonl"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# P2-11: export_wandb_to_csv
+# ─────────────────────────────────────────────────────────────────────────────
+
+from evor.telemetry import export_wandb_to_csv  # noqa: E402
+
+
+class TestExportWandbToCsv:
+    def test_no_wandb_dir_returns_none(self, tmp_path: Path) -> None:
+        """No .wandb directory → no-op, returns None."""
+        result = export_wandb_to_csv(tmp_path)
+        assert result is None
+
+    def test_empty_wandb_dir_returns_none(self, tmp_path: Path) -> None:
+        """Empty .wandb directory with no summary → returns None."""
+        (tmp_path / ".wandb").mkdir()
+        result = export_wandb_to_csv(tmp_path)
+        assert result is None
+
+    def test_summary_json_writes_csv(self, tmp_path: Path) -> None:
+        """wandb-summary.json present → telemetry.csv written, path returned."""
+        import json as _json
+
+        summary = {"train_loss": 0.42, "val_metric": 0.88, "epoch": 5}
+        wandb_dir = tmp_path / ".wandb"
+        wandb_dir.mkdir()
+        (wandb_dir / "wandb-summary.json").write_text(_json.dumps(summary))
+
+        result = export_wandb_to_csv(tmp_path)
+        assert result is not None
+        assert result.name == "telemetry.csv"
+        assert result.exists()
+        content = result.read_text()
+        # CSV must have a header row and at least one data row
+        lines = [l for l in content.splitlines() if l.strip()]
+        assert len(lines) >= 2
+        assert "train_loss" in lines[0]
+
+    def test_jsonl_records_write_csv(self, tmp_path: Path) -> None:
+        """wandb JSONL history → CSV rows per record."""
+        import json as _json
+
+        wandb_dir = tmp_path / ".wandb"
+        wandb_dir.mkdir()
+        history_path = wandb_dir / "history.jsonl"
+        records = [
+            {"step": 0, "train_loss": 0.9},
+            {"step": 1, "train_loss": 0.7},
+            {"step": 2, "train_loss": 0.5},
+        ]
+        with open(history_path, "w") as fh:
+            for r in records:
+                fh.write(_json.dumps(r) + "\n")
+
+        result = export_wandb_to_csv(tmp_path)
+        assert result is not None
+        lines = [l for l in result.read_text().splitlines() if l.strip()]
+        # header + 3 data rows
+        assert len(lines) == 4
+
+    def test_idempotent_overwrite(self, tmp_path: Path) -> None:
+        """Calling twice overwrites the CSV (not appends)."""
+        import json as _json
+
+        wandb_dir = tmp_path / ".wandb"
+        wandb_dir.mkdir()
+        (wandb_dir / "wandb-summary.json").write_text(_json.dumps({"loss": 0.1}))
+
+        export_wandb_to_csv(tmp_path)
+        result = export_wandb_to_csv(tmp_path)
+        assert result is not None
+        lines = [l for l in result.read_text().splitlines() if l.strip()]
+        # Should be header + 1 row = 2 lines, not 4 (no append)
+        assert len(lines) == 2

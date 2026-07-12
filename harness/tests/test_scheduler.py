@@ -188,3 +188,125 @@ def test_preflight_raises_when_torch_missing(scheduler: ResourceScheduler) -> No
         with patch("importlib.import_module", side_effect=ImportError("no torch")):
             with pytest.raises(NotImplementedError, match="PyTorch"):
                 scheduler.preflight("run-1")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# P1-9: preflight mode="env_only"
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def test_preflight_env_only_skips_loss_decreasing(scheduler: ResourceScheduler) -> None:
+    """mode='env_only' must omit loss_decreasing key entirely (not return None)."""
+    import importlib
+
+    with patch("evor.scheduler.query_gpus", return_value=[]):
+        with patch.object(importlib, "import_module", return_value=object()):
+            result = scheduler.preflight("run-1", mode="env_only")
+
+    assert "loss_decreasing" not in result
+    assert "import_ok" in result
+    assert "gpu_active" in result
+
+
+def test_preflight_env_only_does_not_call_micro_train(scheduler: ResourceScheduler, tmp_path: Path) -> None:
+    """mode='env_only' must not call _preflight_micro_train even when worktree supplied."""
+    import importlib
+
+    with patch("evor.scheduler.query_gpus", return_value=[]):
+        with patch.object(importlib, "import_module", return_value=object()):
+            with patch.object(scheduler, "_preflight_micro_train") as mock_mt:
+                scheduler.preflight(
+                    "run-1",
+                    eval_script=tmp_path / "eval.py",
+                    worktree=tmp_path,
+                    mode="env_only",
+                )
+    mock_mt.assert_not_called()
+
+
+def test_preflight_full_mode_returns_loss_decreasing_none_without_worktree(
+    scheduler: ResourceScheduler,
+) -> None:
+    """mode='full' (default) returns loss_decreasing=None when no worktree supplied."""
+    import importlib
+
+    with patch("evor.scheduler.query_gpus", return_value=[]):
+        with patch.object(importlib, "import_module", return_value=object()):
+            result = scheduler.preflight("run-1", mode="full")
+
+    assert result.get("loss_decreasing") is None
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# P1-10 + P2-12: check_corpus_layout / check_config_drift
+# ─────────────────────────────────────────────────────────────────────────────
+
+from evor.scheduler import check_corpus_layout, check_config_drift  # noqa: E402
+
+
+class TestCheckCorpusLayout:
+    def test_matching_pairs_ok(self, tmp_path: Path) -> None:
+        """Equal number of images and ground-truth files → ok=True."""
+        img_dir = tmp_path / "images"
+        gt_dir = tmp_path / "gt"
+        img_dir.mkdir(); gt_dir.mkdir()
+        for i in range(3):
+            (img_dir / f"{i}.png").write_bytes(b"img")
+            (gt_dir / f"{i}.png").write_bytes(b"gt")
+
+        ok, detail = check_corpus_layout(tmp_path)
+        assert ok is True
+        assert "3" in detail
+
+    def test_mismatched_pairs_fail(self, tmp_path: Path) -> None:
+        """Unequal image/gt counts → ok=False with descriptive detail."""
+        img_dir = tmp_path / "images"
+        gt_dir = tmp_path / "gt"
+        img_dir.mkdir(); gt_dir.mkdir()
+        for i in range(4):
+            (img_dir / f"{i}.png").write_bytes(b"img")
+        for i in range(2):
+            (gt_dir / f"{i}.png").write_bytes(b"gt")
+
+        ok, detail = check_corpus_layout(tmp_path)
+        assert ok is False
+        assert "4" in detail or "2" in detail
+
+    def test_missing_images_dir_fail(self, tmp_path: Path) -> None:
+        """Missing images/ subdir → ok=False."""
+        (tmp_path / "gt").mkdir()
+        ok, detail = check_corpus_layout(tmp_path)
+        assert ok is False
+
+    def test_missing_gt_dir_fail(self, tmp_path: Path) -> None:
+        """Missing gt/ subdir → ok=False."""
+        (tmp_path / "images").mkdir()
+        ok, detail = check_corpus_layout(tmp_path)
+        assert ok is False
+
+    def test_empty_split_dir_fail(self, tmp_path: Path) -> None:
+        """Both present but empty → ok=False (0 images)."""
+        (tmp_path / "images").mkdir()
+        (tmp_path / "gt").mkdir()
+        ok, detail = check_corpus_layout(tmp_path)
+        assert ok is False
+
+
+class TestCheckConfigDrift:
+    def test_matching_arch_ok(self) -> None:
+        ok, detail = check_config_drift("small_unet", {"arch": "small_unet"})
+        assert ok is True
+
+    def test_mismatched_arch_fail(self) -> None:
+        ok, detail = check_config_drift("small_unet", {"arch": "dual_robust_v2"})
+        assert ok is False
+        assert "small_unet" in detail or "dual_robust_v2" in detail
+
+    def test_missing_arch_key_fail(self) -> None:
+        """Checkpoint hparams missing 'arch' → ok=False."""
+        ok, detail = check_config_drift("small_unet", {})
+        assert ok is False
+
+    def test_none_hparams_fail(self) -> None:
+        ok, detail = check_config_drift("small_unet", None)
+        assert ok is False

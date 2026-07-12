@@ -449,10 +449,20 @@ class TestTelemetrySane:
         report = self._base_check(tmp_path, recs)
         assert report.checks.telemetry_sane is False
 
-    def test_zero_grad_norm_fails(self, tmp_path: Path):
+    def test_zero_grad_norm_passes(self, tmp_path: Path):
+        """grad_norm=0.0 is valid at epoch 0 or for tabular/XGBoost models (P2-10)."""
         recs = [
             {"step": 0, "train_loss": 1.0, "grad_norm": 0.0, "node_id": "n", "run_id": "r", "timestamp": "t"},
             {"step": 1, "train_loss": 0.8, "grad_norm": 0.0, "node_id": "n", "run_id": "r", "timestamp": "t"},
+        ]
+        report = self._base_check(tmp_path, recs)
+        assert report.checks.telemetry_sane is True
+
+    def test_negative_grad_norm_fails(self, tmp_path: Path):
+        """Negative grad_norm is physically impossible and indicates corruption (P2-10)."""
+        recs = [
+            {"step": 0, "train_loss": 1.0, "grad_norm": -0.5, "node_id": "n", "run_id": "r", "timestamp": "t"},
+            {"step": 1, "train_loss": 0.8, "grad_norm": -1.2, "node_id": "n", "run_id": "r", "timestamp": "t"},
         ]
         report = self._base_check(tmp_path, recs)
         assert report.checks.telemetry_sane is False
@@ -915,6 +925,83 @@ class TestIngestionContaminationGate:
         # The implementation counts exact hash matches; 1/21 < 5%, so may pass or fail
         # depending on implementation detail — just verify the check ran (not None)
         assert report.checks.acquisition_contamination_clear is not None
+
+    def test_license_gate_false_bypasses_license_check(self, tmp_path: Path):
+        """P1-12: license_gate=False skips license-allowlist enforcement.
+
+        An out-of-allowlist license identifier must still PASS when the operator
+        has set license_gate=False (e.g. private/proprietary dataset).
+        """
+        from evor.contracts import AutonomyCharter
+        gate, frozen_test, eval_script, tel_path, node, goal = _setup_acquisition_test(tmp_path)
+
+        # Override goal with license_gate disabled
+        goal_no_gate = goal.model_copy(update={
+            "autonomy_charter": AutonomyCharter(license_gate=False),
+        })
+
+        prov = AcquisitionProvenance(
+            acquisition_id="acq-nolicgate",
+            acquisition_type="external",
+            license_identifier="PROPRIETARY",  # NOT in allowed_licenses
+            license_in_allowlist=False,
+            citation="Internal proprietary dataset v1",
+            sample_count=10,
+            acquired_at="2026-07-03T00:00:00Z",
+            ingestion_contamination_cleared=False,
+        )
+        mock_store = MagicMock()
+        mock_store.verify_namespace.return_value = True
+
+        report = gate.check(
+            node=node, result=_make_result(), goal=goal_no_gate,
+            telemetry_path=tel_path, eval_script_path=eval_script,
+            frozen_test=frozen_test, provenance_path=None, run_dir=tmp_path,
+            acquired_samples=[b"private_sample"],
+            acquisition_provenance=prov,
+            store=mock_store,
+        )
+
+        # license_gate=False → license allowlist check skipped → provenance valid
+        assert report.checks.acquired_data_provenance_valid is True
+
+    def test_license_gate_true_enforces_license_check(self, tmp_path: Path):
+        """P1-12: license_gate=True (default) still enforces license allowlist.
+
+        An out-of-allowlist license must FAIL when license_gate is True.
+        """
+        from evor.contracts import AutonomyCharter
+        gate, frozen_test, eval_script, tel_path, node, goal = _setup_acquisition_test(tmp_path)
+
+        # Override goal with license_gate explicitly enabled
+        goal_with_gate = goal.model_copy(update={
+            "autonomy_charter": AutonomyCharter(license_gate=True),
+        })
+
+        prov = AcquisitionProvenance(
+            acquisition_id="acq-licgate",
+            acquisition_type="external",
+            license_identifier="GPL-3.0",  # NOT in allowed_licenses ["MIT","Apache-2.0","CC-BY-4.0"]
+            license_in_allowlist=False,
+            citation="Some GPL dataset",
+            sample_count=5,
+            acquired_at="2026-07-03T00:00:00Z",
+            ingestion_contamination_cleared=False,
+        )
+        mock_store = MagicMock()
+        mock_store.verify_namespace.return_value = True
+
+        report = gate.check(
+            node=node, result=_make_result(), goal=goal_with_gate,
+            telemetry_path=tel_path, eval_script_path=eval_script,
+            frozen_test=frozen_test, provenance_path=None, run_dir=tmp_path,
+            acquired_samples=[b"gpl_sample"],
+            acquisition_provenance=prov,
+            store=mock_store,
+        )
+
+        # license_gate=True → license check enforced → GPL not in allowlist → fail
+        assert report.checks.acquired_data_provenance_valid is False
 
 
 # ─────────────────────────────────────────────────────────────────────────────
