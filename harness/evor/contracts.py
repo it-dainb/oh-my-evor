@@ -99,7 +99,9 @@ class MetricSpec(BaseEvorModel):
     metric_name: str
     direction: Literal["higher", "lower"]
     domain_applicability: Union[list[str], Literal["all"]]
-    aggregation_rule: Literal["macro_avg", "weighted_avg", "min", "max"]
+    # Sensible default so a spec is never rejected for omitting it; macro_avg
+    # weights every domain equally (override for weighted/min/max aggregation).
+    aggregation_rule: Literal["macro_avg", "weighted_avg", "min", "max"] = "macro_avg"
     role: Literal["primary_fitness", "secondary_reported"]
     sota_bar: Optional[float] = None
 
@@ -320,7 +322,9 @@ class GoalContract(BaseEvorModel):
     dataset_ref: str
     metric_specs: list[MetricSpec]
     fitness_mode: Literal["aggregate", "worst-domain", "weighted"]
-    eval_version: str
+    # Defaults to the first eval suite version so setup never fails for omitting
+    # it; the harness names frozen splits and eval suites "v1" by convention.
+    eval_version: str = "v1"
     baseline_value: float
     target_value: Optional[float] = None
     coverage_target: Optional[float] = None

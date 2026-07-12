@@ -343,6 +343,62 @@ def test_bad_mode_literal_exits_1(tmp_path: Path, capsys) -> None:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# 10b. Forgiving defaults (F1) — omitting server-defaultable fields must succeed
+# ─────────────────────────────────────────────────────────────────────────────
+
+def test_omitting_eval_version_defaults_v1(tmp_path: Path) -> None:
+    """eval_version is optional at input; the stored contract defaults it to v1."""
+    answers = _minimal_answers()
+    del answers["eval_version"]
+
+    answers_path = _write_answers(tmp_path, answers)
+    evor_root = tmp_path / ".evor"
+
+    rc = run_init_run(str(answers_path), run_id_arg="run-no-ev", evor_root_arg=str(evor_root))
+    assert rc == 0, "omitting eval_version must not fail init-run"
+
+    gc_path = evor_root / "runs" / "test-mission" / "run-no-ev" / "goal-contract.json"
+    gc = GoalContract.model_validate(json.loads(gc_path.read_text()))
+    assert gc.eval_version == "v1"
+
+
+def test_omitting_aggregation_rule_defaults_macro_avg(tmp_path: Path) -> None:
+    """MetricSpec.aggregation_rule is optional at input; defaults to macro_avg."""
+    answers = _minimal_answers()
+    for spec in answers["metric_specs"]:
+        spec.pop("aggregation_rule", None)
+
+    answers_path = _write_answers(tmp_path, answers)
+    evor_root = tmp_path / ".evor"
+
+    rc = run_init_run(str(answers_path), run_id_arg="run-no-agg", evor_root_arg=str(evor_root))
+    assert rc == 0, "omitting aggregation_rule must not fail init-run"
+
+    gc_path = evor_root / "runs" / "test-mission" / "run-no-agg" / "goal-contract.json"
+    gc = GoalContract.model_validate(json.loads(gc_path.read_text()))
+    assert gc.metric_specs[0].aggregation_rule == "macro_avg"
+
+
+def test_validation_error_message_is_sanitized(tmp_path: Path, capsys) -> None:
+    """A validation failure must not leak Pydantic/model internals to the surface."""
+    answers = _minimal_answers()
+    del answers["baseline_value"]        # required — forces a ValidationError
+    answers["mission_type"] = "nonsense"  # invalid Literal — second error
+
+    answers_path = _write_answers(tmp_path, answers)
+    evor_root = tmp_path / ".evor"
+
+    run_init_run(str(answers_path), run_id_arg="run-clean-err", evor_root_arg=str(evor_root))
+    err = json.loads(capsys.readouterr().out)["error"].lower()
+
+    # jargon / implementation-detail leaks that must NOT appear
+    for banned in ("pydantic", "goalcontract", "http", "validation error", "input_value", "input_type"):
+        assert banned not in err, f"error message leaked {banned!r}: {err}"
+    # but it must still name the offending user-domain fields so it's actionable
+    assert "baseline_value" in err and "mission_type" in err
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # 11. CLI subprocess tests (cwd=_HARNESS_DIR, mirrors test_gotchas pattern)
 # ─────────────────────────────────────────────────────────────────────────────
 

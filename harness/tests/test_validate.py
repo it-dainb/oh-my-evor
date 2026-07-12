@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -155,6 +156,38 @@ def test_valid_contract_passes(tmp_path: Path) -> None:
     run_dir = _minimal_run_dir(tmp_path)
     report = validate_run(run_dir)
     assert report.ok, f"Expected VALID but got: {report.verdict}\nFailed checks: {[c for c in report.checks if not c.ok]}"
+
+
+def test_check_details_do_not_leak_paths_or_filenames(tmp_path: Path) -> None:
+    """F3: report details must be name-only — no absolute .evor paths or internal filenames.
+
+    The report is agent-facing; a stray absolute run path or a raw state filename
+    (goal-contract.json, tree.json, run-state.json, v1-test.json) is an internal
+    -implementation leak. Assert every check detail is clean, on both the pass path
+    and a fail path (missing frozen splits, which exercises the failure details).
+    """
+    banned_substrings = (
+        str(tmp_path),          # absolute run directory
+        ".evor/",               # internal state root
+        "goal-contract.json",
+        "run-state.json",
+        "tree.json",
+        "-test.json",           # frozen split filename shape (e.g. v1-test.json)
+    )
+
+    # Pass path — all files present.
+    ok_report = validate_run(_minimal_run_dir(tmp_path / "ok"))
+    # Fail path — remove frozen splits to fire the failure-branch details.
+    fail_dir = _minimal_run_dir(tmp_path / "fail")
+    shutil.rmtree(fail_dir / "frozen-splits")
+    fail_report = validate_run(fail_dir)
+
+    for report in (ok_report, fail_report):
+        for check in report.checks:
+            for banned in banned_substrings:
+                assert banned not in check.detail, (
+                    f"check {check.name!r} leaked {banned!r} in detail: {check.detail!r}"
+                )
 
 
 # ─── 2. Missing required field fails ─────────────────────────────────────────

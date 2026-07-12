@@ -62,6 +62,23 @@ def _atomic_write_text(path: Path, text: str) -> None:
     os.replace(tmp, path)
 
 
+def _humanize_validation_error(exc: ValidationError) -> str:
+    """Turn a Pydantic ValidationError into a concise, jargon-free message.
+
+    Drops the "N validation errors for GoalContract" header, per-error input
+    dumps, and the "https://errors.pydantic.dev/…" URLs that would otherwise
+    leak the internal model name and implementation into the agent surface.
+    Keeps only the user-domain field path + the plain reason for each problem.
+    """
+    parts: list[str] = []
+    for e in exc.errors():
+        loc = ".".join(str(x) for x in e.get("loc", ()))
+        msg = str(e.get("msg", "invalid value")).strip()
+        parts.append(f"{loc} ({msg})" if loc else msg)
+    detail = "; ".join(parts) if parts else "one or more values are invalid"
+    return f"the mission setup has missing or invalid values: {detail}"
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Public entry point
 # ─────────────────────────────────────────────────────────────────────────────
@@ -113,7 +130,7 @@ def run_init_run(
     try:
         contract = GoalContract.model_validate(answers)
     except ValidationError as exc:
-        print(json.dumps({"error": str(exc)}))
+        print(json.dumps({"error": _humanize_validation_error(exc)}))
         return 1
     except Exception as exc:
         print(json.dumps({"error": f"unexpected error constructing GoalContract: {exc}"}))

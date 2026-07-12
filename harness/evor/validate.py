@@ -377,13 +377,13 @@ def _check_goal_contract(run_dir: Path) -> list[CheckResult]:
         checks.append(CheckResult(
             name="goal_contract_exists",
             ok=False,
-            detail=f"goal-contract.json not found at {gc_path}",
+            detail="the run's goal contract is missing — the run has not been initialized yet",
         ))
         return checks
     checks.append(CheckResult(
         name="goal_contract_exists",
         ok=True,
-        detail=str(gc_path),
+        detail="present",
     ))
 
     try:
@@ -408,7 +408,7 @@ def _check_goal_contract(run_dir: Path) -> list[CheckResult]:
         checks.append(CheckResult(
             name="goal_contract_schema",
             ok=False,
-            detail=f"GoalContract.model_validate failed: {exc}",
+            detail=f"the goal contract failed its schema check: {exc}",
         ))
         return checks
     checks.append(CheckResult(
@@ -537,13 +537,13 @@ def _check_frozen_splits(run_dir: Path) -> list[CheckResult]:
         checks.append(CheckResult(
             name="frozen_splits_dir",
             ok=False,
-            detail=f"frozen-splits/ directory missing at {frozen_dir}",
+            detail="the frozen eval splits are missing — freeze the test/val splits first",
         ))
         return checks
     checks.append(CheckResult(
         name="frozen_splits_dir",
         ok=True,
-        detail=str(frozen_dir),
+        detail="present",
     ))
 
     test_jsons = sorted(frozen_dir.glob("*-test.json"))
@@ -551,13 +551,13 @@ def _check_frozen_splits(run_dir: Path) -> list[CheckResult]:
         checks.append(CheckResult(
             name="frozen_splits_test_json",
             ok=False,
-            detail="No *-test.json file found in frozen-splits/",
+            detail="no frozen test split was found — freeze the test/val splits first",
         ))
         return checks
     checks.append(CheckResult(
         name="frozen_splits_test_json",
         ok=True,
-        detail=f"Found: {[p.name for p in test_jsons]}",
+        detail=f"{len(test_jsons)} frozen test split(s) present",
     ))
 
     missing_hash: list[str] = []
@@ -573,7 +573,7 @@ def _check_frozen_splits(run_dir: Path) -> list[CheckResult]:
         checks.append(CheckResult(
             name="frozen_splits_hash",
             ok=False,
-            detail=f"split_hash missing or empty in: {missing_hash}",
+            detail=f"{len(missing_hash)} frozen test split(s) are missing their integrity hash",
         ))
     else:
         checks.append(CheckResult(
@@ -593,13 +593,13 @@ def _check_tree(run_dir: Path) -> list[CheckResult]:
         checks.append(CheckResult(
             name="tree_json_exists",
             ok=False,
-            detail=f"tree.json not found at {tree_path}",
+            detail="the run's evolution tree is missing",
         ))
         return checks
     checks.append(CheckResult(
         name="tree_json_exists",
         ok=True,
-        detail=str(tree_path),
+        detail="present",
     ))
 
     try:
@@ -642,13 +642,13 @@ def _check_run_state(run_dir: Path) -> list[CheckResult]:
         checks.append(CheckResult(
             name="run_state_exists",
             ok=False,
-            detail=f"run-state.json not found at {rs_path}",
+            detail="the run state is missing — the run has not been initialized yet",
         ))
         return checks
     checks.append(CheckResult(
         name="run_state_exists",
         ok=True,
-        detail=str(rs_path),
+        detail="present",
     ))
 
     try:
