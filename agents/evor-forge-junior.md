@@ -112,6 +112,29 @@ skills: [oh-my-evor:evor-mcp]
     ```
     If either grep returns 0 lines, the wiring failed — fix it before proceeding.
 
+    **Step 4.5 — Numeric-stability clamp guards (P2-9)**
+    For ANY loss function whose forward pass computes a ratio or complement that can reach zero
+    (e.g. Dice/FocalTversky: `1 - TI`, IoU: `intersection / union`, BCE with logits near ±∞),
+    you MUST add a clamp guard on the singular operand BEFORE the division or logarithm:
+
+    ```python
+    # FocalTversky / Dice example — guard the denominator before dividing:
+    denom = tp + alpha * fn + beta * fp
+    denom = denom.clamp(min=1e-6)          # P2-9: prevents 0/0 → NaN
+    tversky_idx = tp / denom
+    loss = (1 - tversky_idx).clamp(min=0)  # complement clamp: guards negative rounding
+
+    # BCE / focal loss log guard:
+    p = torch.sigmoid(logits).clamp(min=1e-7, max=1 - 1e-7)
+    ```
+
+    Apply the clamp AT the point of singularity — not at the final loss value (clamping only
+    the output loss masks the instability without fixing it). If the proposal's cited paper
+    specifies a different epsilon, use that value and document it in a comment.
+
+    After adding clamp guards, add a one-line comment citing the guarded expression:
+    `# P2-9 clamp: prevents NaN when <expression> → 0`
+
     **Step 5 — LSP pre-flight**
     Run lsp_diagnostics on the candidate files (trainer.py and any other modified seams) to
     catch type or syntax errors before handing back to Forge. Fix all diagnostics-level errors.

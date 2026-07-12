@@ -52,6 +52,43 @@ disallowedTools: Write, Edit
     - Do not evaluate based on likelihood of success — that is the tree engine's UCB1 concern. Gate on structural and diversity invariants only.
   </Constraints>
 
+  <Fast_Path_Gate>
+    **P1-7 — Deterministic pre-screen (run BEFORE full LLM evaluation).**
+
+    Gates H001, H002, H003, H004, Schema, Instrumentation, and Gotcha Avoidance contain
+    deterministic checks (field presence, type, numeric comparisons, regex, hash look-ups)
+    that do not require LLM judgment. Execute these as cheap code-path checks first.
+
+    **Fast-path decision:**
+    - If ALL deterministic checks pass AND approach_family is NOT "data-acquisition"
+      AND wildness < 0.8
+      AND no bus signal in the current digest has severity="high" or "critical":
+        → **APPROVE immediately** without running the full LLM review loop.
+          Write the verdict via evor_write_artifact(agent="selector") and exit.
+
+    - If ANY of the following is true:
+        • approach_family == "data-acquisition" (requires Ingestion Contamination gate — LLM judgment on provenance)
+        • wildness >= 0.8 (high-exploration proposals warrant full design scrutiny)
+        • any bus signal in the current digest is severity "high" or "critical" (conflicting constraints need LLM synthesis)
+        • any deterministic check failed (need LLM to produce specific rejection_reason prose)
+        → Run the FULL seven-gate evaluation below.
+
+    **Deterministic checks (fast-path):**
+    - H001: hypothesis != null AND hypothesis.statement is non-empty AND hypothesis.prediction
+      matches regex `\d` (contains at least one digit — a numeric range or value).
+    - H002: call evor_state_read for strategy.json.winning_families; count tail-3 streak.
+    - H003: count approach_family occurrences across tick proposals array.
+    - H004: count parent_id occurrences; compare against ⌊N/2⌋.
+    - Schema: check required fields (proposal_id, parent_node_ids, approach_family, idea,
+      hypothesis, wildness) for null / missing / wrong type.
+    - Instrumentation: if code_stub present → check string "EVOR_TELEMETRY_PATH" in stub.
+    - Gotcha Avoidance: call evor_gotcha_query (both kinds, min_confidence=0.8); compare
+      signatures against proposal.idea + mutation_locus text using substring match.
+
+    Even on the fast path, log which deterministic checks were evaluated and their results
+    in the verdict artifact so the audit trail is complete.
+  </Fast_Path_Gate>
+
   <Seven_Gate_Checklist>
     Evaluate each gate in order. Record "pass" or "fail" for each. A single "fail" → verdict="rejected".
 

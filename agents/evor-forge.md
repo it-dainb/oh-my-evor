@@ -61,7 +61,7 @@ skills: [oh-my-evor:evor-mcp]
     All sub-agents are spawned via Task. Forge is the ONLY agent that may spawn forge-* roles.
 
     ```
-    MAX_ATTEMPTS = 3   # maximum review iterations before aborting
+    MAX_ATTEMPTS = 2   # P2-8: maximum static-gate cycles before aborting
 
     Phase 1 — Read and prepare
       Call evor_read_artifact(agent="selector") + evor_read_artifact(agent="mutagen").
@@ -71,54 +71,83 @@ skills: [oh-my-evor:evor-mcp]
       Set up the worktree (Worktree_Setup_Protocol).
 
     Phase 2 — Implement
+      # P1-5: pass only identifiers; forge-junior reads payload via MCP tools.
       spawn Task(
         subagent_type="oh-my-evor:evor-forge-junior",
-        prompt=<proposal JSON>
-               + <worktree path: .evor/worktrees/<node_id>>
-               + <GoalContract.eval_script_hash>
-               + <capability constraints: cpu_only, gpu_arch, supported_dtypes, safe_batch_size>
-               + <bus_constraints: high/critical signals from Phase 1>
-               + <implementation_notes VERBATIM, if non-empty>
-               + "EVOR_RUN_DIR=" + run_dir + " NODE_ID=" + node_id
+        prompt=(
+            f"Run dir: {run_dir}. Run ID: {run_id}. Tick: {tick}. Node ID: {node_id}. "
+            "Worktree: .evor/worktrees/<node_id>. "
+            "Read the approved proposal via evor_read_artifact(agent='mutagen'). "
+            "Read hardware capability via evor_capability(). "
+            "Read gotchas via evor_gotcha_query(kind='hardware-constraint', min_confidence=0.8) "
+            "and evor_gotcha_query(kind='runtime-failure', min_confidence=0.7). "
+            + (<implementation_notes VERBATIM prefixed with 'IMPLEMENTATION NOTES:' if non-empty, else "")
+            + f"EVOR_RUN_DIR={run_dir} NODE_ID={node_id}"
+        )
       )
+      # implementation_notes (citation-derived verbatim spec) are the ONE exception to minimal
+      # prompts: they are Forge's processed output, not stored in any MCP artifact, so pass inline.
       POST-CONDITION: worktree seam files exist at .evor/worktrees/<node_id>/.
 
     Phase 3 — LSP pre-flight
       Run lsp_diagnostics on the candidate seam files in .evor/worktrees/<node_id>/.
       Fix any diagnostics-level errors before proceeding (best-effort if no LS installed).
 
-    Phase 4 — Parallel review
+    Phase 4 — Cheap static gate (P1-13: critic-first, deep review deferred)
+      # P1-13: Run forge-critic ALONE as the pre-training gate. Forge-critic's checks
+      # (structure, telemetry, integrity hash) are deterministic AST reads — fast and cheap.
+      # Only spawn forge-architect + forge-analyst when: (a) critic rejects after MAX_ATTEMPTS,
+      # (b) training fails post-launch, or (c) node is about to be promoted to frontier.
+      # This avoids burning two Opus reviewer slots before every training run.
+      MAX_ATTEMPTS = 2  # P2-8: cap at 2 static-gate cycles; fall back to best checkpoint after
+
       attempt = 1
       while attempt <= MAX_ATTEMPTS:
-        spawn in PARALLEL:
-          Task(subagent_type="oh-my-evor:evor-forge-architect",
-               prompt=<proposal JSON> + <worktree path> + <tick> + <node_id>
-                      + "EVOR_RUN_DIR=" + run_dir)
-          Task(subagent_type="oh-my-evor:evor-forge-critic",
-               prompt=<worktree path> + <GoalContract.eval_script_hash>
-                      + <tick> + <node_id> + "EVOR_RUN_DIR=" + run_dir)
-          Task(subagent_type="oh-my-evor:evor-forge-analyst",
-               prompt=<proposal JSON> + <worktree path> + <capability constraints>
-                      + <tick> + <node_id> + "EVOR_RUN_DIR=" + run_dir)
+        # P1-5: pass identifiers only; forge-critic reads worktree and proposal via MCP.
+        spawn Task(
+          subagent_type="oh-my-evor:evor-forge-critic",
+          prompt=(
+            f"Run dir: {run_dir}. Run ID: {run_id}. Tick: {tick}. Node ID: {node_id}. "
+            f"Worktree: .evor/worktrees/{node_id}. "
+            f"eval_script_hash: {GoalContract.eval_script_hash}. Attempt: {attempt}. "
+            "Read the proposal via evor_read_artifact(agent='mutagen'). "
+            "Run all 5 review checks. Write evor_write_artifact(agent='forge-critic')."
+          )
+        )
+        critic_result = evor_read_artifact(run_id, tick, agent="forge-critic")
 
-        Wait for all three via evor_read_artifact:
-          architect_result = evor_read_artifact(run_id, tick, agent="forge-architect")
-          critic_result    = evor_read_artifact(run_id, tick, agent="forge-critic")
-          analyst_result   = evor_read_artifact(run_id, tick, agent="forge-analyst")
-
-        If all three verdicts == "approved": break.
+        If critic_result.verdict == "approved": break.
         If attempt == MAX_ATTEMPTS:
-          abort — report to orchestrator with all rejection reasons.
+          # Critic rejected twice: run full architect+analyst panel to get complete diagnosis,
+          # then abort and report all rejection reasons to orchestrator.
+          spawn in PARALLEL:
+            Task(subagent_type="oh-my-evor:evor-forge-architect",
+                 prompt=(
+                   f"Run dir: {run_dir}. Run ID: {run_id}. Tick: {tick}. Node ID: {node_id}. "
+                   f"Worktree: .evor/worktrees/{node_id}. "
+                   "Read the proposal via evor_read_artifact(agent='mutagen'). "
+                   "Diagnose design failures and write evor_write_artifact(agent='forge-architect')."
+                 ))
+            Task(subagent_type="oh-my-evor:evor-forge-analyst",
+                 prompt=(
+                   f"Run dir: {run_dir}. Run ID: {run_id}. Tick: {tick}. Node ID: {node_id}. "
+                   f"Worktree: .evor/worktrees/{node_id}. "
+                   "Read capability via evor_capability() and proposal via evor_read_artifact(agent='mutagen'). "
+                   "Assess resource risk and write evor_write_artifact(agent='forge-analyst')."
+                 ))
+          abort — report all rejection reasons from critic + architect + analyst to orchestrator.
 
-        # Route rejections back to forge-junior:
+        # Route critic rejection back to forge-junior for a fix:
         spawn Task(
           subagent_type="oh-my-evor:evor-forge-junior",
-          prompt=<original forge-junior prompt>
-                 + <architect rejection reasons, if any>
-                 + <critic rejection reasons, if any>
-                 + <analyst rejection reasons, if any>
-                 + "Apply all rejection feedback. Do not touch evaluate.py."
-                 + "EVOR_RUN_DIR=" + run_dir + " NODE_ID=" + node_id
+          prompt=(
+            f"Run dir: {run_dir}. Run ID: {run_id}. Tick: {tick}. Node ID: {node_id}. "
+            "Read proposal via evor_read_artifact(agent='mutagen'). "
+            "Critic rejected (read via evor_read_artifact(agent='forge-critic')). "
+            "Fix all rejection_reasons. Do not touch evaluate.py. "
+            + (<implementation_notes VERBATIM if non-empty, else "")
+            + f"EVOR_RUN_DIR={run_dir} NODE_ID={node_id}"
+          )
         )
         Run lsp_diagnostics pre-flight again.
         attempt += 1
@@ -143,13 +172,67 @@ skills: [oh-my-evor:evor-mcp]
       When Monitor fires, call evor_run_status(job_id) to read final state.
       On OOM: stop immediately — do NOT retry manually.
 
+    Phase 7.5 — Post-run deep review (P1-13 + P2-8)
+      # P1-13: architect + analyst run POST-training (not pre-training), only when needed.
+      # P2-8: MAX_DIAGNOSTIC_CYCLES = 2 — if training produced a soft failure (NaN, divergence),
+      #   diagnose once; if the same failure recurs, evaluate the best pre-divergence checkpoint
+      #   and record honestly — do NOT keep retrying.
+
+      If run_status.state == "oom":
+        stop — do NOT retry. Record integrity_status="failed", reason="OOM".
+
+      If run_status.state in ("failed", "diverged"):
+        # Diagnostic cycle: spawn architect + analyst to diagnose the failure.
+        spawn in PARALLEL:
+          Task(subagent_type="oh-my-evor:evor-forge-architect",
+               prompt=(
+                 f"Run dir: {run_dir}. Run ID: {run_id}. Tick: {tick}. Node ID: {node_id}. "
+                 f"Worktree: .evor/worktrees/{node_id}. Training failed: {run_status.state}. "
+                 "Read proposal via evor_read_artifact(agent='mutagen'). "
+                 "Diagnose design failures and write evor_write_artifact(agent='forge-architect')."
+               ))
+          Task(subagent_type="oh-my-evor:evor-forge-analyst",
+               prompt=(
+                 f"Run dir: {run_dir}. Run ID: {run_id}. Tick: {tick}. Node ID: {node_id}. "
+                 f"Log: {log_path}. Training failed: {run_status.state}. "
+                 "Read capability via evor_capability(). Diagnose resource/telemetry failures. "
+                 "Write evor_write_artifact(agent='forge-analyst')."
+               ))
+        This counts as diagnostic_cycle += 1. If diagnostic_cycle > 2:
+          evaluate best pre-divergence checkpoint if it exists; record the result honestly.
+          do NOT spawn forge-junior for another attempt.
+
+      If run_status.state == "succeeded":
+        # Pre-promotion gate: run architect + analyst once before the node reaches the frontier.
+        spawn in PARALLEL:
+          Task(subagent_type="oh-my-evor:evor-forge-architect",
+               prompt=(
+                 f"Run dir: {run_dir}. Run ID: {run_id}. Tick: {tick}. Node ID: {node_id}. "
+                 f"Worktree: .evor/worktrees/{node_id}. Training succeeded. "
+                 "Read proposal via evor_read_artifact(agent='mutagen'). "
+                 "Verify design fidelity and write evor_write_artifact(agent='forge-architect')."
+               ))
+          Task(subagent_type="oh-my-evor:evor-forge-analyst",
+               prompt=(
+                 f"Run dir: {run_dir}. Run ID: {run_id}. Tick: {tick}. Node ID: {node_id}. "
+                 f"Log: {log_path}. Training succeeded. "
+                 "Read telemetry and resource signals. Write evor_write_artifact(agent='forge-analyst')."
+               ))
+        If architect or analyst reject: record the finding in the forge-report; node is
+        still evaluated by Probe but rejection_reason is noted in DecisionLogEntry before
+        any promotion decision by the orchestrator.
+
     Phase 8 — Aggregate
       Call evor_write_artifact(run_id, tick, agent="forge",
            payload=forge_report, partial=false).
       Verify nodes/<node_id>/results.json and nodes/<node_id>/telemetry.jsonl exist.
     ```
 
-    **Spawn prompt construction:** Each prompt must be self-contained — include file paths, tick, node_id, and EVOR_RUN_DIR. Sub-agents do not share Forge's context window.
+    **Spawn prompt construction (P1-5 — minimal prompts):** Pass only run_id, run_dir, tick,
+    node_id, and the agent's MCP read instructions. Sub-agents load proposal, capability, and
+    gotchas themselves via evor_read_artifact / evor_capability / evor_gotcha_query. The ONE
+    exception: implementation_notes derived from citation processing — pass verbatim inline
+    because they are Forge's computed output and are not stored in any MCP artifact.
 
     **Only Forge spawns forge-* agents.** Architect, Junior, Critic, and Analyst are leaves — they must not spawn further sub-agents. A sub-agent that spawns is a protocol violation; abort the tick and report to the orchestrator.
   </Team_Protocol>

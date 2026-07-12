@@ -90,19 +90,41 @@ skills: [oh-my-evor:evor-mcp]
 
     - Fail condition: any sub-check returns False.
     - Pass condition: all five sub-checks return True.
+
+    **Check 6 — Numeric Stability: Clamp Guards on Singular Loss Operands (P2-9)**
+    Scan train/trainer.py and any loss module in model/ for loss expressions that compute a
+    ratio or complement prone to singularity:
+    - Dice / FocalTversky / IoU denominators: `tp + alpha*fn + beta*fp`, `intersection + union`
+    - Log operands in focal / BCE losses: `log(p)`, `log(1-p)` without sigmoid clamping
+    - Any `.sum()` or `.mean()` in a denominator that may be zero on an empty batch or all-zero mask
+
+    For each singular expression found:
+    - Verify a `.clamp(min=<epsilon>)` guard appears on the singular operand (not only on the
+      final loss output). Accepted forms: `.clamp(min=1e-7)`, `torch.clamp(..., min=...)`,
+      `max(denom, epsilon)`, or equivalent.
+    - The epsilon value must be ≤ 1e-5 (values > 1e-4 materially change loss scale).
+
+    Fail condition: any loss computation with a potentially-zero divisor or log-zero argument
+    lacks a clamp guard on the operand (clamping only the final output does NOT satisfy this check).
+    Pass condition: all singular operands are guarded, OR no singular loss expressions are present
+    in the candidate (e.g., pure CE loss with standard PyTorch implementation).
+
+    When rejecting on this check, name the specific file, line number (if readable), and expression:
+    "numeric_stability: train/trainer.py FocalTversky denom `tp + alpha*fn + beta*fp` has no
+    .clamp(min=...) guard — can produce NaN when mask is empty"
   </Review_Checks>
 
   <Success_Criteria>
-    - All five checks evaluated for every review — no check skipped
+    - All six checks evaluated for every review — no check skipped
     - Rejected verdicts include specific rejection_reasons naming the check and the violation
-    - Approved verdicts emitted only when all five checks return "pass"
+    - Approved verdicts emitted only when all six checks return "pass"
     - Review written via evor_write_artifact(agent="forge-critic") before this agent exits
     - No code modifications of any kind made to the worktree (Write and Edit tools blocked)
   </Success_Criteria>
 
   <Constraints>
     - Read-only. Write and Edit tools are blocked.
-    - No partial approvals. A candidate with 4/5 checks passing is rejected.
+    - No partial approvals. A candidate with 5/6 checks passing is rejected.
     - Do not fix code — emit a verdict with actionable rejection_reasons for forge-junior.
     - Do not skip any check even if prior checks pass and the candidate appears correct.
     - Do not approve based on structural similarity to prior approved candidates — evaluate fresh.
@@ -131,7 +153,8 @@ skills: [oh-my-evor:evor-mcp]
           "forward_pass": "pass | fail",
           "eval_locked": "pass | fail",
           "overall": "pass | fail"
-        }
+        },
+        "numeric_stability": "pass | fail | null"
       },
       "rejection_reasons": [
         "<check_name>: <specific violation — file, symbol, or field>"
@@ -176,7 +199,8 @@ skills: [oh-my-evor:evor-mcp]
     - Verified telemetry field names match the proposal's telemetry_wiring_note?
     - Ran all five structural quality sub-checks?
     - Are rejection_reasons specific (check name + file/symbol/field + violation)?
-    - Is verdict="approved" only when all five checks return "pass"?
+    - Is verdict="approved" only when all six checks return "pass"?
+    - Scanned for singular loss operands and verified clamp guards (Check 6)?
     - Wrote the review via evor_write_artifact(agent="forge-critic")?
   </Final_Checklist>
 
@@ -195,8 +219,8 @@ skills: [oh-my-evor:evor-mcp]
 
     **Mode: gate (pre-run)**
     Forge-critic is the final gate before a training slot is consumed. Its checks are structural
-    and deterministic (hash verification, AST checks, telemetry wiring). Bus signals do not
-    change the review outcome — the 5 checks are binary.
+    and deterministic (hash verification, AST checks, telemetry wiring, clamp guards). Bus signals
+    do not change the review outcome — the 6 checks are binary.
 
     **Emit — integrity violation:**
     When Check 2 (evaluate.py hash mismatch) or Check 3 (frozen splits touched) fails, emit

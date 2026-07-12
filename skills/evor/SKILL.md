@@ -176,8 +176,29 @@ Spawn Mutagen and Sage as REAL sub-agents. Do NOT write proposals or citations y
 
 1. `Task(subagent_type="oh-my-evor:evor-mutagen", description="Tick <n> proposals", prompt="Run dir: <run_dir>. Tick: <n>. Parent node(s): <ids>. Wildness: <w>. Generate N=<concurrency> proposals and write ticks/<n>/mutagen/proposals.json per your write-as-you-go contract.")`.
    - **POST-CONDITION:** call `evor_read_artifact({ run_id, tick: n, agent: "mutagen" })`. If it returns `{error:"not found"}`, re-spawn Mutagen with a corrective note. Never fabricate the artifact.
-2. Write Mutagen's `investigation_queries[]` to the tick handoff via `evor_write_handoff({ run_id, tick: n, data: { to: "sage", investigation_queries: [...] } })`, then
-   `Task(subagent_type="oh-my-evor:evor-sage", description="Tick <n> grounding", prompt="Run dir: <run_dir>. Tick: <n>. Read the tick handoff via evor_read_handoff and answer the investigation_queries, then write ticks/<n>/sage/findings.json.")`.
+2. Write Mutagen's `investigation_queries[]` to the tick handoff via `evor_write_handoff({ run_id, tick: n, data: { to: "sage", investigation_queries: [...] } })`.
+
+   **P1-8 — Conditional Sage gate (wiki+gotcha first; Sage only when needed):**
+   Before spawning Sage, call `evor_wiki_query` and `evor_gotcha_query` for each angle in
+   `investigation_queries[]`. Classify each query as wiki-resolved, gotcha-resolved, or unresolved.
+
+   **Skip Sage entirely** (and mark all queries resolved from wiki/gotcha) when ALL of the
+   following hold:
+   - All investigation_queries are wiki-resolved (wiki returned a confirmed lesson for each angle)
+   - The proposal's approach_family is a known recipe already run this mission (not new to the run)
+   - wildness < 0.7 (parametric / familiar territory; low surprise risk)
+   - approach_family != "data-acquisition" (no sourcing due diligence needed)
+
+   **Spawn Sage** when ANY of the following is true:
+   - One or more investigation_queries are NOT wiki-resolved after the wiki+gotcha check
+   - approach_family is new to this run (first tick using this family in this mission)
+   - wildness >= 0.7 (structural or high-exploration proposal; external grounding adds value)
+   - approach_family == "data-acquisition" (license sourcing requires Sage's Tier-1 search)
+
+   When spawning Sage (narrowed scope): pass the UNRESOLVED angles only; wiki-resolved angles
+   are already handled. Include the wiki hit IDs in the spawn prompt so Sage skips them.
+
+   `Task(subagent_type="oh-my-evor:evor-sage", description="Tick <n> grounding", prompt="Run dir: <run_dir>. Tick: <n>. Read the tick handoff via evor_read_handoff and answer the UNRESOLVED investigation_queries (wiki-resolved angle IDs already handled: [<ids>]). Write ticks/<n>/sage/findings.json.")`.
    - **POST-CONDITION:** call `evor_read_artifact({ run_id, tick: n, agent: "sage" })`. If it returns `{error:"not found"}`, re-spawn Sage.
 3. Attach Sage's findings to the matching `MutationProposal.citations[]`.
 
@@ -486,4 +507,23 @@ before acting — the restore block is a navigation aid, not the authoritative s
 - Respect budget.max_wall_clock_hours and budget.max_gpu_hours if set.
 - Print tick summary after each Step 9 (tick number, best score, frontier size, strategy state).
 - Use `TaskUpdate` to mark each tick complete in the task list after Step 9.
+
+**P2-16 — Narration reduction (one-line HUD; push only on milestone).**
+Emit ONE concise status line per tick step, not a multi-paragraph essay. Format:
+  `[T{tick} S{step}] {verb}: {object} → {outcome}` (e.g. `[T3 S2] Mutagen: 3 proposals → written`)
+
+Do NOT emit:
+- "Holding..." or "Waiting..." turns (idle silently via Monitor instead)
+- Intermediate reasoning paragraphs or "I will now..." preambles
+- Redundant recaps of what was already logged in the previous step
+- Full JSON payloads in orchestrator text output (those belong in artifacts, not narration)
+
+**Push notification (PushNotification tool) ONLY for these milestones:**
+1. New best score achieved (best_score improved by any amount)
+2. IntegrityReport.verdict == "failed" (integrity violation detected)
+3. Run blocked (doom-loop detected, or budget exhausted, or all proposals rejected)
+4. Tick complete (end of Step 9) — one line only
+
+For all other transitions (step start, sub-agent spawned, artifact written, etc.), update
+`TaskUpdate` silently; do not output narrative text.
 </Execution_Policy>
