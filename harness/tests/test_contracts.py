@@ -851,6 +851,12 @@ class TestInferMetricScale:
         assert infer_metric_scale("") == 1.0
         assert infer_metric_scale("", "") == 1.0
 
+    def test_none_inputs_do_not_crash(self) -> None:
+        """dataset_ref/metric_name may be None on a real contract — must not raise."""
+        assert infer_metric_scale("accuracy", None) == 1.0
+        assert infer_metric_scale(None, None) == 1.0  # type: ignore[arg-type]
+        assert infer_metric_scale("f_measure", None) == 100.0  # metric still infers
+
 
 class TestMetricScaleAutoInference:
     """P0-7: GoalContract must auto-fill metric_scale from infer_metric_scale()

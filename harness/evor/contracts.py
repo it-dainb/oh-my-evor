@@ -213,8 +213,8 @@ def infer_metric_scale(metric_name: str, dataset_ref: str = "") -> float:
     Returns:
         100.0 if the metric is on a 0-100 scale, else 1.0.
     """
-    lower_metric = metric_name.lower()
-    lower_dataset = dataset_ref.lower()
+    lower_metric = (metric_name or "").lower()
+    lower_dataset = (dataset_ref or "").lower()
 
     for kw in _METRIC_NAME_100_KEYWORDS:
         if kw in lower_metric:
