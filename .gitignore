@@ -39,3 +39,6 @@ mcp/.uv/
 **/.omc/
 .evor/runs/
 .evor/active-run.json
+
+# generated CI evidence artifacts
+ci/out/
