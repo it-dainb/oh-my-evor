@@ -41,6 +41,7 @@ const SUBAGENT_STOP = join(HOOKS_DIR, "subagent-stop.mjs");
 const PRE_TOOL_USE = join(HOOKS_DIR, "pre-tool-use.mjs");
 const SUBAGENT_START = join(HOOKS_DIR, "subagent-start.mjs");
 const POST_COMPACT = join(HOOKS_DIR, "post-compact.mjs");
+const JOB_STATUS_WATCHER = join(HOOKS_DIR, "job-status-watcher.mjs");
 
 /** Spawn a hook script as a child process with a minimal, controlled env. */
 function runHook(scriptPath: string, env: Record<string, string>) {
@@ -2713,6 +2714,44 @@ describe("post-tool-use hook — reflex advisor", () => {
     expect(result.status).toBe(0);
     expect(result.stdout).not.toContain("EVOR REFLEX");
   });
+
+  // P1-1: record_eval reflex must nudge both integrity_check AND state_write
+  it("P1-1: record_eval reflex nudges evor_integrity_check AND evor_state_write", () => {
+    const runDir = join(tmpDir, "runs", RUN_ID);
+    mkdirSync(runDir, { recursive: true });
+    const payload = JSON.stringify({
+      tool_name: "evor_record_eval",
+      tool_input: { run_id: RUN_ID, node_id: "node-p11" },
+      tool_response: { node_id: "node-p11", score: 0.82 },
+    });
+    const result = runHookWithStdin(
+      POST_TOOL_USE,
+      { EVOR_ACTIVE_RUN_ID: RUN_ID, EVOR_ROOT: tmpDir },
+      payload,
+    );
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain("evor_integrity_check");
+    expect(result.stdout).toContain("evor_state_write");
+  });
+
+  // P1-1: job-complete signal (run_status=succeeded) nudges record_eval
+  it("P1-1: run_status succeeded nudges evor_record_eval (job-complete → record_eval)", () => {
+    const runDir = join(tmpDir, "runs", RUN_ID);
+    mkdirSync(runDir, { recursive: true });
+    const payload = JSON.stringify({
+      tool_name: "evor_run_status",
+      tool_input: { run_id: RUN_ID, node_id: "node-jc" },
+      tool_response: { state: "succeeded", node_id: "node-jc", metrics: { val_score: 0.91 } },
+    });
+    const result = runHookWithStdin(
+      POST_TOOL_USE,
+      { EVOR_ACTIVE_RUN_ID: RUN_ID, EVOR_ROOT: tmpDir },
+      payload,
+    );
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain("evor_record_eval");
+    expect(result.stdout).toContain("evor_integrity_check");
+  });
 });
 
 // ─── pre-tool-use hook — .evor write-guard (EVOR_GUARD_DIRECT_WRITES) ─────────
@@ -3594,5 +3633,105 @@ describe("stop hook — P0-4 pending_subagent_ids guard", () => {
     expect(result.stdout).toMatch(/id-b/);
     expect(result.stdout).toMatch(/id-c/);
     expect(result.stdout).toMatch(/\.\.\./);
+  });
+});
+
+// ─── job-status-watcher hook — P2-3 stale-notification dedup ─────────────────
+
+describe("job-status-watcher hook — P2-3 stale-notification dedup", () => {
+  let tmpDir: string;
+  let dedupDir: string;
+  const RUN_ID = "run-jsw-dedup-001";
+
+  beforeEach(() => {
+    tmpDir = mkdtempSync(join(tmpdir(), "evor-jsw-test-"));
+    dedupDir = join(tmpDir, "dedup");
+    mkdirSync(dedupDir, { recursive: true });
+  });
+  afterEach(() => {
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  function makeStatusFile(state: string, jobId: string, nodeId: string): string {
+    const dir = join(tmpDir, "status-files");
+    mkdirSync(dir, { recursive: true });
+    // Include state in filename so different-state files for the same job don't collide
+    const p = join(dir, `${jobId}-${state}-status.json`);
+    writeFileSync(p, JSON.stringify({ state, job_id: jobId, node_id: nodeId }));
+    return p;
+  }
+
+  function runWatcher(statusFilePath: string, extraEnv: Record<string, string> = {}) {
+    return runHookWithStdin(
+      JOB_STATUS_WATCHER,
+      {
+        EVOR_ACTIVE_RUN_ID: RUN_ID,
+        EVOR_DEDUP_DIR: dedupDir,
+        ...extraEnv,
+      },
+      JSON.stringify({ file_path: statusFilePath }),
+    );
+  }
+
+  it("emits notification on first succeeded event", () => {
+    const p = makeStatusFile("succeeded", "job-001", "node-abc");
+    const result = runWatcher(p);
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain("evor_record_eval");
+  });
+
+  it("P2-3: suppresses duplicate succeeded notification for same (node_id, job_id, state)", () => {
+    const p = makeStatusFile("succeeded", "job-002", "node-xyz");
+    // First fire — should notify
+    const r1 = runWatcher(p);
+    expect(r1.stdout).toContain("evor_record_eval");
+    // Second fire same state — must be silent
+    const r2 = runWatcher(p);
+    expect(r2.status).toBe(0);
+    expect(r2.stdout).not.toContain("EVOR JOB");
+  });
+
+  it("P2-3: suppresses duplicate failed notification for same (node_id, job_id, state)", () => {
+    const p = makeStatusFile("failed", "job-003", "node-fail");
+    const r1 = runWatcher(p);
+    expect(r1.stdout).toContain("evor_signal_emit");
+    const r2 = runWatcher(p);
+    expect(r2.status).toBe(0);
+    expect(r2.stdout).not.toContain("EVOR JOB FAILED");
+  });
+
+  it("P2-3: fires again when state transitions to a new value (succeeded → failed is different key)", () => {
+    const jobId = "job-004";
+    const nodeId = "node-trans";
+    const pSucceeded = makeStatusFile("succeeded", jobId, nodeId);
+    const pFailed = makeStatusFile("failed", jobId, nodeId);
+
+    // First: succeeded fires
+    const r1 = runWatcher(pSucceeded);
+    expect(r1.stdout).toContain("evor_record_eval");
+
+    // Then status changes to failed — different dedup key → must fire
+    const r2 = runWatcher(pFailed);
+    expect(r2.stdout).toContain("evor_signal_emit");
+  });
+
+  it("P2-3: running state is not deduped (informational, not terminal)", () => {
+    const p = makeStatusFile("running", "job-005", "node-run");
+    const r1 = runWatcher(p);
+    expect(r1.stdout).toContain("EVOR JOB RUNNING");
+    // running fires again (no dedup for non-terminal)
+    const r2 = runWatcher(p);
+    expect(r2.stdout).toContain("EVOR JOB RUNNING");
+  });
+
+  it("exits 0 silently when EVOR_ACTIVE_RUN_ID is unset", () => {
+    const p = makeStatusFile("succeeded", "job-006", "node-guard");
+    const result = runHookWithStdin(
+      JOB_STATUS_WATCHER,
+      { EVOR_DEDUP_DIR: dedupDir },
+      JSON.stringify({ file_path: p }),
+    );
+    expect(result.status).toBe(0);
+    expect(result.stdout).toBe("");
   });
 });

@@ -20,8 +20,10 @@
  * §19: NO `python -m evor` in any agent-facing string.
  */
 
-import { existsSync, readFileSync } from 'fs';
+import { existsSync, readFileSync, writeFileSync, mkdirSync, renameSync } from 'fs';
 import { join } from 'path';
+import { tmpdir } from 'os';
+import { randomBytes } from 'crypto';
 
 // ── Kill switches ─────────────────────────────────────────────────────────────
 if (process.env.DISABLE_EVOR) process.exit(0);
@@ -58,6 +60,34 @@ try {
 const state = String(status?.state ?? status?.status ?? '').toLowerCase();
 const jobId = String(status?.job_id ?? '');
 const nodeId = String(status?.node_id ?? '');
+
+// ── P2-3: Dedup terminal notifications by (node_id, job_id, state) ────────────
+// Prevents re-firing when status.json is touched after the node is finalized.
+// Only terminal states are deduped; 'running' is informational and repeatable.
+const TERMINAL_STATES = new Set(['succeeded', 'success', 'completed', 'failed', 'error', 'crashed']);
+if (TERMINAL_STATES.has(state)) {
+  const dedupBase = process.env.EVOR_DEDUP_DIR
+    ? join(process.env.EVOR_DEDUP_DIR, activeRunId)
+    : join(tmpdir(), 'evor-job-dedup', activeRunId);
+  const rawKey = `${nodeId}|${jobId}|${state}`;
+  // Sanitize key into a safe filename (keep alphanum, dash, underscore, pipe→_)
+  const safeKey = rawKey.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 128) + '.lock';
+  const dedupFile = join(dedupBase, safeKey);
+  try {
+    if (existsSync(dedupFile)) {
+      process.exit(0); // Already notified for this (node_id, job_id, state) — suppress
+    }
+    mkdirSync(dedupBase, { recursive: true });
+    const tmp = dedupFile + '.tmp.' + randomBytes(4).toString('hex');
+    writeFileSync(tmp, JSON.stringify({
+      node_id: nodeId, job_id: jobId, state,
+      created_at: new Date().toISOString(),
+    }), 'utf8');
+    renameSync(tmp, dedupFile);
+  } catch {
+    // Fail-open — a dedup write failure must never suppress a legitimate notification
+  }
+}
 
 // ── Build wake message based on job state ─────────────────────────────────────
 let additionalContext = '';

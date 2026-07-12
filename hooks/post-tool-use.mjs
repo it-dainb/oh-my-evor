@@ -508,13 +508,15 @@ try {
     if (!isThrottled('record_eval:integrity')) {
       markThrottled('record_eval:integrity');
       const nodeId4 = String(toolResp?.node_id ?? toolInpR?.node_id ?? '');
+      const runId4  = String(toolInpR?.run_id ?? activeRunId);
       const prevBest = toolResp?.previous_best_score ?? null;
       const newScore = toolResp?.score ?? toolResp?.best_score ?? null;
       const improved = prevBest !== null && newScore !== null && newScore > prevBest;
+      // P1-1: nudge full post-eval flow — integrity THEN state_write frontier update
       const nudge =
         `[EVOR REFLEX] Eval recorded${nodeId4 ? ` for ${nodeId4}` : ''}. ` +
-        `Verify with evor_integrity_check(${nodeId4 ? `node_id="${nodeId4}"` : 'node_id=...'}) ` +
-        `before propagating the score.` +
+        `Next: (1) verify evor_integrity_check(${nodeId4 ? `node_id="${nodeId4}"` : 'node_id=...'}); ` +
+        `(2) if passed, update the frontier with evor_state_write(run_id="${runId4}").` +
         (improved
           ? ` New best score ${String(newScore).slice(0, 8)} > ${String(prevBest).slice(0, 8)} — ` +
             `call PushNotification to alert the user of the breakthrough.`
