@@ -160,6 +160,29 @@ export function recordEval(
   return { resultsPath, integrityVerdict, integrityError };
 }
 
+/**
+ * Read nodes/<nodeId>/results.json and return parsed JSON (P2-14).
+ * Eliminates the orchestrator's "cat results.json" shell-out turn.
+ * Call after evor_run_status shows state='done'.
+ */
+export function readResult(
+  runId: string,
+  nodeId: string,
+  missionId?: string,
+): { ok: boolean; data?: unknown; error?: string } {
+  const paths = resolveRunPaths(runId, missionId);
+  const resultPath = join(paths.nodesDir, nodeId, "results.json");
+  if (!existsSync(resultPath)) {
+    return { ok: false, error: `results.json not found at ${resultPath}` };
+  }
+  try {
+    const data = JSON.parse(readFileSync(resultPath, "utf8")) as unknown;
+    return { ok: true, data };
+  } catch (e) {
+    return { ok: false, error: `Failed to parse results.json: ${String(e)}` };
+  }
+}
+
 // ── Tool registrations ──────────────────────────────────────────────────────
 
 export function registerRecordTools(server: McpServer): void {
@@ -173,7 +196,9 @@ export function registerRecordTools(server: McpServer): void {
   });
   server.tool(
     "evor_record_node",
-    "Validate a TreeNode against the Zod schema and atomically write it into tree.json for the given run. node.id is optional — a UUID is auto-generated when omitted.",
+    "Call BEFORE evor_record_eval. Validate a TreeNode against the Zod schema and atomically "
+    + "upsert it into tree.json. node.id is optional — a UUID is auto-generated when omitted "
+    + "(no shell-out to python -c 'import uuid' needed). Returns {ok, node_id, pending_remaining}.",
     {
       run_id: z.string().describe("Active run identifier"),
       node: RecordNodeInputSchema.describe("TreeNode to record (id is optional; auto-generated if absent)"),
@@ -203,7 +228,9 @@ export function registerRecordTools(server: McpServer): void {
   // ── evor_record_eval ───────────────────────────────────────────────────────
   server.tool(
     "evor_record_eval",
-    "Write an EvaluationResult to nodes/<id>/results.json and auto-trigger evor_integrity_check.",
+    "Write an EvaluationResult to nodes/<node_id>/results.json and auto-trigger "
+    + "evor_integrity_check. Always call evor_record_node first so the tree has the node. "
+    + "Returns {ok, results_path, integrity_verdict, integrity_error}.",
     {
       run_id: z.string().describe("Active run identifier"),
       node_id: z.string().describe("Node being evaluated"),
@@ -225,6 +252,35 @@ export function registerRecordTools(server: McpServer): void {
               integrity_verdict: integrityVerdict,
               integrity_error: integrityError,
             }),
+          },
+        ],
+      };
+    }
+  );
+
+  // ── evor_read_result (P2-14) ───────────────────────────────────────────────
+  server.tool(
+    "evor_read_result",
+    "Read nodes/<node_id>/results.json and return parsed JSON. "
+    + "Eliminates the need to shell out 'cat results.json' or read artifact paths manually. "
+    + "Call after evor_run_status shows state='done'. Returns the full EvaluationResult object.",
+    {
+      run_id: z.string().describe("Active run identifier"),
+      node_id: z.string().describe("Node identifier returned by evor_record_node"),
+      mission_id: z.string().optional().describe(
+        "Mission identifier (resolved from EVOR_MISSION_ID env when omitted)",
+      ),
+    },
+    async ({ run_id, node_id, mission_id }) => {
+      const missionId = mission_id ?? process.env.EVOR_MISSION_ID;
+      const result = readResult(run_id, node_id, missionId);
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: result.ok
+              ? JSON.stringify(result.data)
+              : JSON.stringify({ error: result.error }),
           },
         ],
       };

@@ -234,6 +234,30 @@ describe("preflightRun", () => {
     const [, args] = mockedCall.mock.calls[0];
     expect(args).toContain("--no-gpu-check");
   });
+
+  // ── P1-9: mode param ────────────────────────────────────────────────────────
+  it("P1-9: passes --mode env_only when mode='env_only'", () => {
+    mockedCall.mockReturnValue({ ok: true, data: { passed: true } });
+    preflightRun("run-1", "/runs/run-1", false, "env_only");
+    const [, args] = mockedCall.mock.calls[0];
+    expect(args).toContain("--mode");
+    expect(args).toContain("env_only");
+  });
+
+  it("P1-9: passes --mode full when mode='full'", () => {
+    mockedCall.mockReturnValue({ ok: true, data: { passed: true } });
+    preflightRun("run-1", "/runs/run-1", false, "full");
+    const [, args] = mockedCall.mock.calls[0];
+    expect(args).toContain("--mode");
+    expect(args).toContain("full");
+  });
+
+  it("P1-9: does not append --mode when mode is omitted (default full behaviour)", () => {
+    mockedCall.mockReturnValue({ ok: true, data: { passed: true } });
+    preflightRun("run-1", "/runs/run-1");
+    const [, args] = mockedCall.mock.calls[0];
+    expect(args).not.toContain("--mode");
+  });
 });
 
 // ── freezeSplits ─────────────────────────────────────────────────────────────

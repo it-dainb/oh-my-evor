@@ -6,13 +6,13 @@
  * callBridge (integrity) is expected to fail gracefully in test env.
  */
 
-import { mkdtempSync, existsSync, readFileSync, rmSync } from "fs";
+import { mkdtempSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
 import { randomUUID } from "crypto";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 
-import { recordNode, recordEval, readRunState, writeRunState, fillNodeId } from "../src/tools/record.js";
+import { recordNode, recordEval, readRunState, writeRunState, fillNodeId, readResult } from "../src/tools/record.js";
 import { ensureRunDirs } from "../src/run-store.js";
 import { writeTree } from "../src/tree-store.js";
 import type { TreeNode } from "../src/contracts.js";
@@ -260,5 +260,45 @@ describe("fillNodeId (P2-1)", () => {
     const a = fillNodeId(nodeWithoutId as Omit<typeof node, "id"> & { id?: string });
     const b = fillNodeId(nodeWithoutId as Omit<typeof node, "id"> & { id?: string });
     expect(a.id).not.toBe(b.id);
+  });
+});
+
+// ── P2-14: readResult ────────────────────────────────────────────────────────
+
+describe("readResult (P2-14)", () => {
+  it("returns ok:false when results.json does not exist", () => {
+    const r = readResult("run-result-001", "node-missing", "test-mission");
+    expect(r.ok).toBe(false);
+    expect(r.error).toMatch(/not found/i);
+  });
+
+  it("returns parsed JSON from nodes/<nodeId>/results.json", () => {
+    const runDir = join(tmpRoot, "runs", "test-mission", "run-result-002");
+    const nodeDir = join(runDir, "nodes", "node-abc");
+    mkdirSync(nodeDir, { recursive: true });
+    writeFileSync(
+      join(nodeDir, "results.json"),
+      JSON.stringify({ score: 0.85, metrics: { f1: 0.9 } })
+    );
+
+    const r = readResult("run-result-002", "node-abc", "test-mission");
+    expect(r.ok).toBe(true);
+    expect((r.data as Record<string, unknown>).score).toBe(0.85);
+    expect(((r.data as Record<string, unknown>).metrics as Record<string, unknown>).f1).toBe(0.9);
+  });
+
+  it("returns ok:false on corrupt results.json", () => {
+    const runDir = join(tmpRoot, "runs", "test-mission", "run-result-003");
+    const nodeDir = join(runDir, "nodes", "node-xyz");
+    mkdirSync(nodeDir, { recursive: true });
+    writeFileSync(join(nodeDir, "results.json"), "not valid json {{{");
+
+    const r = readResult("run-result-003", "node-xyz", "test-mission");
+    expect(r.ok).toBe(false);
+    expect(r.error).toMatch(/parse/i);
+  });
+
+  it("does not throw for any input", () => {
+    expect(() => readResult("run-noexist", randomUUID(), "test-mission")).not.toThrow();
   });
 });

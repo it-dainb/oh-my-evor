@@ -257,6 +257,8 @@ export interface QueryParams {
   kind?: string;
   min_severity?: string;
   since_tick?: number;
+  /** Cap the number of results returned (default 100). Guards agents against pulling the full bus. */
+  limit?: number;
 }
 
 /**
@@ -307,7 +309,9 @@ export function querySignals(
     return b.last_seen.localeCompare(a.last_seen);
   });
 
-  return out;
+  // P2-13: cap to prevent agents from pulling the full bus in one call
+  const cap = params.limit ?? 100;
+  return out.slice(0, cap);
 }
 
 export interface DigestParams {
@@ -413,12 +417,16 @@ export function registerSignalTools(server: McpServer): void {
       kind: z.string().optional().describe("Exact kind filter; omit for all kinds"),
       min_severity: SignalSeveritySchema.default("low").describe("Severity floor (inclusive). Default: low"),
       since_tick: z.number().int().optional().describe("Only include signals with tick >= this value"),
+      limit: z.number().int().min(1).max(500).optional().describe(
+        "Cap on returned signals sorted by (severity, confidence, recency) desc. Default 100. "
+        + "Use a smaller value (e.g. 10) for spawn-prompt injection to avoid context bloat.",
+      ),
     },
-    async ({ run_id, mission_id, shapes, axes, kind, min_severity, since_tick }) => {
+    async ({ run_id, mission_id, shapes, axes, kind, min_severity, since_tick, limit }) => {
       const missionId = mission_id ?? process.env.EVOR_MISSION_ID;
       const signals = querySignals(
         run_id,
-        { shapes, axes, kind, min_severity, since_tick },
+        { shapes, axes, kind, min_severity, since_tick, limit },
         missionId,
       );
       return {

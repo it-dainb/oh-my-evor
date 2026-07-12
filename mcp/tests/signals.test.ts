@@ -457,3 +457,82 @@ describe("querySignals — since_tick filter", () => {
     expect(results[0].signature).toBe("tick-recent");
   });
 });
+
+// ── P2-13: limit cap ─────────────────────────────────────────────────────────
+
+describe("querySignals — limit cap (P2-13)", () => {
+  it("caps results to limit param when fewer matches exist", () => {
+    const runId = "run-limit-001";
+    for (let i = 0; i < 5; i++) {
+      emitSignal(runId, {
+        kind: "test",
+        signature: `sig-limit-${i}`,
+        shapes: ["trend"],
+        axes: ["compute"],
+        severity: "medium",
+        evidence: {},
+        source: "test",
+      }, "test-mission");
+    }
+    const results = querySignals(runId, { limit: 2 }, "test-mission");
+    expect(results).toHaveLength(2);
+  });
+
+  it("returns highest-severity signals first within the limit", () => {
+    const runId = "run-limit-002";
+    emitSignal(runId, {
+      kind: "a",
+      signature: "sig-low",
+      shapes: ["trend"],
+      axes: ["compute"],
+      severity: "low",
+      evidence: {},
+      source: "test",
+    }, "test-mission");
+    emitSignal(runId, {
+      kind: "b",
+      signature: "sig-high",
+      shapes: ["failure"],
+      axes: ["memory"],
+      severity: "high",
+      evidence: {},
+      source: "test",
+    }, "test-mission");
+    const results = querySignals(runId, { limit: 1 }, "test-mission");
+    expect(results).toHaveLength(1);
+    expect(results[0].severity).toBe("high");
+  });
+
+  it("returns all signals when limit exceeds count", () => {
+    const runId = "run-limit-003";
+    emitSignal(runId, {
+      kind: "x",
+      signature: "sig-only",
+      shapes: ["trend"],
+      axes: ["cost"],
+      severity: "medium",
+      evidence: {},
+      source: "test",
+    }, "test-mission");
+    const results = querySignals(runId, { limit: 100 }, "test-mission");
+    expect(results).toHaveLength(1);
+  });
+
+  it("default (no limit) returns all matching signals up to 100", () => {
+    const runId = "run-limit-004";
+    // Emit 3 signals — default cap of 100 should not truncate them
+    for (let i = 0; i < 3; i++) {
+      emitSignal(runId, {
+        kind: "def",
+        signature: `sig-def-${i}`,
+        shapes: ["trend"],
+        axes: ["cost"],
+        severity: "low",
+        evidence: {},
+        source: "test",
+      }, "test-mission");
+    }
+    const results = querySignals(runId, {}, "test-mission");
+    expect(results).toHaveLength(3);
+  });
+});

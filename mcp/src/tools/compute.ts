@@ -97,11 +97,20 @@ export function doctorRun(runDir?: string, repair?: boolean): PyResult {
 }
 
 /**
- * Run the 5-step micro-train smoke-test.
+ * Run the preflight suite.
+ *
+ * mode="full" (default): 5-step micro-train smoke-test + GPU/import checks.
+ * mode="env_only" (P1-9): checks imports + env only — fast, no GPU needed.
  */
-export function preflightRun(runId: string, runDir: string, noGpuCheck?: boolean): PyResult {
+export function preflightRun(
+  runId: string,
+  runDir: string,
+  noGpuCheck?: boolean,
+  mode?: "full" | "env_only",
+): PyResult {
   const args = ["preflight", "--run-id", runId, "--run-dir", runDir];
   if (noGpuCheck) args.push("--no-gpu-check");
+  if (mode) args.push("--mode", mode);
   return callPythonModule("evor", args, { timeout: 120_000 });
 }
 
@@ -380,19 +389,27 @@ export function registerComputeTools(server: McpServer): void {
   // ── evor_preflight ──────────────────────────────────────────────────────────
   server.tool(
     "evor_preflight",
-    "Run the 5-step micro-train smoke-test. "
-    + "Returns {run_id, checks:{import_ok, loss_decreasing, gpu_active}, passed}.",
+    "Smoke-test the run environment before committing GPU time. "
+    + "Two modes: mode='full' (default) runs the 5-step micro-train + import/GPU checks — "
+    + "checks: import_ok, loss_decreasing, gpu_active; returns {run_id, checks, passed}. "
+    + "mode='env_only' checks imports + env variables only — fast, no GPU required, "
+    + "safe to call on CPU-only nodes or before evor_capability. "
+    + "Pass no_gpu_check=true to skip GPU utilisation even in full mode.",
     {
       run_id: z.string().describe("Active run identifier"),
       run_dir: z.string().optional().describe("Explicit run_dir override"),
       no_gpu_check: z.boolean().optional().describe(
-        "Skip GPU utilisation check (CPU-only environments)",
+        "Skip GPU utilisation check (useful in CPU-only environments)",
+      ),
+      mode: z.enum(["full", "env_only"]).optional().describe(
+        "Preflight mode: 'full' (default) runs 5-step micro-train; "
+        + "'env_only' checks imports + env only (fast, no GPU needed)",
       ),
     },
-    async ({ run_id, run_dir, no_gpu_check }) => {
+    async ({ run_id, run_dir, no_gpu_check, mode }) => {
       const missionId = process.env.EVOR_MISSION_ID;
       const resolvedDir = run_dir ?? resolveRunPaths(run_id, missionId).runDir;
-      const result = preflightRun(run_id, resolvedDir, no_gpu_check);
+      const result = preflightRun(run_id, resolvedDir, no_gpu_check, mode);
       if (!result.ok) return err(result.error ?? "evor preflight failed");
       return ok(result.data);
     },
