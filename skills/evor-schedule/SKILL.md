@@ -39,7 +39,7 @@ State the choice plainly: which scheduler is active, the cadence, and how to sto
 
 ## The poll-and-advance step (what each firing does)
 Each scheduled firing runs ONE step, then reschedules:
-1. `evor_run_status({ run_id, job_id })` for the active job.
+1. `evor_run_status({ run_id })` for the active job. The tool looks up the active job internally from `run_id` — do not carry or pass `job_id` across schedule firings.
 2. If still running → reschedule the next check (cadence matched to expected run time); do nothing else.
 3. If succeeded → `evor_record_eval` → `evor_integrity_check` → `evor_wiki_add` → `evor_select` → `evor_run_start`
    for the next candidate → reschedule → `PushNotification` (progress) + `SendUserFile` (tree/metrics plot)

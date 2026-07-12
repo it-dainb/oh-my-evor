@@ -154,8 +154,8 @@ signature=f"cuda-oom-bs{batch_size}-{task_slug}"
 signature=f"family-rejected-{rejected_family}"
 signature="eval-saturated"          # intentionally single dedup key across all ticks
 
-# Bad — unique per call, defeats dedup
-signature=f"cuda-oom-{uuid4()}"
+# BAD: signature="cuda-oom-<random-suffix>"  # unique-per-call defeats dedup
+# Never generate a random or time-based suffix for signatures.
 ```
 
 Do not spam duplicates. The recurrence x confidence weighting means a signal that fires

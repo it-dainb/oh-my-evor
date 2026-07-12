@@ -178,7 +178,7 @@ disallowedTools: Write, Edit
       `<evor-remember>Fact — e.g. "MixUp degrades on heavily imbalanced splits"</evor-remember>`
       `<evor-remember gotcha>Hard constraint — e.g. "Paper X results use private test set"</evor-remember>`
     The PostToolUse hook routes these to the wiki (regular tags) or the gotcha store
-    (gotcha-tagged items) via `.evor/runs/<run_id>/remember-inbox.jsonl`.
+    (gotcha-tagged items) automatically. Agents need not know the inbox path.
   </Write_As_You_Go>
 
   <Signal_Lens>

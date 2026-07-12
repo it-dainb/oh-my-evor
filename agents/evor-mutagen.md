@@ -215,14 +215,12 @@ skills: [oh-my-evor:evor-mcp]
     {
       "proposals": [
         {
-          "proposal_id": "prop-<uuid>",
-          "parent_node_ids": ["<node-id>"],
+          "parent_node_ids": ["<node-name>"],
           "approach_family": "arch | training | data-curation | data-augmentation | data-acquisition | algo | other",
           "mutation_tier": "parametric | structural",
           "mutation_locus": { "family": "arch", "path": "model/" },
           "idea": "Plain-language description of what this proposal changes and why it might help",
           "hypothesis": {
-            "id": "hyp-<uuid>",
             "statement": "Doing X will improve Y because Z",
             "prediction": "val_acc +2–4% over parent baseline of N%"
           },
@@ -241,9 +239,13 @@ skills: [oh-my-evor:evor-mcp]
       "crossover_triggered": false
     }
     ```
+    Do NOT generate `proposal_id` or `hypothesis.id` fields — the server assigns these when
+    `evor_validate_proposals` / `evor_record` processes the payload. Supply only content fields.
+    Do NOT supply `critic_review` gate codes (h001_…, h002_…) — the validator computes them.
     `citations[]` starts empty — Sage fills it; the orchestrator attaches Sage's findings before Selector reviews.
     `angle` is a free-text creative label (not restricted to approach_family or the inspiration menu).
     `in_provided_list` is true only if angle exactly matches an entry in the Open_Ended_Mutation_Angle_Space menu.
+    Node references use readable names, not opaque IDs — pass the node name the orchestrator gave you.
   </Output_Format>
 
   <Adaptive_Meta_Trigger>

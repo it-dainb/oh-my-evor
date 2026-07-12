@@ -228,7 +228,8 @@ the whole point is an independent critic that did not generate the proposals it 
 
 For each approved proposal, spawn Forge as a REAL sub-agent. Do NOT write or run training code yourself.
 
-`Task(subagent_type="oh-my-evor:evor-forge", description="Implement <node_id>", prompt="Run dir: <run_dir>. Tick: <n>. Node: <node_id>. Materialize the genome for proposal <id>, instrument telemetry via EVOR_TELEMETRY_PATH env-path append, store the delta, run the harness/training, and write ticks/<n>/forge/forge-report.json plus nodes/<node_id>/results.json and telemetry.")`.
+`Task(subagent_type="oh-my-evor:evor-forge", description="Implement <proposal_name>", prompt="Run dir: <run_dir>. Tick: <n>. Proposal name: <proposal_name>. Materialize the genome for this proposal, instrument telemetry via EVOR_TELEMETRY_PATH env-path append, store the delta, run the harness/training, and write your artifacts via evor_write_artifact.")`.
+- Pass the proposal by NAME. Do NOT pass raw `node_id` UUIDs or internal path literals. Forge derives its own artifact paths and writes via `evor_write_artifact`.
 - **POST-CONDITION:** call `evor_read_artifact({ run_id, tick: n, agent: "forge" })`. If it returns `{error:"not found"}`, re-spawn Forge.
 - If parallel teams available: launch Forge Tasks concurrently; use `Monitor` for job_complete. Otherwise run one at a time.
 - **P0-4 — Forge atomic completion contract:** `evor_read_artifact({ run_id, tick: n, agent: "forge" })` returning successfully is the ONLY signal that Forge's full turn is done. Individual forge-* sub-agent completions (forge-critic, forge-architect, forge-analyst, forge-junior completing their Tasks) are Forge's INTERNAL delegation — they are NOT signals that Forge itself has finished. Do NOT advance to Step 6 until the forge-report artifact is confirmed present. Treating a forge-critic or forge-analyst Task completion as "Forge done" is a protocol violation that corrupts the tick.
@@ -252,7 +253,8 @@ For each completed Forge job:
 
 For each node where integrity_status="passed", spawn Probe as a REAL sub-agent. Do NOT write lessons or hypothesis verdicts yourself.
 
-`Task(subagent_type="oh-my-evor:evor-probe", description="Analyze <node_id>", prompt="Run dir: <run_dir>. Tick: <n>. Node: <node_id>. Analyze nodes/<node_id>/telemetry.jsonl against the registered Hypothesis, and write ticks/<n>/probe/findings.json (LessonEntry + hypothesis_verdict).")`.
+`Task(subagent_type="oh-my-evor:evor-probe", description="Analyze <node_name>", prompt="Run dir: <run_dir>. Tick: <n>. Node name: <node_name>. Read telemetry via evor_read_artifact, analyze against the registered Hypothesis, and write your findings via evor_write_artifact (LessonEntry + hypothesis_verdict).")`.
+- Pass the node by NAME (as returned by `evor_record_node`). Probe reads via `evor_read_artifact` and writes via `evor_write_artifact`; it derives its own paths.
 - **POST-CONDITION:** call `evor_read_artifact({ run_id, tick: n, agent: "probe" })`. If it returns `{error:"not found"}`, re-spawn Probe.
 - Read the LessonEntry from the artifact; call `evor_wiki_add(run_id, lesson_entry)` to persist it.
 - Update node.lesson_ids with the returned lesson_id.
@@ -364,9 +366,9 @@ After Step 9 (before the stop-check / next-tick loop decision), call `evor_write
 {
   "tick": "<current_tick_number>",
   "best_score": "<run_state.best_score>",
-  "best_node_id": "<run_state.best_node_id>",
+  "best_node_name": "<name returned by evor_record_node for the best node>",
   "frontier_size": "<len(frontier_ids)>",
-  "nodes_this_tick": ["<node_id>"],
+  "nodes_this_tick": ["<node_name>"],
   "lessons": ["<lesson_id>"],
   "dominant_family": "<dominant_approach_family_this_tick>",
   "next_tick_seed": "<brief hint for Mutagen: what to explore next based on Probe's lessons>",
@@ -377,6 +379,8 @@ After Step 9 (before the stop-check / next-tick loop decision), call `evor_write
   }
 }
 ```
+
+`best_node_name` and `nodes_this_tick` use node NAMES as returned by `evor_record_node`. `evor_write_handoff` accepts names. Do not carry raw UUIDs across tick boundaries.
 
 At milestones (every 5 ticks, or when best_score improves by ≥5%): call `evor_plot_report({ run_id })` then deliver the tree PNG via `SendUserFile`.
 

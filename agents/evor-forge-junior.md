@@ -32,14 +32,16 @@ skills: [oh-my-evor:evor-mcp]
 
     **Step 2 — Lock evaluate.py**
     Do NOT write or edit evaluate.py. It was copied from the locked reference during worktree setup.
-    Verify and lock it immediately:
-    ```bash
-    sha256sum .evor/worktrees/<node_id>/evaluate.py
-    # Compare against GoalContract.eval_script_hash provided in your prompt
-    chmod 444 .evor/worktrees/<node_id>/evaluate.py
+    Verify and lock it immediately by calling the harness lock tool — the harness owns file
+    hashing and permission enforcement:
     ```
-    If the hash does not match, abort immediately and report the integrity violation to Forge.
-    Do not proceed with any other seam writes.
+    evor_lock_evaluate(node=node_name)
+    ```
+    The tool verifies the sha256 against GoalContract.eval_script_hash and sets the file
+    read-only atomically. If it reports a hash mismatch, abort immediately and report the
+    integrity violation to Forge. Do not proceed with any other seam writes.
+    (Note: `evor_lock_evaluate` is the expected harness tool; do NOT shell out via sha256sum
+    or chmod — those raw ops bypass the harness integrity chain.)
 
     **Step 3 — Seam files**
     Write each seam per the proposal's module_seams and dataloader spec:
@@ -105,12 +107,15 @@ skills: [oh-my-evor:evor-mcp]
             _f.write(json.dumps(_record) + "\n")
     ```
 
-    After wiring, self-verify both the env var read and the loop-body write are present:
-    ```bash
-    grep -n "EVOR_TELEMETRY_PATH" .evor/worktrees/<node_id>/train/trainer.py
-    grep -n "open(" .evor/worktrees/<node_id>/train/trainer.py
+    After wiring, self-verify both the env var read and the loop-body write are present
+    using the LSP find-references tool (available in this agent context):
     ```
-    If either grep returns 0 lines, the wiring failed — fix it before proceeding.
+    lsp_find_references("EVOR_TELEMETRY_PATH", scope=<worktree_path>)
+    ```
+    Confirm the result shows at least two reference sites: the `os.environ.get` read in
+    `__init__` and the `open(self._tel_path, "a")` call inside the training loop body.
+    If fewer than two references are found, the wiring is incomplete — fix it before
+    proceeding. Do NOT use grep against internal worktree paths.
 
     **Step 4.5 — Numeric-stability clamp guards (P2-9)**
     For ANY loss function whose forward pass computes a ratio or complement that can reach zero
@@ -138,8 +143,8 @@ skills: [oh-my-evor:evor-mcp]
     **Step 5 — LSP pre-flight**
     Run lsp_diagnostics on the candidate files (trainer.py and any other modified seams) to
     catch type or syntax errors before handing back to Forge. Fix all diagnostics-level errors.
-    This is best-effort — skip gracefully if no LSP server is present, but always run the grep
-    self-checks in Step 4 regardless.
+    This is best-effort — skip gracefully if no LSP server is present, but always run the
+    lsp_find_references self-check in Step 4 regardless (it uses the same LSP path).
   </Implementation_Protocol>
 
   <Citation_Verification>
@@ -183,7 +188,7 @@ skills: [oh-my-evor:evor-mcp]
   </Architecture_Agnostic_Rules>
 
   <Success_Criteria>
-    - evaluate.py is untouched: chmod 444, sha256 verified against GoalContract.eval_script_hash
+    - evaluate.py is untouched: locked and sha256 verified via evor_lock_evaluate(node) against GoalContract.eval_script_hash
     - genome.yaml reflects exactly the genome_changes in the proposal (no extra field changes
       for parametric mutations)
     - All seam files specified by the proposal are present and implement the design
@@ -230,7 +235,7 @@ skills: [oh-my-evor:evor-mcp]
     - Read the proposal in full before writing any seam file?
     - Read the existing genome.yaml before applying genome_changes?
     - For re-attempts: read and addressed every rejection_reason from all reviewers?
-    - Is evaluate.py chmod 444 and sha256-verified?
+    - Is evaluate.py locked and hash-verified via evor_lock_evaluate(node)?
     - Are all seam files present per the proposal's module_seams?
     - Is neck.py absent when the proposal specifies neck=null?
     - Is EVOR_TELEMETRY_PATH read from env AND a JSON record appended inside the per-step loop body?

@@ -39,7 +39,7 @@ If a server is already listening on port 8756: print "Dashboard already running 
 
 ## Step 3 — Start Dashboard Server
 
-Launch the server in the background:
+Launch the server in the background. Call `evor_state_read` to get the log path from the active run state, then:
 
 ```bash
 EVOR_RUN_DIR=<run_dir> uvicorn evor.dashboard.server:app \
@@ -47,7 +47,7 @@ EVOR_RUN_DIR=<run_dir> uvicorn evor.dashboard.server:app \
   --port 8756 \
   --reload \
   --reload-dir <run_dir> \
-  2>.evor/logs/dashboard.log &
+  2><log_path> &
 ```
 
 Wait up to 5 seconds for the server to become ready:
@@ -58,7 +58,7 @@ for i in 1 2 3 4 5; do
 done
 ```
 
-If health check fails after 5 attempts: print the last 20 lines of `.evor/logs/dashboard.log` and stop.
+If health check fails after 5 attempts: print "Dashboard failed to start. Check the server log for details." and stop.
 
 ## Step 4 — Open Browser
 
@@ -72,7 +72,6 @@ Print:
 Dashboard running at: http://localhost:8756
 Run ID: <run_id>
 Mission: <mission_id>
-Log: .evor/logs/dashboard.log
 
 Available views:
   /          — Evolution tree (D3 DAG, frontier highlighted)

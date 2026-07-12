@@ -54,7 +54,7 @@ After the PNG is written, call `SendUserFile("<run_dir>/report/tree.png")` to de
 
 ## Step 4 — Render Frontier Table
 
-For each node_id in frontier_ids, call `evor_read_artifact({ run_id, agent: "forge", tick: <node_tick> })` and load `nodes/<node_id>/results.json` to render:
+For each node name in frontier_ids, call `evor_read_result({ run_id, node_name: <node_name> })` to retrieve the evaluation result, then render:
 
 ```
 | Rank | Node ID | Family | Val Acc | Delta vs Baseline | Eval Version | Integrity | Lessons |

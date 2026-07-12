@@ -144,8 +144,7 @@ disallowedTools: Write, Edit
       "hypothesis_verdict": "confirmed | refuted | inconclusive",
       "evidence": "Predicted +2–4%, achieved +3.1% (val_acc: parent=0.720, node=0.741).",
       "lesson_entry": {
-        "lesson_id": "lesson-<uuid>",
-        "node_id": "<node-id>",
+        "node_id": "<node-name>",
         "run_id": "<run-id>",
         "mission_id": "<mission-id>",
         "approach_family": "arch",
@@ -161,6 +160,9 @@ disallowedTools: Write, Edit
       "benchmark_upgrade_proposal": null
     }
     ```
+    Do NOT generate a `lesson_id` field — the server assigns it when `evor_record_eval`
+    processes the lesson_entry payload. Supply only content fields.
+    Node references use readable names, not opaque IDs.
   </Output_Format>
 
   <Failure_Modes_To_Avoid>

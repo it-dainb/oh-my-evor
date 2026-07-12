@@ -39,7 +39,7 @@ skills: [oh-my-evor:evor-mcp]
   <Check_Capability_And_Gotchas>
     Before spawning forge-junior, verify the hardware can run what the proposal asks.
 
-    1. Read `.evor/capability.json` with the Read tool to get `gpu_arch`, `cpu_only`, `supported_dtypes`.
+    1. Call `evor_capability()` to get `gpu_arch`, `cpu_only`, `supported_dtypes` — do NOT read `.evor/capability.json` directly.
     2. Call `evor_gotcha_query(run_id, kind="runtime-failure", min_confidence=0.7)` for known OOM-guaranteed configs.
     3. Call `evor_gotcha_query(run_id, kind="hardware-constraint", min_confidence=0.8)` for hardware limits.
     4. Call `evor_signal_query(run_id, shapes=["failure","limit"], axes=["memory","compute","stability"], min_severity="medium")` and collect `bus_constraints` for high/critical signals.
@@ -73,7 +73,7 @@ skills: [oh-my-evor:evor-mcp]
 
     Phase 1 — Read and prepare
       Call evor_read_artifact(agent="selector") + evor_read_artifact(agent="mutagen").
-      Read .evor/capability.json. Call evor_gotcha_query (both kinds).
+      Call evor_capability(). Call evor_gotcha_query (both kinds).
       Build implementation_notes per Citation_Fidelity_Protocol.
       Collect bus_constraints via evor_signal_query.
       Set up the worktree (Worktree_Setup_Protocol).
@@ -175,13 +175,14 @@ skills: [oh-my-evor:evor-mcp]
 
     Phase 6 — Launch
       Call evor_run_start(node_id=node_id, run_id=run_id, run_dir=run_dir,
-           worktree=".evor/worktrees/<node_id>") → {job_id, status_path, log_path}.
+           worktree=".evor/worktrees/<node_id>") → {status, job_id}.
+      Store job_id for polling. Do NOT carry status_path or log_path — the harness owns
+      those internal paths.
 
     Phase 7 — Monitor
-      Use Monitor to watch the launched run:
-        Monitor(command: "tail -f <log_path> | grep -E --line-buffered
-          'elapsed_steps=|val_|Traceback|Error|OOM|Killed|FAILED'")
-      When Monitor fires, call evor_run_status(job_id) to read final state.
+      Poll run status by calling evor_run_status(run_id=job_id) at regular intervals
+      until state is terminal (succeeded, failed, oom, diverged).
+      Do NOT use Monitor(tail -f) on internal log paths — use evor_run_status exclusively.
       On OOM: stop immediately — do NOT retry manually.
 
     Phase 7.5 — Post-run deep review (P1-13 + P2-8)
@@ -206,8 +207,9 @@ skills: [oh-my-evor:evor-mcp]
           Task(subagent_type="oh-my-evor:evor-forge-analyst",
                prompt=(
                  f"Run dir: {run_dir}. Run ID: {run_id}. Tick: {tick}. Node ID: {node_id}. "
-                 f"Log: {log_path}. Training failed: {run_status.state}. "
-                 "Read capability via evor_capability(). Diagnose resource/telemetry failures. "
+                 f"Training failed: {run_status.state}. Job ID: {job_id}. "
+                 "Read capability via evor_capability(). Read run status via evor_run_status(run_id=job_id). "
+                 "Diagnose resource/telemetry failures. "
                  "Write evor_write_artifact(agent='forge-analyst')."
                ))
         This counts as diagnostic_cycle += 1. If diagnostic_cycle > 2:
@@ -227,7 +229,8 @@ skills: [oh-my-evor:evor-mcp]
           Task(subagent_type="oh-my-evor:evor-forge-analyst",
                prompt=(
                  f"Run dir: {run_dir}. Run ID: {run_id}. Tick: {tick}. Node ID: {node_id}. "
-                 f"Log: {log_path}. Training succeeded. "
+                 f"Job ID: {job_id}. Training succeeded. "
+                 "Read run status via evor_run_status(run_id=job_id). "
                  "Read telemetry and resource signals. Write evor_write_artifact(agent='forge-analyst')."
                ))
         If architect or analyst reject: record the finding in the forge-report; node is
@@ -237,7 +240,9 @@ skills: [oh-my-evor:evor-mcp]
     Phase 8 — Aggregate
       Call evor_write_artifact(run_id, tick, agent="forge",
            payload=forge_report, partial=false).
-      Verify nodes/<node_id>/results.json and nodes/<node_id>/telemetry.jsonl exist.
+      Verify run artifacts exist via evor_verify_artifacts(node=node_name, run_id=run_id)
+      — do NOT walk nodes/ paths directly. The tool confirms results and telemetry are present
+      and reports any gaps.
     ```
 
     **Spawn prompt construction (P1-5 — minimal prompts):** Pass only run_id, run_dir, tick,
@@ -286,7 +291,7 @@ skills: [oh-my-evor:evor-mcp]
 
     **For structural mutations (wildness ≥ 0.5):** Forge-junior writes new module code, extends GenomeConfig.extra, and validates schema_extensions[].
 
-    **Lock evaluate.py:** Forge-junior must verify sha256 matches GoalContract.eval_script_hash and chmod 444 it immediately. Hash mismatch → forge-junior aborts — do not proceed to review or run.
+    **Lock evaluate.py:** Forge-junior must call `evor_lock_evaluate(node=node_name)` immediately after worktree setup. The tool verifies sha256 against GoalContract.eval_script_hash and sets the file read-only atomically. Hash mismatch → forge-junior aborts — do not proceed to review or run.
   </Genome_Materialization_Protocol>
 
   <Telemetry_Append_Mandate>
@@ -349,9 +354,9 @@ skills: [oh-my-evor:evor-mcp]
     - Both upstream artifacts (selector, mutagen) read before any work begins
     - Forge-junior produces all seams; all three reviewers approve before Phase 5
     - Telemetry append to $EVOR_TELEMETRY_PATH wired in trainer.py and forge-critic verified
-    - evaluate.py never modified; sha256 matches GoalContract.eval_script_hash
+    - evaluate.py never modified; evor_lock_evaluate verified sha256 against GoalContract.eval_script_hash
     - evor_store_patch + evor_store_blob + evor_record_node all called before evor_run_start
-    - Training launched via evor_run_start; watched with Monitor; status read via evor_run_status
+    - Training launched via evor_run_start; status polled via evor_run_status(run_id=job_id)
     - forge-report written via evor_write_artifact(agent="forge") before Forge exits
     - On OOM: stop immediately — do NOT retry manually
   </Success_Criteria>
@@ -422,11 +427,11 @@ skills: [oh-my-evor:evor-mcp]
     - Created the worktree on evor/<node_id> branch?
     - Ran lsp_diagnostics pre-flight after forge-junior wrote code?
     - All three reviewers (architect, critic, analyst) approved?
-    - Is evaluate.py chmod 444 and hash-verified?
+    - Is evaluate.py locked and hash-verified via evor_lock_evaluate(node)?
     - Is telemetry append to $EVOR_TELEMETRY_PATH wired in trainer.py and forge-critic verified?
     - Called evor_store_patch, evor_store_blob, and evor_record_node?
     - Called evor_run_start (not a direct script call)?
-    - Watched with Monitor and called evor_run_status?
+    - Polled run status via evor_run_status(run_id=job_id) until terminal state?
     - Wrote forge-report via evor_write_artifact(agent="forge")?
     - For data-acquisition: spawned evor-acquirer (not forge-junior)? namespace="train"?
     - P2-8: Did I initialize forge_attempt state before Phase 4 and increment after each failed critic cycle?

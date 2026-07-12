@@ -185,7 +185,7 @@ For brownfield missions, call `evor_distill_scan` before `evor_init_run` to prod
 
 Use these platform tools directly — do not replicate their behavior in MCP.
 
-- **`Monitor`** — Watch a launched run: `Monitor(command: "tail -f <log_path> | grep -E --line-buffered 'elapsed_steps=|val_|Traceback|Error|OOM|Killed|FAILED'")`. Cover both success and failure signatures.
+- **`evor_run_status`** — Watch a launched run by polling `evor_run_status({run_id})` until `state` reaches `done` or `failed`. It reports progress, the latest metrics, and any error signature — cover both success and failure. Do not tail log files by hand; the tool owns the run's internals.
 - **`AskUserQuestion`** — Capture the mission goal, metric, budget, and autonomy level at setup; any human decision or consent gate. Do not use in the autonomous hot-loop.
 - **`PushNotification`** — Fire when a run finishes, crashes, hits an OOM, achieves a breakthrough (best-score jump), or reaches a human gate. Use for state changes the user would act on.
 - **`TaskCreate` / `TaskList` / `TaskUpdate` / `TaskStop`** — Track per-tick candidates and phase progress as a visible task list. Use `TaskStop` to abort a runaway sub-agent on a `severity=critical` signal.

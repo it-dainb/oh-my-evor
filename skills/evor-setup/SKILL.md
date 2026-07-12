@@ -255,7 +255,7 @@ Do you confirm this budget is acceptable before the mission starts?
 ALL task-specific settings collected during the interview are LOCKED at setup time. This means:
 
 - **Metrics and constraints** (Q4 + Q4a): `metric_specs[]`, `fitness_formula`, `fbeta`, `constraints[]`, `custom_metrics[]`, `fitness_mode` — immutable after GoalContract is written.
-- **Dataset and splits** (Q2): `dataset_ref`, `locked_split_hash`, `eval_script_hash` — immutable; the frozen splits enforce this at the filesystem level (chmod 444).
+- **Dataset and splits** (Q2): `dataset_ref`, `locked_split_hash`, `eval_script_hash` — immutable; the frozen splits are made read-only so they cannot drift after lock.
 - **Budget** (Q6): `budget.*` — cannot be expanded mid-run; requires re-setup to increase.
 - **Wildness** (Q8): changing wildness mid-run invalidates the strategy baseline; locked.
 - **License allowlist** (Q12): data acquired under a rejected license is blocked by the Ingestion Contamination Gate; the gate uses the locked list.
@@ -295,107 +295,55 @@ Environment discovered:
 <Frozen_Split_Setup>
 After environment discovery, initialize frozen data splits (Addendum v2 Pillar 2).
 
-Call `evor_freeze_splits` with the dataset path, eval version, and run directory:
+Call `evor_freeze_splits` with the dataset path and eval version:
 
 ```
 evor_freeze_splits({
   dataset_path: "<dataset_ref>",
-  eval_version: "v1",
-  run_dir: ".evor/runs/<mission-slug>/<run-id>/"
+  eval_version: "v1"
 })
 ```
 
 This:
 1. Creates FrozenSplit records for test and val splits.
 2. Computes `per_sample_hashes` and `split_hash`.
-3. Copies files to `frozen-splits/v1-test/` and `frozen-splits/v1-val/`.
-4. Sets `chmod 444` on all frozen-split files (read-only enforcement).
-5. Writes `frozen-splits/v1-test.json` and `frozen-splits/v1-val.json`.
-6. Returns `locked_split_hash` = sha256 of the test split.
+3. Copies files to the frozen-splits directory and sets them read-only.
+4. Writes frozen-split manifests.
+5. Returns split hashes and eval script hash — the harness owns all hash computation.
 
-Set `GoalContract.locked_split_hash` from the returned value.
-Compute `eval_script_hash` = sha256 of the evaluate.py script in the dataset/benchmark directory.
-Set `GoalContract.eval_script_hash`.
+Set `GoalContract.locked_split_hash` and `GoalContract.eval_script_hash` from the returned values.
 
-Print confirmation: "Frozen splits initialized. locked_split_hash: <hash>. Files are read-only (chmod 444)."
+Print confirmation: "Frozen splits initialized. Files are read-only."
 </Frozen_Split_Setup>
 
 <Materialize_Anchors>
-## Materialize anchors (MANDATORY — no placeholders)
+## Materialize anchors
 
-This step produces the real cryptographic anchors written into the GoalContract. NEVER write human-readable labels, version strings, or any non-hex text into `locked_split_hash` or `eval_script_hash`. The tick loop's integrity gate will reject them.
+`evor_freeze_splits` returns the split hashes; the harness owns them. Never compute a hash yourself. If `evor_freeze_splits` is unavailable, that is an error — stop and surface it; there is no fallback.
 
-**locked_split_hash — real sha256 of the frozen test split:**
+**locked_split_hash:** Set `GoalContract.locked_split_hash` from the value returned by `evor_freeze_splits`. Do not compute it manually.
 
-If `evor_freeze_splits` ran successfully it already returns this value — use it.
-If the freeze module is unavailable or splits are baked into cached features/index arrays rather than files, compute from the sorted index list:
+**eval_script_hash:** Set `GoalContract.eval_script_hash` from the value returned by `evor_freeze_splits`. Do not compute it manually.
 
-```bash
-python -c "
-import hashlib, json
-# Replace with the actual sorted list of integer test-split indices
-indices = sorted(<test_split_indices>)
-blob = json.dumps(indices, separators=(',', ':')).encode()
-print(hashlib.sha256(blob).hexdigest())
-"
-```
-
-Set `GoalContract.locked_split_hash` to the 64-hex-char result.
-
-**eval_script_hash — sha256 of the evaluate.py bytes (after any patches):**
-
-```bash
-python -c "
-import hashlib
-print(hashlib.sha256(open('<path_to_evaluate.py>', 'rb').read()).hexdigest())
-"
-```
-
-Set `GoalContract.eval_script_hash` to the 64-hex-char result.
-
-**Frozen-split manifests — must carry real hashes, not empty fields:**
-
-After `evor_freeze_splits`, verify:
-- `frozen-splits/v1-test.json` exists and its `split_hash` field is a 64-hex-char string.
-- `eval-suites/v1.json` will be written by EvalSuite_Initialization immediately after this section.
-
-If `frozen_test.split_hash` is empty or absent, recompute from the sorted test index list (see above) and patch the file before continuing. An empty `split_hash` will fail the Phase-2 `frozen_splits_*` check.
+**Frozen-split manifests:** After `evor_freeze_splits` succeeds, verify `frozen-splits/v1-test.json` exists and its `split_hash` field is non-empty. A missing or empty `split_hash` means the freeze call failed — re-run it; do not patch the file manually.
 
 **Class→domain mapping guard:**
 
 If any `MetricConstraint` or guard in the contract references a class→domain mapping file (e.g., `class_domain_map.json`):
 - Materialize that file now, from the available dataset.
 - If it cannot be built at setup time, REMOVE the guard from the contract entirely. Only lock guards that are satisfiable from tick 1. A guard that references a file that does not exist will block every tick.
-
-**POST-CONDITION (assert before proceeding to Validate_And_Lock):**
-
-```python
-import re
-
-for field_name, field_val in [
-    ("locked_split_hash", goal_contract.locked_split_hash),
-    ("eval_script_hash",  goal_contract.eval_script_hash),
-]:
-    assert re.fullmatch(r'[0-9a-f]{64}', field_val or ''), (
-        f"SETUP FAILED: {field_name}='{field_val}' is not a valid sha256 hex digest. "
-        "Replace the placeholder with a real hash before continuing."
-    )
-```
-
-Setup halts with a clear error if either field contains a label, a version string, an empty string, or any non-64-hex value. Do NOT proceed to `Validate_And_Lock` with a placeholder — the validator will reject it and the mission will not lock.
 </Materialize_Anchors>
 
 <EvalSuite_Initialization>
 Create the initial EvalSuite v1 (Addendum v2 Pillar 3).
 
-Call `evor_init_eval_suite` with the mission details and run directory:
+Call `evor_init_eval_suite` with the mission details:
 
 ```
 evor_init_eval_suite({
   mission_id: "<mission_id>",
   eval_version: "v1",
-  task_description: "<task_description>",
-  run_dir: ".evor/runs/<mission-slug>/<run-id>/"
+  task_description: "<task_description>"
 })
 ```
 
@@ -404,14 +352,12 @@ This:
 2. Creates an EvalSuite record with `created_by="user"`, `consent_log_ref` pointing to this setup session.
 3. Writes `eval-suites/v1.json`.
 4. Initializes `angle-registry.json` with one entry per initial domain.
-
-Set `GoalContract.eval_version = "v1"`.
 </EvalSuite_Initialization>
 
 <Preflight_Smoke_Train>
 Run a 5-step smoke-train to verify the environment is functional.
 
-Call `evor_preflight({ run_id: "<run_id>" })`.
+Call `evor_preflight({ mission_id: "<mission_id>" })`.
 
 The preflight runs a micro-train (10 random samples, 2-layer MLP, 5 steps) and verifies:
 1. Loss at step 5 < loss at step 1 (training is working).
@@ -446,7 +392,7 @@ Budget:             <max_iterations> ticks, plateau_window=<n>, circuit_breaker=
 Wildness:           <wildness>
 License allowlist:  <allowed_licenses>
 GPUs:               <detected GPUs or CPU-only>
-Frozen splits:      initialized (locked_split_hash: <hash>)
+Frozen splits:      initialized
 EvalSuite:          v1 initialized (<N> initial domains)
 Preflight:          passed | overridden
 ```
@@ -470,9 +416,7 @@ Use `AskUserQuestion`:
 <Run_Initialization>
 After consent:
 
-1. Generate `run_id` = `<mission_id>-<timestamp>` (e.g., "cifar10-improve-2026-07-20260703T142300").
-
-2. Assemble all GoalContract fields collected during the interview into `answers.json` under the run scratch directory. Every field must be plain JSON — nested models (Budget, StopCondition, MetricSpec, ExpansionPolicy, etc.) are plain dicts, not Python objects:
+1. Assemble the interview-answer fields into an `answers` object. Every field must be plain JSON — nested models (Budget, StopCondition, MetricSpec, ExpansionPolicy, etc.) are plain dicts, not Python objects. Include only the fields collected during the interview:
 
    ```json
    {
@@ -486,7 +430,6 @@ After consent:
          "metric_name": "<metric>",
          "direction": "higher",
          "domain_applicability": "all",
-         "aggregation_rule": "macro_avg",
          "role": "primary_fitness",
          "fitness_formula": null,
          "fbeta": null,
@@ -495,7 +438,6 @@ After consent:
        }
      ],
      "fitness_mode": "aggregate",
-     "eval_version": "v1",
      "baseline_value": 0.85,
      "target_value": null,
      "coverage_target": null,
@@ -511,21 +453,21 @@ After consent:
      },
      "framework": "pytorch",
      "seed_repo_path": null,
-     "locked_split_hash": "<64-hex-char sha256 from Frozen_Split_Setup>",
-     "eval_script_hash": "<64-hex-char sha256 from Materialize_Anchors>",
      "expansion_policy": null,
      "allowed_licenses": ["MIT", "Apache-2.0", "BSD-2-Clause", "BSD-3-Clause", "CC-BY-4.0", "CC0-1.0"]
    }
    ```
 
+   Do NOT include `locked_split_hash`, `eval_script_hash`, `eval_version`, `created_at`, `aggregation_rule`, or other internal fields — `evor_init_run` constructs the full GoalContract internally, computing hashes and timestamps server-side from the frozen splits already initialized.
+
    `autonomy_charter` may be omitted — the tool defaults it to `AutonomyCharter(posture="aggressive-never-halt", license_gate=False, data_acquisition_enabled=True)`.
 
    Print: "Mission will run FULLY AUTONOMOUS to the goal — the monotonic-honesty invariant auto-decides every mid-run choice with no human questions."
 
-3. Call `evor_init_run` to write all run artifacts atomically:
+2. Call `evor_init_run` to write all run artifacts atomically. It generates and returns `run_id` — do not generate `run_id` yourself:
 
    ```
-   evor_init_run({ answers: <answers object>, run_id: "<run_id>", mission_id: "<mission_id>" })
+   evor_init_run({ answers: <answers object>, mission_id: "<mission_id>" })
    ```
 
    This ONE call writes — atomically — all seven run artifacts into `<run_dir>` (and `active-run.json` at `<evor_root>`):
@@ -542,7 +484,7 @@ After consent:
 
    **Do NOT hand-write any of these files.** The tool constructs them from the validated GoalContract; manual writes produce schema drift. Surface any `{error}` result to the user.
 
-4. Call `evor_state_write({ mission_status: "initialized", active_run: { mission_id, run_id, run_dir, status: "initialized" } })` to set the active run state.
+3. Call `evor_state_write({ mission_status: "initialized", active_run: { mission_id, run_id, run_dir, status: "initialized" } })` using the `run_id` returned by `evor_init_run`.
 
 Print: "Mission initialized. Run ID: <run_id>. Running Phase-2 validation gate..."
 Then proceed to Validate_And_Lock.
@@ -551,7 +493,7 @@ Then proceed to Validate_And_Lock.
 <Validate_And_Lock>
 Run the Phase-2 enforcement gate and lock the contract before `/evor-run` is possible.
 
-Call `evor_validate({ run_id: "<run_dir>" })`.
+Call `evor_validate({ run_id: "<run_id>" })`.
 
 **On pass:**
 Call `evor_state_write({ mission_status: "locked" })` to flip mission-state.json from `"draft"` to `"locked"`.
@@ -575,11 +517,11 @@ Setup CANNOT complete with a draft/invalid contract. `/evor-run` will refuse to 
 
 <Tool_Usage>
 - `AskUserQuestion` — drive the interview with structured multiple-choice questions (Q3, Q4a, Q8, Q9, Q12, Q13, preflight override, consent checkpoint)
-- `Bash` — nvidia-smi, free, df, sha256sum (environment discovery + hash computation)
-- `evor_freeze_splits` — freeze test and val splits; returns locked_split_hash
+- `Bash` — nvidia-smi, free, df (environment discovery only)
+- `evor_freeze_splits` — freeze test and val splits; returns locked_split_hash and eval_script_hash
 - `evor_init_eval_suite` — create initial EvalSuite v1 and angle-registry.json
 - `evor_preflight` — 5-step smoke-train to verify training pipeline
-- `evor_init_run` — atomically write goal-contract.json + all six run artifacts (the ONLY path to create run state)
+- `evor_init_run` — atomically write goal-contract.json + all six run artifacts; returns run_id (the ONLY path to create run state)
 - `evor_validate` — Phase-2 enforcement gate (schema + gameability + splits + tree + run-state)
 - `evor_state_write` — set mission_status="locked" on pass; set active_run after init
 - `evor_state_read` — read active-run.json for run resolution

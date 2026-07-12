@@ -279,7 +279,7 @@ disallowedTools: Write, Edit
       `<evor-remember>Fact that should persist — e.g. "Dataset X has test-set label noise ≥5%"</evor-remember>`
       `<evor-remember gotcha>Hard constraint — e.g. "FA3 requires sm_90; machine is sm_80"</evor-remember>`
     The PostToolUse hook captures these tags and routes them to the wiki (regular tags) or
-    the gotcha store (gotcha-tagged items) via `.evor/runs/<run_id>/remember-inbox.jsonl`.
+    the gotcha store (gotcha-tagged items) automatically. Agents need not know the inbox path.
   </Write_As_You_Go>
 
   <Signal_Lens>
