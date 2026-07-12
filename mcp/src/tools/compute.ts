@@ -566,6 +566,22 @@ export function registerComputeTools(server: McpServer): void {
       const data = result.data as Record<string, unknown> | undefined;
       if (data) {
         const { locked_split_hash: _lh, val_split_hash: _vh, ...clean } = data;
+
+        // Zero-item guard: a freeze that captured nothing means the location
+        // held no data files (usually it points at a folder of sub-folders, or
+        // the wrong folder). Freezing an empty eval set silently would let the
+        // whole run proceed with nothing to evaluate against — fail loudly with
+        // actionable guidance instead of returning a hollow ok:true.
+        const testCount = Number(clean.test_item_count ?? 0);
+        const valCount = Number(clean.val_item_count ?? 0);
+        if (testCount === 0 && valCount === 0) {
+          return err(
+            "no data items were found to freeze at the given location — nothing was captured. " +
+            "The location should directly contain the individual data files (not sub-folders). " +
+            "Point it at the folder that holds the files themselves and try again.",
+          );
+        }
+
         return ok({ ok: true, ...clean });
       }
       return ok(result.data);

@@ -21035,7 +21035,7 @@ var MetricSpecSchema = external_exports.object({
   metric_name: external_exports.string(),
   direction: external_exports.enum(["higher", "lower"]),
   domain_applicability: external_exports.union([external_exports.array(external_exports.string()), external_exports.literal("all")]),
-  aggregation_rule: external_exports.enum(["macro_avg", "weighted_avg", "min", "max"]),
+  aggregation_rule: external_exports.enum(["macro_avg", "weighted_avg", "min", "max"]).default("macro_avg"),
   role: external_exports.enum(["primary_fitness", "secondary_reported"]),
   sota_bar: external_exports.number().optional(),
   // Composite / F-beta / constrained / custom modes (mirrors Python MetricSpec)
@@ -21087,7 +21087,7 @@ var GoalContractSchema = external_exports.object({
   dataset_ref: external_exports.string(),
   metric_specs: external_exports.array(MetricSpecSchema),
   fitness_mode: external_exports.enum(["aggregate", "worst-domain", "weighted"]),
-  eval_version: external_exports.string(),
+  eval_version: external_exports.string().default("v1"),
   baseline_value: external_exports.number(),
   target_value: external_exports.number().optional(),
   coverage_target: external_exports.number().min(0).max(1).optional(),
@@ -22785,7 +22785,14 @@ var RunStatePatchSchema = external_exports.object({
   pending_node_ids: external_exports.array(external_exports.string()).optional().describe("Node names started in this tick but not yet recorded to the tree"),
   strategy: StrategyStateSchema.partial().optional().describe("Strategy delta to merge into strategy.json"),
   // ── Extended fields (spec §1 evor_state_write extension) ─────────────────
-  mission_status: external_exports.enum(["draft", "locked", "running", "paused", "completed", "failed"]).optional().describe("If set, patches mission-state.json .status (gate: draft\u2192locked requires contract validation)"),
+  mission_status: external_exports.preprocess(
+    // The run lifecycle uses "initialized"; the mission lifecycle's equivalent
+    // opening state is "draft". Coerce that common mix-up instead of rejecting it.
+    (v) => v === "initialized" ? "draft" : v,
+    external_exports.enum(["draft", "locked", "running", "paused", "completed", "failed"])
+  ).optional().describe(
+    "Mission lifecycle state (draft, locked, running, paused, completed, failed). If set, patches the mission's status (gate: draft\u2192locked requires contract validation)."
+  ),
   active_run: external_exports.object({
     mission_id: external_exports.string(),
     run_id: external_exports.string(),
@@ -24251,6 +24258,13 @@ function registerComputeTools(server) {
       const data = result.data;
       if (data) {
         const { locked_split_hash: _lh, val_split_hash: _vh, ...clean } = data;
+        const testCount = Number(clean.test_item_count ?? 0);
+        const valCount = Number(clean.val_item_count ?? 0);
+        if (testCount === 0 && valCount === 0) {
+          return err(
+            "no data items were found to freeze at the given location \u2014 nothing was captured. The location should directly contain the individual data files (not sub-folders). Point it at the folder that holds the files themselves and try again."
+          );
+        }
         return ok({ ok: true, ...clean });
       }
       return ok(result.data);

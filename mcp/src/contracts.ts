@@ -48,7 +48,7 @@ export const MetricSpecSchema = z.object({
   metric_name: z.string(),
   direction: z.enum(["higher", "lower"]),
   domain_applicability: z.union([z.array(z.string()), z.literal("all")]),
-  aggregation_rule: z.enum(["macro_avg", "weighted_avg", "min", "max"]),
+  aggregation_rule: z.enum(["macro_avg", "weighted_avg", "min", "max"]).default("macro_avg"),
   role: z.enum(["primary_fitness", "secondary_reported"]),
   sota_bar: z.number().optional(),
   // Composite / F-beta / constrained / custom modes (mirrors Python MetricSpec)
@@ -140,7 +140,7 @@ export const GoalContractSchema = z.object({
   dataset_ref: z.string(),
   metric_specs: z.array(MetricSpecSchema),
   fitness_mode: z.enum(["aggregate", "worst-domain", "weighted"]),
-  eval_version: z.string(),
+  eval_version: z.string().default("v1"),
   baseline_value: z.number(),
   target_value: z.number().optional(),
   coverage_target: z.number().min(0).max(1).optional(),

@@ -39,10 +39,34 @@ import {
   forgeDispatchBatch,
   lockEvaluate,
   verifyArtifacts,
+  registerComputeTools,
 } from "../src/tools/compute.js";
 import { callPythonModule } from "../src/subprocess-bridge.js";
 
 const mockedCall = vi.mocked(callPythonModule);
+
+/**
+ * Register the compute tools against a minimal fake McpServer that captures each
+ * tool's async handler, so tests can invoke a handler end-to-end (including the
+ * response-shaping guards that live inside it, not in the exported wrappers).
+ */
+function captureComputeHandlers(): Map<string, (args: never) => Promise<{ content: { text: string }[] }>> {
+  const handlers = new Map<string, (args: never) => Promise<{ content: { text: string }[] }>>();
+  const fakeServer = {
+    tool: (name: string, _desc: string, _schema: unknown, handler: never) => {
+      handlers.set(name, handler as (args: never) => Promise<{ content: { text: string }[] }>);
+    },
+  };
+  registerComputeTools(fakeServer as never);
+  return handlers;
+}
+
+async function callTool(name: string, args: Record<string, unknown>): Promise<Record<string, unknown>> {
+  const handler = captureComputeHandlers().get(name);
+  if (!handler) throw new Error(`tool ${name} was not registered`);
+  const res = await handler(args as never);
+  return JSON.parse(res.content[0].text) as Record<string, unknown>;
+}
 
 // ── Lifecycle ─────────────────────────────────────────────────────────────────
 
@@ -606,5 +630,51 @@ describe("verifyArtifacts", () => {
     expect(result.has_results).toBe(true);
     expect(result.has_telemetry).toBe(false);
     expect(result.node_name).toBe("half-node");
+  });
+});
+
+// ── evor_freeze_splits — zero-item guard (F4) ────────────────────────────────
+
+describe("evor_freeze_splits zero-item guard", () => {
+  const FREEZE_ARGS = {
+    dataset_ref: "/data/whatever",
+    eval_version: "v1",
+    run_id: "run-frz",
+    mission_id: "test-mission",
+  };
+
+  it("fails loudly when the freeze captured nothing (both counts 0)", async () => {
+    mockedCall.mockReturnValue({
+      ok: true,
+      data: { test_item_count: 0, val_item_count: 0, locked_split_hash: "h", val_split_hash: "h" },
+    });
+    const out = await callTool("evor_freeze_splits", FREEZE_ARGS);
+    expect(out.ok).toBeUndefined();
+    expect(typeof out.error).toBe("string");
+    expect(out.error).toMatch(/no data items were found/i);
+    // guidance must be name-only — no internal path/filename leak
+    expect(out.error).not.toMatch(/\.evor|\.json|frozen-splits/);
+  });
+
+  it("returns ok when at least one split captured items, stripping hash fields", async () => {
+    mockedCall.mockReturnValue({
+      ok: true,
+      data: { test_item_count: 400, val_item_count: 100, locked_split_hash: "h", val_split_hash: "h" },
+    });
+    const out = await callTool("evor_freeze_splits", FREEZE_ARGS);
+    expect(out.ok).toBe(true);
+    expect(out.test_item_count).toBe(400);
+    expect(out.val_item_count).toBe(100);
+    expect(out.locked_split_hash).toBeUndefined();
+    expect(out.val_split_hash).toBeUndefined();
+  });
+
+  it("allows a tiny dataset where only val is empty (test has items)", async () => {
+    mockedCall.mockReturnValue({
+      ok: true,
+      data: { test_item_count: 1, val_item_count: 0, locked_split_hash: "h", val_split_hash: "h" },
+    });
+    const out = await callTool("evor_freeze_splits", FREEZE_ARGS);
+    expect(out.ok).toBe(true);
   });
 });

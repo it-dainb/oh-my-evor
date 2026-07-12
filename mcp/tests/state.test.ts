@@ -8,8 +8,27 @@ import { join } from "path";
 import { tmpdir } from "os";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 
-import { stateRead, stateWrite } from "../src/tools/state.js";
+import { stateRead, stateWrite, RunStatePatchSchema } from "../src/tools/state.js";
 import { ensureRunDirs } from "../src/run-store.js";
+
+// ── F2: mission_status forgiveness ───────────────────────────────────────────
+
+describe("RunStatePatchSchema.mission_status", () => {
+  it("coerces the run-lifecycle word 'initialized' to the mission word 'draft'", () => {
+    const parsed = RunStatePatchSchema.parse({ mission_status: "initialized" });
+    expect(parsed.mission_status).toBe("draft");
+  });
+
+  it("passes valid mission-status values through unchanged", () => {
+    for (const s of ["draft", "locked", "running", "paused", "completed", "failed"] as const) {
+      expect(RunStatePatchSchema.parse({ mission_status: s }).mission_status).toBe(s);
+    }
+  });
+
+  it("still rejects a genuinely invalid mission-status", () => {
+    expect(() => RunStatePatchSchema.parse({ mission_status: "nonsense" })).toThrow();
+  });
+});
 
 // ── Lifecycle ────────────────────────────────────────────────────────────────
 

@@ -29,8 +29,8 @@ const TickStateSchema = z.object({
   updated_at: z.string().optional().describe("ISO 8601 timestamp of last update"),
 });
 
-/** Minimal run-state fields tracked by the MCP server. */
-const RunStatePatchSchema = z.object({
+/** Minimal run-state fields tracked by the MCP server. (exported for tests) */
+export const RunStatePatchSchema = z.object({
   status: z
     .enum(["initialized", "running", "paused", "completed", "failed"])
     .optional()
@@ -46,9 +46,17 @@ const RunStatePatchSchema = z.object({
   strategy: StrategyStateSchema.partial().optional().describe("Strategy delta to merge into strategy.json"),
   // ── Extended fields (spec §1 evor_state_write extension) ─────────────────
   mission_status: z
-    .enum(["draft", "locked", "running", "paused", "completed", "failed"])
+    .preprocess(
+      // The run lifecycle uses "initialized"; the mission lifecycle's equivalent
+      // opening state is "draft". Coerce that common mix-up instead of rejecting it.
+      (v) => (v === "initialized" ? "draft" : v),
+      z.enum(["draft", "locked", "running", "paused", "completed", "failed"]),
+    )
     .optional()
-    .describe("If set, patches mission-state.json .status (gate: draft→locked requires contract validation)"),
+    .describe(
+      "Mission lifecycle state (draft, locked, running, paused, completed, failed). " +
+      "If set, patches the mission's status (gate: draft→locked requires contract validation).",
+    ),
   active_run: z
     .object({
       mission_id: z.string(),
