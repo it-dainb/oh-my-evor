@@ -47,6 +47,7 @@ export function jobStart(
   runDir: string,
   worktree: string,
   evalVersion?: string,
+  env?: Record<string, string>,
 ): PyResult {
   const python = process.env.EVOR_PYTHON ?? "python3";
   const cmdArgs: string[] = [
@@ -62,7 +63,7 @@ export function jobStart(
     "start",
     "--run-dir", runDir,
     "--cmd-json", JSON.stringify(cmdArgs),
-  ]);
+  ], { extraEnv: env });
 }
 
 /**
@@ -209,12 +210,12 @@ export function forgeDispatchBatch(
 
   const dispatched: BatchDispatchResult[] = [];
   for (const c of candidates) {
-    // Pass gpu_fraction via eval_version slot is wrong; instead pass as env override.
-    // The evor.jobs start script reads EVOR_GPU_FRACTION if present — the caller
-    // sets it via the worktree environment. We still dispatch via jobStart which
-    // invokes evor.jobs start with the standard args; gpu_fraction is advisory
-    // metadata returned to the orchestrator so it can set per-job env correctly.
-    const res = jobStart(c.node_id, runId, runDir, c.worktree, c.eval_version);
+    // Inject EVOR_GPU_FRACTION so the training subprocess knows its VRAM budget.
+    // _child_env() in jobs.py propagates os.environ → supervisor → training child,
+    // so setting it here means the actual torch/training process sees it.
+    const res = jobStart(c.node_id, runId, runDir, c.worktree, c.eval_version, {
+      EVOR_GPU_FRACTION: String(fraction),
+    });
     const jobData = res.data as Record<string, unknown> | undefined;
     dispatched.push({
       node_id: c.node_id,

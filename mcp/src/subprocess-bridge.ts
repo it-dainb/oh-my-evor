@@ -95,16 +95,19 @@ function _parseSpawnResult(result: SpawnSyncReturns<string>): PyResult {
  *
  * Used for modules that expose a `_cli()` / `if __name__ == "__main__"` entry
  * point (e.g. `python -m evor.tree select --run-id <id>`).
+ *
+ * `extraEnv` is merged on top of the base Python env so callers can inject
+ * per-call variables (e.g. EVOR_GPU_FRACTION) without mutating process.env.
  */
 export function callPythonModule(
   module: string,
   args: string[],
-  opts?: { timeout?: number; cwd?: string }
+  opts?: { timeout?: number; cwd?: string; extraEnv?: Record<string, string> }
 ): PyResult {
   const result = spawnSync(pythonBin(), ["-m", module, ...args], {
     encoding: "utf8",
     timeout: opts?.timeout ?? 30_000,
-    env: _pythonEnv() as Record<string, string>,
+    env: { ..._pythonEnv() as Record<string, string>, ...opts?.extraEnv },
     cwd: opts?.cwd,
   });
   return _parseSpawnResult(result);
@@ -119,13 +122,13 @@ export function callPythonModule(
 export function callBridge(
   scriptName: string,
   args: string[],
-  opts?: { timeout?: number; cwd?: string }
+  opts?: { timeout?: number; cwd?: string; extraEnv?: Record<string, string> }
 ): PyResult {
   const script = resolve(_bridgeDir, scriptName);
   const result = spawnSync(pythonBin(), [script, ...args], {
     encoding: "utf8",
     timeout: opts?.timeout ?? 60_000,
-    env: _pythonEnv() as Record<string, string>,
+    env: { ..._pythonEnv() as Record<string, string>, ...opts?.extraEnv },
     cwd: opts?.cwd,
   });
   return _parseSpawnResult(result);

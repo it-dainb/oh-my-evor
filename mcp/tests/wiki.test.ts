@@ -1,6 +1,6 @@
 /**
  * tests/wiki.test.ts
- * Unit tests for tools/wiki.ts: wikiAdd + wikiQuery (pure TS, no subprocess)
+ * Unit tests for tools/wiki.ts: wikiAdd + wikiQuery + wikiGetRelevant
  */
 
 import { mkdtempSync, existsSync, readFileSync, rmSync } from "fs";
@@ -8,7 +8,13 @@ import { join } from "path";
 import { tmpdir } from "os";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 
-import { wikiAdd, wikiQuery, wikiGetRelevant } from "../src/tools/wiki.js";
+import {
+  wikiAdd,
+  wikiQuery,
+  wikiGetRelevant,
+  _wikiCacheStats,
+  _resetWikiCache,
+} from "../src/tools/wiki.js";
 import type { LessonEntry } from "../src/contracts.js";
 
 // ── Fixture ──────────────────────────────────────────────────────────────────
@@ -43,6 +49,7 @@ beforeEach(() => {
   tmpRoot = mkdtempSync(join(tmpdir(), "evor-wiki-test-"));
   savedEvorRoot = process.env.EVOR_ROOT;
   process.env.EVOR_ROOT = tmpRoot;
+  _resetWikiCache(); // clear IDF cache + stats before each test
 });
 
 afterEach(() => {
@@ -129,7 +136,112 @@ describe("wikiAdd", () => {
   });
 });
 
-// ── wikiQuery ────────────────────────────────────────────────────────────────
+// ── wikiAdd dedup / cap ───────────────────────────────────────────────────────
+
+describe("wikiAdd dedup and corpus cap", () => {
+  it("re-adding the same lesson_id replaces entry, does not append", () => {
+    const runId = "run-dedup-001";
+    const entry = makeEntry();
+    wikiAdd(runId, entry, "test-mission");
+    wikiAdd(runId, { ...entry, observation: "Updated observation after rerun." }, "test-mission");
+
+    const indexPath = join(tmpRoot, "wiki", "index.jsonl");
+    const lines = readFileSync(indexPath, "utf8").split("\n").filter(Boolean);
+    expect(lines).toHaveLength(1);
+    expect(JSON.parse(lines[0]).observation).toBe("Updated observation after rerun.");
+  });
+
+  it("near-dup (same node+approach+obs prefix) replaces, does not append", () => {
+    const runId = "run-neardup-001";
+    // All entries share node_id, approach_family, and the same observation prefix
+    const baseObs = "Binarization threshold tuning is critical for binary classification tasks here.";
+    for (let i = 0; i < 4; i++) {
+      const base = makeEntry({
+        node_id: "same-node",
+        approach_family: "arch",
+        observation: baseObs,
+      });
+      wikiAdd(runId, { ...base, lesson_id: `neardup-${i}` }, "test-mission");
+    }
+
+    const indexPath = join(tmpRoot, "wiki", "index.jsonl");
+    const lines = readFileSync(indexPath, "utf8").split("\n").filter(Boolean);
+    // Only the most recent survives — each add replaced the previous
+    expect(lines).toHaveLength(1);
+    expect(JSON.parse(lines[0]).lesson_id).toBe("neardup-3");
+  });
+
+  it("distinct observations from same node+approach are NOT deduped (genuinely different lessons)", () => {
+    const runId = "run-neardup-002";
+    wikiAdd(runId, makeEntry({ node_id: "nodeA", approach_family: "arch", observation: "Wider heads help spatial tasks." }), "test-mission");
+    wikiAdd(runId, makeEntry({ node_id: "nodeA", approach_family: "arch", observation: "Dropout after attention reduces overfitting." }), "test-mission");
+
+    const indexPath = join(tmpRoot, "wiki", "index.jsonl");
+    const lines = readFileSync(indexPath, "utf8").split("\n").filter(Boolean);
+    // Different observation prefixes → two distinct entries preserved
+    expect(lines).toHaveLength(2);
+  });
+
+  it("corpus stays bounded at EVOR_WIKI_MAX_ENTRIES cap", () => {
+    const origMax = process.env.EVOR_WIKI_MAX_ENTRIES;
+    process.env.EVOR_WIKI_MAX_ENTRIES = "5";
+    try {
+      const runId = "run-cap-001";
+      for (let i = 0; i < 10; i++) {
+        wikiAdd(
+          runId,
+          makeEntry({ node_id: `cap-node-${i}`, lesson_id: `cap-lesson-${i}` }),
+          "test-mission"
+        );
+      }
+      const indexPath = join(tmpRoot, "wiki", "index.jsonl");
+      const lines = readFileSync(indexPath, "utf8").split("\n").filter(Boolean);
+      expect(lines.length).toBeLessThanOrEqual(5);
+    } finally {
+      if (origMax === undefined) {
+        delete process.env.EVOR_WIKI_MAX_ENTRIES;
+      } else {
+        process.env.EVOR_WIKI_MAX_ENTRIES = origMax;
+      }
+    }
+  });
+
+  it("cap retains the most-recent entries (by created_at)", () => {
+    const origMax = process.env.EVOR_WIKI_MAX_ENTRIES;
+    process.env.EVOR_WIKI_MAX_ENTRIES = "3";
+    try {
+      const runId = "run-cap-002";
+      const base = new Date("2024-01-01T00:00:00Z").getTime();
+      for (let i = 0; i < 5; i++) {
+        wikiAdd(
+          runId,
+          makeEntry({
+            node_id: `capn-${i}`,
+            lesson_id: `capl-${i}`,
+            created_at: new Date(base + i * 60_000).toISOString(), // i minutes apart
+          }),
+          "test-mission"
+        );
+      }
+      const indexPath = join(tmpRoot, "wiki", "index.jsonl");
+      const lines = readFileSync(indexPath, "utf8").split("\n").filter(Boolean);
+      expect(lines.length).toBe(3);
+      const ids = lines.map((l) => JSON.parse(l).lesson_id);
+      // Most recent 3 are capl-2, capl-3, capl-4
+      expect(ids).toContain("capl-2");
+      expect(ids).toContain("capl-3");
+      expect(ids).toContain("capl-4");
+    } finally {
+      if (origMax === undefined) {
+        delete process.env.EVOR_WIKI_MAX_ENTRIES;
+      } else {
+        process.env.EVOR_WIKI_MAX_ENTRIES = origMax;
+      }
+    }
+  });
+});
+
+// ── wikiQuery ─────────────────────────────────────────────────────────────────
 
 describe("wikiQuery", () => {
   it("returns empty array when index.jsonl absent", () => {
@@ -218,7 +330,7 @@ describe("wikiQuery", () => {
   });
 });
 
-// ── wikiGetRelevant ──────────────────────────────────────────────────────────
+// ── wikiGetRelevant ───────────────────────────────────────────────────────────
 
 describe("wikiGetRelevant", () => {
   it("returns empty array when index.jsonl is absent", () => {
@@ -302,5 +414,63 @@ describe("wikiGetRelevant", () => {
     const results = wikiGetRelevant("cosine annealing", 5);
     expect(results.length).toBeGreaterThanOrEqual(1);
     expect(results[0].tags).toContain("cosine");
+  });
+});
+
+// ── wikiGetRelevant IDF cache ─────────────────────────────────────────────────
+
+describe("wikiGetRelevant IDF cache", () => {
+  it("second call with different query hits cache (1 miss, 1 hit)", () => {
+    const runId = "run-cache-001";
+    wikiAdd(runId, makeEntry({ observation: "dropout regularization reduces overfitting", tags: ["dropout"] }), "test-mission");
+
+    // Cache is already reset by global beforeEach, but ensure clean state
+    _resetWikiCache();
+
+    wikiGetRelevant("dropout regularization", 5);  // cold load → 1 miss
+    wikiGetRelevant("attention heads spatial", 5); // same file, same mtime → cache hit
+
+    expect(_wikiCacheStats.misses).toBe(1);
+    expect(_wikiCacheStats.hits).toBe(1);
+  });
+
+  it("cache invalidates after wikiAdd (mtime changes → new miss)", () => {
+    const runId = "run-cache-002";
+    wikiAdd(runId, makeEntry({ observation: "cosine annealing schedule" }), "test-mission");
+
+    _resetWikiCache();
+    wikiGetRelevant("cosine", 5);   // miss 1
+    wikiGetRelevant("cosine", 5);   // hit 1 (file unchanged)
+    expect(_wikiCacheStats.misses).toBe(1);
+    expect(_wikiCacheStats.hits).toBe(1);
+
+    // New write changes mtime
+    wikiAdd(runId, makeEntry({ observation: "dropout regularization separate entry" }), "test-mission");
+    wikiGetRelevant("dropout", 5);  // miss 2 (mtime changed)
+
+    expect(_wikiCacheStats.misses).toBe(2);
+    expect(_wikiCacheStats.hits).toBe(1);
+  });
+
+  it("returns correct results from cached corpus", () => {
+    const runId = "run-cache-003";
+    const target = makeEntry({
+      observation: "binarization threshold critical for binary tasks",
+      tags: ["binarization"],
+    });
+    const noise = makeEntry({ observation: "unrelated batch experiment" });
+    wikiAdd(runId, target, "test-mission");
+    wikiAdd(runId, noise, "test-mission");
+
+    _resetWikiCache();
+    const r1 = wikiGetRelevant("binarization binary", 5);  // cold
+    const r2 = wikiGetRelevant("binarization binary", 5);  // warm
+
+    // Both calls return the same result
+    expect(r1.length).toBeGreaterThan(0);
+    expect(r2.length).toBe(r1.length);
+    expect(r2[0].lesson_id).toBe(r1[0].lesson_id);
+    expect(_wikiCacheStats.misses).toBe(1);
+    expect(_wikiCacheStats.hits).toBe(1);
   });
 });

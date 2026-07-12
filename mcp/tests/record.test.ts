@@ -185,6 +185,27 @@ describe("recordEval", () => {
     expect(integrityVerdict).toBeNull();
   });
 
+  it("P1-1: recordEval returns integrityReport field (null when bridge unavailable)", () => {
+    const runId = "run-eval-p1-1";
+    const nodeId = randomUUID();
+    // bridge fails in test env — integrityReport must be null, not undefined
+    const result = recordEval(runId, nodeId, makeResult(nodeId, runId), "test-mission");
+    expect("integrityReport" in result).toBe(true);
+    // bridge unavailable → null (not undefined, not missing)
+    expect(result.integrityReport).toBeNull();
+  });
+
+  it("P1-1: recordEval response is self-contained (no need for separate integrity_check call)", () => {
+    const runId = "run-eval-p1-1b";
+    const nodeId = randomUUID();
+    const result = recordEval(runId, nodeId, makeResult(nodeId, runId), "test-mission");
+    // All four fields must be present so the MCP tool response is complete in one call
+    expect("resultsPath" in result).toBe(true);
+    expect("integrityVerdict" in result).toBe(true);
+    expect("integrityError" in result).toBe(true);
+    expect("integrityReport" in result).toBe(true);
+  });
+
   it("overwrites existing results.json on repeated call", () => {
     const runId = "run-eval-004";
     const nodeId = randomUUID();

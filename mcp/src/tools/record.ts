@@ -12,7 +12,7 @@ import { z } from "zod";
 import { TreeNode, TreeNodeSchema, EvaluationResultSchema } from "../contracts.js";
 import { readTree, upsertNode } from "../tree-store.js";
 import { ensureRunDirs, resolveRunPaths } from "../run-store.js";
-import { callBridge } from "../subprocess-bridge.js";
+import { integrityCheck } from "./integrity.js";
 
 // ── Shared helpers ──────────────────────────────────────────────────────────
 
@@ -101,15 +101,24 @@ export function recordNode(runId: string, node: TreeNode, missionId?: string): {
 }
 
 /**
- * Write results.json for a node and trigger the integrity bridge (best-effort).
- * Returns the integrity verdict if the bridge ran successfully, otherwise null.
+ * Write results.json for a node and atomically trigger the integrity bridge (P1-1).
+ *
+ * Uses integrityCheck() — the same path as evor_integrity_check — so P1-11 eval paths
+ * are resolved and the P2-2 evalVersionCache is populated. Returns the full IntegrityReport
+ * inline, so the orchestrator never needs a separate evor_integrity_check call for the
+ * normal eval flow.
  */
 export function recordEval(
   runId: string,
   nodeId: string,
   result: unknown,
   missionId?: string
-): { resultsPath: string; integrityVerdict: string | null; integrityError: string | null } {
+): {
+  resultsPath: string;
+  integrityVerdict: string | null;
+  integrityError: string | null;
+  integrityReport: unknown | null;
+} {
   const paths = resolveRunPaths(runId, missionId);
   const nodeDir = join(paths.nodesDir, nodeId);
 
@@ -120,18 +129,18 @@ export function recordEval(
   const resultsPath = join(nodeDir, "results.json");
   writeFileSync(resultsPath, JSON.stringify(result, null, 2), "utf8");
 
-  // Auto-trigger integrity check; failures are non-fatal (best-effort)
+  // P1-1: atomic integrity check — same call path as evor_integrity_check tool.
+  // Resolves eval-script/split-path via P1-11 and seeds P2-2 cache on first call.
+  // Failures are non-fatal (best-effort); orchestrator can re-check explicitly.
   let integrityVerdict: string | null = null;
-  const bridgeArgs = [
-    "--run-id", runId,
-    "--node-id", nodeId,
-    "--run-dir", paths.runDir,
-  ];
   let integrityError: string | null = null;
-  const integrityResult = callBridge("integrity_bridge.py", bridgeArgs);
-  if (integrityResult.ok && integrityResult.data != null) {
-    const report = integrityResult.data as Record<string, unknown>;
+  let integrityReport: unknown | null = null;
+
+  const integrityResult = integrityCheck(runId, nodeId, missionId);
+  if (integrityResult.ok && integrityResult.report != null) {
+    const report = integrityResult.report as Record<string, unknown>;
     integrityVerdict = typeof report.verdict === "string" ? report.verdict : null;
+    integrityReport = integrityResult.report;
   } else if (!integrityResult.ok) {
     // Surface WHY the bridge failed (e.g. "Node X not found in tree.json") so the
     // orchestrator can act (record the node first) instead of a silent, un-diagnosable
@@ -157,7 +166,7 @@ export function recordEval(
     // orchestrator can re-check integrity explicitly via evor_integrity_check.
   }
 
-  return { resultsPath, integrityVerdict, integrityError };
+  return { resultsPath, integrityVerdict, integrityError, integrityReport };
 }
 
 /**
@@ -238,11 +247,14 @@ export function registerRecordTools(server: McpServer): void {
     },
     async ({ run_id, node_id, result }) => {
       const missionId = process.env.EVOR_MISSION_ID;
-      const { resultsPath, integrityVerdict, integrityError } = recordEval(run_id, node_id, result, missionId);
+      const { resultsPath, integrityVerdict, integrityError, integrityReport } =
+        recordEval(run_id, node_id, result, missionId);
       return {
         content: [
           {
             type: "text" as const,
+            // P1-1: integrity_report is the FULL IntegrityReport inline — the orchestrator
+            // never needs a separate evor_integrity_check call for the normal flow.
             text: JSON.stringify({
               ok: true,
               run_id,
@@ -251,6 +263,7 @@ export function registerRecordTools(server: McpServer): void {
               results_path: resultsPath,
               integrity_verdict: integrityVerdict,
               integrity_error: integrityError,
+              integrity_report: integrityReport,
             }),
           },
         ],

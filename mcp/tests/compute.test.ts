@@ -424,6 +424,52 @@ describe("forgeDispatchBatch (P0-3)", () => {
     expect(result.dispatched).toHaveLength(2);
   });
 
+  // ── P0-3: EVOR_GPU_FRACTION env injection ─────────────────────────────────
+
+  it("P0-3: injects EVOR_GPU_FRACTION≈0.333 into extraEnv of each jobStart call (3 candidates)", () => {
+    mockedCall
+      .mockReturnValueOnce(makeJobHandle("job-1"))
+      .mockReturnValueOnce(makeJobHandle("job-2"))
+      .mockReturnValueOnce(makeJobHandle("job-3"));
+
+    const runDir = join(tmpRoot, "runs", "m1", "r1");
+    const result = forgeDispatchBatch("run-1", [
+      { node_id: "n1", worktree: "/wt/1" },
+      { node_id: "n2", worktree: "/wt/2" },
+      { node_id: "n3", worktree: "/wt/3" },
+    ], runDir);
+
+    expect(result.gpu_fraction).toBeCloseTo(1 / 3, 5);
+    expect(mockedCall).toHaveBeenCalledTimes(3);
+
+    for (const call of mockedCall.mock.calls) {
+      // callPythonModule(module, args, opts) — opts is the 3rd arg
+      const opts = call[2] as { extraEnv?: Record<string, string> } | undefined;
+      expect(opts?.extraEnv?.EVOR_GPU_FRACTION).toBeDefined();
+      expect(parseFloat(opts!.extraEnv!.EVOR_GPU_FRACTION)).toBeCloseTo(1 / 3, 5);
+    }
+  });
+
+  it("P0-3: EVOR_GPU_FRACTION in extraEnv reflects explicit gpu_fraction override (0.7)", () => {
+    mockedCall.mockReturnValueOnce(makeJobHandle("job-a"));
+
+    const runDir = join(tmpRoot, "runs", "m1", "r1");
+    forgeDispatchBatch("run-1", [{ node_id: "n1", worktree: "/wt/1" }], runDir, 0.7);
+
+    const opts = mockedCall.mock.calls[0][2] as { extraEnv?: Record<string, string> } | undefined;
+    expect(opts?.extraEnv?.EVOR_GPU_FRACTION).toBeDefined();
+    expect(parseFloat(opts!.extraEnv!.EVOR_GPU_FRACTION)).toBeCloseTo(0.7, 5);
+  });
+
+  it("P0-3: jobStart passes extraEnv through to callPythonModule", () => {
+    mockedCall.mockReturnValue(OK_JOB_HANDLE);
+    const runDir = join(tmpRoot, "runs", "m1", "r1");
+    jobStart("node-1", "run-1", runDir, "/wt/path", undefined, { EVOR_GPU_FRACTION: "0.5" });
+
+    const opts = mockedCall.mock.calls[0][2] as { extraEnv?: Record<string, string> } | undefined;
+    expect(opts?.extraEnv?.EVOR_GPU_FRACTION).toBe("0.5");
+  });
+
   it("surfaces per-candidate errors without throwing when a job fails", () => {
     mockedCall
       .mockReturnValueOnce(makeJobHandle("job-ok"))

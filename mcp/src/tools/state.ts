@@ -65,6 +65,17 @@ const RunStatePatchSchema = z.object({
     "If set, atomically writes tick-state.json in the run directory; " +
     "read by all agents to determine current tick and step progress",
   ),
+  // ── P2-8: Forge attempt tracking ──────────────────────────────────────────
+  forge_attempt: z
+    .number()
+    .int()
+    .min(0)
+    .optional()
+    .describe(
+      "Number of Forge attempts made for the current node in this tick. " +
+      "Increment on each attempt; check with shouldAbortForge() before spawning a new one. " +
+      "Reset to 0 at the start of each new tick/node.",
+    ),
 });
 
 // ── Core logic (exported for tests) ────────────────────────────────────────
@@ -282,6 +293,25 @@ export function readGoalContract(
   }
 
   return { ok: true, contract: parsed.data };
+}
+
+// ── P2-8: Forge attempt bound helper ─────────────────────────────────────────
+
+/**
+ * Returns true when the Forge agent should be aborted because it has already
+ * attempted `forge_attempt` times and the configured maximum has been reached.
+ *
+ * Usage (in Forge or the stop-hook):
+ *   const state = stateRead(runId);
+ *   if (shouldAbortForge(state.forge_attempt as number ?? 0)) {
+ *     // escalate to Evor rather than spawning another attempt
+ *   }
+ *
+ * @param forge_attempt Number of attempts already made (from run-state).
+ * @param max           Maximum allowed attempts (default: 2).
+ */
+export function shouldAbortForge(forge_attempt: number, max = 2): boolean {
+  return forge_attempt >= max;
 }
 
 // ── Tool registrations ──────────────────────────────────────────────────────

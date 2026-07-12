@@ -13,7 +13,7 @@ import { tmpdir } from "os";
 import { randomUUID } from "crypto";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 
-import { integrityCheck, resolveIntegrityPaths, frozenSplitHashCache, getCachedSplitHash } from "../src/tools/integrity.js";
+import { integrityCheck, resolveIntegrityPaths, frozenSplitHashCache, evalVersionCache, getCachedSplitHash } from "../src/tools/integrity.js";
 
 // ── Lifecycle ────────────────────────────────────────────────────────────────
 
@@ -25,6 +25,7 @@ beforeEach(() => {
   savedEvorRoot = process.env.EVOR_ROOT;
   process.env.EVOR_ROOT = tmpRoot;
   frozenSplitHashCache.clear();
+  evalVersionCache.clear();
 });
 
 afterEach(() => {
@@ -34,6 +35,7 @@ afterEach(() => {
     process.env.EVOR_ROOT = savedEvorRoot;
   }
   frozenSplitHashCache.clear();
+  evalVersionCache.clear();
   rmSync(tmpRoot, { recursive: true, force: true });
 });
 
@@ -93,6 +95,49 @@ describe("resolveIntegrityPaths (P1-11)", () => {
     const paths = resolveIntegrityPaths("/base", { eval_version: "v99-alpha" } as never);
     expect(paths.evalScript).toBe("/base/eval-suites/v99-alpha.py");
     expect(paths.splitPath).toBe("/base/frozen-splits/v99-alpha.json");
+  });
+});
+
+// ── P2-2: evalVersionCache ──────────────────────────────────────────────────
+
+describe("evalVersionCache (P2-2)", () => {
+  it("is cleared between tests by beforeEach/afterEach", () => {
+    expect(evalVersionCache.size).toBe(0);
+  });
+
+  it("integrityCheck populates evalVersionCache on first call (cache miss)", () => {
+    const runId = "run-evc-miss";
+    const runDir = join(tmpRoot, "runs", "test-mission", runId);
+    mkdirSync(runDir, { recursive: true });
+    writeFileSync(
+      join(runDir, "goal-contract.json"),
+      JSON.stringify({ eval_version: "v7", locked_split_hash: "hash7" })
+    );
+    integrityCheck(runId, randomUUID(), "test-mission");
+    expect(evalVersionCache.get(runId)).toBe("v7");
+    expect(frozenSplitHashCache.get(runId)).toBe("hash7");
+  });
+
+  it("P2-2: integrityCheck takes cache-hit path and does NOT overwrite evalVersionCache with disk value", () => {
+    const runId = "run-evc-hit";
+    const runDir = join(tmpRoot, "runs", "test-mission", runId);
+    mkdirSync(runDir, { recursive: true });
+    // Contract file has DIFFERENT values from what we put in cache
+    writeFileSync(
+      join(runDir, "goal-contract.json"),
+      JSON.stringify({ eval_version: "v_DISK", locked_split_hash: "DISK_HASH" })
+    );
+    // Pre-seed the cache — simulates what the 1st call would have done
+    evalVersionCache.set(runId, "v_CACHED");
+    frozenSplitHashCache.set(runId, "CACHED_HASH");
+
+    // 2nd call: cache-hit branch — must NOT read the file and must NOT overwrite
+    integrityCheck(runId, randomUUID(), "test-mission");
+
+    // If the cache-hit branch ran: cache still holds "v_CACHED"
+    // If the miss branch ran: cache would now hold "v_DISK" (definitive proof)
+    expect(evalVersionCache.get(runId)).toBe("v_CACHED");
+    expect(frozenSplitHashCache.get(runId)).toBe("CACHED_HASH");
   });
 });
 

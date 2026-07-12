@@ -9,7 +9,7 @@ import { join } from "path";
 import { tmpdir } from "os";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 
-import { stateRead, stateWrite, readGoalContract, checkPlateauCondition } from "../src/tools/state.js";
+import { stateRead, stateWrite, readGoalContract, checkPlateauCondition, shouldAbortForge } from "../src/tools/state.js";
 import { ensureRunDirs, resolveRunPaths } from "../src/run-store.js";
 
 // ── Lifecycle ────────────────────────────────────────────────────────────────
@@ -461,5 +461,71 @@ describe("dream_k strategy field roundtrip (P1-14)", () => {
 
     const strategy = JSON.parse(readFileSync(paths.strategyPath, "utf8"));
     expect(strategy.dream_k).toBeUndefined();
+  });
+});
+
+// ── P2-8 forge_attempt tracking ──────────────────────────────────────────────
+
+describe("forge_attempt state field (P2-8)", () => {
+  it("roundtrips forge_attempt via stateWrite / stateRead", () => {
+    const runId = "run-forge-001";
+    ensureRunDirs(runId, "test-mission");
+
+    stateWrite(runId, { forge_attempt: 1 } as any);
+    const state = stateRead(runId);
+    expect(state.forge_attempt).toBe(1);
+  });
+
+  it("increments forge_attempt across writes", () => {
+    const runId = "run-forge-002";
+    ensureRunDirs(runId, "test-mission");
+
+    stateWrite(runId, { forge_attempt: 0 } as any);
+    stateWrite(runId, { forge_attempt: 1 } as any);
+    stateWrite(runId, { forge_attempt: 2 } as any);
+
+    const state = stateRead(runId);
+    expect(state.forge_attempt).toBe(2);
+  });
+
+  it("forge_attempt=0 does not trigger abort (below max)", () => {
+    expect(shouldAbortForge(0)).toBe(false);
+    expect(shouldAbortForge(0, 2)).toBe(false);
+  });
+
+  it("forge_attempt=1 does not trigger abort when max=2", () => {
+    expect(shouldAbortForge(1, 2)).toBe(false);
+  });
+
+  it("forge_attempt=2 triggers abort at default max=2", () => {
+    expect(shouldAbortForge(2)).toBe(true);
+  });
+
+  it("forge_attempt=3 triggers abort at default max=2", () => {
+    expect(shouldAbortForge(3, 2)).toBe(true);
+  });
+
+  it("shouldAbortForge respects custom max", () => {
+    expect(shouldAbortForge(4, 5)).toBe(false);
+    expect(shouldAbortForge(5, 5)).toBe(true);
+    expect(shouldAbortForge(6, 5)).toBe(true);
+  });
+
+  it("forge_attempt does not bleed into tick_state or strategy", () => {
+    const runId = "run-forge-003";
+    const paths = ensureRunDirs(runId, "test-mission");
+
+    stateWrite(runId, {
+      forge_attempt: 1,
+      tick_state: { tick: 1, current_step: 3, step_status: "running" },
+    } as any);
+
+    // run-state.json should have forge_attempt
+    const rs = JSON.parse(readFileSync(paths.runStatePath, "utf8"));
+    expect(rs.forge_attempt).toBe(1);
+
+    // tick-state.json must NOT have forge_attempt
+    const ts = JSON.parse(readFileSync(join(paths.runDir, "tick-state.json"), "utf8"));
+    expect(ts).not.toHaveProperty("forge_attempt");
   });
 });

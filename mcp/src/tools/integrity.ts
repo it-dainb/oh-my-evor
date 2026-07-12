@@ -22,6 +22,14 @@ import { callBridge } from "../subprocess-bridge.js";
 export const frozenSplitHashCache = new Map<string, string>();
 
 /**
+ * Module-level cache: runId → eval_version loaded from goal-contract.json.
+ * Paired with frozenSplitHashCache to fully skip the contract file read on
+ * subsequent integrityCheck calls within the same run (P2-2).
+ * Exported so tests can clear it in beforeEach/afterEach.
+ */
+export const evalVersionCache = new Map<string, string>();
+
+/**
  * Return the locked_split_hash for runId, loading from goal-contract.json on
  * the first call and caching for subsequent calls (P2-2).
  */
@@ -80,30 +88,44 @@ export function integrityCheck(
 ): { ok: boolean; report?: unknown; error?: string; stderr?: string } {
   const paths = resolveRunPaths(runId, missionId);
 
-  // P1-11: resolve eval paths from GoalContract (falls back gracefully if missing)
   const bridgeArgs: string[] = [
     "--run-id", runId,
     "--node-id", nodeId,
     "--run-dir", paths.runDir,
   ];
 
-  // Attempt to resolve GoalContract paths; pass them only if the contract exists
-  try {
-    const contractPath = join(paths.runDir, "goal-contract.json");
-    if (existsSync(contractPath)) {
-      const contract = JSON.parse(readFileSync(contractPath, "utf8")) as Partial<GoalContract>;
-      if (contract.eval_version) {
-        const intPaths = resolveIntegrityPaths(paths.runDir, { eval_version: contract.eval_version });
-        bridgeArgs.push("--eval-script", intPaths.evalScript);
-        bridgeArgs.push("--split-path", intPaths.splitPath);
-        // P2-2: populate hash cache while we have the contract open
+  // P2-2: check BOTH caches at the TOP — skip the contract file read entirely on cache hit.
+  // evalVersionCache + frozenSplitHashCache are populated on the first call within a run.
+  const cachedEvalVersion = evalVersionCache.get(runId);
+  const cachedHash = frozenSplitHashCache.get(runId);
+
+  if (cachedEvalVersion !== undefined) {
+    // Cache hit: derive bridge paths from cached eval_version — no disk read needed.
+    const intPaths = resolveIntegrityPaths(paths.runDir, { eval_version: cachedEvalVersion });
+    bridgeArgs.push("--eval-script", intPaths.evalScript);
+    bridgeArgs.push("--split-path", intPaths.splitPath);
+    // cachedHash may be undefined if the contract lacked locked_split_hash; that's fine —
+    // the bridge handles it via its own defaults.
+    void cachedHash;
+  } else {
+    // P1-11 + P2-2 cache miss: read goal-contract.json once and populate both caches.
+    try {
+      const contractPath = join(paths.runDir, "goal-contract.json");
+      if (existsSync(contractPath)) {
+        const contract = JSON.parse(readFileSync(contractPath, "utf8")) as Partial<GoalContract>;
+        if (contract.eval_version) {
+          evalVersionCache.set(runId, contract.eval_version);
+          const intPaths = resolveIntegrityPaths(paths.runDir, { eval_version: contract.eval_version });
+          bridgeArgs.push("--eval-script", intPaths.evalScript);
+          bridgeArgs.push("--split-path", intPaths.splitPath);
+        }
         if (contract.locked_split_hash && !frozenSplitHashCache.has(runId)) {
           frozenSplitHashCache.set(runId, contract.locked_split_hash);
         }
       }
+    } catch {
+      // fail-open — bridge still works without explicit paths (Python uses its own defaults)
     }
-  } catch {
-    // fail-open — bridge still works without explicit paths (Python uses its own defaults)
   }
 
   const result = callBridge("integrity_bridge.py", bridgeArgs);

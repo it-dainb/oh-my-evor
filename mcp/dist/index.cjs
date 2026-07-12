@@ -21011,8 +21011,8 @@ var StdioServerTransport = class {
 };
 
 // src/tools/record.ts
-var import_fs4 = require("fs");
-var import_path5 = require("path");
+var import_fs5 = require("fs");
+var import_path6 = require("path");
 var import_crypto = require("crypto");
 
 // src/contracts.ts
@@ -21720,6 +21720,10 @@ function upsertNode(runId, node, missionId) {
   });
 }
 
+// src/tools/integrity.ts
+var import_fs4 = require("fs");
+var import_path5 = require("path");
+
 // src/subprocess-bridge.ts
 var import_child_process = require("child_process");
 var import_path4 = require("path");
@@ -21776,7 +21780,7 @@ function callPythonModule(module2, args, opts) {
   const result = (0, import_child_process.spawnSync)(pythonBin(), ["-m", module2, ...args], {
     encoding: "utf8",
     timeout: opts?.timeout ?? 3e4,
-    env: _pythonEnv(),
+    env: { ..._pythonEnv(), ...opts?.extraEnv },
     cwd: opts?.cwd
   });
   return _parseSpawnResult(result);
@@ -21786,15 +21790,87 @@ function callBridge(scriptName, args, opts) {
   const result = (0, import_child_process.spawnSync)(pythonBin(), [script, ...args], {
     encoding: "utf8",
     timeout: opts?.timeout ?? 6e4,
-    env: _pythonEnv(),
+    env: { ..._pythonEnv(), ...opts?.extraEnv },
     cwd: opts?.cwd
   });
   return _parseSpawnResult(result);
 }
 
+// src/tools/integrity.ts
+var frozenSplitHashCache = /* @__PURE__ */ new Map();
+var evalVersionCache = /* @__PURE__ */ new Map();
+function resolveIntegrityPaths(runDir, contract) {
+  return {
+    evalScript: (0, import_path5.join)(runDir, "eval-suites", `${contract.eval_version}.py`),
+    splitPath: (0, import_path5.join)(runDir, "frozen-splits", `${contract.eval_version}.json`)
+  };
+}
+function integrityCheck(runId, nodeId, missionId) {
+  const paths = resolveRunPaths(runId, missionId);
+  const bridgeArgs = [
+    "--run-id",
+    runId,
+    "--node-id",
+    nodeId,
+    "--run-dir",
+    paths.runDir
+  ];
+  const cachedEvalVersion = evalVersionCache.get(runId);
+  const cachedHash = frozenSplitHashCache.get(runId);
+  if (cachedEvalVersion !== void 0) {
+    const intPaths = resolveIntegrityPaths(paths.runDir, { eval_version: cachedEvalVersion });
+    bridgeArgs.push("--eval-script", intPaths.evalScript);
+    bridgeArgs.push("--split-path", intPaths.splitPath);
+  } else {
+    try {
+      const contractPath = (0, import_path5.join)(paths.runDir, "goal-contract.json");
+      if ((0, import_fs4.existsSync)(contractPath)) {
+        const contract = JSON.parse((0, import_fs4.readFileSync)(contractPath, "utf8"));
+        if (contract.eval_version) {
+          evalVersionCache.set(runId, contract.eval_version);
+          const intPaths = resolveIntegrityPaths(paths.runDir, { eval_version: contract.eval_version });
+          bridgeArgs.push("--eval-script", intPaths.evalScript);
+          bridgeArgs.push("--split-path", intPaths.splitPath);
+        }
+        if (contract.locked_split_hash && !frozenSplitHashCache.has(runId)) {
+          frozenSplitHashCache.set(runId, contract.locked_split_hash);
+        }
+      }
+    } catch {
+    }
+  }
+  const result = callBridge("integrity_bridge.py", bridgeArgs);
+  if (!result.ok) {
+    return { ok: false, error: result.error, stderr: result.stderr };
+  }
+  return { ok: true, report: result.data };
+}
+function registerIntegrityTools(server) {
+  server.tool(
+    "evor_integrity_check",
+    "Auto-triggered by evor_record_eval; call explicitly only for re-checks or manual spot-checks. Runs all 13 IntegrityGate checks via integrity_bridge.py and writes IntegrityReport to evaluations/<node-id>.json. Checks: reward-hacking, split-purity, telemetry-sane, acquisition-provenance, grad-norm-health, loss-monotonic, eval-consistency, config-reproducibility, dataset-frozen, license-gate, leakage-probe, performance-ceiling, and coverage-gap.",
+    {
+      run_id: external_exports.string().describe("Active run identifier"),
+      node_id: external_exports.string().describe("Node to check")
+    },
+    async ({ run_id, node_id }) => {
+      const missionId = process.env.EVOR_MISSION_ID;
+      const result = integrityCheck(run_id, node_id, missionId);
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(result.ok ? result.report : result)
+          }
+        ]
+      };
+    }
+  );
+}
+
 // src/tools/record.ts
 function readRunState(runStatePath, runId) {
-  if (!(0, import_fs4.existsSync)(runStatePath)) {
+  if (!(0, import_fs5.existsSync)(runStatePath)) {
     return {
       run_id: runId,
       status: "running",
@@ -21806,7 +21882,7 @@ function readRunState(runStatePath, runId) {
     };
   }
   try {
-    return JSON.parse((0, import_fs4.readFileSync)(runStatePath, "utf8"));
+    return JSON.parse((0, import_fs5.readFileSync)(runStatePath, "utf8"));
   } catch {
     return {
       run_id: runId,
@@ -21821,8 +21897,8 @@ function readRunState(runStatePath, runId) {
 }
 function writeRunState(runStatePath, state) {
   const tmpPath = `${runStatePath}.tmp`;
-  (0, import_fs4.writeFileSync)(tmpPath, JSON.stringify(state, null, 2), "utf8");
-  (0, import_fs4.renameSync)(tmpPath, runStatePath);
+  (0, import_fs5.writeFileSync)(tmpPath, JSON.stringify(state, null, 2), "utf8");
+  (0, import_fs5.renameSync)(tmpPath, runStatePath);
 }
 function fillNodeId(node) {
   if (!node.id) {
@@ -21842,7 +21918,7 @@ function recordNode(runId, node, missionId) {
     `- depth: ${node.depth}`,
     ""
   ].join("\n");
-  (0, import_fs4.appendFileSync)(paths.decisionLogPath, logLine, "utf8");
+  (0, import_fs5.appendFileSync)(paths.decisionLogPath, logLine, "utf8");
   const state = readRunState(paths.runStatePath, runId);
   const pending = Array.isArray(state.pending_node_ids) ? state.pending_node_ids.filter((id) => id !== node.id) : [];
   state.pending_node_ids = pending;
@@ -21851,26 +21927,20 @@ function recordNode(runId, node, missionId) {
 }
 function recordEval(runId, nodeId, result, missionId) {
   const paths = resolveRunPaths(runId, missionId);
-  const nodeDir = (0, import_path5.join)(paths.nodesDir, nodeId);
-  if (!(0, import_fs4.existsSync)(nodeDir)) {
-    (0, import_fs4.mkdirSync)(nodeDir, { recursive: true });
+  const nodeDir = (0, import_path6.join)(paths.nodesDir, nodeId);
+  if (!(0, import_fs5.existsSync)(nodeDir)) {
+    (0, import_fs5.mkdirSync)(nodeDir, { recursive: true });
   }
-  const resultsPath = (0, import_path5.join)(nodeDir, "results.json");
-  (0, import_fs4.writeFileSync)(resultsPath, JSON.stringify(result, null, 2), "utf8");
+  const resultsPath = (0, import_path6.join)(nodeDir, "results.json");
+  (0, import_fs5.writeFileSync)(resultsPath, JSON.stringify(result, null, 2), "utf8");
   let integrityVerdict = null;
-  const bridgeArgs = [
-    "--run-id",
-    runId,
-    "--node-id",
-    nodeId,
-    "--run-dir",
-    paths.runDir
-  ];
   let integrityError = null;
-  const integrityResult = callBridge("integrity_bridge.py", bridgeArgs);
-  if (integrityResult.ok && integrityResult.data != null) {
-    const report = integrityResult.data;
+  let integrityReport = null;
+  const integrityResult = integrityCheck(runId, nodeId, missionId);
+  if (integrityResult.ok && integrityResult.report != null) {
+    const report = integrityResult.report;
     integrityVerdict = typeof report.verdict === "string" ? report.verdict : null;
+    integrityReport = integrityResult.report;
   } else if (!integrityResult.ok) {
     integrityError = integrityResult.error ?? "integrity bridge failed";
   }
@@ -21886,16 +21956,16 @@ function recordEval(runId, nodeId, result, missionId) {
     }
   } catch {
   }
-  return { resultsPath, integrityVerdict, integrityError };
+  return { resultsPath, integrityVerdict, integrityError, integrityReport };
 }
 function readResult(runId, nodeId, missionId) {
   const paths = resolveRunPaths(runId, missionId);
-  const resultPath = (0, import_path5.join)(paths.nodesDir, nodeId, "results.json");
-  if (!(0, import_fs4.existsSync)(resultPath)) {
+  const resultPath = (0, import_path6.join)(paths.nodesDir, nodeId, "results.json");
+  if (!(0, import_fs5.existsSync)(resultPath)) {
     return { ok: false, error: `results.json not found at ${resultPath}` };
   }
   try {
-    const data = JSON.parse((0, import_fs4.readFileSync)(resultPath, "utf8"));
+    const data = JSON.parse((0, import_fs5.readFileSync)(resultPath, "utf8"));
     return { ok: true, data };
   } catch (e) {
     return { ok: false, error: `Failed to parse results.json: ${String(e)}` };
@@ -21944,11 +22014,13 @@ function registerRecordTools(server) {
     },
     async ({ run_id, node_id, result }) => {
       const missionId = process.env.EVOR_MISSION_ID;
-      const { resultsPath, integrityVerdict, integrityError } = recordEval(run_id, node_id, result, missionId);
+      const { resultsPath, integrityVerdict, integrityError, integrityReport } = recordEval(run_id, node_id, result, missionId);
       return {
         content: [
           {
             type: "text",
+            // P1-1: integrity_report is the FULL IntegrityReport inline — the orchestrator
+            // never needs a separate evor_integrity_check call for the normal flow.
             text: JSON.stringify({
               ok: true,
               run_id,
@@ -21956,7 +22028,8 @@ function registerRecordTools(server) {
               status: result.status,
               results_path: resultsPath,
               integrity_verdict: integrityVerdict,
-              integrity_error: integrityError
+              integrity_error: integrityError,
+              integrity_report: integrityReport
             })
           }
         ]
@@ -22180,8 +22253,8 @@ function registerScheduleTools(server) {
 }
 
 // src/tools/wiki.ts
-var import_fs5 = require("fs");
-var import_path6 = require("path");
+var import_fs6 = require("fs");
+var import_path7 = require("path");
 function renderLesson(entry) {
   const lines = [
     `# Lesson: ${entry.lesson_id}`,
@@ -22214,31 +22287,145 @@ function renderLesson(entry) {
   }
   return lines.join("\n");
 }
+function getWikiMaxEntries() {
+  return parseInt(process.env.EVOR_WIKI_MAX_ENTRIES ?? "500", 10);
+}
+function nearDupKey(e) {
+  return `${e.node_id}\0${e.approach_family}\0${e.observation.slice(0, 100).toLowerCase()}`;
+}
+function pruneAndWrite(indexPath, newEntry) {
+  const entries = [];
+  if ((0, import_fs6.existsSync)(indexPath)) {
+    for (const line of (0, import_fs6.readFileSync)(indexPath, "utf8").split("\n")) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+      try {
+        entries.push(LessonEntrySchema.parse(JSON.parse(trimmed)));
+      } catch {
+        continue;
+      }
+    }
+  }
+  const ndKey = nearDupKey(newEntry);
+  let replaced = false;
+  for (let i = 0; i < entries.length; i++) {
+    if (entries[i].lesson_id === newEntry.lesson_id || nearDupKey(entries[i]) === ndKey) {
+      entries[i] = newEntry;
+      replaced = true;
+      break;
+    }
+  }
+  if (!replaced) {
+    entries.push(newEntry);
+  }
+  const max = getWikiMaxEntries();
+  if (entries.length > max) {
+    entries.sort((a, b) => b.created_at.localeCompare(a.created_at));
+    entries.splice(max);
+  }
+  const tmp = `${indexPath}.tmp.${process.pid}`;
+  (0, import_fs6.writeFileSync)(tmp, entries.map((e) => JSON.stringify(e)).join("\n") + "\n", "utf8");
+  (0, import_fs6.renameSync)(tmp, indexPath);
+}
+function tokenize(text) {
+  return text.toLowerCase().split(/[^a-z]+/).filter((t) => t.length >= 2);
+}
+function termFreq(tokens) {
+  const tf = /* @__PURE__ */ new Map();
+  for (const t of tokens) {
+    tf.set(t, (tf.get(t) ?? 0) + 1);
+  }
+  return tf;
+}
+function cosineSim(a, b) {
+  let dot = 0;
+  let normA = 0;
+  let normB = 0;
+  for (const [term, wa] of a) {
+    const wb = b.get(term) ?? 0;
+    dot += wa * wb;
+    normA += wa * wa;
+  }
+  for (const wb of b.values()) {
+    normB += wb * wb;
+  }
+  if (normA === 0 || normB === 0) return 0;
+  return dot / (Math.sqrt(normA) * Math.sqrt(normB));
+}
+var idfCache = /* @__PURE__ */ new Map();
+var _wikiCacheStats = { hits: 0, misses: 0 };
+function loadCorpus(indexPath) {
+  let mtime = 0;
+  try {
+    mtime = (0, import_fs6.statSync)(indexPath).mtimeMs;
+  } catch {
+    return { mtime: 0, entries: [], entryVecs: [], df: /* @__PURE__ */ new Map(), N: 0 };
+  }
+  const cached2 = idfCache.get(indexPath);
+  if (cached2 && cached2.mtime === mtime) {
+    _wikiCacheStats.hits++;
+    return cached2;
+  }
+  _wikiCacheStats.misses++;
+  const entries = [];
+  for (const line of (0, import_fs6.readFileSync)(indexPath, "utf8").split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    try {
+      entries.push(LessonEntrySchema.parse(JSON.parse(trimmed)));
+    } catch {
+      continue;
+    }
+  }
+  const entryTokensList = entries.map(
+    (e) => tokenize(
+      [e.observation, e.actionable_lesson, e.root_cause ?? "", e.tags.join(" ")].join(" ")
+    )
+  );
+  const df = /* @__PURE__ */ new Map();
+  for (const tokens of entryTokensList) {
+    for (const term of new Set(tokens)) {
+      df.set(term, (df.get(term) ?? 0) + 1);
+    }
+  }
+  const N = entries.length;
+  const entryVecs = entryTokensList.map((tokens) => {
+    const tf = termFreq(tokens);
+    const vec = /* @__PURE__ */ new Map();
+    for (const [term, count] of tf) {
+      const idf = Math.log((N + 1) / ((df.get(term) ?? 0) + 1)) + 1;
+      vec.set(term, count * idf);
+    }
+    return vec;
+  });
+  const result = { mtime, entries, entryVecs, df, N };
+  idfCache.set(indexPath, result);
+  return result;
+}
 function wikiAdd(runId, entry, missionId) {
   const paths = resolveRunPaths(runId, missionId);
   const evorRoot = getEvorRoot();
-  const wikiRoot = (0, import_path6.join)(evorRoot, "wiki");
+  const wikiRoot = (0, import_path7.join)(evorRoot, "wiki");
   const rendered = renderLesson(entry);
-  const entryJson = JSON.stringify(entry);
-  (0, import_fs5.mkdirSync)(wikiRoot, { recursive: true });
-  (0, import_fs5.writeFileSync)((0, import_path6.join)(wikiRoot, `${entry.lesson_id}.md`), rendered, "utf8");
-  const indexPath = (0, import_path6.join)(wikiRoot, "index.jsonl");
-  (0, import_fs5.appendFileSync)(indexPath, entryJson + "\n", "utf8");
-  const runWikiDir = (0, import_path6.join)(paths.runDir, "wiki");
-  (0, import_fs5.mkdirSync)(runWikiDir, { recursive: true });
-  (0, import_fs5.writeFileSync)((0, import_path6.join)(runWikiDir, `${entry.lesson_id}.md`), rendered, "utf8");
+  (0, import_fs6.mkdirSync)(wikiRoot, { recursive: true });
+  (0, import_fs6.writeFileSync)((0, import_path7.join)(wikiRoot, `${entry.lesson_id}.md`), rendered, "utf8");
+  const indexPath = (0, import_path7.join)(wikiRoot, "index.jsonl");
+  pruneAndWrite(indexPath, entry);
+  const runWikiDir = (0, import_path7.join)(paths.runDir, "wiki");
+  (0, import_fs6.mkdirSync)(runWikiDir, { recursive: true });
+  (0, import_fs6.writeFileSync)((0, import_path7.join)(runWikiDir, `${entry.lesson_id}.md`), rendered, "utf8");
   return { lessonId: entry.lesson_id, indexPath };
 }
 function wikiQuery(query, opts) {
   const evorRoot = getEvorRoot();
-  const indexPath = (0, import_path6.join)(evorRoot, "wiki", "index.jsonl");
-  if (!(0, import_fs5.existsSync)(indexPath)) {
+  const indexPath = (0, import_path7.join)(evorRoot, "wiki", "index.jsonl");
+  if (!(0, import_fs6.existsSync)(indexPath)) {
     return [];
   }
   const keywords = query.split(/\s+/).filter(Boolean).map((k) => k.toLowerCase());
   const limit = opts?.limit ?? 10;
   const scored = [];
-  for (const line of (0, import_fs5.readFileSync)(indexPath, "utf8").split("\n")) {
+  for (const line of (0, import_fs6.readFileSync)(indexPath, "utf8").split("\n")) {
     const trimmed = line.trim();
     if (!trimmed) continue;
     let entry;
@@ -22278,75 +22465,23 @@ function wikiQuery(query, opts) {
   });
   return scored.slice(0, limit).map((s) => s.entry);
 }
-function tokenize(text) {
-  return text.toLowerCase().split(/[^a-z]+/).filter((t) => t.length >= 2);
-}
-function termFreq(tokens) {
-  const tf = /* @__PURE__ */ new Map();
-  for (const t of tokens) {
-    tf.set(t, (tf.get(t) ?? 0) + 1);
-  }
-  return tf;
-}
-function cosineSim(a, b) {
-  let dot = 0;
-  let normA = 0;
-  let normB = 0;
-  for (const [term, wa] of a) {
-    const wb = b.get(term) ?? 0;
-    dot += wa * wb;
-    normA += wa * wa;
-  }
-  for (const wb of b.values()) {
-    normB += wb * wb;
-  }
-  if (normA === 0 || normB === 0) return 0;
-  return dot / (Math.sqrt(normA) * Math.sqrt(normB));
-}
 function wikiGetRelevant(context, k) {
   const evorRoot = getEvorRoot();
-  const indexPath = (0, import_path6.join)(evorRoot, "wiki", "index.jsonl");
-  if (!(0, import_fs5.existsSync)(indexPath)) {
-    return [];
-  }
-  const entries = [];
-  for (const line of (0, import_fs5.readFileSync)(indexPath, "utf8").split("\n")) {
-    const trimmed = line.trim();
-    if (!trimmed) continue;
-    try {
-      entries.push(LessonEntrySchema.parse(JSON.parse(trimmed)));
-    } catch {
-      continue;
-    }
-  }
+  const indexPath = (0, import_path7.join)(evorRoot, "wiki", "index.jsonl");
+  const { entries, entryVecs, df, N } = loadCorpus(indexPath);
   if (entries.length === 0) return [];
-  const N = entries.length;
-  const entryTokens = entries.map(
-    (e) => tokenize(
-      [e.observation, e.actionable_lesson, e.root_cause ?? "", e.tags.join(" ")].join(" ")
-    )
-  );
-  const df = /* @__PURE__ */ new Map();
-  for (const tokens of entryTokens) {
-    for (const term of new Set(tokens)) {
-      df.set(term, (df.get(term) ?? 0) + 1);
-    }
+  const queryTokens = tokenize(context);
+  if (queryTokens.length === 0) return [];
+  const queryTf = termFreq(queryTokens);
+  const queryVec = /* @__PURE__ */ new Map();
+  for (const [term, count] of queryTf) {
+    const idf = Math.log((N + 1) / ((df.get(term) ?? 0) + 1)) + 1;
+    queryVec.set(term, count * idf);
   }
-  const tfidfVec = (tokens) => {
-    const tf = termFreq(tokens);
-    const vec = /* @__PURE__ */ new Map();
-    for (const [term, count] of tf) {
-      const idf = Math.log((N + 1) / ((df.get(term) ?? 0) + 1)) + 1;
-      vec.set(term, count * idf);
-    }
-    return vec;
-  };
-  const queryVec = tfidfVec(tokenize(context));
   if (queryVec.size === 0) return [];
   const scored = [];
   for (let i = 0; i < entries.length; i++) {
-    const entryVec = tfidfVec(entryTokens[i]);
-    const sim = cosineSim(queryVec, entryVec);
+    const sim = cosineSim(queryVec, entryVecs[i]);
     if (sim > 0) {
       scored.push({ sim, createdAt: entries[i].created_at, entry: entries[i] });
     }
@@ -22360,7 +22495,12 @@ function wikiGetRelevant(context, k) {
 function registerWikiTools(server) {
   server.tool(
     "evor_wiki_add",
-    "Write a LessonEntry to wiki/<lesson_id>.md and append to .evor/wiki/index.jsonl (cross-run compounding wiki).",
+    [
+      "Write a LessonEntry to wiki/<lesson_id>.md and update .evor/wiki/index.jsonl.",
+      "Dedup: same lesson_id OR same (node_id + approach_family + obs[:100]) replaces",
+      "the existing entry instead of appending (prevents loop-duplicates).",
+      "Cap: corpus is bounded at EVOR_WIKI_MAX_ENTRIES (default 500) most-recent entries."
+    ].join(" "),
     {
       run_id: external_exports.string().describe("Active run identifier"),
       entry: LessonEntrySchema.describe("LessonEntry to persist")
@@ -22380,7 +22520,13 @@ function registerWikiTools(server) {
   );
   server.tool(
     "evor_wiki_get_relevant",
-    "Retrieve the k most semantically-relevant wiki lessons for the given context string. Uses TF-IDF to surface lessons about related concepts even without exact keyword match. Prefer this over evor_wiki_query when looking for lessons about the current tick's approach, metric, or failure mode.",
+    [
+      "Retrieve the k most semantically-relevant wiki lessons for the given context string.",
+      "Uses TF-IDF (cached per-file-mtime) to surface lessons about related concepts",
+      "even without exact keyword match.",
+      "Prefer this over evor_wiki_query when looking for lessons about the current",
+      "tick's approach, metric, or failure mode."
+    ].join(" "),
     {
       run_id: external_exports.string(),
       context: external_exports.string().describe("Current tick context: approach, metric, error, or architecture name"),
@@ -22400,7 +22546,12 @@ function registerWikiTools(server) {
   );
   server.tool(
     "evor_wiki_query",
-    "Keyword search over .evor/wiki/index.jsonl; filter by approach_family and/or confirmed_only; cross-run scope.",
+    [
+      "Legacy keyword search over .evor/wiki/index.jsonl.",
+      "Filter by approach_family and/or confirmed_only; cross-run scope.",
+      "Prefer evor_wiki_get_relevant for semantic context-based retrieval;",
+      "use this tool only for exact keyword filtering or family/verdict narrowing."
+    ].join(" "),
     {
       run_id: external_exports.string().describe("Active run identifier (sets cross-run scope)"),
       query: external_exports.string().describe("Keyword or phrase to search"),
@@ -22427,8 +22578,8 @@ function registerWikiTools(server) {
 }
 
 // src/tools/state.ts
-var import_fs6 = require("fs");
-var import_path7 = require("path");
+var import_fs7 = require("fs");
+var import_path8 = require("path");
 var TickStateSchema = external_exports.object({
   tick: external_exports.number().int().min(0).describe("Current tick number"),
   current_step: external_exports.number().int().min(0).describe("Step within the tick (0-indexed)"),
@@ -22457,15 +22608,19 @@ var RunStatePatchSchema = external_exports.object({
   // ── Tick-state extension (spec §15B) ──────────────────────────────────────
   tick_state: TickStateSchema.optional().describe(
     "If set, atomically writes tick-state.json in the run directory; read by all agents to determine current tick and step progress"
+  ),
+  // ── P2-8: Forge attempt tracking ──────────────────────────────────────────
+  forge_attempt: external_exports.number().int().min(0).optional().describe(
+    "Number of Forge attempts made for the current node in this tick. Increment on each attempt; check with shouldAbortForge() before spawning a new one. Reset to 0 at the start of each new tick/node."
   )
 });
 function stateRead(runId, missionId) {
   const paths = resolveRunPaths(runId, missionId);
   const state = readRunState(paths.runStatePath, runId);
-  const tickStatePath = (0, import_path7.join)(paths.runDir, "tick-state.json");
-  if ((0, import_fs6.existsSync)(tickStatePath)) {
+  const tickStatePath = (0, import_path8.join)(paths.runDir, "tick-state.json");
+  if ((0, import_fs7.existsSync)(tickStatePath)) {
     try {
-      state.tick_state = JSON.parse((0, import_fs6.readFileSync)(tickStatePath, "utf8"));
+      state.tick_state = JSON.parse((0, import_fs7.readFileSync)(tickStatePath, "utf8"));
     } catch {
     }
   }
@@ -22490,49 +22645,49 @@ function stateWrite(runId, patch, missionId) {
   writeRunState(paths.runStatePath, updated);
   if (strategyDelta && Object.keys(strategyDelta).length > 0) {
     let currentStrategy = {};
-    if ((0, import_fs6.existsSync)(paths.strategyPath)) {
+    if ((0, import_fs7.existsSync)(paths.strategyPath)) {
       try {
-        currentStrategy = JSON.parse((0, import_fs6.readFileSync)(paths.strategyPath, "utf8"));
+        currentStrategy = JSON.parse((0, import_fs7.readFileSync)(paths.strategyPath, "utf8"));
       } catch {
       }
     }
     const updatedStrategy = { ...currentStrategy, ...strategyDelta };
     const strategyTmpPath = `${paths.strategyPath}.tmp`;
-    (0, import_fs6.writeFileSync)(strategyTmpPath, JSON.stringify(updatedStrategy, null, 2), "utf8");
-    (0, import_fs6.renameSync)(strategyTmpPath, paths.strategyPath);
+    (0, import_fs7.writeFileSync)(strategyTmpPath, JSON.stringify(updatedStrategy, null, 2), "utf8");
+    (0, import_fs7.renameSync)(strategyTmpPath, paths.strategyPath);
   }
   if (missionStatus !== void 0) {
-    const missionStatePath = (0, import_path7.join)(paths.runDir, "mission-state.json");
+    const missionStatePath = (0, import_path8.join)(paths.runDir, "mission-state.json");
     let ms = {};
-    if ((0, import_fs6.existsSync)(missionStatePath)) {
+    if ((0, import_fs7.existsSync)(missionStatePath)) {
       try {
-        ms = JSON.parse((0, import_fs6.readFileSync)(missionStatePath, "utf8"));
+        ms = JSON.parse((0, import_fs7.readFileSync)(missionStatePath, "utf8"));
       } catch {
       }
     }
     ms.status = missionStatus;
     ms.updated_at = (/* @__PURE__ */ new Date()).toISOString();
     const msTmp = `${missionStatePath}.tmp`;
-    (0, import_fs6.writeFileSync)(msTmp, JSON.stringify(ms, null, 2), "utf8");
-    (0, import_fs6.renameSync)(msTmp, missionStatePath);
+    (0, import_fs7.writeFileSync)(msTmp, JSON.stringify(ms, null, 2), "utf8");
+    (0, import_fs7.renameSync)(msTmp, missionStatePath);
   }
   if (activeRun !== void 0) {
     const evorRoot = getEvorRoot();
-    (0, import_fs6.mkdirSync)(evorRoot, { recursive: true });
+    (0, import_fs7.mkdirSync)(evorRoot, { recursive: true });
     const arPath = getActiveRunPath();
     const arTmp = `${arPath}.tmp`;
-    (0, import_fs6.writeFileSync)(arTmp, JSON.stringify(activeRun, null, 2), "utf8");
-    (0, import_fs6.renameSync)(arTmp, arPath);
+    (0, import_fs7.writeFileSync)(arTmp, JSON.stringify(activeRun, null, 2), "utf8");
+    (0, import_fs7.renameSync)(arTmp, arPath);
   }
   if (tickState !== void 0) {
-    const tickStatePath = (0, import_path7.join)(paths.runDir, "tick-state.json");
+    const tickStatePath = (0, import_path8.join)(paths.runDir, "tick-state.json");
     const tsData = {
       ...tickState,
       updated_at: tickState.updated_at ?? (/* @__PURE__ */ new Date()).toISOString()
     };
     const tsTmp = `${tickStatePath}.tmp`;
-    (0, import_fs6.writeFileSync)(tsTmp, JSON.stringify(tsData, null, 2), "utf8");
-    (0, import_fs6.renameSync)(tsTmp, tickStatePath);
+    (0, import_fs7.writeFileSync)(tsTmp, JSON.stringify(tsData, null, 2), "utf8");
+    (0, import_fs7.renameSync)(tsTmp, tickStatePath);
   }
   return updated;
 }
@@ -22566,8 +22721,8 @@ function checkPlateauCondition(runId, missionId) {
 }
 function readGoalContract(runId, missionId) {
   const paths = resolveRunPaths(runId, missionId);
-  const contractPath = (0, import_path7.join)(paths.runDir, "goal-contract.json");
-  if (!(0, import_fs6.existsSync)(contractPath)) {
+  const contractPath = (0, import_path8.join)(paths.runDir, "goal-contract.json");
+  if (!(0, import_fs7.existsSync)(contractPath)) {
     return {
       ok: false,
       error: `goal-contract.json not found at ${contractPath}`
@@ -22575,7 +22730,7 @@ function readGoalContract(runId, missionId) {
   }
   let raw;
   try {
-    raw = JSON.parse((0, import_fs6.readFileSync)(contractPath, "utf8"));
+    raw = JSON.parse((0, import_fs7.readFileSync)(contractPath, "utf8"));
   } catch (err2) {
     return {
       ok: false,
@@ -22666,70 +22821,6 @@ function registerStateTools(server) {
             text: JSON.stringify(
               result.ok ? { ok: true, run_id, contract: result.contract } : { error: result.error }
             )
-          }
-        ]
-      };
-    }
-  );
-}
-
-// src/tools/integrity.ts
-var import_fs7 = require("fs");
-var import_path8 = require("path");
-var frozenSplitHashCache = /* @__PURE__ */ new Map();
-function resolveIntegrityPaths(runDir, contract) {
-  return {
-    evalScript: (0, import_path8.join)(runDir, "eval-suites", `${contract.eval_version}.py`),
-    splitPath: (0, import_path8.join)(runDir, "frozen-splits", `${contract.eval_version}.json`)
-  };
-}
-function integrityCheck(runId, nodeId, missionId) {
-  const paths = resolveRunPaths(runId, missionId);
-  const bridgeArgs = [
-    "--run-id",
-    runId,
-    "--node-id",
-    nodeId,
-    "--run-dir",
-    paths.runDir
-  ];
-  try {
-    const contractPath = (0, import_path8.join)(paths.runDir, "goal-contract.json");
-    if ((0, import_fs7.existsSync)(contractPath)) {
-      const contract = JSON.parse((0, import_fs7.readFileSync)(contractPath, "utf8"));
-      if (contract.eval_version) {
-        const intPaths = resolveIntegrityPaths(paths.runDir, { eval_version: contract.eval_version });
-        bridgeArgs.push("--eval-script", intPaths.evalScript);
-        bridgeArgs.push("--split-path", intPaths.splitPath);
-        if (contract.locked_split_hash && !frozenSplitHashCache.has(runId)) {
-          frozenSplitHashCache.set(runId, contract.locked_split_hash);
-        }
-      }
-    }
-  } catch {
-  }
-  const result = callBridge("integrity_bridge.py", bridgeArgs);
-  if (!result.ok) {
-    return { ok: false, error: result.error, stderr: result.stderr };
-  }
-  return { ok: true, report: result.data };
-}
-function registerIntegrityTools(server) {
-  server.tool(
-    "evor_integrity_check",
-    "Auto-triggered by evor_record_eval; call explicitly only for re-checks or manual spot-checks. Runs all 13 IntegrityGate checks via integrity_bridge.py and writes IntegrityReport to evaluations/<node-id>.json. Checks: reward-hacking, split-purity, telemetry-sane, acquisition-provenance, grad-norm-health, loss-monotonic, eval-consistency, config-reproducibility, dataset-frozen, license-gate, leakage-probe, performance-ceiling, and coverage-gap.",
-    {
-      run_id: external_exports.string().describe("Active run identifier"),
-      node_id: external_exports.string().describe("Node to check")
-    },
-    async ({ run_id, node_id }) => {
-      const missionId = process.env.EVOR_MISSION_ID;
-      const result = integrityCheck(run_id, node_id, missionId);
-      return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify(result.ok ? result.report : result)
           }
         ]
       };
@@ -23597,7 +23688,7 @@ function ok(data) {
 function err(msg) {
   return { content: [{ type: "text", text: JSON.stringify({ error: msg }) }] };
 }
-function jobStart(nodeId, runId, runDir, worktree, evalVersion) {
+function jobStart(nodeId, runId, runDir, worktree, evalVersion, env) {
   const python = process.env.EVOR_PYTHON ?? "python3";
   const cmdArgs = [
     python,
@@ -23620,7 +23711,7 @@ function jobStart(nodeId, runId, runDir, worktree, evalVersion) {
     runDir,
     "--cmd-json",
     JSON.stringify(cmdArgs)
-  ]);
+  ], { extraEnv: env });
 }
 function jobStatus(jobId, runDir) {
   return callPythonModule("evor.jobs", [
@@ -23693,7 +23784,9 @@ function forgeDispatchBatch(runId, candidates, runDir, gpuFraction) {
   const fraction = gpuFraction ?? Math.min(1, 1 / n);
   const dispatched = [];
   for (const c of candidates) {
-    const res = jobStart(c.node_id, runId, runDir, c.worktree, c.eval_version);
+    const res = jobStart(c.node_id, runId, runDir, c.worktree, c.eval_version, {
+      EVOR_GPU_FRACTION: String(fraction)
+    });
     const jobData = res.data;
     dispatched.push({
       node_id: c.node_id,
@@ -24325,6 +24418,150 @@ function registerGotchaTools(server) {
   );
 }
 
+// src/tools/proposals.ts
+var ProposalInputSchema = external_exports.object({
+  proposal_id: external_exports.string().describe("Unique ID for this proposal (correlates results)"),
+  parent_node_ids: external_exports.array(external_exports.string()).min(1).describe("Parent node IDs; first element is the primary lineage parent"),
+  approach_family: external_exports.string().describe("Approach family (arch, training, data-curation, augmentation, regularization, other)"),
+  hypothesis: external_exports.object({
+    prediction: external_exports.string().describe("Expected improvement claim \u2014 must contain a quantified metric for H001")
+  }).passthrough().describe("Proposal hypothesis; prediction field evaluated for H001"),
+  wildness: external_exports.number().min(0).max(1).describe("Proposal wildness score in [0, 1]; >= 0.8 forces needs_llm"),
+  is_acquisition: external_exports.boolean().optional().describe("True \u2192 acquisition proposal; always routes to needs_llm regardless of other gates")
+});
+var StrategyContextSchema = external_exports.object({
+  winning_families: external_exports.array(external_exports.string()).optional().describe(
+    "Ordered list of approach families that won recent ticks; last 3 used for H002 streak check"
+  )
+}).passthrough();
+function gateH001(prediction) {
+  if (!prediction?.trim()) return "fail";
+  const QUANTIFIED = /\d+(\.\d+)?\s*(%|×|x\b|bps|pp\b|pts\b|ms\b|s\b)/i;
+  const HAS_DIGIT = /\d/.test(prediction);
+  if (!HAS_DIGIT) return "fail";
+  if (QUANTIFIED.test(prediction)) return "pass";
+  if (prediction.trim().length >= 10) return "pass";
+  return "fail";
+}
+function gateH002(family, winningFamilies) {
+  const last3 = winningFamilies.slice(-3);
+  if (last3.length < 3) return "pass";
+  const allSame = last3.every((f) => f === last3[0]);
+  if (allSame && last3[0] === family) return "fail";
+  return "pass";
+}
+function gateH003(family, familiesSeenSoFar) {
+  return familiesSeenSoFar.has(family) ? "fail" : "pass";
+}
+function gateH004(primaryParentId, parentShareCounts, N) {
+  const share = parentShareCounts.get(primaryParentId) ?? 0;
+  return share <= Math.floor(N / 2) ? "pass" : "fail";
+}
+function gateSchema(proposal) {
+  const { proposal_id, parent_node_ids, approach_family, hypothesis, wildness } = proposal;
+  if (!proposal_id?.trim()) return "fail";
+  if (!parent_node_ids?.length) return "fail";
+  if (!approach_family?.trim()) return "fail";
+  if (!hypothesis?.prediction?.trim()) return "fail";
+  if (typeof wildness !== "number" || wildness < 0 || wildness > 1) return "fail";
+  return "pass";
+}
+function validateProposals(proposals, strategy) {
+  const N = proposals.length;
+  const winningFamilies = strategy.winning_families ?? [];
+  const parentShareCounts = /* @__PURE__ */ new Map();
+  for (const p of proposals) {
+    const primary = p.parent_node_ids[0] ?? "";
+    parentShareCounts.set(primary, (parentShareCounts.get(primary) ?? 0) + 1);
+  }
+  const familiesSeen = /* @__PURE__ */ new Set();
+  const results = proposals.map((proposal) => {
+    const schemaGate = gateSchema(proposal);
+    if (schemaGate === "fail") {
+      return {
+        proposal_id: proposal.proposal_id,
+        h001: "fail",
+        h002: "fail",
+        h003: "fail",
+        h004: "fail",
+        schema: "fail",
+        verdict: "reject",
+        reason: "schema: required field(s) null or empty"
+      };
+    }
+    const h001 = gateH001(proposal.hypothesis.prediction);
+    const h002 = gateH002(proposal.approach_family, winningFamilies);
+    const h003 = gateH003(proposal.approach_family, familiesSeen);
+    const primaryParent = proposal.parent_node_ids[0] ?? "";
+    const h004 = gateH004(primaryParent, parentShareCounts, N);
+    familiesSeen.add(proposal.approach_family);
+    const isAcquisition = proposal.is_acquisition === true;
+    const hardFail = h001 === "fail";
+    const softFail = h002 === "fail" || h003 === "fail" || h004 === "fail";
+    const highWildness = proposal.wildness >= 0.8;
+    let verdict;
+    let reason;
+    if (hardFail) {
+      verdict = "reject";
+      reason = "h001: prediction contains no quantified metric claim";
+    } else if (isAcquisition) {
+      verdict = "needs_llm";
+      reason = "acquisition proposal \u2014 always requires LLM judgment";
+    } else if (softFail) {
+      const failing = [
+        h002 === "fail" ? "h002(streak)" : null,
+        h003 === "fail" ? "h003(duplicate-family)" : null,
+        h004 === "fail" ? "h004(champion-share)" : null
+      ].filter(Boolean).join(", ");
+      verdict = "needs_llm";
+      reason = `gate(s) failed: ${failing}`;
+    } else if (highWildness) {
+      verdict = "needs_llm";
+      reason = `wildness=${proposal.wildness.toFixed(2)} >= 0.8; LLM review required`;
+    } else {
+      verdict = "pass";
+      reason = "all structural gates pass; Selector LLM may be skipped";
+    }
+    return {
+      proposal_id: proposal.proposal_id,
+      h001,
+      h002,
+      h003,
+      h004,
+      schema: schemaGate,
+      verdict,
+      reason
+    };
+  });
+  const pass_count = results.filter((r) => r.verdict === "pass").length;
+  const needs_llm_count = results.filter((r) => r.verdict === "needs_llm").length;
+  const reject_count = results.filter((r) => r.verdict === "reject").length;
+  return { results, total: N, pass_count, needs_llm_count, reject_count };
+}
+function registerProposalTools(server) {
+  server.tool(
+    "evor_validate_proposals",
+    "Deterministic structural gate for Mutagen proposals \u2014 runs H001\u2013H004 + schema checks in code before any Selector LLM is invoked. H001: hypothesis.prediction contains a quantified metric claim (digit + unit). H002: approach_family is not in a pure 3-tick win-streak (strategy.winning_families). H003: each approach_family appears at most once within this tick's batch. H004: no single primary parent provides more than floor(N/2) proposals. verdict='pass' \u2192 all gates pass + wildness<0.8 + not acquisition; Selector LLM safe to skip. verdict='needs_llm' \u2192 borderline; must route to Selector for full judgment. verdict='reject' \u2192 hard structural failure (no digit in prediction or missing fields); discard. Call this BEFORE spawning the Selector agent each tick to cut LLM cost on clean proposals.",
+    {
+      proposals: external_exports.array(ProposalInputSchema).min(1).describe("Proposals to validate; results are returned in the same order"),
+      strategy: StrategyContextSchema.describe(
+        "Current strategy context; winning_families used for H002 streak check"
+      )
+    },
+    async ({ proposals, strategy }) => {
+      const summary = validateProposals(proposals, strategy);
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({ ok: true, ...summary })
+          }
+        ]
+      };
+    }
+  );
+}
+
 // src/index.ts
 var EVOR_INSTRUCTIONS = "Evor runs an autonomous ML-research evolution: it evolves a model+dataset by mutation tree search under integrity gates. USE these evor_* tools whenever a mission is being set up, run, resumed, or inspected \u2014 any time you change or read .evor state, record a node/eval, launch or check a training run, write or read a tick artifact, cite a paper, emit/query a signal, or manage the run. These evor_* tools are the only sanctioned way to operate a run; do not author .evor state files by hand. Search for them whenever an evor run is active. Core loop: evor_init_run -> evor_record_node -> evor_run_start (async; watch with the native Monitor tool) -> evor_run_status -> evor_record_eval -> evor_integrity_check -> evor_wiki_add. Read upstream tick artifacts with evor_read_artifact before acting. Full catalog, lifecycle recipes, and artifact schemas: invoke the `oh-my-evor:evor-mcp` skill.";
 async function main() {
@@ -24349,6 +24586,7 @@ async function main() {
   registerLineageTools(server);
   registerComputeTools(server);
   registerGotchaTools(server);
+  registerProposalTools(server);
   const transport = new StdioServerTransport();
   await server.connect(transport);
   process.on("SIGINT", async () => {
