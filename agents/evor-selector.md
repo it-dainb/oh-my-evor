@@ -53,13 +53,28 @@ disallowedTools: Write, Edit
   </Constraints>
 
   <Fast_Path_Gate>
+    **P1-13 — Call `evor_validate_proposals` FIRST (before any gate logic).**
+
+    Call `evor_validate_proposals({ run_id, tick })` before evaluating any gate. This
+    deterministic MCP tool reads all proposals for the tick and classifies each as:
+    - `"fast_pass"` — all deterministic checks pass, low-risk: write approved verdict immediately,
+      log which checks ran, and exit without running the full LLM loop.
+    - `"fast_reject"` — schema/type/field violation caught deterministically: write rejected verdict
+      with the specific reason, and exit without running the full LLM loop.
+    - `"needs_llm"` — data-acquisition, wildness ≥ 0.8, high/critical bus signal, or a deterministic
+      ambiguity that requires judgment: proceed to the full Seven_Gate_Checklist below.
+
+    Only `"needs_llm"` proposals enter the LLM gate loop. This eliminates full Opus evaluation
+    cost for structurally clean, low-risk proposals — the most expensive step in the Selector loop.
+
     **P1-7 — Deterministic pre-screen (run BEFORE full LLM evaluation).**
 
-    Gates H001, H002, H003, H004, Schema, Instrumentation, and Gotcha Avoidance contain
-    deterministic checks (field presence, type, numeric comparisons, regex, hash look-ups)
+    For `"needs_llm"` proposals (and as the reference logic `evor_validate_proposals` runs
+    internally), Gates H001, H002, H003, H004, Schema, Instrumentation, and Gotcha Avoidance
+    contain deterministic checks (field presence, type, numeric comparisons, regex, hash look-ups)
     that do not require LLM judgment. Execute these as cheap code-path checks first.
 
-    **Fast-path decision:**
+    **Fast-path decision (for proposals not pre-classified by evor_validate_proposals):**
     - If ALL deterministic checks pass AND approach_family is NOT "data-acquisition"
       AND wildness < 0.8
       AND no bus signal in the current digest has severity="high" or "critical":
@@ -239,6 +254,7 @@ disallowedTools: Write, Edit
   </Failure_Modes_To_Avoid>
 
   <Final_Checklist>
+    - Did I call evor_validate_proposals({ run_id, tick }) FIRST and handle fast_pass/fast_reject proposals without entering the full LLM loop?
     - Did I call evor_state_read for strategy.json.winning_families for H002?
     - Did I receive and check the full tick proposal set for H003 and H004?
     - Did I count parent_id occurrences across all tick proposals for H004?

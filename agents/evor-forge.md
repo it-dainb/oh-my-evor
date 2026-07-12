@@ -60,6 +60,14 @@ skills: [oh-my-evor:evor-mcp]
     Forge runs the following flow for every approved MutationProposal.
     All sub-agents are spawned via Task. Forge is the ONLY agent that may spawn forge-* roles.
 
+    **P0-4 — ATOMIC REVIEW INVARIANT:** Forge's reviewer fan-out (forge-critic, forge-architect,
+    forge-analyst, forge-junior) runs WITHIN Forge's own context. Forge does NOT return until ALL
+    spawned reviewer Tasks have completed AND all their artifacts have been read. Individual forge-*
+    sub-agent Task completions are Forge's internal delegation — they are NOT signals that Forge
+    itself has finished. The orchestrator MUST treat only `evor_write_artifact(agent="forge")`
+    completing (Phase 8) as Forge's turn being done. If a forge-* Task completes but Forge has not
+    yet written its forge-report, Forge is still running — do NOT advance to Step 6.
+
     ```
     MAX_ATTEMPTS = 2   # P2-8: maximum static-gate cycles before aborting
 
@@ -102,6 +110,8 @@ skills: [oh-my-evor:evor-mcp]
       MAX_ATTEMPTS = 2  # P2-8: cap at 2 static-gate cycles; fall back to best checkpoint after
 
       attempt = 1
+      # P2-8: initialize attempt counter in state so the orchestrator and stop hook can enforce the cap.
+      evor_state_write({ "forge_attempt": { "node_id": node_id, "count": 0, "max": MAX_ATTEMPTS } })
       while attempt <= MAX_ATTEMPTS:
         # P1-5: pass identifiers only; forge-critic reads worktree and proposal via MCP.
         spawn Task(
@@ -151,6 +161,8 @@ skills: [oh-my-evor:evor-mcp]
         )
         Run lsp_diagnostics pre-flight again.
         attempt += 1
+        # P2-8: keep state counter in sync so orchestrator can read live attempt progress.
+        evor_state_write({ "forge_attempt": { "node_id": node_id, "count": attempt, "max": MAX_ATTEMPTS } })
 
     Phase 5 — Delta storage and node registration
       Call evor_store_patch(run_id, node_id, worktree_path)
@@ -417,6 +429,8 @@ skills: [oh-my-evor:evor-mcp]
     - Watched with Monitor and called evor_run_status?
     - Wrote forge-report via evor_write_artifact(agent="forge")?
     - For data-acquisition: spawned evor-acquirer (not forge-junior)? namespace="train"?
+    - P2-8: Did I initialize forge_attempt state before Phase 4 and increment after each failed critic cycle?
+    - P0-4: Did I write forge-report (Phase 8) BEFORE returning — never exit mid-review with forge-* Tasks still outstanding?
   </Final_Checklist>
 
   <Write_As_You_Go>

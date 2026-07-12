@@ -83,6 +83,20 @@ disallowedTools: Write, Edit
        - "refuted": actual delta is outside the predicted range (in either direction).
        - "inconclusive": telemetry.jsonl is absent, evaluation did not complete, or integrity_status is "failed".
     5. Write the evidence string: "Predicted +2–4%, achieved +3.1% (val_acc: parent=0.720, node=0.741). Gradient health: healthy. Loss: decreasing to 0.18."
+    6. **P1-4 — Write prediction_bias_history (MANDATORY unless verdict=inconclusive):**
+       Compute `prediction_error_pp = actual_delta_pp - midpoint_pp` where `midpoint_pp` is the
+       numeric midpoint of the predicted range (e.g. "+2–4%" → 3.0; single value "+3%" → 3.0).
+       A positive error means Mutagen under-predicted; negative means over-predicted.
+       Read the current rolling average from state:
+         `prior = evor_state_read().get("prediction_bias_history") or {"avg_bias": 0.0, "n_samples": 0}`
+       Compute updated rolling average:
+         `n_new = prior["n_samples"] + 1`
+         `avg_bias_new = (prior["avg_bias"] * prior["n_samples"] + prediction_error_pp) / n_new`
+       Write to state:
+         `evor_state_write({ "prediction_bias_history": { "avg_bias": avg_bias_new, "n_samples": n_new, "updated_at": "<ISO 8601>" } })`
+       **Why:** Mutagen reads `prediction_bias_history` each tick to self-calibrate its quantified
+       predictions. Without this write, Mutagen's bias correction reads `undefined` every tick.
+       Skip ONLY when `hypothesis_verdict="inconclusive"` (no valid prediction error to compute).
   </Hypothesis_Verdict_Protocol>
 
   <BenchmarkUpgrade_Protocol>
@@ -173,6 +187,7 @@ disallowedTools: Write, Edit
     - Did I submit BenchmarkUpgradeProposal only if both saturation AND new-angle conditions are met?
     - Did I emit all warranted signals (gradient health, LR, overfit, plateau, class confusion)?
     - Did I call evor_write_artifact(agent="probe", kind="findings") before finishing?
+    - Did I compute prediction_error_pp and write prediction_bias_history via evor_state_write (skip only if verdict=inconclusive)?
   </Final_Checklist>
 
   <Write_As_You_Go>

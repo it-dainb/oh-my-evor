@@ -213,10 +213,13 @@ For each MutationProposal returned by Mutagen:
 
 ## Step 4 — Critique
 
+**P1-7/P1-13 — Deterministic pre-screen before spawning Selector:**
+Call `evor_validate_proposals({ run_id, tick })` to run deterministic checks (field presence, numeric types, schema, H001/H002/H003/H004 fast-path) on all proposals BEFORE spawning Selector. The result classifies each proposal as `"fast_pass"`, `"fast_reject"`, or `"needs_llm"`. Pass the classification result in Selector's spawn prompt. Selector skips full LLM gate evaluation for `fast_pass` proposals (write approved verdict immediately) and only runs the complete 7-gate loop for `needs_llm` ones. `fast_reject` proposals are dropped before Selector is invoked. This eliminates full LLM evaluation cost for structurally clean, low-risk proposals.
+
 Spawn Selector as a REAL sub-agent in a SEPARATE context. Do NOT approve/reject proposals yourself —
 the whole point is an independent critic that did not generate the proposals it gates.
 
-`Task(subagent_type="oh-my-evor:evor-selector", description="Tick <n> gate", prompt="Run dir: <run_dir>. Tick: <n>. Evaluate all 6 gates for every proposal in ticks/<n>/mutagen/proposals.json against strategy.json, and write ticks/<n>/selector/verdict.json.")`.
+`Task(subagent_type="oh-my-evor:evor-selector", description="Tick <n> gate", prompt="Run dir: <run_dir>. Tick: <n>. Evaluate all gates for every proposal in ticks/<n>/mutagen/proposals.json against strategy.json. evor_validate_proposals result: <classification_json>. fast_pass proposals: write approved verdict immediately. needs_llm proposals: run full 7-gate evaluation. Write ticks/<n>/selector/verdict.json.")`.
 - **POST-CONDITION:** call `evor_read_artifact({ run_id, tick: n, agent: "selector" })`. If it returns `{error:"not found"}`, re-spawn Selector.
 - Read the verdict; collect approved proposals. If zero pass, trigger Doom-Loop_Detection.
 - The rejection reasons are already in the verdict artifact; append a DecisionLogEntry summarizing them via `evor_state_write`.
@@ -228,6 +231,7 @@ For each approved proposal, spawn Forge as a REAL sub-agent. Do NOT write or run
 `Task(subagent_type="oh-my-evor:evor-forge", description="Implement <node_id>", prompt="Run dir: <run_dir>. Tick: <n>. Node: <node_id>. Materialize the genome for proposal <id>, instrument telemetry via EVOR_TELEMETRY_PATH env-path append, store the delta, run the harness/training, and write ticks/<n>/forge/forge-report.json plus nodes/<node_id>/results.json and telemetry.")`.
 - **POST-CONDITION:** call `evor_read_artifact({ run_id, tick: n, agent: "forge" })`. If it returns `{error:"not found"}`, re-spawn Forge.
 - If parallel teams available: launch Forge Tasks concurrently; use `Monitor` for job_complete. Otherwise run one at a time.
+- **P0-4 — Forge atomic completion contract:** `evor_read_artifact({ run_id, tick: n, agent: "forge" })` returning successfully is the ONLY signal that Forge's full turn is done. Individual forge-* sub-agent completions (forge-critic, forge-architect, forge-analyst, forge-junior completing their Tasks) are Forge's INTERNAL delegation — they are NOT signals that Forge itself has finished. Do NOT advance to Step 6 until the forge-report artifact is confirmed present. Treating a forge-critic or forge-analyst Task completion as "Forge done" is a protocol violation that corrupts the tick.
 - Then YOU (orchestrator) call `evor_record_node` to register each new TreeNode in tree.json, and append a DecisionLogEntry (decision_type="implement", node_ids=[node_id]) via `evor_state_write`.
 - **The node MUST appear in tree.json before you advance.** Training a candidate without recording it is a FAILED tick (the Stop hook enforces this).
 
@@ -252,6 +256,23 @@ For each node where integrity_status="passed", spawn Probe as a REAL sub-agent. 
 - **POST-CONDITION:** call `evor_read_artifact({ run_id, tick: n, agent: "probe" })`. If it returns `{error:"not found"}`, re-spawn Probe.
 - Read the LessonEntry from the artifact; call `evor_wiki_add(run_id, lesson_entry)` to persist it.
 - Update node.lesson_ids with the returned lesson_id.
+
+**P1-4 — Prediction bias tracking (close the producer gap; Mutagen reads this every tick):**
+After the probe artifact is confirmed, extract `actual_delta_pp` (the numeric metric change Probe measured) and compare against the `predicted_range` midpoint from the original MutationProposal hypothesis (e.g. "+2–4%" → midpoint=3.0). Compute `prediction_error = actual_delta_pp - midpoint_pp`. Then:
+```
+prior = evor_state_read().get("prediction_bias_history") or {"avg_bias": 0.0, "n_samples": 0}
+n_new = prior["n_samples"] + 1
+avg_bias_new = (prior["avg_bias"] * prior["n_samples"] + prediction_error) / n_new
+evor_state_write({
+  "prediction_bias_history": {
+    "avg_bias": avg_bias_new,
+    "n_samples": n_new,
+    "updated_at": "<ISO 8601>"
+  }
+})
+```
+Skip this write ONLY when `hypothesis_verdict="inconclusive"` (no valid prediction error). Mutagen reads `prediction_bias_history` each tick to self-calibrate its quantified predictions — this write is mandatory.
+
 - If Probe returns a BenchmarkUpgradeProposal:
   - Log it as a DecisionLogEntry (decision_type="meta-evolve") via `evor_state_write`.
   - Apply the benchmark upgrade.
@@ -372,7 +393,11 @@ tick-state makes every tick resumable at the step level — an interrupted tick 
 </Tick_Lifecycle>
 
 <Meta_Evolution>
-Every `strategy.json.meta_loop_interval` ticks (default 5), call `evor_meta_evolve({ run_id })` to update strategy.json fields: ucb1_c, wildness, family_mix, meta_iteration. Log as DecisionLogEntry(decision_type="meta-evolve", strategy_delta=delta) via `evor_state_write`.
+**Adaptive meta-evolve trigger (P1-3):** At the end of Step 9 (after promote/prune), ALWAYS call `evor_check_plateau({ run_id })` first:
+- If `plateau=true` OR `consecutive_regression=true` in the result → call `evor_meta_evolve({ run_id })` IMMEDIATELY, regardless of the tick interval. Log as DecisionLogEntry(decision_type="meta-evolve", rationale="plateau/regression-triggered", strategy_delta=delta) via `evor_state_write`.
+- Otherwise → check the fixed interval: if `(tick_count % strategy.meta_loop_interval) == 0` → call `evor_meta_evolve({ run_id })` and log normally.
+
+Every `strategy.json.meta_loop_interval` ticks (default 5) — fixed-interval fallback if no plateau/regression detected. Update strategy.json fields: ucb1_c, wildness, family_mix, meta_iteration. Log as DecisionLogEntry(decision_type="meta-evolve", strategy_delta=delta) via `evor_state_write`.
 
 If a BenchmarkUpgrade was recently applied (post_upgrade_exploration_ticks > 0):
 - Override wildness to strategy.post_upgrade_exploration_boost for post_upgrade_exploration_ticks remaining ticks.
