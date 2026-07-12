@@ -8,7 +8,7 @@ import { join } from "path";
 import { tmpdir } from "os";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 
-import { wikiAdd, wikiQuery } from "../src/tools/wiki.js";
+import { wikiAdd, wikiQuery, wikiGetRelevant } from "../src/tools/wiki.js";
 import type { LessonEntry } from "../src/contracts.js";
 
 // ── Fixture ──────────────────────────────────────────────────────────────────
@@ -215,5 +215,92 @@ describe("wikiQuery", () => {
 
     const results = wikiQuery("cosine_annealing");
     expect(results).toHaveLength(1);
+  });
+});
+
+// ── wikiGetRelevant ──────────────────────────────────────────────────────────
+
+describe("wikiGetRelevant", () => {
+  it("returns empty array when index.jsonl is absent", () => {
+    expect(wikiGetRelevant("binarization threshold", 5)).toEqual([]);
+  });
+
+  it("returns empty array when context shares no terms with any entry", () => {
+    const runId = "run-rel-001";
+    wikiAdd(runId, makeEntry({ observation: "spatial attention heads improve accuracy", tags: ["attention"] }), "test-mission");
+    wikiAdd(runId, makeEntry({ observation: "dropout reduces overfitting", tags: ["regularization"] }), "test-mission");
+
+    const results = wikiGetRelevant("zxqy foobar quux", 5);
+    expect(results).toEqual([]);
+  });
+
+  it("returns top-k entries ranked by TF-IDF similarity, not raw keyword count", () => {
+    const runId = "run-rel-002";
+    // high entry: rare term "binarization" appears → high IDF weight
+    const high = makeEntry({
+      observation: "binarization threshold tuning is critical for binary classification",
+      actionable_lesson: "tune binarization cutoff carefully",
+      tags: ["binarization", "binary"],
+    });
+    // low entry: common term "learning" appears many times but IDF is low in corpus
+    const low = makeEntry({
+      observation: "learning rate learning rate learning rate schedule matters",
+      actionable_lesson: "adjust learning rate for convergence",
+      tags: ["learning"],
+    });
+    // filler: unrelated
+    const filler = makeEntry({
+      observation: "batch normalization helps gradient flow",
+      tags: ["normalization"],
+    });
+    wikiAdd(runId, high, "test-mission");
+    wikiAdd(runId, low, "test-mission");
+    wikiAdd(runId, filler, "test-mission");
+
+    const results = wikiGetRelevant("binarization binary threshold", 3);
+    expect(results.length).toBeGreaterThan(0);
+    // The binarization-tagged entry must rank first
+    expect(results[0].lesson_id).toBe(high.lesson_id);
+  });
+
+  it("k=2 returns exactly 2 entries", () => {
+    const runId = "run-rel-003";
+    for (let i = 0; i < 5; i++) {
+      wikiAdd(runId, makeEntry({ observation: "dropout regularization reduces overfitting", tags: ["dropout"] }), "test-mission");
+    }
+    const results = wikiGetRelevant("dropout regularization", 2);
+    expect(results).toHaveLength(2);
+  });
+
+  it("cross-domain match: context 'binarization' ranks binary-tagged lesson above regression-tagged", () => {
+    const runId = "run-rel-004";
+    const binaryLesson = makeEntry({
+      observation: "binary classification threshold selection matters for precision recall",
+      actionable_lesson: "use binary cross-entropy loss for two-class problems",
+      tags: ["binary", "classification"],
+    });
+    const regressionLesson = makeEntry({
+      observation: "regression loss convergence depends on output scale normalization",
+      actionable_lesson: "normalize targets before regression training",
+      tags: ["regression", "normalization"],
+    });
+    wikiAdd(runId, binaryLesson, "test-mission");
+    wikiAdd(runId, regressionLesson, "test-mission");
+
+    // "binarization" is not an exact keyword in either entry, but "binary" shares stem
+    const results = wikiGetRelevant("binarization binary threshold", 5);
+    expect(results.length).toBeGreaterThan(0);
+    expect(results[0].lesson_id).toBe(binaryLesson.lesson_id);
+  });
+
+  it("returns fewer than k entries when wiki has fewer matching documents", () => {
+    const runId = "run-rel-005";
+    wikiAdd(runId, makeEntry({ observation: "cosine annealing schedule for learning rate", tags: ["cosine"] }), "test-mission");
+    wikiAdd(runId, makeEntry({ observation: "unrelated batch size tuning experiment" }), "test-mission");
+
+    // Only 1 of 2 entries should match "cosine annealing" with nonzero similarity
+    const results = wikiGetRelevant("cosine annealing", 5);
+    expect(results.length).toBeGreaterThanOrEqual(1);
+    expect(results[0].tags).toContain("cosine");
   });
 });

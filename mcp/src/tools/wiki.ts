@@ -181,6 +181,123 @@ export function wikiQuery(
   return scored.slice(0, limit).map((s) => s.entry);
 }
 
+// ── TF-IDF helpers ─────────────────────────────────────────────────────────
+
+/** Tokenize text: split on non-alpha chars, lowercase, drop tokens shorter than 2 chars. */
+function tokenize(text: string): string[] {
+  return text
+    .toLowerCase()
+    .split(/[^a-z]+/)
+    .filter((t) => t.length >= 2);
+}
+
+/** Build a term-frequency map from a token list. */
+function termFreq(tokens: string[]): Map<string, number> {
+  const tf = new Map<string, number>();
+  for (const t of tokens) {
+    tf.set(t, (tf.get(t) ?? 0) + 1);
+  }
+  return tf;
+}
+
+/** Cosine similarity between two TF-IDF vectors (both represented as Map<term, weight>). */
+function cosineSim(a: Map<string, number>, b: Map<string, number>): number {
+  let dot = 0;
+  let normA = 0;
+  let normB = 0;
+  for (const [term, wa] of a) {
+    const wb = b.get(term) ?? 0;
+    dot += wa * wb;
+    normA += wa * wa;
+  }
+  for (const wb of b.values()) {
+    normB += wb * wb;
+  }
+  if (normA === 0 || normB === 0) return 0;
+  return dot / (Math.sqrt(normA) * Math.sqrt(normB));
+}
+
+/**
+ * Retrieve the k most semantically-relevant wiki lessons for a given context string.
+ *
+ * Uses smooth TF-IDF (sklearn default: IDF = log((N+1)/(df+1)) + 1) and cosine
+ * similarity to rank entries. Entries with zero cosine similarity are excluded.
+ * Sort order: highest similarity first; newest created_at as tiebreaker.
+ */
+export function wikiGetRelevant(context: string, k: number): LessonEntry[] {
+  const evorRoot = getEvorRoot();
+  const indexPath = join(evorRoot, "wiki", "index.jsonl");
+
+  if (!existsSync(indexPath)) {
+    return [];
+  }
+
+  // Parse all entries
+  const entries: LessonEntry[] = [];
+  for (const line of readFileSync(indexPath, "utf8").split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    try {
+      entries.push(LessonEntrySchema.parse(JSON.parse(trimmed)));
+    } catch {
+      continue;
+    }
+  }
+
+  if (entries.length === 0) return [];
+
+  const N = entries.length;
+
+  // Build per-entry token lists from all searchable fields
+  const entryTokens: string[][] = entries.map((e) =>
+    tokenize(
+      [e.observation, e.actionable_lesson, e.root_cause ?? "", e.tags.join(" ")].join(" ")
+    )
+  );
+
+  // Compute document frequency for each term across the corpus
+  const df = new Map<string, number>();
+  for (const tokens of entryTokens) {
+    for (const term of new Set(tokens)) {
+      df.set(term, (df.get(term) ?? 0) + 1);
+    }
+  }
+
+  // Helper: build TF-IDF vector for a token list
+  const tfidfVec = (tokens: string[]): Map<string, number> => {
+    const tf = termFreq(tokens);
+    const vec = new Map<string, number>();
+    for (const [term, count] of tf) {
+      const idf = Math.log((N + 1) / ((df.get(term) ?? 0) + 1)) + 1;
+      vec.set(term, count * idf);
+    }
+    return vec;
+  };
+
+  // Build TF-IDF vector for the query context
+  const queryVec = tfidfVec(tokenize(context));
+
+  if (queryVec.size === 0) return [];
+
+  // Score each entry
+  const scored: Array<{ sim: number; createdAt: string; entry: LessonEntry }> = [];
+  for (let i = 0; i < entries.length; i++) {
+    const entryVec = tfidfVec(entryTokens[i]);
+    const sim = cosineSim(queryVec, entryVec);
+    if (sim > 0) {
+      scored.push({ sim, createdAt: entries[i].created_at, entry: entries[i] });
+    }
+  }
+
+  // Sort: highest similarity first, then newest created_at as tiebreaker
+  scored.sort((a, b) => {
+    if (b.sim !== a.sim) return b.sim - a.sim;
+    return b.createdAt.localeCompare(a.createdAt);
+  });
+
+  return scored.slice(0, k).map((s) => s.entry);
+}
+
 // ── Tool registrations ──────────────────────────────────────────────────────
 
 export function registerWikiTools(server: McpServer): void {
@@ -200,6 +317,28 @@ export function registerWikiTools(server: McpServer): void {
           {
             type: "text" as const,
             text: JSON.stringify({ ok: true, lesson_id: lessonId, run_id, index_path: indexPath }),
+          },
+        ],
+      };
+    }
+  );
+
+  // ── evor_wiki_get_relevant ─────────────────────────────────────────────────
+  server.tool(
+    "evor_wiki_get_relevant",
+    "Retrieve the k most semantically-relevant wiki lessons for the given context string. Uses TF-IDF to surface lessons about related concepts even without exact keyword match. Prefer this over evor_wiki_query when looking for lessons about the current tick's approach, metric, or failure mode.",
+    {
+      run_id: z.string(),
+      context: z.string().describe("Current tick context: approach, metric, error, or architecture name"),
+      k: z.number().int().positive().optional().describe("Max results, default 5"),
+    },
+    async ({ run_id, context, k }) => {
+      const lessons = wikiGetRelevant(context, k ?? 5);
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: JSON.stringify({ lessons, run_id, context, count: lessons.length }),
           },
         ],
       };
