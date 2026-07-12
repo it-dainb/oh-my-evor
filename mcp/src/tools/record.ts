@@ -6,6 +6,7 @@
 
 import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "fs";
 import { join } from "path";
+import { randomUUID } from "crypto";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { TreeNode, TreeNodeSchema, EvaluationResultSchema } from "../contracts.js";
@@ -51,6 +52,18 @@ export function writeRunState(runStatePath: string, state: Record<string, unknow
 }
 
 // ── Core logic (exported for tests) ────────────────────────────────────────
+
+/**
+ * Fill node.id with a fresh UUID if the caller omitted it (P2-1).
+ * The internal TreeNode type still requires id; callers that construct nodes
+ * programmatically can skip the shell-out to `python -c "import uuid; …"`.
+ */
+export function fillNodeId(node: Partial<TreeNode> & Omit<TreeNode, "id">): TreeNode {
+  if (!node.id) {
+    return { ...node, id: randomUUID() } as TreeNode;
+  }
+  return node as TreeNode;
+}
 
 /**
  * Record a TreeNode into tree.json, clear it from pending_node_ids, and
@@ -126,22 +139,22 @@ export function recordEval(
     integrityError = integrityResult.error ?? "integrity bridge failed";
   }
 
-  // Write the integrity verdict back to the node's integrity_status field in tree.json.
-  // Without this, tree.json nodes stay "pending" forever even after the gate runs.
-  if (integrityVerdict === "passed" || integrityVerdict === "failed") {
-    try {
-      const nodes = readTree(runId, missionId);
-      const node = nodes[nodeId];
-      if (node) {
-        upsertNode(runId, {
-          ...node,
-          integrity_status: integrityVerdict as "passed" | "failed",
-        }, missionId);
+  // Cascade status → "done" and write integrity_status back to tree.json.
+  // Without this, tree nodes stay status="running" forever after Forge writes results —
+  // the orchestrator had to call evor_record_node 4+ extra times per run to fix it (P0-5).
+  try {
+    const nodes = readTree(runId, missionId);
+    const node = nodes[nodeId];
+    if (node) {
+      const updates: Partial<TreeNode> = { status: "done" };
+      if (integrityVerdict === "passed" || integrityVerdict === "failed") {
+        updates.integrity_status = integrityVerdict as "passed" | "failed";
       }
-    } catch {
-      // Non-fatal: if tree.json cannot be updated the run continues; the
-      // orchestrator can re-check integrity explicitly via evor_integrity_check.
+      upsertNode(runId, { ...node, ...updates }, missionId);
     }
+  } catch {
+    // Non-fatal: if tree.json cannot be updated the run continues; the
+    // orchestrator can re-check integrity explicitly via evor_integrity_check.
   }
 
   return { resultsPath, integrityVerdict, integrityError };
@@ -151,23 +164,32 @@ export function recordEval(
 
 export function registerRecordTools(server: McpServer): void {
   // ── evor_record_node ───────────────────────────────────────────────────────
+  // node.id is optional here so callers can omit it — fillNodeId auto-generates
+  // a UUID (P2-1), saving the orchestrator a shell-out turn per node.
+  const RecordNodeInputSchema = TreeNodeSchema.extend({
+    id: z.string().uuid().optional().describe(
+      "Node UUID; auto-generated if omitted (saves a shell-out to python -c 'import uuid; …')",
+    ),
+  });
   server.tool(
     "evor_record_node",
-    "Validate a TreeNode against the Zod schema and atomically write it into tree.json for the given run.",
+    "Validate a TreeNode against the Zod schema and atomically write it into tree.json for the given run. node.id is optional — a UUID is auto-generated when omitted.",
     {
       run_id: z.string().describe("Active run identifier"),
-      node: TreeNodeSchema.describe("TreeNode to record"),
+      node: RecordNodeInputSchema.describe("TreeNode to record (id is optional; auto-generated if absent)"),
     },
     async ({ run_id, node }) => {
       const missionId = process.env.EVOR_MISSION_ID;
-      const { pendingRemaining, treePath } = recordNode(run_id, node, missionId);
+      // Auto-fill id before passing to recordNode (which expects a full TreeNode)
+      const filledNode = fillNodeId(node as Partial<TreeNode> & Omit<TreeNode, "id">);
+      const { pendingRemaining, treePath } = recordNode(run_id, filledNode, missionId);
       return {
         content: [
           {
             type: "text" as const,
             text: JSON.stringify({
               ok: true,
-              node_id: node.id,
+              node_id: filledNode.id,
               run_id,
               pending_remaining: pendingRemaining,
               tree_path: treePath,

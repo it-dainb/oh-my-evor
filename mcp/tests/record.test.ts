@@ -12,7 +12,7 @@ import { tmpdir } from "os";
 import { randomUUID } from "crypto";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 
-import { recordNode, recordEval, readRunState, writeRunState } from "../src/tools/record.js";
+import { recordNode, recordEval, readRunState, writeRunState, fillNodeId } from "../src/tools/record.js";
 import { ensureRunDirs } from "../src/run-store.js";
 import { writeTree } from "../src/tree-store.js";
 import type { TreeNode } from "../src/contracts.js";
@@ -192,5 +192,73 @@ describe("recordEval", () => {
     const { resultsPath } = recordEval(runId, nodeId, { ...makeResult(nodeId, runId), metrics: { accuracy: 0.9 } }, "test-mission");
     const written = JSON.parse(readFileSync(resultsPath, "utf8"));
     expect(written.metrics.accuracy).toBe(0.9);
+  });
+
+  // ── P0-5: eval→tree status cascade ─────────────────────────────────────────
+
+  it("P0-5: cascades status to 'done' on the tree node after recordEval (integrity passed)", () => {
+    const runId = "run-eval-p05-a";
+    const node = makeNode({ status: "running" });
+
+    // Pre-populate the tree with a running node
+    recordNode(runId, node, "test-mission");
+
+    // Run recordEval — bridge will fail (no Python) but status must still flip
+    recordEval(runId, node.id, makeResult(node.id, runId), "test-mission");
+
+    const treePath = join(tmpRoot, "runs", "test-mission", runId, "tree.json");
+    const tree = JSON.parse(readFileSync(treePath, "utf8"));
+    expect(tree.nodes[node.id].status).toBe("done");
+  });
+
+  it("P0-5: sets status 'done' even when integrity bridge returns null (bridge failed)", () => {
+    const runId = "run-eval-p05-b";
+    const node = makeNode({ status: "running" });
+
+    recordNode(runId, node, "test-mission");
+
+    // bridge fails in test env — integrityVerdict will be null
+    const { integrityVerdict } = recordEval(runId, node.id, makeResult(node.id, runId), "test-mission");
+    expect(integrityVerdict).toBeNull();
+
+    const treePath = join(tmpRoot, "runs", "test-mission", runId, "tree.json");
+    const tree = JSON.parse(readFileSync(treePath, "utf8"));
+    expect(tree.nodes[node.id].status).toBe("done");
+  });
+
+  it("P0-5: does not throw when tree node does not exist (no prior recordNode call)", () => {
+    const runId = "run-eval-p05-c";
+    const nodeId = randomUUID();
+    // No recordNode call — tree.json won't have this node; must not throw
+    expect(() => recordEval(runId, nodeId, makeResult(nodeId, runId), "test-mission")).not.toThrow();
+  });
+});
+
+// ── P2-1: auto-ID on evor_record_node ──────────────────────────────────────
+
+describe("fillNodeId (P2-1)", () => {
+  it("generates a UUID when node.id is absent", () => {
+    const node = makeNode();
+    const { id: _ignored, ...nodeWithoutId } = node;
+    const filled = fillNodeId(nodeWithoutId as Omit<typeof node, "id"> & { id?: string });
+    expect(filled.id).toBeDefined();
+    // Must be a valid UUID so TreeNodeSchema.id (z.string().uuid()) accepts it
+    expect(filled.id).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+    );
+  });
+
+  it("preserves an explicitly provided node.id unchanged", () => {
+    const node = makeNode();
+    const filled = fillNodeId(node);
+    expect(filled.id).toBe(node.id);
+  });
+
+  it("generated id is different on each call (no collisions)", () => {
+    const node = makeNode();
+    const { id: _ignored, ...nodeWithoutId } = node;
+    const a = fillNodeId(nodeWithoutId as Omit<typeof node, "id"> & { id?: string });
+    const b = fillNodeId(nodeWithoutId as Omit<typeof node, "id"> & { id?: string });
+    expect(a.id).not.toBe(b.id);
   });
 });

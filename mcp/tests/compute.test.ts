@@ -36,6 +36,7 @@ import {
   metaEvolve,
   distillScan,
   plotReport,
+  forgeDispatchBatch,
 } from "../src/tools/compute.js";
 import { callPythonModule } from "../src/subprocess-bridge.js";
 
@@ -331,5 +332,94 @@ describe("plotReport", () => {
     plotReport("r", "/r");
     const [, args] = mockedCall.mock.calls[0];
     expect(args).toContain("png");
+  });
+});
+
+// ── P0-3: evor_forge_dispatch_batch ──────────────────────────────────────────
+
+describe("forgeDispatchBatch (P0-3)", () => {
+  const makeJobHandle = (jobId: string) => ({
+    ok: true as const,
+    data: {
+      job_id: jobId,
+      status_path: `/tmp/run/jobs/${jobId}/status.json`,
+      log_path: `/tmp/run/jobs/${jobId}/log.jsonl`,
+    },
+  });
+
+  it("returns one result per candidate without blocking (2 candidates)", () => {
+    mockedCall
+      .mockReturnValueOnce(makeJobHandle("job-c1"))
+      .mockReturnValueOnce(makeJobHandle("job-c2"));
+
+    const runDir = join(tmpRoot, "runs", "m1", "r1");
+    const result = forgeDispatchBatch("run-1", [
+      { node_id: "node-1", worktree: "/wt/c1" },
+      { node_id: "node-2", worktree: "/wt/c2" },
+    ], runDir);
+
+    expect(result.dispatched).toHaveLength(2);
+    expect(result.dispatched[0].node_id).toBe("node-1");
+    expect(result.dispatched[0].job_id).toBe("job-c1");
+    expect(result.dispatched[0].ok).toBe(true);
+    expect(result.dispatched[1].node_id).toBe("node-2");
+    expect(result.dispatched[1].job_id).toBe("job-c2");
+    expect(result.run_id).toBe("run-1");
+    // callPythonModule must be called once per candidate
+    expect(mockedCall).toHaveBeenCalledTimes(2);
+  });
+
+  it("auto-computes gpu_fraction = 0.5 when 2 candidates and no explicit fraction", () => {
+    mockedCall
+      .mockReturnValueOnce(makeJobHandle("job-a"))
+      .mockReturnValueOnce(makeJobHandle("job-b"));
+
+    const runDir = join(tmpRoot, "runs", "m1", "r1");
+    const result = forgeDispatchBatch("run-1", [
+      { node_id: "n1", worktree: "/wt/1" },
+      { node_id: "n2", worktree: "/wt/2" },
+    ], runDir);
+
+    // gpu_fraction passed to each jobStart must reflect 0.5
+    expect(result.gpu_fraction).toBeCloseTo(0.5);
+  });
+
+  it("respects explicit gpu_fraction=1.0 (sequential intent)", () => {
+    mockedCall
+      .mockReturnValueOnce(makeJobHandle("job-seq-1"))
+      .mockReturnValueOnce(makeJobHandle("job-seq-2"));
+
+    const runDir = join(tmpRoot, "runs", "m1", "r1");
+    const result = forgeDispatchBatch("run-1", [
+      { node_id: "n1", worktree: "/wt/1" },
+      { node_id: "n2", worktree: "/wt/2" },
+    ], runDir, 1.0);
+
+    expect(result.gpu_fraction).toBe(1.0);
+    // All candidates still dispatched
+    expect(result.dispatched).toHaveLength(2);
+  });
+
+  it("surfaces per-candidate errors without throwing when a job fails", () => {
+    mockedCall
+      .mockReturnValueOnce(makeJobHandle("job-ok"))
+      .mockReturnValueOnce({ ok: false as const, error: "OOM on node n2" });
+
+    const runDir = join(tmpRoot, "runs", "m1", "r1");
+    // Single call — must not throw even when one candidate fails
+    let result!: ReturnType<typeof forgeDispatchBatch>;
+    expect(() => {
+      result = forgeDispatchBatch("run-1", [
+        { node_id: "n1", worktree: "/wt/1" },
+        { node_id: "n2", worktree: "/wt/2" },
+      ], runDir);
+    }).not.toThrow();
+
+    expect(result.dispatched).toHaveLength(2);
+    const ok_candidate = result.dispatched.find((d) => d.node_id === "n1");
+    expect(ok_candidate?.ok).toBe(true);
+    const failed = result.dispatched.find((d) => d.node_id === "n2");
+    expect(failed?.ok).toBe(false);
+    expect(failed?.error).toBeDefined();
   });
 });

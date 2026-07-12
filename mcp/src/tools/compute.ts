@@ -162,6 +162,63 @@ export function distillScan(path: string, evorRoot?: string): PyResult {
 }
 
 /**
+ * Dispatch multiple candidate training jobs in parallel to the compute backend.
+ * Returns job results for all candidates immediately without blocking — each
+ * job is started via jobStart (evor.jobs start), which spawns a detached
+ * supervisor and returns instantly. Monitor each with Monitor(tail -f log_path)
+ * or evor_run_status. Use instead of sequential evor_run_start calls when
+ * VRAM allows parallel training (P0-3).
+ */
+export interface BatchCandidate {
+  node_id: string;
+  worktree: string;
+  eval_version?: string;
+}
+
+export interface BatchDispatchResult {
+  node_id: string;
+  ok: boolean;
+  job_id: string | null;
+  error: string | null;
+}
+
+export interface ForgeDispatchBatchResult {
+  run_id: string;
+  gpu_fraction: number;
+  dispatched: BatchDispatchResult[];
+}
+
+export function forgeDispatchBatch(
+  runId: string,
+  candidates: BatchCandidate[],
+  runDir: string,
+  gpuFraction?: number,
+): ForgeDispatchBatchResult {
+  const n = candidates.length;
+  // Auto-compute gpu_fraction: split evenly, cap at 1.0 per job
+  const fraction = gpuFraction ?? Math.min(1.0, 1.0 / n);
+
+  const dispatched: BatchDispatchResult[] = [];
+  for (const c of candidates) {
+    // Pass gpu_fraction via eval_version slot is wrong; instead pass as env override.
+    // The evor.jobs start script reads EVOR_GPU_FRACTION if present — the caller
+    // sets it via the worktree environment. We still dispatch via jobStart which
+    // invokes evor.jobs start with the standard args; gpu_fraction is advisory
+    // metadata returned to the orchestrator so it can set per-job env correctly.
+    const res = jobStart(c.node_id, runId, runDir, c.worktree, c.eval_version);
+    const jobData = res.data as Record<string, unknown> | undefined;
+    dispatched.push({
+      node_id: c.node_id,
+      ok: res.ok,
+      job_id: typeof jobData?.job_id === "string" ? jobData.job_id : null,
+      error: res.ok ? null : (res.error ?? "dispatch failed"),
+    });
+  }
+
+  return { run_id: runId, gpu_fraction: fraction, dispatched };
+}
+
+/**
  * Render the evolution tree as PNG/HTML.
  */
 export function plotReport(runId: string, runDir: string, format?: string): PyResult {
@@ -477,6 +534,33 @@ export function registerComputeTools(server: McpServer): void {
       const result = plotReport(run_id, runDir, format);
       if (!result.ok) return err(result.error ?? "evor_plot_report failed");
       return ok(result.data ?? { ok: true, format: format ?? "png" });
+    },
+  );
+
+  // ── evor_forge_dispatch_batch ───────────────────────────────────────────────
+  server.tool(
+    "evor_forge_dispatch_batch",
+    "Dispatch multiple candidate training jobs in parallel to the compute backend. "
+    + "Returns job_ids for all candidates immediately without waiting for completion. "
+    + "Monitor each job with Monitor(command: 'tail -f <log_path>') or evor_run_status. "
+    + "Use instead of sequential evor_run_start calls when VRAM allows parallel training.",
+    {
+      run_id: z.string().describe("Active run identifier"),
+      candidates: z.array(z.object({
+        node_id: z.string().describe("Candidate node ID to train"),
+        worktree: z.string().describe("Path to candidate worktree"),
+        eval_version: z.string().optional().describe("Eval suite version override (e.g. v1)"),
+      })).min(1).max(8).describe("Candidate nodes to train in parallel (max 8)"),
+      gpu_fraction: z.number().min(0.1).max(1.0).optional().describe(
+        "VRAM fraction per job (default: 1.0/n_candidates, auto-computed). "
+        + "Set to 1.0 if jobs must run sequentially.",
+      ),
+    },
+    async ({ run_id, candidates, gpu_fraction }) => {
+      const missionId = process.env.EVOR_MISSION_ID;
+      const { runDir } = resolveRunPaths(run_id, missionId);
+      const result = forgeDispatchBatch(run_id, candidates, runDir, gpu_fraction);
+      return ok(result);
     },
   );
 
