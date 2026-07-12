@@ -1,28 +1,44 @@
 """
-evor harness CLI — `run`, `preflight`, `validate`, and `doctor` subcommands.
+evor harness CLI — `run`, `preflight`, `validate`, `doctor`, `setup-gates`,
+and `export-telemetry` subcommands.
 
 Entry point: python -m evor <subcommand> [options]
 
 Subcommands:
-  run        — Forge's primary invocation after materialising code in worktree.
-               Loads GoalContract, verifies EVOR_TELEMETRY_PATH instrumentation,
-               submits job via ResourceScheduler, supervises via SelfHealMonitor,
-               runs EvaluatorAdapter on completion, writes EvaluationResult.
-               Requires mission-state.json status=="locked" (Phase-2 gate).
+  run              — Forge's primary invocation after materialising code in
+                     worktree. Loads GoalContract, verifies EVOR_TELEMETRY_PATH
+                     instrumentation, submits job via ResourceScheduler,
+                     supervises via SelfHealMonitor, runs EvaluatorAdapter on
+                     completion, writes EvaluationResult.
+                     Requires mission-state.json status=="locked" (Phase-2 gate).
 
-  preflight  — 5-step micro-train smoke-test (spec R3 / §evor-setup).
-               Verifies environment: imports, loss decreasing, GPU active.
-               Exit 0 on pass; non-zero on failure (prompts user to confirm/override).
+  preflight        — 5-step micro-train smoke-test (spec R3 / §evor-setup).
+                     Verifies environment: imports, loss decreasing, GPU active.
+                     --mode env_only: skip loss_decreasing (use at setup time
+                     before any candidate worktree exists).
+                     Exit 0 on pass; non-zero on failure.
 
-  validate   — Contract and state validator (Phase 2). Checks goal-contract.json
-               schema, MetricSpec gameability guards (two-layer), frozen-splits,
-               tree.json DICT format, and run-state.json. Exit 0 = VALID.
-               Prints a JSON ValidationReport to stdout.
+  setup-gates      — Run corpus-layout and config-drift gates; print JSON
+                     pass/fail report. Use before committing to a training run
+                     to verify the dataset split and architecture are consistent.
+                     --split-dir: check image/gt pair count match.
+                     --declared-arch + --checkpoint-hparams-json: detect
+                     arch drift between GoalContract and a resume checkpoint.
 
-  doctor     — Environment and .evor integrity doctor (Phase 2). Checks Python,
-               torch, Node.js, env vars, tree.json format, mission-state,
-               orphan pending nodes, and frozen-split hash integrity.
-               Use --repair to auto-convert list-format tree.json to DICT.
+  export-telemetry — Export wandb run data to telemetry.csv inside the given
+                     job directory. Reads .wandb/history.jsonl or
+                     .wandb/wandb-summary.json; no wandb package required.
+                     Prints the CSV path on success or null if no wandb data.
+
+  validate         — Contract and state validator (Phase 2). Checks goal-contract.json
+                     schema, MetricSpec gameability guards (two-layer), frozen-splits,
+                     tree.json DICT format, and run-state.json. Exit 0 = VALID.
+                     Prints a JSON ValidationReport to stdout.
+
+  doctor           — Environment and .evor integrity doctor (Phase 2). Checks Python,
+                     torch, Node.js, env vars, tree.json format, mission-state,
+                     orphan pending nodes, and frozen-split hash integrity.
+                     Use --repair to auto-convert list-format tree.json to DICT.
 
 Exit codes:
   0 — success / preflight passed / validate VALID / doctor OK
@@ -109,6 +125,51 @@ def _build_parser() -> argparse.ArgumentParser:
     pre_p.add_argument(
         "--no-gpu-check", action="store_true",
         help="Skip GPU utilisation check (for CPU-only environments).",
+    )
+    pre_p.add_argument(
+        "--mode", choices=["full", "env_only"], default="full",
+        help=(
+            "Preflight scope. 'env_only': check import_ok + gpu_active only "
+            "(skip loss_decreasing — use at setup time before any candidate "
+            "worktree is materialised). 'full' (default): run all checks."
+        ),
+    )
+
+    # setup-gates subcommand — corpus layout + config drift checks
+    gates_p = sub.add_parser(
+        "setup-gates",
+        help="Run corpus-layout and config-drift gates; print JSON pass/fail",
+    )
+    gates_p.add_argument(
+        "--split-dir", type=Path, default=None, metavar="SPLIT_DIR",
+        help=(
+            "Root of a corpus split to verify (must contain images/ and gt/ "
+            "subdirectories with matching file counts)."
+        ),
+    )
+    gates_p.add_argument(
+        "--declared-arch", default=None, metavar="ARCH",
+        help="Architecture name from the active GoalContract / config.",
+    )
+    gates_p.add_argument(
+        "--checkpoint-hparams-json", default=None, metavar="JSON",
+        help=(
+            "Inline JSON object of checkpoint hyperparameters "
+            "(e.g. '{\"arch\": \"small_unet\"}'). Required with --declared-arch."
+        ),
+    )
+
+    # export-telemetry subcommand — wandb → CSV export
+    export_p = sub.add_parser(
+        "export-telemetry",
+        help="Export wandb run data (.wandb/) to telemetry.csv inside JOB_DIR",
+    )
+    export_p.add_argument(
+        "--job-dir", required=True, type=Path, metavar="JOB_DIR",
+        help=(
+            "Directory that contains (or should contain) a .wandb/ subdirectory "
+            "written by the training job."
+        ),
     )
 
     # gotchas subcommand
@@ -497,7 +558,7 @@ def _cmd_preflight(args: argparse.Namespace) -> int:
     report: dict = {"run_id": args.run_id, "checks": {}, "passed": False}
 
     try:
-        checks = scheduler.preflight(run_id=args.run_id)
+        checks = scheduler.preflight(run_id=args.run_id, mode=args.mode)
         report["checks"] = checks
 
         # If torch is not available, preflight() raises NotImplementedError
@@ -762,6 +823,102 @@ def _cmd_jobs(args: argparse.Namespace) -> int:
     return 1
 
 
+def _cmd_setup_gates(args: argparse.Namespace) -> int:
+    """Execute the setup-gates subcommand.
+
+    Runs corpus-layout and/or config-drift checks and prints a JSON report.
+    At least one of --split-dir or (--declared-arch + --checkpoint-hparams-json)
+    must be provided; prints an error and exits 1 otherwise.
+
+    Exit 0 = all supplied checks passed; exit 1 = any check failed or error.
+    """
+    from evor.scheduler import check_config_drift, check_corpus_layout
+
+    if not args.split_dir and not args.declared_arch:
+        print(
+            "[evor setup-gates] ERROR: supply at least one of "
+            "--split-dir or --declared-arch (with --checkpoint-hparams-json).",
+            file=sys.stderr,
+        )
+        return 1
+
+    report: dict = {"checks": {}, "passed": True}
+    any_failed = False
+
+    if args.split_dir:
+        split_dir = Path(args.split_dir).resolve()
+        ok, detail = check_corpus_layout(split_dir)
+        report["checks"]["corpus_layout"] = {"ok": ok, "detail": detail, "split_dir": str(split_dir)}
+        if not ok:
+            any_failed = True
+
+    if args.declared_arch:
+        if not args.checkpoint_hparams_json:
+            print(
+                "[evor setup-gates] ERROR: --declared-arch requires --checkpoint-hparams-json.",
+                file=sys.stderr,
+            )
+            return 1
+        try:
+            hparams = json.loads(args.checkpoint_hparams_json)
+        except json.JSONDecodeError as exc:
+            print(
+                f"[evor setup-gates] ERROR: --checkpoint-hparams-json is not valid JSON: {exc}",
+                file=sys.stderr,
+            )
+            return 1
+        ok, detail = check_config_drift(args.declared_arch, hparams)
+        report["checks"]["config_drift"] = {"ok": ok, "detail": detail, "declared_arch": args.declared_arch}
+        if not ok:
+            any_failed = True
+
+    report["passed"] = not any_failed
+    print(json.dumps(report, indent=2))
+
+    if any_failed:
+        print("[evor setup-gates] FAILED — fix issues before starting the run.", file=sys.stderr)
+        return 1
+
+    print("[evor setup-gates] PASSED — all gates green.", file=sys.stderr)
+    return 0
+
+
+def _cmd_export_telemetry(args: argparse.Namespace) -> int:
+    """Execute the export-telemetry subcommand.
+
+    Reads .wandb/history.jsonl or .wandb/wandb-summary.json inside JOB_DIR
+    and writes telemetry.csv there. The real wandb package is NOT required.
+
+    Prints a JSON result to stdout:
+      {"csv_path": "<path>"}  on success
+      {"csv_path": null}      when no wandb data found
+
+    Exit 0 always (wandb data is optional; absence is not an error).
+    """
+    from evor.telemetry import export_wandb_to_csv
+
+    job_dir = Path(args.job_dir).resolve()
+    if not job_dir.is_dir():
+        print(
+            f"[evor export-telemetry] ERROR: --job-dir does not exist: {job_dir}",
+            file=sys.stderr,
+        )
+        return 1
+
+    csv_path = export_wandb_to_csv(job_dir)
+
+    if csv_path is not None:
+        print(json.dumps({"csv_path": str(csv_path)}))
+        print(f"[evor export-telemetry] wrote {csv_path}", file=sys.stderr)
+    else:
+        print(json.dumps({"csv_path": None}))
+        print(
+            f"[evor export-telemetry] no wandb data found under {job_dir}/.wandb/",
+            file=sys.stderr,
+        )
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = _build_parser()
     args = parser.parse_args(argv)
@@ -774,6 +931,10 @@ def main(argv: list[str] | None = None) -> int:
         return _cmd_capability(args)
     if args.subcommand == "preflight":
         return _cmd_preflight(args)
+    if args.subcommand == "setup-gates":
+        return _cmd_setup_gates(args)
+    if args.subcommand == "export-telemetry":
+        return _cmd_export_telemetry(args)
     if args.subcommand == "validate":
         return _cmd_validate(args)
     if args.subcommand == "doctor":

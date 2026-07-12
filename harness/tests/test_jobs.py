@@ -157,6 +157,46 @@ def test_log_file_written_after_job(tmp_path: Path) -> None:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# P0-3: EVOR_GPU_FRACTION recorded in status.json
+# ─────────────────────────────────────────────────────────────────────────────
+
+def test_start_job_records_gpu_fraction_in_status(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """EVOR_GPU_FRACTION in env must be recorded in status.json as a float.
+
+    The TypeScript bridge injects it via extraEnv before spawning
+    `python -m evor.jobs start`; _child_env() then propagates it to the
+    supervisor and training child.  Recording it in status.json makes it
+    verifiable end-to-end without inspecting subprocess env tables.
+    """
+    monkeypatch.setenv("EVOR_GPU_FRACTION", "0.5")
+    run_dir = _make_run_dir(tmp_path)
+    result = start_job(_fast_cmd(), run_dir)
+    sp = Path(result["status_path"])
+    data = json.loads(sp.read_text())
+    assert "gpu_fraction" in data, f"gpu_fraction missing from status.json: {data}"
+    assert abs(data["gpu_fraction"] - 0.5) < 1e-9, f"expected 0.5, got {data['gpu_fraction']}"
+
+
+def test_start_job_no_gpu_fraction_without_env(tmp_path: Path) -> None:
+    """status.json must NOT contain gpu_fraction when EVOR_GPU_FRACTION is absent."""
+    env = os.environ.copy()
+    env.pop("EVOR_GPU_FRACTION", None)
+    run_dir = _make_run_dir(tmp_path)
+    # Call without the env var — monkeypatch not used, just ensure it's not set
+    old = os.environ.pop("EVOR_GPU_FRACTION", None)
+    try:
+        result = start_job(_fast_cmd(), run_dir)
+    finally:
+        if old is not None:
+            os.environ["EVOR_GPU_FRACTION"] = old
+    sp = Path(result["status_path"])
+    data = json.loads(sp.read_text())
+    assert "gpu_fraction" not in data, f"gpu_fraction should be absent: {data}"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # status()
 # ─────────────────────────────────────────────────────────────────────────────
 

@@ -27,8 +27,11 @@ from evor.contracts import (
     StrategyState,
     StopCondition,
     TreeNode,
+    infer_metric_scale,
+    is_contract_authentic,
     seal_contract,
     verify_contract_seal,
+    verify_contract_seal_strict,
 )
 
 # ─── Shared fixtures ──────────────────────────────────────────────────────────
@@ -713,3 +716,196 @@ class TestContractSeal:
         gc = self._base_gc()
         data = gc.model_dump()
         assert "contract_seal" not in data
+
+
+# ─── P0-2: Strict seal verification ──────────────────────────────────────────
+
+
+class TestStrictSealVerification:
+    """is_contract_authentic() and verify_contract_seal_strict() must reject
+    unsigned contracts instead of silently accepting them."""
+
+    def _base_gc(self) -> GoalContract:
+        return GoalContract(**VALID_GOAL_CONTRACT_KWARGS)
+
+    # ── is_contract_authentic ────────────────────────────────────────────────
+
+    def test_authentic_sealed_contract_returns_true(self) -> None:
+        gc = seal_contract(self._base_gc())
+        assert is_contract_authentic(gc) is True
+
+    def test_unsigned_contract_is_not_authentic(self) -> None:
+        """None seal → False, NOT True+warn (unlike verify_contract_seal)."""
+        gc = self._base_gc()
+        assert gc.contract_seal is None
+        assert is_contract_authentic(gc) is False
+
+    def test_tampered_contract_is_not_authentic(self) -> None:
+        gc = seal_contract(self._base_gc())
+        tampered = gc.model_copy(update={"baseline_value": 0.99})
+        assert is_contract_authentic(tampered) is False
+
+    def test_mission_id_tamper_detected(self) -> None:
+        gc = seal_contract(self._base_gc())
+        tampered = gc.model_copy(update={"mission_id": "m-EVIL"})
+        assert is_contract_authentic(tampered) is False
+
+    def test_backward_compat_verify_still_passes_for_unsigned(self) -> None:
+        """Legacy verify_contract_seal() must still return True+warn for None seal."""
+        gc = self._base_gc()
+        import warnings
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            result = verify_contract_seal(gc)
+        assert result is True
+        assert len(caught) == 1
+        assert "no contract_seal" in str(caught[0].message).lower()
+
+    def test_strict_rejects_unsigned_where_lenient_passes(self) -> None:
+        """Key divergence: same unsigned contract → lenient=True, strict=False."""
+        gc = self._base_gc()
+        import warnings
+        with warnings.catch_warnings(record=True):
+            warnings.simplefilter("always")
+            lenient = verify_contract_seal(gc)
+        strict = verify_contract_seal_strict(gc)
+        assert lenient is True
+        assert strict is False
+
+    # ── verify_contract_seal_strict ──────────────────────────────────────────
+
+    def test_strict_sealed_contract_passes(self) -> None:
+        gc = seal_contract(self._base_gc())
+        assert verify_contract_seal_strict(gc) is True
+
+    def test_strict_tampered_contract_fails(self) -> None:
+        gc = seal_contract(self._base_gc())
+        tampered = gc.model_copy(update={"wildness": 0.99})
+        assert verify_contract_seal_strict(tampered) is False
+
+    def test_strict_unsigned_fails(self) -> None:
+        gc = self._base_gc()
+        assert verify_contract_seal_strict(gc) is False
+
+
+# ─── P0-7: infer_metric_scale + auto-fill ─────────────────────────────────────
+
+
+class TestInferMetricScale:
+    """Unit tests for the infer_metric_scale() helper function."""
+
+    @pytest.mark.parametrize("metric_name,expected", [
+        # DIBCO family → 100.0
+        ("f_measure", 100.0),
+        ("F_Measure", 100.0),          # case-insensitive
+        ("pfm", 100.0),
+        ("fps", 100.0),
+        ("pseudo_fm", 100.0),
+        ("dibco_fm", 100.0),
+        # percent-expressed → 100.0
+        ("cer_percent", 100.0),
+        ("wer_percent", 100.0),
+        ("accuracy_percent", 100.0),
+        ("map_percent", 100.0),
+        ("iou_percent", 100.0),
+        ("miou_percent", 100.0),
+        # standard [0,1] metrics → 1.0
+        ("accuracy", 1.0),
+        ("f1", 1.0),
+        ("precision", 1.0),
+        ("recall", 1.0),
+        ("auc", 1.0),
+        ("loss", 1.0),
+        ("psnr", 1.0),          # PSNR is 0-40+dB, not 0-100
+        ("ssim", 1.0),
+        ("cer", 1.0),           # CER without _percent suffix stays 1.0
+        ("wer", 1.0),           # WER without _percent suffix stays 1.0
+    ])
+    def test_metric_name_inference(self, metric_name: str, expected: float) -> None:
+        assert infer_metric_scale(metric_name) == expected
+
+    @pytest.mark.parametrize("dataset_ref,expected", [
+        ("dibco2019", 100.0),
+        ("DIBCO2017", 100.0),           # case-insensitive
+        ("s3://bucket/dibco", 100.0),
+        ("binarization/train", 100.0),
+        ("document_binarization", 100.0),
+        # negative cases
+        ("s3://bucket/cifar10", 1.0),
+        ("imagenet", 1.0),
+        ("coco/train2017", 1.0),
+        ("my-dataset", 1.0),
+    ])
+    def test_dataset_ref_inference(self, dataset_ref: str, expected: float) -> None:
+        assert infer_metric_scale("accuracy", dataset_ref) == expected
+
+    def test_metric_name_wins_over_neutral_dataset(self) -> None:
+        """DIBCO metric_name → 100.0 even if dataset ref is neutral."""
+        assert infer_metric_scale("f_measure", "s3://bucket/cifar10") == 100.0
+
+    def test_dataset_ref_wins_for_unknown_metric_on_dibco(self) -> None:
+        """Unknown metric but DIBCO dataset → still 100.0."""
+        assert infer_metric_scale("custom_score", "dibco2019") == 100.0
+
+    def test_empty_inputs_return_1(self) -> None:
+        assert infer_metric_scale("") == 1.0
+        assert infer_metric_scale("", "") == 1.0
+
+
+class TestMetricScaleAutoInference:
+    """P0-7: GoalContract must auto-fill metric_scale from infer_metric_scale()
+    when the caller omits the field, and preserve explicit values."""
+
+    def _make_gc(self, metric_name: str = "accuracy", dataset_ref: str = "s3://bucket/cifar10",
+                 **extra) -> GoalContract:
+        spec = MetricSpec(
+            metric_name=metric_name,
+            direction="higher",
+            domain_applicability="all",
+            aggregation_rule="macro_avg",
+            role="primary_fitness",
+        )
+        return GoalContract(**{
+            **VALID_GOAL_CONTRACT_KWARGS,
+            "metric_specs": [spec],
+            "dataset_ref": dataset_ref,
+            **extra,
+        })
+
+    def test_omitted_metric_scale_infers_1_for_accuracy(self) -> None:
+        gc = self._make_gc(metric_name="accuracy")
+        # metric_scale not in kwargs → auto-inferred → 1.0 for accuracy
+        assert gc.metric_scale == 1.0
+
+    def test_omitted_metric_scale_infers_100_for_dibco_metric(self) -> None:
+        gc = self._make_gc(metric_name="f_measure")
+        assert gc.metric_scale == 100.0
+
+    def test_omitted_metric_scale_infers_100_for_dibco_dataset(self) -> None:
+        gc = self._make_gc(metric_name="custom_score", dataset_ref="dibco2019")
+        assert gc.metric_scale == 100.0
+
+    def test_explicit_metric_scale_1_preserved(self) -> None:
+        """Explicit 1.0 even on a DIBCO metric must NOT be overridden."""
+        gc = self._make_gc(metric_name="f_measure", metric_scale=1.0)
+        assert gc.metric_scale == 1.0
+
+    def test_explicit_metric_scale_100_preserved(self) -> None:
+        """Explicit 100.0 on a neutral metric must NOT be overridden."""
+        gc = self._make_gc(metric_name="accuracy", metric_scale=100.0)
+        assert gc.metric_scale == 100.0
+
+    def test_explicit_metric_scale_50_preserved(self) -> None:
+        """Arbitrary non-standard explicit value must survive unchanged."""
+        gc = self._make_gc(metric_name="accuracy", metric_scale=50.0)
+        assert gc.metric_scale == 50.0
+
+    def test_roundtrip_preserves_inferred_scale(self) -> None:
+        """After dump+reload the inferred scale survives in the serialised form."""
+        gc = self._make_gc(metric_name="f_measure")
+        assert gc.metric_scale == 100.0
+        data = gc.model_dump()
+        # metric_scale must be present in dump when non-default
+        assert data.get("metric_scale") == 100.0
+        gc2 = GoalContract.model_validate(data)
+        assert gc2.metric_scale == 100.0

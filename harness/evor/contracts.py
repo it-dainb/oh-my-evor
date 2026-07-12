@@ -12,7 +12,7 @@ from __future__ import annotations
 import hashlib
 import json
 from typing import Any, Literal, Optional, Union
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 # ────────────────────────────────────────────────────────────────────────────
 # Shared type aliases
@@ -175,6 +175,59 @@ class ExpansionPolicy(BaseEvorModel):
 
 
 # ────────────────────────────────────────────────────────────────────────────
+# P0-7: metric_scale inference helpers
+# ────────────────────────────────────────────────────────────────────────────
+
+# Metric-name substrings that imply a 0-100 reporting scale.
+_METRIC_NAME_100_KEYWORDS: frozenset[str] = frozenset([
+    # DIBCO document-binarization family
+    "dibco", "f_measure", "f-measure", "pfm", "fps", "pseudo_fm",
+    # Percent-expressed error rates
+    "cer_percent", "wer_percent",
+    # Percent-expressed accuracy / IoU
+    "accuracy_percent", "acc_percent",
+    "map_percent", "coco_map_percent", "iou_percent", "miou_percent",
+])
+
+# Dataset-ref substrings that imply a 0-100 reporting scale (e.g. DIBCO benchmarks).
+_DATASET_REF_100_KEYWORDS: frozenset[str] = frozenset([
+    "dibco", "binarization", "document_binarization",
+])
+
+
+def infer_metric_scale(metric_name: str, dataset_ref: str = "") -> float:
+    """Infer the metric_scale divisor for a GoalContract.
+
+    Returns 100.0 when *metric_name* or *dataset_ref* match a known 0-100
+    reporting convention (DIBCO F-measure, CER%, accuracy-as-percent, etc.).
+    Returns 1.0 for everything else (standard [0,1] metrics).
+
+    This is a heuristic covering the most common cases; unusual metric naming
+    or novel benchmarks should set ``metric_scale`` explicitly on GoalContract
+    rather than relying on inference.
+
+    Args:
+        metric_name: Primary metric name (e.g. ``"f_measure"``, ``"accuracy"``).
+        dataset_ref: Dataset reference string (e.g. ``"dibco2019"``).  Optional.
+
+    Returns:
+        100.0 if the metric is on a 0-100 scale, else 1.0.
+    """
+    lower_metric = metric_name.lower()
+    lower_dataset = dataset_ref.lower()
+
+    for kw in _METRIC_NAME_100_KEYWORDS:
+        if kw in lower_metric:
+            return 100.0
+
+    for kw in _DATASET_REF_100_KEYWORDS:
+        if kw in lower_dataset:
+            return 100.0
+
+    return 1.0
+
+
+# ────────────────────────────────────────────────────────────────────────────
 # GoalContract
 # ────────────────────────────────────────────────────────────────────────────
 
@@ -303,6 +356,29 @@ class GoalContract(BaseEvorModel):
     Absent (None) on legacy contracts → backward-compat pass with a warning.
     """
 
+    # ── P0-7: auto-infer metric_scale when not explicitly provided ────────────
+    @model_validator(mode="before")
+    @classmethod
+    def _auto_infer_metric_scale(cls, data: object) -> object:
+        """Fill metric_scale from infer_metric_scale() when caller omits it.
+
+        Runs only when ``metric_scale`` is absent from the input dict.
+        Explicit user values (including 1.0) are always preserved as-is.
+        """
+        if not isinstance(data, dict) or "metric_scale" in data:
+            return data
+        metric_specs = data.get("metric_specs", [])
+        dataset_ref = str(data.get("dataset_ref", ""))
+        primary_name = ""
+        if metric_specs:
+            first = metric_specs[0]
+            if isinstance(first, dict):
+                primary_name = str(first.get("metric_name", ""))
+            elif hasattr(first, "metric_name"):
+                primary_name = str(first.metric_name)
+        data["metric_scale"] = infer_metric_scale(primary_name, dataset_ref)
+        return data
+
 
 # ── P0-2: seal helpers ────────────────────────────────────────────────────────
 
@@ -339,6 +415,42 @@ def verify_contract_seal(contract: "GoalContract") -> bool:
         json.dumps(payload, sort_keys=True, default=str).encode()
     ).hexdigest()
     return expected == contract.contract_seal
+
+
+def _compute_seal(contract: "GoalContract") -> str:
+    """Recompute the expected seal digest for *contract* (internal helper)."""
+    payload = contract.model_dump(exclude={"contract_seal"})
+    return hashlib.sha256(
+        json.dumps(payload, sort_keys=True, default=str).encode()
+    ).hexdigest()
+
+
+def is_contract_authentic(contract: "GoalContract") -> bool:
+    """Return True only when the seal is present AND matches the contract content.
+
+    Unlike :func:`verify_contract_seal`, this never silently accepts an unsigned
+    contract:
+
+    * Seal absent (None) → **False** (unsigned = not authentic).
+    * Seal present but tampered → **False**.
+    * Seal present and matching → **True**.
+
+    Use this instead of ``verify_contract_seal`` for locked/production contracts
+    where the absence of a seal is itself a security failure.
+    """
+    if contract.contract_seal is None:
+        return False
+    return _compute_seal(contract) == contract.contract_seal
+
+
+def verify_contract_seal_strict(contract: "GoalContract") -> bool:
+    """Strict alias for :func:`is_contract_authentic`.
+
+    Returns False for unsigned contracts (seal=None) rather than True+warn.
+    Intended for locked contracts in production paths where a missing seal
+    must be treated as a verification failure, not a backward-compat pass.
+    """
+    return is_contract_authentic(contract)
 
 
 # ────────────────────────────────────────────────────────────────────────────

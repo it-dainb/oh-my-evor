@@ -98,6 +98,16 @@ def start_job(cmd_args: list[str], run_dir: Path) -> dict[str, str]:
         "started_at": now,
         "cmd": cmd_args,
     }
+    # Record EVOR_GPU_FRACTION in status.json so it is verifiable end-to-end
+    # and visible to the run-watcher monitor.  Written by the TS bridge before
+    # spawning this process; propagates naturally through _child_env() to the
+    # supervisor and training child.
+    gpu_fraction_str = os.environ.get("EVOR_GPU_FRACTION")
+    if gpu_fraction_str is not None:
+        try:
+            initial["gpu_fraction"] = float(gpu_fraction_str)
+        except ValueError:
+            pass  # malformed value — skip silently
     _atomic_write(status_path(run_dir, job_id), initial)
 
     # Supervisor: python -m evor.jobs supervise --job-id X --run-dir Y --cmd-json [...]
