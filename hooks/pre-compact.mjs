@@ -138,19 +138,42 @@ try {
 }
 
 // ── Build <evor-restore> summary (≤500 chars) ────────────────────────────────
-const runPath = missionId ? `runs/${missionId}/${activeRunId}` : `runs/${activeRunId}`;
 const scoreStr = bestScore !== null ? String(bestScore).slice(0, 8) : 'unknown';
-const nodeStr = bestNodeId ? bestNodeId.slice(0, 16) : 'none';
+// Use mission name/objective as the header — never raw run_id or mission_id
+const missionName = (missionState?.name ?? missionState?.title ?? '').slice(0, 60);
+const header = missionName || (objective ? objective.slice(0, 60) : 'Active mission');
 const objSnippet = objective ? objective.slice(0, 100) : '(no objective on disk)';
 const decisionSnippet = lastDecision ? lastDecision.slice(0, 80) : '(no decision log)';
+// For pending nodes: resolve names from tree.json best-effort, else show count
+let pendingStr = null;
+if (pendingNodeIds.length > 0) {
+  try {
+    const treePath = join(runDir, 'tree.json');
+    if (existsSync(treePath)) {
+      const td = JSON.parse(readFileSync(treePath, 'utf8'));
+      const nodesRaw = td.nodes ?? {};
+      const names = pendingNodeIds.map(id => {
+        const n = Object.values(nodesRaw).find(nd => nd?.id === id);
+        return n?.name ?? null;
+      }).filter(Boolean);
+      pendingStr = names.length > 0
+        ? `Pending: ${names.join(', ')}`
+        : `${pendingNodeIds.length} pending node(s)`;
+    } else {
+      pendingStr = `${pendingNodeIds.length} pending node(s)`;
+    }
+  } catch { pendingStr = `${pendingNodeIds.length} pending node(s)`; }
+}
 
-const restoreBody = [
-  `Run: ${activeRunId.slice(0, 20)}${missionId ? ` | Mission: ${missionId.slice(0, 20)}` : ''}`,
-  `Objective: ${objSnippet}`,
-  `Tick ${currentTick} step ${currentStep} | Best: ${scoreStr} (${nodeStr})`,
+const restoreLines = [
+  `Mission: ${header}`,
+  ...(objective && objective !== header ? [`Objective: ${objSnippet}`] : []),
+  `Tick ${currentTick} step ${currentStep} | Best: ${scoreStr}`,
   `Last: ${decisionSnippet}`,
-  `Recover: read .evor/${runPath}/ for full state.`,
-].join('\n');
+  ...(pendingStr ? [pendingStr] : []),
+  `Call evor_state_read to check position.`,
+];
+const restoreBody = restoreLines.join('\n');
 
 const systemMessage = `<evor-restore>\n${restoreBody}\n</evor-restore>`;
 

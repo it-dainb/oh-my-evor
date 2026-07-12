@@ -41,23 +41,26 @@ function buildEvorRestore(rDir, rId, mId) {
   const runState     = safeRead(join(rDir, 'run-state.json'));
 
   const objective   = (missionState?.objective ?? missionState?.goal ?? '').slice(0, 100);
+  const missionName = (missionState?.name ?? missionState?.title ?? '').slice(0, 60);
   const currentTick = tickState?.tick ?? runState?.tick_count ?? 0;
   const currentStep = tickState?.current_step ?? 0;
   const bestScore   = runState?.best_score ?? missionState?.best_score ?? null;
-  const bestNodeId  = runState?.best_node_id ?? missionState?.best_node_id ?? null;
+  // Prefer human-readable node name over raw node id
+  const bestNodeName = (runState?.best_node_name ?? runState?.name ?? null);
 
   if (!objective && currentTick === 0 && bestScore === null) return null;
 
   const scoreStr = bestScore !== null ? String(bestScore).slice(0, 8) : 'unknown';
-  const nodeStr  = bestNodeId ? bestNodeId.slice(0, 16) : 'none';
-  const runPath  = mId ? `runs/${mId}/${rId}` : `runs/${rId}`;
+  const nodeStr  = bestNodeName ? String(bestNodeName).slice(0, 40) : null;
 
-  const lines = [
-    `Run: ${rId.slice(0, 20)}${mId ? ` | Mission: ${mId.slice(0, 20)}` : ''}`,
-  ];
-  if (objective) lines.push(`Objective: ${objective}`);
-  lines.push(`Tick ${currentTick} step ${currentStep} | Best: ${scoreStr} (${nodeStr})`);
-  lines.push(`Resume from .evor/${runPath}/; prioritise the user's newest request.`);
+  // Use mission name/objective as the header — never raw run_id or mission_id
+  const header = missionName || (objective ? objective.slice(0, 60) : 'Active mission');
+
+  const lines = [`Mission: ${header}`];
+  if (objective && objective !== header) lines.push(`Objective: ${objective}`);
+  const bestStr = scoreStr + (nodeStr ? ` (${nodeStr})` : '');
+  lines.push(`Tick ${currentTick} step ${currentStep} | Best: ${bestStr}`);
+  lines.push(`Call evor_state_read to check position; prioritise the user's newest request.`);
 
   return `<evor-restore>\n${lines.join('\n')}\n</evor-restore>`;
 }
@@ -95,7 +98,7 @@ function checkHarnessDeps(pRoot, eRoot) {
     const missing = (res.stderr ?? '').split('\n').find(l => l.includes('ModuleNotFoundError')) ?? '';
     return [
       `[oh-my-evor] Python harness is not importable${missing ? ` (${missing.trim()})` : ''} — the MCP tools that call Python will fail until deps are installed once:`,
-      `  pip install -e "${harness}"      # or run the plugin's ./install.sh`,
+      `  pip install -e <plugin-harness-dir>      # or run ./install.sh in the plugin directory`,
       `(Python: ${py}. Override with EVOR_PYTHON / EVOR_HARNESS_DIR.)`,
     ].join('\n');
   } catch {
@@ -304,7 +307,7 @@ const output = {
     EVOR_MISSION_ID: missionId,
     EVOR_RUN_DIR: runDir,
   },
-  message: `[EVOR CONTEXT] Active run: ${runId}${missionId ? ` (mission: ${missionId})` : ''}`,
+  message: `[EVOR CONTEXT] Active mission in progress — call evor_state_read to check current position.`,
 };
 
 // Prime session with recent wiki lessons (graceful — skip if evor.wiki not installed yet)
@@ -331,7 +334,7 @@ if (restoreBlock) {
 const LAW_PRIMER =
   `[EVOR LAW] Use evor_* MCP tools to change evor state — never write .evor/ directly.\n` +
   `[READ-FIRST] Read the upstream artifact (evor_read_artifact) before acting on it.\n` +
-  `[TOOLS] ToolSearch("select:evor_record_node,evor_record_eval,evor_run_start,evor_state_read") for hot-path tools.`;
+  `[TOOLS] Hot-path tools: evor_record_node, evor_record_eval, evor_run_start, evor_state_read.`;
 output.message += `\n\n${LAW_PRIMER}`;
 
 // ── Next-action hint: resume at the right step ────────────────────────────────
@@ -378,11 +381,11 @@ try {
     watchPaths.push(...jobDirs);
   }
 
-  // Also check active-run.json for a job_id field (written by evor_run_start)
+  // active-run.json may have a job_id; resolve status.json via the run dir (already known)
   try {
     const arData = JSON.parse(readFileSync(join(evorRoot, 'active-run.json'), 'utf8'));
-    if (arData?.job_id && arData?.run_dir) {
-      const statusPath = join(String(arData.run_dir), 'jobs', String(arData.job_id), 'status.json');
+    if (arData?.job_id) {
+      const statusPath = join(runDir, 'jobs', String(arData.job_id), 'status.json');
       if (!watchPaths.includes(statusPath)) watchPaths.push(statusPath);
     }
   } catch { /* no active-run.json job info — fine */ }

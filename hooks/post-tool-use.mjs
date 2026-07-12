@@ -373,8 +373,7 @@ try {
       const artPath = pathJoin(runDir(runId2), relPath);
       if (!fsExists(artPath)) {
         process.stdout.write(
-          `[EVOR WARNING] evor_write_artifact(agent="${agentSlot}") did not land at ${relPath} — ` +
-          `the artifact may not have been written correctly.\n`
+          `[EVOR WARNING] artifact for agent='${agentSlot}' not confirmed — the write may not have completed\n`
         );
       }
     }
@@ -426,15 +425,9 @@ try {
   if (bareToolR === 'run_start') {
     if (!isThrottled('run_start:launched')) {
       markThrottled('run_start:launched');
-      const jobId   = String(toolResp?.job_id ?? '');
-      const logPath = String(toolResp?.log_path ?? '');
-      const logCmd  = logPath
-        ? `tail -f "${logPath}" | grep -E --line-buffered "val_|elapsed|Traceback|Error|OOM|Killed|FAILED"`
-        : 'tail -f <log_path> | grep -E --line-buffered "val_|elapsed|Traceback|Error|OOM|Killed|FAILED"';
       const nudge =
-        `[EVOR REFLEX] Training launched${jobId ? ` (job ${jobId})` : ''}. ` +
-        `Do NOT block or tight-loop poll. Watch it with the native Monitor tool: ` +
-        `Monitor(command: "${logCmd}"). ` +
+        `[EVOR REFLEX] Job launched — poll with evor_run_status (no arguments needed beyond the active run). ` +
+        `Do NOT block or tight-loop poll. Use the native Monitor tool to watch for progress and completion. ` +
         `When the run succeeds → call evor_record_eval; when it fails → call evor_signal_emit(kind="runtime-failure") + PushNotification.`;
       process.stdout.write(
         JSON.stringify({
@@ -450,12 +443,13 @@ try {
     if (respState === 'succeeded' || respState === 'success' || respState === 'completed') {
       if (!isThrottled('run_status:succeeded')) {
         markThrottled('run_status:succeeded');
-        const nodeId2 = String(toolResp?.node_id ?? toolInpR?.node_id ?? '');
+        // Prefer node name from response; fall back to name field in input. Never use a raw UUID.
+        const nodeName2 = String(toolResp?.node_name ?? toolResp?.name ?? '').trim() || null;
         const score   = toolResp?.metrics?.val_score ?? toolResp?.metrics?.score ?? null;
         const scoreHint = score !== null ? ` (score: ${String(score).slice(0, 8)})` : '';
         const nudge =
           `[EVOR REFLEX] Run succeeded${scoreHint}. ` +
-          `Call evor_record_eval(${nodeId2 ? `node_id="${nodeId2}"` : 'node_id=...'}) ` +
+          `Call evor_record_eval(${nodeName2 ? `node_id="${nodeName2}"` : 'node_id=<name>'}) for the active run ` +
           `then evor_integrity_check to verify before propagating the score. ` +
           `If best_score improved, call PushNotification to alert the user of the breakthrough.`;
         process.stdout.write(
@@ -508,18 +502,16 @@ try {
   if (bareToolR === 'record_eval') {
     if (!isThrottled('record_eval:integrity')) {
       markThrottled('record_eval:integrity');
-      // Name-only surface: response carries `name`; fall back to the input node_id
-      // the caller passed (which is itself a name in the new API).
-      const nodeName4 = String(toolResp?.name ?? toolInpR?.node_id ?? '');
-      const runId4  = String(toolInpR?.run_id ?? activeRunId);
+      // Name-only surface: response carries `name`; do NOT fall back to node_id (may be UUID).
+      const nodeName4 = String(toolResp?.name ?? toolInpR?.name ?? '').trim() || null;
       const prevBest = toolResp?.previous_best_score ?? null;
       const newScore = toolResp?.score ?? toolResp?.best_score ?? null;
       const improved = prevBest !== null && newScore !== null && newScore > prevBest;
       // P1-1: nudge full post-eval flow — integrity THEN state_write frontier update
       const nudge =
         `[EVOR REFLEX] Eval recorded${nodeName4 ? ` for ${nodeName4}` : ''}. ` +
-        `Next: (1) verify evor_integrity_check(${nodeName4 ? `node_id="${nodeName4}"` : 'node_id=...'}); ` +
-        `(2) if passed, update the frontier with evor_state_write(run_id="${runId4}").` +
+        `Next: (1) verify evor_integrity_check(${nodeName4 ? `node_id="${nodeName4}"` : 'node_id=<name>'}); ` +
+        `(2) if passed, update the frontier with evor_state_write for the active run.` +
         (improved
           ? ` New best score ${String(newScore).slice(0, 8)} > ${String(prevBest).slice(0, 8)} — ` +
             `call PushNotification to alert the user of the breakthrough.`
@@ -585,7 +577,9 @@ try {
   if (bareToolR === 'select') {
     if (!isThrottled('select:spawn_forge')) {
       markThrottled('select:spawn_forge');
-      const winnerHint = String(toolResp?.winner ?? toolResp?.selected_id ?? '');
+      // Use selected_names (name array) from new API shape; never use selected_id (may be UUID).
+      const selectedNames = Array.isArray(toolResp?.selected_names) ? toolResp.selected_names : [];
+      const winnerHint = selectedNames.length > 0 ? selectedNames.join(', ') : null;
       const nudge =
         `[EVOR REFLEX] Selector verdict recorded${winnerHint ? ` (winner: ${winnerHint})` : ''}. ` +
         `Spawn Forge for the winning proposal: Task(subagent_type="oh-my-evor:evor-forge").`;

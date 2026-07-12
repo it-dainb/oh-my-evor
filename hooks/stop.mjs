@@ -153,9 +153,26 @@ try {
 const pendingIds = Array.isArray(runState?.pending_node_ids) ? runState.pending_node_ids : [];
 if (pendingIds.length > 0) {
   const tick = runState?.tick_count ?? '?';
+
+  // Best-effort: resolve node names from tree.json so the message uses readable names
+  // rather than raw ids. On any failure, fall back to showing the count only.
+  let pendingLabel = `${pendingIds.length} pending node(s)`;
+  try {
+    const treePath = join(runDir, 'tree.json');
+    if (existsSync(treePath)) {
+      const treeData = JSON.parse(readFileSync(treePath, 'utf8'));
+      const nodesRaw = treeData.nodes ?? {};
+      const names = pendingIds.map(id => {
+        const n = Object.values(nodesRaw).find(nd => nd?.id === id);
+        return n?.name ?? null;
+      }).filter(Boolean);
+      if (names.length > 0) pendingLabel = names.join(', ');
+    }
+  } catch { /* fail-open — use count-only label */ }
+
   blockStop(
     `[EVOR CONTINUATION GUARD] Tick ${tick} started but tree DB not updated.\n` +
-      `Call evor_record_node for nodes: ${pendingIds.join(', ')}.\n` +
+      `Call evor_record_node for: ${pendingLabel}.\n` +
       `Do not finish until the tree is updated.\n`
   );
 }
@@ -187,10 +204,13 @@ try {
 
         const evalPath = join(runDir, 'evaluations', `${nodeId}.json`);
 
-        // (a) Missing integrity verdict
+        // (a) Missing integrity verdict — use node name if available, else omit identifier
+        const nodeLabelA = node.name ?? null;
         if (!existsSync(evalPath)) {
           debtReasons.push(
-            `node ${nodeId} (status=done) has no evaluations/${nodeId}.json — integrity verdict missing`
+            nodeLabelA
+              ? `node '${nodeLabelA}' (status=done) — integrity verdict missing`
+              : `a done node has no integrity verdict recorded`
           );
           continue; // skip telemetry check; integrity is the primary debt
         }
@@ -208,8 +228,11 @@ try {
           }
         }
         if (telemetryMissing) {
+          const nodeLabelB = node.name ?? null;
           debtReasons.push(
-            `node ${nodeId} has evaluations/${nodeId}.json but telemetry.jsonl is missing or empty`
+            nodeLabelB
+              ? `node '${nodeLabelB}' — telemetry missing`
+              : `an evaluated node is missing telemetry`
           );
         }
       }

@@ -80,26 +80,27 @@ try {
   }
 
   // ── Build <evor-restore> from checkpoint ─────────────────────────────────
-  const runId   = cp.run_id    ?? activeRunId;
-  const mId     = cp.mission_id ?? missionId ?? null;
   const objText = (cp.mission_objective ?? '').slice(0, 100);
   const tick    = cp.current_tick  ?? 0;
   const step    = cp.current_step  ?? 0;
   const score   = cp.best_score    !== null && cp.best_score !== undefined
     ? String(cp.best_score).slice(0, 8)
     : 'unknown';
-  const nodeStr = cp.best_node_id ? String(cp.best_node_id).slice(0, 16) : 'none';
-  const runPath = mId ? `runs/${mId}/${runId}` : `runs/${runId}`;
-  const pending = Array.isArray(cp.pending_node_ids) && cp.pending_node_ids.length > 0
-    ? `Pending: ${cp.pending_node_ids.slice(0, 4).join(', ')}${cp.pending_node_ids.length > 4 ? '…' : ''}`
+  // Use mission name/objective as header — never raw run_id or mission_id
+  const missionName = (cp.mission_name ?? cp.mission_title ?? '').slice(0, 60);
+  const header = missionName || (objText ? objText.slice(0, 60) : 'Active mission');
+  // Pending: show count only (checkpoint stores ids, not names)
+  const pendingIds = Array.isArray(cp.pending_node_ids) ? cp.pending_node_ids : [];
+  const pending = pendingIds.length > 0
+    ? `${pendingIds.length} pending node(s)`
     : null;
 
   const restoreLines = [
-    `Run: ${String(runId).slice(0, 20)}${mId ? ` | Mission: ${String(mId).slice(0, 20)}` : ''}`,
-    ...(objText ? [`Objective: ${objText}`] : []),
-    `Tick ${tick} step ${step} | Best: ${score} (${nodeStr})`,
+    `Mission: ${header}`,
+    ...(objText && objText !== header ? [`Objective: ${objText}`] : []),
+    `Tick ${tick} step ${step} | Best: ${score}`,
     ...(pending ? [pending] : []),
-    `State: .evor/${runPath}/`,
+    `Call evor_state_read to check position.`,
   ];
 
   const restoreBlock = `<evor-restore>\n${restoreLines.join('\n')}\n</evor-restore>`;

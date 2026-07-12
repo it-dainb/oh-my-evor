@@ -143,7 +143,15 @@ try {
 
       const runStateSA = JSON.parse(readFileSync(join(runDirSA, 'run-state.json'), 'utf8'));
       const bestScore = runStateSA?.best_score ?? '?';
-      const bestNodeId = runStateSA?.best_node_id ?? '?';
+      // Prefer human-readable node name; omit best-node token if only a raw id is available
+      const bestNodeName = runStateSA?.best_node_name ?? runStateSA?.name ?? null;
+
+      // Read mission name/objective for a readable label (never expose raw ids)
+      let missionLabel = '';
+      try {
+        const ms = JSON.parse(readFileSync(join(runDirSA, 'mission-state.json'), 'utf8'));
+        missionLabel = (ms?.name ?? ms?.title ?? ms?.objective ?? '').slice(0, 60);
+      } catch { /* mission-state absent or corrupt — skip */ }
 
       let tick = '?';
       let currentStep = '?';
@@ -156,12 +164,13 @@ try {
         }
       } catch { /* tick-state absent or corrupt — skip */ }
 
-      const runDirRelative = missionIdSA
-        ? `runs/${missionIdSA}/${runId}`
-        : `runs/${runId}`;
+      const missionPart = missionLabel ? ` mission="${missionLabel}" |` : '';
+      const bestPart = bestNodeName
+        ? `best=${bestScore} (${bestNodeName})`
+        : `best=${bestScore}`;
       contextBlock =
-        `\n[CONTEXT] run_id=${runId} | tick=${tick} | step=${currentStep}/9 | ` +
-        `best=${bestScore} (${bestNodeId}) | Read .evor/${runDirRelative}/ for full state.`;
+        `\n[CONTEXT]${missionPart} tick=${tick} | step=${currentStep}/9 | ` +
+        `${bestPart} | call evor_state_read for full state.`;
     }
   }
 } catch { /* fail-open — any error → no context block */ }

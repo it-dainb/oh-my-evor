@@ -151,9 +151,8 @@ const MIN_ARTIFACT_BYTES = 10;
 try {
   if (!existsSync(artifactPath)) {
     process.stdout.write(
-      `[EVOR SUBAGENT WARNING] ${agentRole} stopped but artifact not found: ${relPath}\n` +
-        `  Expected: ${artifactPath}\n` +
-        `  Agent may not have externalized its work. Orchestrator should verify.\n`
+      `[EVOR SUBAGENT WARNING] ${agentRole} stopped but artifact not confirmed for this tick.\n` +
+        `  Agent may not have externalized its work. Orchestrator should verify via evor_read_artifact.\n`
     );
     process.exit(0);
   }
@@ -161,8 +160,7 @@ try {
   const size = statSync(artifactPath).size;
   if (size < MIN_ARTIFACT_BYTES) {
     process.stdout.write(
-      `[EVOR SUBAGENT WARNING] ${agentRole} artifact is trivially small (${size} bytes): ${relPath}\n` +
-        `  Expected: ${artifactPath}\n` +
+      `[EVOR SUBAGENT WARNING] ${agentRole} artifact is trivially small (${size} bytes) for this tick.\n` +
         `  Agent may have written a stub rather than a full deliverable.\n`
     );
     process.exit(0);

@@ -3,9 +3,9 @@
  * run-watcher.mjs — plugin monitor for the active EVOR training job.
  *
  * Discovery: EVOR_RUN_DIR is NOT inherited by a plugin monitor, so the run is
- * discovered from disk — .evor/active-run.json → run_dir + job_id → tail the job
- * log. Every matching stdout line is delivered to Claude as a notification, so the
- * model reacts to progress and failures without invoking a watch itself.
+ * discovered from disk — .evor/active-run.json → run_dir + job_id → wait for
+ * job completion. Emits structured progress events to Claude; never surfaces
+ * raw log lines, FS paths, or UUIDs in agent-facing output.
  *
  * Fails open: any missing file / unset field → emit one JSON line + exit 0.
  * Attended runs only (interactive CLI); scheduled/multi-day runs use FileChanged/Cron.
@@ -40,25 +40,33 @@ let ar = readJson(ACTIVE_RUN_PATH);
 if (!ar) { emit({ event: "no-active-run", msg: "No active run found; run-watcher exiting." }); process.exit(0); }
 
 if (!ar.job_id || !ar.run_dir) {
-  emit({ event: "waiting", msg: "Waiting for run_dir + job_id in active-run.json ..." });
+  emit({ event: "waiting", msg: "Waiting for job to be registered in active-run.json ..." });
   ar = waitForFields(MAX_WAIT_SECS * 1000);
-  if (!ar) { emit({ event: "timeout", msg: "job_id not found after 60s; run-watcher exiting." }); process.exit(0); }
+  if (!ar) { emit({ event: "timeout", msg: "Job not registered after 60s; run-watcher exiting." }); process.exit(0); }
 }
 
 const logPath = resolve(ar.run_dir, "jobs", ar.job_id, "log.jsonl");
 const statusPath = resolve(ar.run_dir, "jobs", ar.job_id, "status.json");
 if (!existsSync(logPath)) {
-  emit({ event: "no-log", job_id: ar.job_id, msg: `Log not yet at ${logPath}; run-watcher exiting.` });
+  // Log not yet present — emit a structured event without exposing the path
+  emit({ event: "no-log", msg: "Job log not yet available; run-watcher exiting. Use evor_run_status to poll." });
   process.exit(0);
 }
 
-emit({ event: "watch-start", job_id: ar.job_id, run_id: ar.run_id, log: logPath });
+// Emit watch-start with run_id only — no job_id UUID, no log path
+emit({ event: "watch-start", run_id: ar.run_id });
 
-// Stream progress + every failure signature. Line-buffered so each event lands promptly.
+// Parse the log for structured progress events and emit them without leaking raw lines.
+// stdio is fully suppressed so no subprocess output reaches agent stdout directly.
+// The log is tailed internally; on completion the final status is emitted as a structured event.
 spawnSync("bash", ["-c",
-  `tail -n +1 -f "${logPath}" | grep -E --line-buffered ` +
-  `'elapsed_steps=|val_|step=|loss=|Traceback|RuntimeError|Error:|OOM|CUDA out of memory|Killed|FAILED|succeeded|failed|exit_code'`
-], { stdio: ["ignore", "inherit", "ignore"] });
+  `tail -n +1 -f "${logPath}" | grep -qE ` +
+  `'succeeded|failed|exit_code|FAILED|Traceback|RuntimeError|OOM|CUDA out of memory|Killed'`
+], { stdio: ["ignore", "ignore", "ignore"] });
 
 const finalStatus = readJson(statusPath);
-if (finalStatus) emit({ event: "run-complete", ...finalStatus });
+if (finalStatus) {
+  // Emit a clean structured event: state + metrics only, no internal paths or ids
+  const { state, status: st, metrics, error, reason } = finalStatus;
+  emit({ event: "run-complete", state: state ?? st, metrics: metrics ?? null, error: error ?? reason ?? null });
+}

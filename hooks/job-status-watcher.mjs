@@ -95,9 +95,12 @@ let additionalContext = '';
 if (state === 'succeeded' || state === 'success' || state === 'completed') {
   const score = status?.metrics?.val_score ?? status?.metrics?.score ?? null;
   const scoreHint = score !== null ? ` (score: ${String(score).slice(0, 8)})` : '';
+  // Use node_name if present; omit node identifier entirely if only a raw id is available
+  const nodeName = status?.node_name ?? null;
+  const nodeHint = nodeName ? `node_id="${nodeName}"` : 'node_id=<name>';
   additionalContext =
-    `[EVOR JOB COMPLETE] Job${jobId ? ` ${jobId}` : ''} succeeded${scoreHint}. ` +
-    `Call evor_record_eval(run_id="${activeRunId}"${nodeId ? `, node_id="${nodeId}"` : ''}) ` +
+    `[EVOR JOB COMPLETE] Job succeeded${scoreHint}. ` +
+    `Call evor_record_eval(${nodeHint}) for the active run ` +
     `then evor_integrity_check to verify before propagating the score. ` +
     `If best_score improved, call PushNotification to alert the user of the breakthrough.`;
 
@@ -108,7 +111,7 @@ if (state === 'succeeded' || state === 'success' || state === 'completed') {
   const isOom = /oom|out.of.mem|killed|sigkill/i.test(errorReason);
   const signalKind = isOom ? 'oom' : 'runtime-failure';
   additionalContext =
-    `[EVOR JOB FAILED] Job${jobId ? ` ${jobId}` : ''} failed: ${errorReason}. ` +
+    `[EVOR JOB FAILED] Job failed: ${errorReason}. ` +
     `Call evor_signal_emit(kind="${signalKind}", severity="high") with the error details. ` +
     `Then call PushNotification to alert the user that the run failed and the mission is blocked.`;
 
