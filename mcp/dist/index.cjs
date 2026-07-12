@@ -21153,6 +21153,9 @@ var MutationLocusSchema = external_exports.discriminatedUnion("family", [
 ]);
 var TreeNodeSchema = external_exports.object({
   id: external_exports.string().uuid(),
+  name: external_exports.string().optional().describe(
+    "Human-readable node slug the agent coined (e.g. 'immune-memory-02'). Optional; when set, every node tool accepts it in place of the UUID (P2-1)."
+  ),
   parent_ids: external_exports.array(external_exports.string()),
   approach_family: ApproachFamilySchema,
   hypothesis_id: external_exports.string(),
@@ -21796,6 +21799,71 @@ function callBridge(scriptName, args, opts) {
   return _parseSpawnResult(result);
 }
 
+// src/tools/node-ref.ts
+function resolveNodeRef(runId, ref, missionId) {
+  if (!ref) return ref;
+  let nodes;
+  try {
+    nodes = readTree(runId, missionId);
+  } catch {
+    return ref;
+  }
+  if (nodes[ref]) return ref;
+  for (const node of Object.values(nodes)) {
+    if (node && node.name === ref) return node.id;
+  }
+  const colon = ref.lastIndexOf(":");
+  if (colon > 0) {
+    const base = ref.slice(0, colon);
+    if (nodes[base]) return base;
+    for (const node of Object.values(nodes)) {
+      if (node && node.name === base) return node.id;
+    }
+  }
+  return ref;
+}
+function deriveName(runId, approachFamily, missionId) {
+  const base = (approachFamily || "node").toLowerCase().replace(/[^a-z0-9-]/g, "-");
+  let nodes = {};
+  try {
+    nodes = readTree(runId, missionId);
+  } catch {
+  }
+  const count = Object.values(nodes).filter(
+    (n) => n && typeof n.name === "string" && n.name.startsWith(`${base}-`)
+  ).length;
+  return assignUniqueNameIn(nodes, `${base}-${count + 1}`);
+}
+function assignUniqueNameIn(nodes, desired) {
+  const taken = /* @__PURE__ */ new Set();
+  for (const node of Object.values(nodes)) {
+    if (node && node.name) taken.add(node.name);
+  }
+  if (!taken.has(desired)) return desired;
+  for (let i = 2; ; i++) {
+    const candidate = `${desired}-${i}`;
+    if (!taken.has(candidate)) return candidate;
+  }
+}
+function assignUniqueName(runId, desired, missionId) {
+  if (!desired) return "";
+  let nodes;
+  try {
+    nodes = readTree(runId, missionId);
+  } catch {
+    return desired;
+  }
+  const taken = /* @__PURE__ */ new Set();
+  for (const node of Object.values(nodes)) {
+    if (node && node.name) taken.add(node.name);
+  }
+  if (!taken.has(desired)) return desired;
+  for (let i = 2; ; i++) {
+    const candidate = `${desired}-${i}`;
+    if (!taken.has(candidate)) return candidate;
+  }
+}
+
 // src/tools/integrity.ts
 var frozenSplitHashCache = /* @__PURE__ */ new Map();
 var evalVersionCache = /* @__PURE__ */ new Map();
@@ -21851,11 +21919,11 @@ function registerIntegrityTools(server) {
     "Auto-triggered by evor_record_eval; call explicitly only for re-checks or manual spot-checks. Runs all 13 IntegrityGate checks via integrity_bridge.py and writes IntegrityReport to evaluations/<node-id>.json. Checks: reward-hacking, split-purity, telemetry-sane, acquisition-provenance, grad-norm-health, loss-monotonic, eval-consistency, config-reproducibility, dataset-frozen, license-gate, leakage-probe, performance-ceiling, and coverage-gap.",
     {
       run_id: external_exports.string().describe("Active run identifier"),
-      node_id: external_exports.string().describe("Node to check")
+      node_id: external_exports.string().describe("The node's name (e.g. 'immune-memory-02')")
     },
     async ({ run_id, node_id }) => {
       const missionId = process.env.EVOR_MISSION_ID;
-      const result = integrityCheck(run_id, node_id, missionId);
+      const result = integrityCheck(run_id, resolveNodeRef(run_id, node_id, missionId), missionId);
       return {
         content: [
           {
@@ -21972,29 +22040,37 @@ function readResult(runId, nodeId, missionId) {
   }
 }
 function registerRecordTools(server) {
-  const RecordNodeInputSchema = TreeNodeSchema.extend({
-    id: external_exports.string().uuid().optional().describe(
-      "Node UUID; auto-generated if omitted (saves a shell-out to python -c 'import uuid; \u2026')"
+  const RecordNodeInputSchema = TreeNodeSchema.omit({ id: true }).extend({
+    name: external_exports.string().optional().describe(
+      "Readable node name you coin, e.g. 'immune-memory-02'. Reused in every later call (evor_record_eval/run_start/read_result). Auto-derived from approach_family if omitted. Name parents in `parent_ids` by their names too."
     )
   });
   server.tool(
     "evor_record_node",
-    "Call BEFORE evor_record_eval. Validate a TreeNode against the Zod schema and atomically upsert it into tree.json. node.id is optional \u2014 a UUID is auto-generated when omitted (no shell-out to python -c 'import uuid' needed). Returns {ok, node_id, pending_remaining}.",
+    "Call BEFORE evor_record_eval. Record a candidate node in the evolution tree, identified by a readable `name` you coin (e.g. 'immune-memory-02'). Reference its parents in `parent_ids` by their names. Returns {ok, name} \u2014 use that name in every later node call; you never handle an internal id.",
     {
       run_id: external_exports.string().describe("Active run identifier"),
-      node: RecordNodeInputSchema.describe("TreeNode to record (id is optional; auto-generated if absent)")
+      node: RecordNodeInputSchema.describe("Candidate node; identify it by `name` (no id \u2014 the server owns that)")
     },
     async ({ run_id, node }) => {
       const missionId = process.env.EVOR_MISSION_ID;
       const filledNode = fillNodeId(node);
+      filledNode.name = filledNode.name ? assignUniqueName(run_id, filledNode.name, missionId) : deriveName(run_id, filledNode.approach_family, missionId);
+      if (Array.isArray(filledNode.parent_ids)) {
+        filledNode.parent_ids = filledNode.parent_ids.map(
+          (p) => resolveNodeRef(run_id, p, missionId)
+        );
+      }
       const { pendingRemaining, treePath } = recordNode(run_id, filledNode, missionId);
       return {
         content: [
           {
             type: "text",
+            // Return ONLY the name — never the internal id. On collision the name
+            // may differ from what was asked; the caller uses THIS value downstream.
             text: JSON.stringify({
               ok: true,
-              node_id: filledNode.id,
+              name: filledNode.name,
               run_id,
               pending_remaining: pendingRemaining,
               tree_path: treePath
@@ -22006,25 +22082,29 @@ function registerRecordTools(server) {
   );
   server.tool(
     "evor_record_eval",
-    "Write an EvaluationResult to nodes/<node_id>/results.json and auto-trigger evor_integrity_check. Always call evor_record_node first so the tree has the node. Returns {ok, results_path, integrity_verdict, integrity_error}.",
+    "Record a node's EvaluationResult and auto-trigger the integrity check. Identify the node by the `name` you gave evor_record_node. Always call evor_record_node first. Returns {ok, name, results_path, integrity_verdict, integrity_report}.",
     {
       run_id: external_exports.string().describe("Active run identifier"),
-      node_id: external_exports.string().describe("Node being evaluated"),
+      node_id: external_exports.string().describe(
+        "The node's name (e.g. 'immune-memory-02'), as returned by evor_record_node"
+      ),
       result: EvaluationResultSchema.describe("EvaluationResult to record")
     },
     async ({ run_id, node_id, result }) => {
       const missionId = process.env.EVOR_MISSION_ID;
-      const { resultsPath, integrityVerdict, integrityError, integrityReport } = recordEval(run_id, node_id, result, missionId);
+      const resolvedId = resolveNodeRef(run_id, node_id, missionId);
+      const { resultsPath, integrityVerdict, integrityError, integrityReport } = recordEval(run_id, resolvedId, result, missionId);
       return {
         content: [
           {
             type: "text",
             // P1-1: integrity_report is the FULL IntegrityReport inline — the orchestrator
             // never needs a separate evor_integrity_check call for the normal flow.
+            // Echo the NAME the caller used, never the internal id.
             text: JSON.stringify({
               ok: true,
               run_id,
-              node_id,
+              name: node_id,
               status: result.status,
               results_path: resultsPath,
               integrity_verdict: integrityVerdict,
@@ -22041,14 +22121,16 @@ function registerRecordTools(server) {
     "Read nodes/<node_id>/results.json and return parsed JSON. Eliminates the need to shell out 'cat results.json' or read artifact paths manually. Call after evor_run_status shows state='done'. Returns the full EvaluationResult object.",
     {
       run_id: external_exports.string().describe("Active run identifier"),
-      node_id: external_exports.string().describe("Node identifier returned by evor_record_node"),
+      node_id: external_exports.string().describe(
+        "The node's name (e.g. 'immune-memory-02'), as returned by evor_record_node"
+      ),
       mission_id: external_exports.string().optional().describe(
         "Mission identifier (resolved from EVOR_MISSION_ID env when omitted)"
       )
     },
     async ({ run_id, node_id, mission_id }) => {
       const missionId = mission_id ?? process.env.EVOR_MISSION_ID;
-      const result = readResult(run_id, node_id, missionId);
+      const result = readResult(run_id, resolveNodeRef(run_id, node_id, missionId), missionId);
       return {
         content: [
           {
@@ -23831,13 +23913,15 @@ function registerComputeTools(server) {
     `Launch candidate node as a detached background job. Returns {job_id, status_path, log_path} instantly \u2014 watch with evor_run_status or Monitor(command: 'tail -f <log_path> | grep -E --line-buffered "elapsed_steps=|val_|Error|OOM"').`,
     {
       run_id: external_exports.string().describe("Active run identifier"),
-      node_id: external_exports.string().describe("TreeNode.id being evaluated"),
+      node_id: external_exports.string().describe("The node's name (e.g. 'immune-memory-02')"),
       run_dir: external_exports.string().describe("Absolute path to .evor/runs/<mission>/<run-id>/"),
       worktree: external_exports.string().describe("Absolute path to the candidate git worktree"),
       eval_version: external_exports.string().optional().describe("Eval suite version override (e.g. v1)")
     },
     async ({ run_id, node_id, run_dir, worktree, eval_version }) => {
-      const result = jobStart(node_id, run_id, run_dir, worktree, eval_version);
+      const missionId = process.env.EVOR_MISSION_ID;
+      const resolvedNodeId = resolveNodeRef(run_id, node_id, missionId);
+      const result = jobStart(resolvedNodeId, run_id, run_dir, worktree, eval_version);
       if (!result.ok) return err(result.error ?? "evor_run_start failed");
       const jobData = result.data;
       const jobId = typeof jobData?.job_id === "string" ? jobData.job_id : void 0;
@@ -23851,7 +23935,6 @@ function registerComputeTools(server) {
             } catch {
             }
           }
-          const missionId = process.env.EVOR_MISSION_ID;
           const ar = {
             ...existing,
             run_id,

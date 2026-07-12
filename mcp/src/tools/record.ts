@@ -13,6 +13,7 @@ import { TreeNode, TreeNodeSchema, EvaluationResultSchema } from "../contracts.j
 import { readTree, upsertNode } from "../tree-store.js";
 import { ensureRunDirs, resolveRunPaths } from "../run-store.js";
 import { integrityCheck } from "./integrity.js";
+import { resolveNodeRef, assignUniqueName, deriveName } from "./node-ref.js";
 
 // ── Shared helpers ──────────────────────────────────────────────────────────
 
@@ -196,34 +197,53 @@ export function readResult(
 
 export function registerRecordTools(server: McpServer): void {
   // ── evor_record_node ───────────────────────────────────────────────────────
-  // node.id is optional here so callers can omit it — fillNodeId auto-generates
-  // a UUID (P2-1), saving the orchestrator a shell-out turn per node.
-  const RecordNodeInputSchema = TreeNodeSchema.extend({
-    id: z.string().uuid().optional().describe(
-      "Node UUID; auto-generated if omitted (saves a shell-out to python -c 'import uuid; …')",
+  // Name-only surface: the agent identifies nodes by a readable `name` it coins
+  // (e.g. "immune-memory-02"). The server owns the internal id entirely — it is
+  // never accepted from, nor returned to, the agent. This keeps opaque ids out of
+  // the agent's context so it never fabricates or carries one.
+  const RecordNodeInputSchema = TreeNodeSchema.omit({ id: true }).extend({
+    name: z.string().optional().describe(
+      "Readable node name you coin, e.g. 'immune-memory-02'. Reused in every later "
+      + "call (evor_record_eval/run_start/read_result). Auto-derived from approach_family "
+      + "if omitted. Name parents in `parent_ids` by their names too.",
     ),
   });
   server.tool(
     "evor_record_node",
-    "Call BEFORE evor_record_eval. Validate a TreeNode against the Zod schema and atomically "
-    + "upsert it into tree.json. node.id is optional — a UUID is auto-generated when omitted "
-    + "(no shell-out to python -c 'import uuid' needed). Returns {ok, node_id, pending_remaining}.",
+    "Call BEFORE evor_record_eval. Record a candidate node in the evolution tree, "
+    + "identified by a readable `name` you coin (e.g. 'immune-memory-02'). Reference its "
+    + "parents in `parent_ids` by their names. Returns {ok, name} — use that name in every "
+    + "later node call; you never handle an internal id.",
     {
       run_id: z.string().describe("Active run identifier"),
-      node: RecordNodeInputSchema.describe("TreeNode to record (id is optional; auto-generated if absent)"),
+      node: RecordNodeInputSchema.describe("Candidate node; identify it by `name` (no id — the server owns that)"),
     },
     async ({ run_id, node }) => {
       const missionId = process.env.EVOR_MISSION_ID;
-      // Auto-fill id before passing to recordNode (which expects a full TreeNode)
+      // Server always mints the internal id — never accepted from the agent.
       const filledNode = fillNodeId(node as Partial<TreeNode> & Omit<TreeNode, "id">);
+      // Name-only surface: ensure a readable, unique name so we never expose the id.
+      //  - agent-supplied name → uniquify (auto-suffix on collision, decision #1)
+      //  - omitted → derive from approach_family so the response is still name-based
+      filledNode.name = filledNode.name
+        ? assignUniqueName(run_id, filledNode.name, missionId)
+        : deriveName(run_id, filledNode.approach_family, missionId);
+      // Resolve parent refs (names) → internal ids (decision #3).
+      if (Array.isArray(filledNode.parent_ids)) {
+        filledNode.parent_ids = filledNode.parent_ids.map((p) =>
+          resolveNodeRef(run_id, p, missionId),
+        );
+      }
       const { pendingRemaining, treePath } = recordNode(run_id, filledNode, missionId);
       return {
         content: [
           {
             type: "text" as const,
+            // Return ONLY the name — never the internal id. On collision the name
+            // may differ from what was asked; the caller uses THIS value downstream.
             text: JSON.stringify({
               ok: true,
-              node_id: filledNode.id,
+              name: filledNode.name,
               run_id,
               pending_remaining: pendingRemaining,
               tree_path: treePath,
@@ -237,28 +257,32 @@ export function registerRecordTools(server: McpServer): void {
   // ── evor_record_eval ───────────────────────────────────────────────────────
   server.tool(
     "evor_record_eval",
-    "Write an EvaluationResult to nodes/<node_id>/results.json and auto-trigger "
-    + "evor_integrity_check. Always call evor_record_node first so the tree has the node. "
-    + "Returns {ok, results_path, integrity_verdict, integrity_error}.",
+    "Record a node's EvaluationResult and auto-trigger the integrity check. Identify the "
+    + "node by the `name` you gave evor_record_node. Always call evor_record_node first. "
+    + "Returns {ok, name, results_path, integrity_verdict, integrity_report}.",
     {
       run_id: z.string().describe("Active run identifier"),
-      node_id: z.string().describe("Node being evaluated"),
+      node_id: z.string().describe(
+        "The node's name (e.g. 'immune-memory-02'), as returned by evor_record_node",
+      ),
       result: EvaluationResultSchema.describe("EvaluationResult to record"),
     },
     async ({ run_id, node_id, result }) => {
       const missionId = process.env.EVOR_MISSION_ID;
+      const resolvedId = resolveNodeRef(run_id, node_id, missionId);
       const { resultsPath, integrityVerdict, integrityError, integrityReport } =
-        recordEval(run_id, node_id, result, missionId);
+        recordEval(run_id, resolvedId, result, missionId);
       return {
         content: [
           {
             type: "text" as const,
             // P1-1: integrity_report is the FULL IntegrityReport inline — the orchestrator
             // never needs a separate evor_integrity_check call for the normal flow.
+            // Echo the NAME the caller used, never the internal id.
             text: JSON.stringify({
               ok: true,
               run_id,
-              node_id,
+              name: node_id,
               status: result.status,
               results_path: resultsPath,
               integrity_verdict: integrityVerdict,
@@ -279,14 +303,16 @@ export function registerRecordTools(server: McpServer): void {
     + "Call after evor_run_status shows state='done'. Returns the full EvaluationResult object.",
     {
       run_id: z.string().describe("Active run identifier"),
-      node_id: z.string().describe("Node identifier returned by evor_record_node"),
+      node_id: z.string().describe(
+        "The node's name (e.g. 'immune-memory-02'), as returned by evor_record_node",
+      ),
       mission_id: z.string().optional().describe(
         "Mission identifier (resolved from EVOR_MISSION_ID env when omitted)",
       ),
     },
     async ({ run_id, node_id, mission_id }) => {
       const missionId = mission_id ?? process.env.EVOR_MISSION_ID;
-      const result = readResult(run_id, node_id, missionId);
+      const result = readResult(run_id, resolveNodeRef(run_id, node_id, missionId), missionId);
       return {
         content: [
           {

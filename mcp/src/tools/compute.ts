@@ -23,6 +23,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { resolveRunPaths, getEvorRoot, getActiveRunPath } from "../run-store.js";
 import { callPythonModule, type PyResult } from "../subprocess-bridge.js";
+import { resolveNodeRef } from "./node-ref.js";
 
 // ── Shared helpers ────────────────────────────────────────────────────────────
 
@@ -293,13 +294,15 @@ export function registerComputeTools(server: McpServer): void {
     + "or Monitor(command: 'tail -f <log_path> | grep -E --line-buffered \"elapsed_steps=|val_|Error|OOM\"').",
     {
       run_id: z.string().describe("Active run identifier"),
-      node_id: z.string().describe("TreeNode.id being evaluated"),
+      node_id: z.string().describe("The node's name (e.g. 'immune-memory-02')"),
       run_dir: z.string().describe("Absolute path to .evor/runs/<mission>/<run-id>/"),
       worktree: z.string().describe("Absolute path to the candidate git worktree"),
       eval_version: z.string().optional().describe("Eval suite version override (e.g. v1)"),
     },
     async ({ run_id, node_id, run_dir, worktree, eval_version }) => {
-      const result = jobStart(node_id, run_id, run_dir, worktree, eval_version);
+      const missionId = process.env.EVOR_MISSION_ID;
+      const resolvedNodeId = resolveNodeRef(run_id, node_id, missionId);
+      const result = jobStart(resolvedNodeId, run_id, run_dir, worktree, eval_version);
       if (!result.ok) return err(result.error ?? "evor_run_start failed");
 
       // Record job_id + run_dir into active-run.json so the run-watcher monitor
@@ -313,7 +316,6 @@ export function registerComputeTools(server: McpServer): void {
           if (existsSync(arPath)) {
             try { existing = JSON.parse(readFileSync(arPath, "utf8")); } catch { /* ignore */ }
           }
-          const missionId = process.env.EVOR_MISSION_ID;
           const ar: Record<string, unknown> = {
             ...existing,
             run_id,

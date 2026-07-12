@@ -488,11 +488,12 @@ try {
   if (bareToolR === 'record_node') {
     if (!isThrottled('record_node:run_start')) {
       markThrottled('record_node:run_start');
-      const nodeId3   = String(toolResp?.node_id ?? toolInpR?.node_id ?? '');
+      // Name-only surface: the response carries `name`, never an internal id.
+      const nodeName = String(toolResp?.name ?? toolInpR?.node?.name ?? '');
       const worktree  = String(toolInpR?.worktree ?? '');
       const nudge =
-        `[EVOR REFLEX] Node recorded${nodeId3 ? ` (${nodeId3})` : ''}. ` +
-        `Launch its evaluation: call evor_run_start(node_id="${nodeId3 || '<node_id>'}"` +
+        `[EVOR REFLEX] Node recorded${nodeName ? ` (${nodeName})` : ''}. ` +
+        `Launch its evaluation: call evor_run_start(node_id="${nodeName || '<name>'}"` +
         `${worktree ? `, worktree="${worktree}"` : ''}).`;
       process.stdout.write(
         JSON.stringify({
@@ -507,15 +508,17 @@ try {
   if (bareToolR === 'record_eval') {
     if (!isThrottled('record_eval:integrity')) {
       markThrottled('record_eval:integrity');
-      const nodeId4 = String(toolResp?.node_id ?? toolInpR?.node_id ?? '');
+      // Name-only surface: response carries `name`; fall back to the input node_id
+      // the caller passed (which is itself a name in the new API).
+      const nodeName4 = String(toolResp?.name ?? toolInpR?.node_id ?? '');
       const runId4  = String(toolInpR?.run_id ?? activeRunId);
       const prevBest = toolResp?.previous_best_score ?? null;
       const newScore = toolResp?.score ?? toolResp?.best_score ?? null;
       const improved = prevBest !== null && newScore !== null && newScore > prevBest;
       // P1-1: nudge full post-eval flow — integrity THEN state_write frontier update
       const nudge =
-        `[EVOR REFLEX] Eval recorded${nodeId4 ? ` for ${nodeId4}` : ''}. ` +
-        `Next: (1) verify evor_integrity_check(${nodeId4 ? `node_id="${nodeId4}"` : 'node_id=...'}); ` +
+        `[EVOR REFLEX] Eval recorded${nodeName4 ? ` for ${nodeName4}` : ''}. ` +
+        `Next: (1) verify evor_integrity_check(${nodeName4 ? `node_id="${nodeName4}"` : 'node_id=...'}); ` +
         `(2) if passed, update the frontier with evor_state_write(run_id="${runId4}").` +
         (improved
           ? ` New best score ${String(newScore).slice(0, 8)} > ${String(prevBest).slice(0, 8)} — ` +

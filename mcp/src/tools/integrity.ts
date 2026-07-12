@@ -11,6 +11,7 @@ import { z } from "zod";
 import { GoalContract } from "../contracts.js";
 import { resolveRunPaths } from "../run-store.js";
 import { callBridge } from "../subprocess-bridge.js";
+import { resolveNodeRef } from "./node-ref.js";
 
 // ── P2-2: frozen-split hash cache ────────────────────────────────────────────
 
@@ -149,11 +150,11 @@ export function registerIntegrityTools(server: McpServer): void {
     + "performance-ceiling, and coverage-gap.",
     {
       run_id: z.string().describe("Active run identifier"),
-      node_id: z.string().describe("Node to check"),
+      node_id: z.string().describe("The node's name (e.g. 'immune-memory-02')"),
     },
     async ({ run_id, node_id }) => {
       const missionId = process.env.EVOR_MISSION_ID;
-      const result = integrityCheck(run_id, node_id, missionId);
+      const result = integrityCheck(run_id, resolveNodeRef(run_id, node_id, missionId), missionId);
       return {
         content: [
           {

@@ -530,6 +530,9 @@ class TreeNode(BaseEvorModel):
     model_config = ConfigDict(strict=True, exclude_none=True)
 
     id: str
+    name: Optional[str] = None
+    """Human-readable node slug the agent coined (P2-1). Node tools accept it in
+    place of the UUID. Optional for back-compat with pre-slug tree.json entries."""
     parent_ids: list[str]
     approach_family: ApproachFamily
     hypothesis_id: str
