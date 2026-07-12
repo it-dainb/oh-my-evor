@@ -915,3 +915,234 @@ class TestMetricScaleAutoInference:
         assert data.get("metric_scale") == 100.0
         gc2 = GoalContract.model_validate(data)
         assert gc2.metric_scale == 100.0
+
+
+# ─── Class 7: server-owned bookkeeping defaults ───────────────────────────────
+
+
+class TestServerOwnedDefaults:
+    """Server-owned fields must be optional with correct defaults (Class 7 fix)."""
+
+    # ── TreeNode ─────────────────────────────────────────────────────────────────
+
+    def test_tree_node_lesson_ids_defaults_to_empty_list(self) -> None:
+        node = TreeNode(**{k: v for k, v in VALID_TREE_NODE_KWARGS.items()
+                           if k not in ("lesson_ids",)})
+        assert node.lesson_ids == []
+
+    def test_tree_node_citations_defaults_to_empty_list(self) -> None:
+        node = TreeNode(**{k: v for k, v in VALID_TREE_NODE_KWARGS.items()
+                           if k not in ("citations",)})
+        assert node.citations == []
+
+    def test_tree_node_integrity_status_defaults_to_pending(self) -> None:
+        node = TreeNode(**{k: v for k, v in VALID_TREE_NODE_KWARGS.items()
+                           if k not in ("integrity_status",)})
+        assert node.integrity_status == "pending"
+
+    def test_tree_node_status_defaults_to_pending(self) -> None:
+        node = TreeNode(**{k: v for k, v in VALID_TREE_NODE_KWARGS.items()
+                           if k not in ("status",)})
+        assert node.status == "pending"
+
+    def test_tree_node_is_crossover_defaults_to_false(self) -> None:
+        node = TreeNode(**{k: v for k, v in VALID_TREE_NODE_KWARGS.items()
+                           if k not in ("is_crossover",)})
+        assert node.is_crossover is False
+
+    def test_tree_node_visit_count_defaults_to_zero(self) -> None:
+        node = TreeNode(**{k: v for k, v in VALID_TREE_NODE_KWARGS.items()
+                           if k not in ("visit_count",)})
+        assert node.visit_count == 0
+
+    def test_tree_node_depth_defaults_to_zero(self) -> None:
+        node = TreeNode(**{k: v for k, v in VALID_TREE_NODE_KWARGS.items()
+                           if k not in ("depth",)})
+        assert node.depth == 0
+
+    def test_tree_node_created_at_is_optional(self) -> None:
+        node = TreeNode(**{k: v for k, v in VALID_TREE_NODE_KWARGS.items()
+                           if k not in ("created_at",)})
+        assert node.created_at is None
+
+    def test_tree_node_all_bookkeeping_omitted(self) -> None:
+        """Node with only semantic fields constructs without error."""
+        omit = {"lesson_ids", "citations", "integrity_status", "status",
+                 "is_crossover", "visit_count", "depth", "created_at"}
+        node = TreeNode(**{k: v for k, v in VALID_TREE_NODE_KWARGS.items()
+                           if k not in omit})
+        assert node.lesson_ids == []
+        assert node.integrity_status == "pending"
+        assert node.visit_count == 0
+        assert node.depth == 0
+
+    # ── EvaluationResult ─────────────────────────────────────────────────────────
+
+    def _make_eval_result(self, **overrides):
+        from evor.contracts import EvaluationResult, TelemetrySummary
+        base = dict(
+            metrics={"accuracy": 0.88},
+            per_domain={},
+            fitness_value=0.88,
+            telemetry_summary=TelemetrySummary(total_steps=50),
+            status="success",
+            benchmark_raw="{}",
+        )
+        base.update(overrides)
+        return EvaluationResult(**base)
+
+    def test_eval_result_node_id_optional(self) -> None:
+        from evor.contracts import EvaluationResult
+        r = self._make_eval_result()
+        assert r.node_id is None
+
+    def test_eval_result_run_id_optional(self) -> None:
+        r = self._make_eval_result()
+        assert r.run_id is None
+
+    def test_eval_result_eval_version_optional(self) -> None:
+        r = self._make_eval_result()
+        assert r.eval_version is None
+
+    def test_eval_result_timestamp_optional(self) -> None:
+        r = self._make_eval_result()
+        assert r.timestamp is None
+
+    def test_eval_result_with_all_bookkeeping_provided(self) -> None:
+        r = self._make_eval_result(
+            node_id="node-abc",
+            run_id="run-001",
+            eval_version="v2",
+            timestamp="2026-01-01T00:00:00Z",
+        )
+        assert r.node_id == "node-abc"
+        assert r.eval_version == "v2"
+
+    # ── TelemetryRecord ───────────────────────────────────────────────────────────
+
+    def _make_telemetry(self, **overrides):
+        from evor.contracts import TelemetryRecord
+        base = dict(step=10)
+        base.update(overrides)
+        return TelemetryRecord(**base)
+
+    def test_telemetry_node_id_optional(self) -> None:
+        r = self._make_telemetry()
+        assert r.node_id is None
+
+    def test_telemetry_run_id_optional(self) -> None:
+        r = self._make_telemetry()
+        assert r.run_id is None
+
+    def test_telemetry_timestamp_optional(self) -> None:
+        r = self._make_telemetry()
+        assert r.timestamp is None
+
+    def test_telemetry_with_bookkeeping_provided(self) -> None:
+        r = self._make_telemetry(
+            node_id="n1", run_id="r1", timestamp="2026-01-01T00:00:00Z"
+        )
+        assert r.node_id == "n1"
+        assert r.run_id == "r1"
+
+    # ── LessonEntry ───────────────────────────────────────────────────────────────
+
+    def _make_lesson(self, **overrides):
+        from evor.contracts import LessonEntry
+        base = dict(
+            approach_family="arch",
+            hypothesis_verdict="confirmed",
+            observation="loss dropped significantly",
+            actionable_lesson="use residual connections",
+            citations=[],
+            tags=["arch"],
+        )
+        base.update(overrides)
+        return LessonEntry(**base)
+
+    def test_lesson_id_optional(self) -> None:
+        r = self._make_lesson()
+        assert r.lesson_id is None
+
+    def test_lesson_node_id_optional(self) -> None:
+        r = self._make_lesson()
+        assert r.node_id is None
+
+    def test_lesson_run_id_optional(self) -> None:
+        r = self._make_lesson()
+        assert r.run_id is None
+
+    def test_lesson_mission_id_optional(self) -> None:
+        r = self._make_lesson()
+        assert r.mission_id is None
+
+    def test_lesson_created_at_optional(self) -> None:
+        r = self._make_lesson()
+        assert r.created_at is None
+
+    # ── GoalContract ──────────────────────────────────────────────────────────────
+
+    def test_goal_contract_created_at_optional(self) -> None:
+        gc = GoalContract(**{k: v for k, v in VALID_GOAL_CONTRACT_KWARGS.items()
+                              if k != "created_at"})
+        assert gc.created_at is None
+
+    def test_goal_contract_locked_split_hash_optional(self) -> None:
+        gc = GoalContract(**{k: v for k, v in VALID_GOAL_CONTRACT_KWARGS.items()
+                              if k != "locked_split_hash"})
+        assert gc.locked_split_hash is None
+
+    def test_goal_contract_eval_script_hash_optional(self) -> None:
+        gc = GoalContract(**{k: v for k, v in VALID_GOAL_CONTRACT_KWARGS.items()
+                              if k != "eval_script_hash"})
+        assert gc.eval_script_hash is None
+
+    def test_goal_contract_all_server_fields_omitted(self) -> None:
+        """Contract with no server-owned fields constructs without error."""
+        omit = {"created_at", "locked_split_hash", "eval_script_hash"}
+        gc = GoalContract(**{k: v for k, v in VALID_GOAL_CONTRACT_KWARGS.items()
+                              if k not in omit})
+        assert gc.created_at is None
+        assert gc.locked_split_hash is None
+        assert gc.eval_script_hash is None
+
+    # ── MutationProposal ──────────────────────────────────────────────────────────
+
+    def test_mutation_proposal_proposal_id_optional(self) -> None:
+        prop = MutationProposal(
+            parent_node_ids=[UUID_A],
+            approach_family="arch",
+            idea="test",
+            hypothesis=Hypothesis(id="h-1", statement="s", prediction="p"),
+            citations=[],
+            wildness=0.3,
+            critic_approved=True,
+        )
+        assert prop.proposal_id is None
+
+    def test_mutation_proposal_critic_review_optional(self) -> None:
+        prop = MutationProposal(
+            proposal_id="p-001",
+            parent_node_ids=[UUID_A],
+            approach_family="arch",
+            idea="test",
+            hypothesis=Hypothesis(id="h-1", statement="s", prediction="p"),
+            citations=[],
+            wildness=0.3,
+            critic_approved=True,
+        )
+        assert prop.critic_review is None
+
+    def test_mutation_proposal_all_server_fields_omitted(self) -> None:
+        """MutationProposal with no proposal_id and no critic_review is valid."""
+        prop = MutationProposal(
+            parent_node_ids=[UUID_A],
+            approach_family="training",
+            idea="use mixup",
+            hypothesis=Hypothesis(id="h-2", statement="s", prediction="p"),
+            citations=[],
+            wildness=0.5,
+            critic_approved=False,
+        )
+        assert prop.proposal_id is None
+        assert prop.critic_review is None

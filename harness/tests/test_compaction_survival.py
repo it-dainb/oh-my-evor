@@ -223,10 +223,10 @@ class TestEvorRestorePayload:
         msg = output["systemMessage"]
         # Must contain tick reference
         assert "Tick 7" in msg, "restore must mention current tick"
-        # Must mention run id (possibly truncated)
-        assert run_id[:10] in msg, "restore must reference run_id"
-        # Must have recovery hint
-        assert ".evor/" in msg, "restore must include recovery path hint"
+        # Name-only surface: anchor on the mission objective, never a raw run_id
+        assert "test objective" in msg, "restore must reference the mission objective"
+        # Recovery hint is tool-based, never an internal .evor/ path
+        assert "evor_state_read" in msg, "restore must direct to evor_state_read"
 
     def test_no_active_run_exits_0_silently(self, tmp_path: Path) -> None:
         result = run_hook(PRE_COMPACT, {"EVOR_ROOT": str(tmp_path)})
@@ -262,7 +262,8 @@ class TestSubagentStopArtifactCheck:
         })
         assert result.returncode == 0
         assert "[EVOR SUBAGENT WARNING]" in result.stdout
-        assert "findings.json" in result.stdout
+        # Name-only surface: the warning names the role, not the on-disk filename/path
+        assert "sage" in result.stdout
 
     def test_silent_when_artifact_present(self, tmp_path: Path) -> None:
         run_id = "run-sa-py-002"
@@ -309,7 +310,7 @@ class TestSubagentStopArtifactCheck:
     def test_each_role_has_distinct_artifact(
         self, tmp_path: Path, role: str, expected_file: str
     ) -> None:
-        """Each roster role's missing artifact produces a warning naming the correct file."""
+        """Each roster role's missing artifact produces a warning naming the role."""
         run_id = f"run-sa-py-role-{role}"
         run_dir = tmp_path / "runs" / run_id
         run_dir.mkdir(parents=True)
@@ -322,8 +323,9 @@ class TestSubagentStopArtifactCheck:
         })
         assert result.returncode == 0
         assert "[EVOR SUBAGENT WARNING]" in result.stdout
-        assert expected_file in result.stdout, (
-            f"Warning for role={role} must mention artifact {expected_file}"
+        # Name-only surface: warning names the role, not the on-disk filename
+        assert role in result.stdout, (
+            f"Warning for role={role} must name the role"
         )
 
 
@@ -429,7 +431,7 @@ class TestNestedLayoutCompactionSurvival:
         assert "<evor-restore>" in message, (
             "session-start must emit <evor-restore> for nested layout"
         )
-        assert run_id[:10] in message
+        assert "nested rehydration test" in message
         assert "Tick 8" in message
 
     def test_nested_full_compaction_loop(self, tmp_path: Path) -> None:

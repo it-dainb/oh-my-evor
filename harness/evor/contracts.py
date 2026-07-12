@@ -330,8 +330,10 @@ class GoalContract(BaseEvorModel):
     budget: Budget
     framework: Optional[str] = None
     seed_repo_path: Optional[str] = None
-    locked_split_hash: str
-    eval_script_hash: str
+    # Server-owned: harness computes at freeze — agent must never supply.
+    # Required in stored contract; optional at agent-facing input layer.
+    locked_split_hash: Optional[str] = None
+    eval_script_hash: Optional[str] = None
     expansion_policy: Optional[ExpansionPolicy] = None
     allowed_licenses: list[str]
     """allowlist for data-acquisition provenance (R-3)"""
@@ -339,7 +341,8 @@ class GoalContract(BaseEvorModel):
     """escalate-mode bounds; None = fully frozen (no auto-adaptation)."""
     autonomy_charter: AutonomyCharter = Field(default_factory=AutonomyCharter)
     """full-autonomy charter; always present — charter is mandatory for all missions."""
-    created_at: str
+    # Server-owned: filled via now() at creation time.
+    created_at: Optional[str] = None
 
     # ── P0-7: metric scale ────────────────────────────────────────────────────
     metric_scale: float = 1.0
@@ -548,15 +551,16 @@ class TreeNode(BaseEvorModel):
     eval_version: str
     fitness_value: Optional[float] = None
     telemetry_ref: Optional[str] = None
-    lesson_ids: list[str]
-    citations: list[str]
-    integrity_status: Literal["pending", "passed", "failed"]
-    status: Literal["pending", "running", "done", "pruned"]
-    is_crossover: bool
+    # Server-owned bookkeeping — optional at agent-facing input; server fills defaults.
+    lesson_ids: list[str] = Field(default_factory=list)
+    citations: list[str] = Field(default_factory=list)
+    integrity_status: Literal["pending", "passed", "failed"] = "pending"
+    status: Literal["pending", "running", "done", "pruned"] = "pending"
+    is_crossover: bool = False
     ucb1_score: Optional[float] = None
-    visit_count: int
-    depth: int
-    created_at: str
+    visit_count: int = 0
+    depth: int = 0
+    created_at: Optional[str] = None
     completed_at: Optional[str] = None
 
 
@@ -581,7 +585,8 @@ class CriticReview(BaseEvorModel):
 class MutationProposal(BaseEvorModel):
     model_config = ConfigDict(strict=True, exclude_none=True)
 
-    proposal_id: str
+    # Server-owned: generated server-side if absent.
+    proposal_id: Optional[str] = None
     parent_node_ids: list[str]
     approach_family: ApproachFamily
     idea: str
@@ -589,7 +594,8 @@ class MutationProposal(BaseEvorModel):
     citations: list[str]
     wildness: float
     critic_approved: bool
-    critic_review: CriticReview
+    # Server-owned: evor_validate_proposals computes gate codes deterministically.
+    critic_review: Optional[CriticReview] = None
 
 
 # ────────────────────────────────────────────────────────────────────────────
@@ -623,9 +629,10 @@ class AngleVsSOTAInline(BaseEvorModel):
 class EvaluationResult(BaseEvorModel):
     model_config = ConfigDict(strict=True, exclude_none=True)
 
-    node_id: str
-    run_id: str
-    eval_version: str
+    # Server-owned bookkeeping — filled server-side from tool args + cache + now().
+    node_id: Optional[str] = None
+    run_id: Optional[str] = None
+    eval_version: Optional[str] = None
     metrics: dict[str, float]
     per_domain: dict[str, dict[str, float]]
     fitness_value: float
@@ -634,7 +641,8 @@ class EvaluationResult(BaseEvorModel):
     telemetry_summary: TelemetrySummary
     status: Literal["success", "regression", "error", "timeout", "oom"]
     benchmark_raw: str
-    timestamp: str
+    # Server-owned: filled via now().
+    timestamp: Optional[str] = None
 
 
 # ────────────────────────────────────────────────────────────────────────────
@@ -694,9 +702,10 @@ class TelemetryRecord(BaseEvorModel):
     gpu_util: Optional[float] = None
     mem_used_gb: Optional[float] = None
     mem_total_gb: Optional[float] = None
-    node_id: str
-    run_id: str
-    timestamp: str
+    # Server-owned bookkeeping — telemetry.ts worker fills these from tool args + now().
+    node_id: Optional[str] = None
+    run_id: Optional[str] = None
+    timestamp: Optional[str] = None
 
 
 # ────────────────────────────────────────────────────────────────────────────
@@ -707,10 +716,11 @@ class TelemetryRecord(BaseEvorModel):
 class LessonEntry(BaseEvorModel):
     model_config = ConfigDict(strict=True, exclude_none=True)
 
-    lesson_id: str
-    node_id: str
-    run_id: str
-    mission_id: str
+    # Server-owned bookkeeping — derived/generated server-side.
+    lesson_id: Optional[str] = None
+    node_id: Optional[str] = None
+    run_id: Optional[str] = None
+    mission_id: Optional[str] = None
     approach_family: ApproachFamily
     hypothesis_verdict: Literal["confirmed", "refuted", "inconclusive"]
     observation: str
@@ -719,7 +729,8 @@ class LessonEntry(BaseEvorModel):
     citations: list[str]
     telemetry_evidence: Optional[str] = None
     tags: list[str]
-    created_at: str
+    # Server-owned: filled via now().
+    created_at: Optional[str] = None
 
 
 # ────────────────────────────────────────────────────────────────────────────
