@@ -8,11 +8,13 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { readTree } from "../tree-store.js";
 import { upsertNode } from "../tree-store.js";
+import { resolveNodeRef } from "./node-ref.js";
 
 // ── Core logic (exported for tests) ────────────────────────────────────────
 
 /**
  * Append `citation` to `node.citations[]` in tree.json for the given node.
+ * Accepts a node name or UUID; resolves to the node's id via resolveNodeRef.
  * Returns the updated citations array, or an error if the node is not found.
  */
 export function addCitation(
@@ -21,11 +23,12 @@ export function addCitation(
   citation: string,
   missionId?: string
 ): { ok: boolean; citations?: string[]; error?: string } {
+  const resolvedId = resolveNodeRef(runId, nodeId, missionId);
   const nodes = readTree(runId, missionId);
-  const node = nodes[nodeId];
+  const node = nodes[resolvedId];
 
   if (!node) {
-    return { ok: false, error: `Node ${nodeId} not found in tree.json for run ${runId}` };
+    return { ok: false, error: `node '${nodeId}' not found in this run's tree — check the name with evor_tree_read.` };
   }
 
   // Deduplicate: only append if not already present
@@ -44,10 +47,10 @@ export function addCitation(
 export function registerCiteTools(server: McpServer): void {
   server.tool(
     "evor_cite",
-    "Append a citation (bib entry, arXiv URL, or dataset URL) to the TreeNode's citations[] in tree.json.",
+    "Append a citation (bib entry, arXiv URL, or dataset URL) to a node's citations. Identify the node by name.",
     {
       run_id: z.string().describe("Active run identifier"),
-      node_id: z.string().describe("Node to annotate"),
+      node_id: z.string().describe("The node's name (e.g. 'immune-memory-02')"),
       citation: z.string().min(1).describe("Citation string: bib entry, arXiv URL, or dataset URL"),
     },
     async ({ run_id, node_id, citation }) => {

@@ -1,6 +1,6 @@
 /**
  * tools/schedule.ts
- * evor_schedule — submit a training job via scheduler_bridge.py
+ * evor_schedule — submit a training job to the ResourceScheduler
  *                 (launches python -m evor run as a background process)
  */
 
@@ -20,7 +20,7 @@ const JobSpecSchema = z.object({
 // ── Core logic (exported for tests) ────────────────────────────────────────
 
 /**
- * Submit a training job via scheduler_bridge.py.
+ * Submit a training job to the ResourceScheduler.
  * The bridge launches `python -m evor run` as a detached subprocess and
  * returns immediately with {job_id, pid, status: "submitted"}.
  */
@@ -61,7 +61,8 @@ export function scheduleJob(
 export function registerScheduleTools(server: McpServer): void {
   server.tool(
     "evor_schedule",
-    "Submit a training job to ResourceScheduler.submit() via scheduler_bridge.py; returns job_id and pid.",
+    "Submit a training job to the ResourceScheduler and return immediately. " +
+    "Returns a job_handle to track the job and its current status.",
     {
       run_id: z.string().describe("Active run identifier"),
       node_id: z.string().describe("Node being trained"),
@@ -76,17 +77,25 @@ export function registerScheduleTools(server: McpServer): void {
         timeoutSeconds: job_spec.timeout_seconds,
       });
 
+      if (!result.ok) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: JSON.stringify({ error: result.error ?? "schedule failed" }),
+            },
+          ],
+        };
+      }
+
       return {
         content: [
           {
             type: "text" as const,
             text: JSON.stringify({
-              run_id,
-              node_id,
-              job_id: result.jobId ?? null,
-              pid: result.pid ?? null,
-              status: result.status ?? "failed",
-              error: result.error ?? null,
+              ok: true,
+              job_handle: result.jobId ?? null,
+              status: result.status ?? "submitted",
             }),
           },
         ],

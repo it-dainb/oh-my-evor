@@ -169,8 +169,9 @@ export const GoalContractSchema = z.object({
   }),
   framework: z.string().optional(),
   seed_repo_path: z.string().optional(),
-  locked_split_hash: z.string(),
-  eval_script_hash: z.string(),
+  // Server-owned: harness computes at freeze — agent must never supply.
+  locked_split_hash: z.string().optional(),
+  eval_script_hash: z.string().optional(),
   expansion_policy: ExpansionPolicySchema.optional(),
   allowed_licenses: z.array(z.string()),
   evolution_bounds: EvolutionBoundsSchema.optional().describe(
@@ -183,7 +184,8 @@ export const GoalContractSchema = z.object({
       "(softening the metric, shifting comparability to inflate a score, leaking test " +
       "into train) are routed around — never executed, never halted on.",
   }).describe("full-autonomy charter; always present — charter is mandatory for all missions."),
-  created_at: ISODate,
+  // Server-owned: filled via now() at creation time.
+  created_at: ISODate.optional(),
 });
 export type GoalContract = z.infer<typeof GoalContractSchema>;
 
@@ -247,15 +249,16 @@ export const TreeNodeSchema = z.object({
   eval_version: z.string(),
   fitness_value: z.number().optional(),
   telemetry_ref: z.string().optional(),
-  lesson_ids: z.array(z.string()),
-  citations: z.array(z.string()),
-  integrity_status: z.enum(["pending", "passed", "failed"]),
-  status: z.enum(["pending", "running", "done", "pruned"]),
-  is_crossover: z.boolean(),
+  // Server-owned bookkeeping — optional in input; server fills defaults before persist.
+  lesson_ids: z.array(z.string()).optional().default([]),
+  citations: z.array(z.string()).optional().default([]),
+  integrity_status: z.enum(["pending", "passed", "failed"]).optional().default("pending"),
+  status: z.enum(["pending", "running", "done", "pruned"]).optional().default("pending"),
+  is_crossover: z.boolean().optional().default(false),
   ucb1_score: z.number().optional(),
-  visit_count: z.number().int().min(0),
-  depth: z.number().int().min(0),
-  created_at: ISODate,
+  visit_count: z.number().int().min(0).optional().default(0),
+  depth: z.number().int().min(0).optional().default(0),
+  created_at: ISODate.optional(),
   completed_at: ISODate.optional(),
 });
 export type TreeNode = z.infer<typeof TreeNodeSchema>;
@@ -265,7 +268,8 @@ export type TreeNode = z.infer<typeof TreeNodeSchema>;
 // ────────────────────────────────────────────────────────────────────────────
 
 export const MutationProposalSchema = z.object({
-  proposal_id: z.string(),
+  // Server-owned: generated server-side if absent.
+  proposal_id: z.string().optional(),
   parent_node_ids: z.array(z.string()),
   approach_family: ApproachFamilySchema,
   idea: z.string(),
@@ -273,6 +277,8 @@ export const MutationProposalSchema = z.object({
   citations: z.array(z.string()),
   wildness: z.number().min(0).max(1),
   critic_approved: z.boolean(),
+  // Server-owned: evor_validate_proposals computes gate codes deterministically.
+  // Agent must NOT supply internal gate codes; the server populates critic_review.
   critic_review: z.object({
     h001_one_hypothesis: z.enum(["pass", "fail"]),
     h002_family_streak: z.enum(["pass", "fail"]),
@@ -282,7 +288,7 @@ export const MutationProposalSchema = z.object({
     schema_valid: z.enum(["pass", "fail"]),
     verdict: z.enum(["approved", "rejected"]),
     rejection_reason: z.string().optional(),
-  }),
+  }).optional(),
 });
 export type MutationProposal = z.infer<typeof MutationProposalSchema>;
 
@@ -291,9 +297,10 @@ export type MutationProposal = z.infer<typeof MutationProposalSchema>;
 // ────────────────────────────────────────────────────────────────────────────
 
 export const EvaluationResultSchema = z.object({
-  node_id: z.string(),
-  run_id: z.string(),
-  eval_version: z.string(),
+  // Server-owned bookkeeping — filled server-side from tool args + cache + now().
+  node_id: z.string().optional(),
+  run_id: z.string().optional(),
+  eval_version: z.string().optional(),
   metrics: z.record(z.string(), z.number()),
   per_domain: z.record(z.string(), z.record(z.string(), z.number())),
   fitness_value: z.number(),
@@ -317,7 +324,8 @@ export const EvaluationResultSchema = z.object({
   }),
   status: z.enum(["success", "regression", "error", "timeout", "oom"]),
   benchmark_raw: z.string(),
-  timestamp: ISODate,
+  // Server-owned: filled via now().
+  timestamp: ISODate.optional(),
 });
 export type EvaluationResult = z.infer<typeof EvaluationResultSchema>;
 
@@ -369,9 +377,10 @@ export const TelemetryRecordSchema = z.object({
   gpu_util: z.number().min(0).max(100).optional(),
   mem_used_gb: z.number().optional(),
   mem_total_gb: z.number().optional(),
-  node_id: z.string(),
-  run_id: z.string(),
-  timestamp: ISODate,
+  // Server-owned bookkeeping — telemetry.ts worker fills these from tool args + now().
+  node_id: z.string().optional(),
+  run_id: z.string().optional(),
+  timestamp: ISODate.optional(),
 });
 export type TelemetryRecord = z.infer<typeof TelemetryRecordSchema>;
 
@@ -380,10 +389,12 @@ export type TelemetryRecord = z.infer<typeof TelemetryRecordSchema>;
 // ────────────────────────────────────────────────────────────────────────────
 
 export const LessonEntrySchema = z.object({
-  lesson_id: z.string(),
-  node_id: z.string(),
-  run_id: z.string(),
-  mission_id: z.string(),
+  // Server-owned bookkeeping — optional at agent-facing input; server fills before persist.
+  // Defaults to "" so the stored TypeScript type remains `string` (wiki.ts sorts/files on these).
+  lesson_id: z.string().optional().default(""),
+  node_id: z.string().optional().default(""),
+  run_id: z.string().optional().default(""),
+  mission_id: z.string().optional().default(""),
   approach_family: ApproachFamilySchema,
   hypothesis_verdict: z.enum(["confirmed", "refuted", "inconclusive"]),
   observation: z.string(),
@@ -392,7 +403,8 @@ export const LessonEntrySchema = z.object({
   citations: z.array(z.string()),
   telemetry_evidence: z.string().optional(),
   tags: z.array(z.string()),
-  created_at: ISODate,
+  // Server-owned: filled via now(); defaults to "" to keep stored type as string.
+  created_at: ISODate.optional().default(""),
 });
 export type LessonEntry = z.infer<typeof LessonEntrySchema>;
 

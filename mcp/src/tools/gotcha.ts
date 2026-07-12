@@ -367,8 +367,9 @@ export function registerGotchaTools(server: McpServer): void {
   server.tool(
     "evor_store_blob",
     [
-      "Store a file or text blob in the ContentAddressedStore (sha256-addressed, dedup via hardlink).",
-      "Returns the content_ref (sha256 hex) which can be passed to evor_record_node or stored in tree artifacts.",
+      "Store a file or text blob durably so it can be referenced across nodes and runs.",
+      "Identical blobs are stored only once (dedup). Returns acquisition_id as the logical handle",
+      "to pass to evor_record_node or store in tree artifacts.",
       "If acquisition_id is provided, the blob is registered under the 'train' namespace (ADR-015 enforcement).",
     ].join(" "),
     {
@@ -404,7 +405,7 @@ export function registerGotchaTools(server: McpServer): void {
         content: [
           {
             type: "text" as const,
-            text: JSON.stringify({ ok: true, run_id, content_ref: result.content_ref }),
+            text: JSON.stringify({ ok: true, acquisition_id: acquisition_id ?? null }),
           },
         ],
       };

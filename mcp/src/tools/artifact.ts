@@ -158,8 +158,8 @@ export function registerArtifactTools(server: McpServer): void {
     "evor_write_artifact",
     [
       "Validate and atomically write a tick artifact for the given agent kind.",
-      "The path is derived from the agent and tick per the spec §1 mapping.",
-      "Payload is validated against Pydantic contracts where one exists;",
+      "The destination is derived automatically from the agent and tick.",
+      "Payload is validated against the contract for that agent kind where one exists;",
       "unknown/loose agents pass through as plain JSON.",
     ].join(" "),
     {
@@ -201,7 +201,6 @@ export function registerArtifactTools(server: McpServer): void {
               run_id,
               tick,
               agent,
-              path: result.path,
             }),
           },
         ],
@@ -243,7 +242,7 @@ export function registerArtifactTools(server: McpServer): void {
             type: "text" as const,
             text: JSON.stringify(
               result.ok
-                ? { ok: true, run_id, tick, agent, payload: result.payload, path: result.path }
+                ? { ok: true, run_id, tick, agent, payload: result.payload }
                 : { error: result.error }
             ),
           },

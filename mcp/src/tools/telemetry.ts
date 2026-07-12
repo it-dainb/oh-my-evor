@@ -17,6 +17,9 @@ import { resolveRunPaths } from "../run-store.js";
  * `nodes/<nodeId>/telemetry.jsonl`.  Each record is written as a single
  * JSON line terminated with `\n`.
  *
+ * Optional fields (node_id, run_id, timestamp) are filled server-side from
+ * tool args + now() before persisting, so the agent need not supply them.
+ *
  * Returns the path of the telemetry file and the count of records written.
  */
 export function telemetryIngest(
@@ -32,8 +35,16 @@ export function telemetryIngest(
     mkdirSync(nodeDir, { recursive: true });
   }
 
+  const now = new Date().toISOString();
+  const filled = records.map((r) => ({
+    ...r,
+    node_id: r.node_id || nodeId,
+    run_id: r.run_id || runId,
+    timestamp: r.timestamp || now,
+  }));
+
   const telemetryPath = join(nodeDir, "telemetry.jsonl");
-  const lines = records.map((r) => JSON.stringify(r)).join("\n") + "\n";
+  const lines = filled.map((r) => JSON.stringify(r)).join("\n") + "\n";
   appendFileSync(telemetryPath, lines, "utf8");
 
   return { telemetryPath, count: records.length };
@@ -44,7 +55,7 @@ export function telemetryIngest(
 export function registerTelemetryTools(server: McpServer): void {
   server.tool(
     "evor_telemetry_ingest",
-    "Validate each TelemetryRecord against schema and append JSONL lines to nodes/<node_id>/telemetry.jsonl.",
+    "Validate each TelemetryRecord and append it to the node's telemetry stream. Identify the node by name.",
     {
       run_id: z.string().describe("Active run identifier"),
       node_id: z.string().describe("Node emitting telemetry"),
@@ -55,12 +66,12 @@ export function registerTelemetryTools(server: McpServer): void {
     },
     async ({ run_id, node_id, records }) => {
       const missionId = process.env.EVOR_MISSION_ID;
-      const { telemetryPath, count } = telemetryIngest(run_id, node_id, records, missionId);
+      const { count } = telemetryIngest(run_id, node_id, records, missionId);
       return {
         content: [
           {
             type: "text" as const,
-            text: JSON.stringify({ ok: true, count, run_id, node_id, telemetry_path: telemetryPath }),
+            text: JSON.stringify({ ok: true, count, run_id, node_id }),
           },
         ],
       };

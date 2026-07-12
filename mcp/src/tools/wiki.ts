@@ -464,12 +464,12 @@ export function registerWikiTools(server: McpServer): void {
     },
     async ({ run_id, entry }) => {
       const missionId = process.env.EVOR_MISSION_ID;
-      const { lessonId, indexPath } = wikiAdd(run_id, entry, missionId);
+      const { lessonId } = wikiAdd(run_id, entry, missionId);
       return {
         content: [
           {
             type: "text" as const,
-            text: JSON.stringify({ ok: true, lesson_id: lessonId, run_id, index_path: indexPath }),
+            text: JSON.stringify({ ok: true, lesson_id: lessonId, run_id }),
           },
         ],
       };

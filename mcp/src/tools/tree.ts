@@ -1,7 +1,11 @@
 /**
  * tools/tree.ts
- * evor_tree_read — read tree.json and return filtered TreeNode list
+ * evor_tree_read — read tree.json and return filtered name-only node list
  * evor_select    — UCB1 selection via python -m evor.tree select subprocess
+ *
+ * Agent surface is UUID-free: node ids never appear in tool responses.
+ * Internal pending_node_ids in run-state.json stays as ids — only the
+ * agent-facing output is name-mapped via nameForId / namesForIds.
  */
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -11,6 +15,21 @@ import { readTree } from "../tree-store.js";
 import { resolveRunPaths } from "../run-store.js";
 import { callPythonModule } from "../subprocess-bridge.js";
 import { readRunState, writeRunState } from "./record.js";
+import { nameForId, namesForIds } from "./node-ref.js";
+
+/**
+ * Agent-facing node shape: readable names only, no internal UUIDs.
+ * parent_names resolves parent_ids via nameForId so the agent can reference
+ * parents by name in subsequent calls.
+ */
+export type NamedTreeNode = {
+  name: string;
+  status: TreeNode["status"];
+  depth: number;
+  approach_family: TreeNode["approach_family"];
+  score?: number;
+  parent_names: string[];
+};
 
 // ── DFS filter helpers ──────────────────────────────────────────────────────
 
@@ -54,8 +73,21 @@ function dfsCollect(
 
 // ── Core logic (exported for tests) ────────────────────────────────────────
 
+/** Map a raw TreeNode to the agent-facing name-only shape. */
+function toNamedNode(node: TreeNode, runId: string, missionId: string | undefined): NamedTreeNode {
+  return {
+    name: nameForId(runId, node.id, missionId),
+    status: node.status,
+    depth: node.depth,
+    approach_family: node.approach_family,
+    score: node.ucb1_score,
+    parent_names: namesForIds(runId, node.parent_ids, missionId),
+  };
+}
+
 /**
- * Read tree.json for `runId` and return a filtered list of TreeNode objects.
+ * Read tree.json for `runId` and return a filtered list of name-only node
+ * objects (no UUIDs surfaced to the agent).
  *
  * If `subtreeRoot` is provided, only nodes reachable from that root are
  * returned.  `depth` limits the relative depth below the root (or the
@@ -66,8 +98,10 @@ export function treeRead(
   subtreeRoot?: string,
   depth?: number,
   missionId?: string
-): TreeNode[] {
+): NamedTreeNode[] {
   const nodes = readTree(runId, missionId);
+
+  let raw: TreeNode[];
 
   if (subtreeRoot !== undefined) {
     if (!(subtreeRoot in nodes)) {
@@ -75,15 +109,14 @@ export function treeRead(
     }
     const childrenMap = buildChildrenMap(nodes);
     const collected = dfsCollect(subtreeRoot, childrenMap, depth);
-    return [...collected].map((id) => nodes[id]).filter(Boolean);
+    raw = [...collected].map((id) => nodes[id]).filter(Boolean) as TreeNode[];
+  } else {
+    // No subtree root — return all nodes, optionally depth-capped
+    const all = Object.values(nodes) as TreeNode[];
+    raw = depth === undefined ? all : all.filter((n) => n.depth <= depth);
   }
 
-  // No subtree root — return all nodes, optionally depth-capped
-  const all = Object.values(nodes);
-  if (depth === undefined) {
-    return all;
-  }
-  return all.filter((n) => n.depth <= depth);
+  return raw.map((n) => toNamedNode(n, runId, missionId));
 }
 
 /**
@@ -92,14 +125,16 @@ export function treeRead(
  * picks it up as a pre-existing directory.
  * Also adds selected IDs to `pending_node_ids` in run-state.json.
  *
- * Returns the selected node IDs plus any UCB1 scores emitted by Python.
+ * Returns selected_names (readable, no UUIDs) plus any UCB1 scores emitted by
+ * Python. Internal pending_node_ids remains stored as ids — only the
+ * agent-facing response is name-mapped.
  */
 export function treeSelect(
   runId: string,
   strategy?: Partial<z.infer<typeof StrategyStateSchema>>,
   count?: number,
   missionId?: string
-): { selected: string[]; scores: Record<string, number>; error?: string } {
+): { selected_names: string[]; scores: Record<string, number>; error?: string } {
   const paths = resolveRunPaths(runId, missionId);
 
   const args = [
@@ -114,7 +149,7 @@ export function treeSelect(
   const pyResult = callPythonModule("evor.tree", args);
   if (!pyResult.ok || pyResult.data == null) {
     return {
-      selected: [],
+      selected_names: [],
       scores: {},
       error: pyResult.error ?? "evor_select failed",
     };
@@ -124,7 +159,7 @@ export function treeSelect(
   const selected = Array.isArray(data.selected) ? data.selected : [];
   const scores = (data.scores && typeof data.scores === "object") ? data.scores : {};
 
-  // Mark selected IDs as pending in run-state.json
+  // Mark selected IDs as pending in run-state.json (internal ids, not names)
   if (selected.length > 0) {
     const state = readRunState(paths.runStatePath, runId);
     const current = Array.isArray(state.pending_node_ids)
@@ -135,7 +170,10 @@ export function treeSelect(
     writeRunState(paths.runStatePath, state);
   }
 
-  return { selected, scores };
+  // Map ids → readable names for the agent-facing response
+  const selected_names = namesForIds(runId, selected, missionId);
+
+  return { selected_names, scores };
 }
 
 // ── Tool registrations ──────────────────────────────────────────────────────
@@ -144,7 +182,7 @@ export function registerTreeTools(server: McpServer): void {
   // ── evor_tree_read ─────────────────────────────────────────────────────────
   server.tool(
     "evor_tree_read",
-    "Read tree.json for a run, optionally filtered to a subtree rooted at subtree_root up to depth levels.",
+    "Read the evolution tree for a run, optionally filtered to a subtree rooted at subtree_root up to depth levels.",
     {
       run_id: z.string().describe("Active run identifier"),
       subtree_root: z.string().optional().describe("Node ID to root the subtree at; omit for full tree"),
@@ -167,7 +205,7 @@ export function registerTreeTools(server: McpServer): void {
   // ── evor_select ────────────────────────────────────────────────────────────
   server.tool(
     "evor_select",
-    "Select the next parent node(s) to expand by the active policy (UCB1 by default); returns ranked parent node IDs.",
+    "Select the next parent node(s) to expand by the active policy (UCB1 by default); returns ranked parent node names.",
     {
       run_id: z.string().describe("Active run identifier"),
       strategy: StrategyStateSchema.partial().optional().describe("Strategy overrides for this selection"),

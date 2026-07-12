@@ -218,7 +218,6 @@ export function registerLineageTools(server: McpServer): void {
               ok: true,
               run_id,
               node_id,
-              patch_path: result.patchPath,
             }),
           },
         ],
@@ -230,8 +229,9 @@ export function registerLineageTools(server: McpServer): void {
   server.tool(
     "evor_write_handoff",
     [
-      "Write a tick handoff payload to handoffs/<tick>-<seq>.json atomically.",
-      "Sequence numbers are auto-incremented so multiple handoffs per tick are supported.",
+      "Write a tick handoff payload atomically.",
+      "Multiple handoffs per tick are supported; seq is a server-assigned sequence number",
+      "that preserves ordering within a tick.",
     ].join(" "),
     {
       run_id: z.string().describe("Active run identifier"),
@@ -256,7 +256,6 @@ export function registerLineageTools(server: McpServer): void {
               ok: true,
               run_id,
               tick,
-              path: result.path,
               seq: result.seq,
             }),
           },

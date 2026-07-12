@@ -71,6 +71,71 @@ export function resolveNodeRef(runId: string, ref: string, missionId?: string): 
 }
 
 /**
+ * Reverse-resolve a node id to its readable name.
+ *
+ * Resolution order:
+ *   1. Node exists and has a `name` set → return it.
+ *   2. Node exists but has no name → derive a readable fallback from
+ *      approach_family + 1-based ordinal within the same family (never
+ *      surfaces the UUID).
+ *   3. Node not found / tree unreadable → return `id` unchanged (fail-open).
+ *
+ * @returns a human-readable name, or the original id when unresolvable.
+ */
+export function nameForId(runId: string, id: string, missionId?: string): string {
+  if (!id) return id;
+
+  let nodes: Record<string, TreeNode>;
+  try {
+    nodes = readTree(runId, missionId);
+  } catch {
+    return id; // fail-open
+  }
+
+  const node = nodes[id];
+  if (!node) return id; // not found — fail-open
+
+  if (node.name) return node.name;
+
+  // Derive readable fallback: approach_family + 1-based ordinal within family
+  const base = (node.approach_family || "node").toLowerCase().replace(/[^a-z0-9-]/g, "-");
+  const sameFamily = Object.values(nodes).filter(
+    (n) => n && n.approach_family === node.approach_family,
+  );
+  const pos = sameFamily.findIndex((n) => n && n.id === id);
+  return `${base}-${pos + 1}`;
+}
+
+/**
+ * Batch reverse-resolution: maps an array of node ids to readable names.
+ * Loads the tree once and resolves each id. Same fail-open contract as nameForId.
+ *
+ * @returns array of names in the same order as the input ids.
+ */
+export function namesForIds(runId: string, ids: string[], missionId?: string): string[] {
+  if (ids.length === 0) return [];
+
+  let nodes: Record<string, TreeNode>;
+  try {
+    nodes = readTree(runId, missionId);
+  } catch {
+    return ids.slice(); // fail-open: return ids unchanged
+  }
+
+  return ids.map((id) => {
+    const node = nodes[id];
+    if (!node) return id; // not found — fail-open
+    if (node.name) return node.name;
+    const base = (node.approach_family || "node").toLowerCase().replace(/[^a-z0-9-]/g, "-");
+    const sameFamily = Object.values(nodes).filter(
+      (n) => n && n.approach_family === node.approach_family,
+    );
+    const pos = sameFamily.findIndex((n) => n && n.id === id);
+    return `${base}-${pos + 1}`;
+  });
+}
+
+/**
  * Derive a readable node name when the agent didn't supply one, so the surface
  * NEVER has to expose a UUID. Uses the approach_family + a short ordinal
  * ("training-1", "arch-2"), uniquified against the tree.

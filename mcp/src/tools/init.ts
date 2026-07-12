@@ -27,8 +27,9 @@ export interface InitRunSummary {
   ok: true;
   mission_id: string;
   run_id: string;
-  run_dir: string;
-  goal_contract_path: string;
+  /** run_dir and goal_contract_path are available internally but not surfaced to agents. */
+  run_dir?: string;
+  goal_contract_path?: string;
 }
 
 export interface InitRunFailure {
@@ -84,12 +85,10 @@ export function registerInitTools(server: McpServer): void {
   server.tool(
     "evor_init_run",
     [
-      "Construct, validate, and atomically write all run artifacts for a new mission run:",
-      "goal-contract.json, run-state.json, strategy.json, tree.json, mission-state.json,",
-      "decision-log.md (into run_dir) and active-run.json (into evor_root).",
-      "Returns {ok:true, mission_id, run_id, run_dir, goal_contract_path} on success,",
+      "Construct, validate, and atomically write everything a new mission run needs.",
+      "This is the single entry point for standing up a run — no files to author by hand.",
+      "Returns {ok:true, mission_id, run_id} on success,",
       "or {ok:false, error:<validation message>} on GoalContract validation failure.",
-      "Replaces the hand-authored python <<'PY' GoalContract heredoc in evor-setup.",
     ].join(" "),
     {
       answers: z
@@ -110,7 +109,7 @@ export function registerInitTools(server: McpServer): void {
       run_dir: z
         .string()
         .optional()
-        .describe("Override the run directory path (default: <evor_root>/runs/<mission_id>/<run_id>)"),
+        .describe("Optional override for the run storage location (advanced use only)"),
     },
     async ({ answers, run_id, mission_id, run_dir }) => {
       const outcome = initRun(answers, {
@@ -118,8 +117,17 @@ export function registerInitTools(server: McpServer): void {
         missionId: mission_id,
         runDir: run_dir,
       });
+      if (!outcome.ok) {
+        return {
+          content: [{ type: "text" as const, text: JSON.stringify(outcome) }],
+        };
+      }
       return {
-        content: [{ type: "text" as const, text: JSON.stringify(outcome) }],
+        content: [{ type: "text" as const, text: JSON.stringify({
+          ok: true,
+          mission_id: outcome.mission_id,
+          run_id: outcome.run_id,
+        }) }],
       };
     }
   );

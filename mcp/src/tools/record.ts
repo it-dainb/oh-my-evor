@@ -67,6 +67,39 @@ export function fillNodeId(node: Partial<TreeNode> & Omit<TreeNode, "id">): Tree
 }
 
 /**
+ * Fill server-owned bookkeeping fields on a node before persisting.
+ * These are fields the agent must never fabricate — server derives them from
+ * context (parent tree, current time, parent count) and fills any missing values.
+ *
+ * Mutates the node in-place. Called by recordNode so the fill applies whether
+ * the caller is the MCP tool handler or a test calling recordNode directly.
+ */
+export function fillNodeBookkeeping(node: TreeNode, runId: string, missionId?: string): void {
+  if (!node.created_at) node.created_at = new Date().toISOString();
+  if (node.visit_count === undefined || node.visit_count === null) node.visit_count = 0;
+  if (node.integrity_status === undefined) node.integrity_status = "pending";
+  if (node.status === undefined) node.status = "pending";
+  if (!node.lesson_ids) node.lesson_ids = [];
+  const parentCount = node.parent_ids.length;
+  if (node.is_crossover === undefined) node.is_crossover = parentCount > 1;
+  // depth: 0 for roots; parentDepth+1 for children (read parent from tree if possible).
+  if (node.depth === undefined || node.depth === null) {
+    if (parentCount === 0) {
+      node.depth = 0;
+    } else {
+      try {
+        const nodes = readTree(runId, missionId);
+        const primaryParentId = node.parent_ids[0];
+        const parentNode = primaryParentId ? nodes[primaryParentId] : undefined;
+        node.depth = parentNode ? (parentNode.depth ?? 0) + 1 : 1;
+      } catch {
+        node.depth = 1;
+      }
+    }
+  }
+}
+
+/**
  * Record a TreeNode into tree.json, clear it from pending_node_ids, and
  * append a one-liner to decision-log.md.
  */
@@ -75,6 +108,9 @@ export function recordNode(runId: string, node: TreeNode, missionId?: string): {
   treePath: string;
 } {
   const paths = ensureRunDirs(runId, missionId);
+
+  // Fill server-owned bookkeeping before persisting (agent must never fabricate these).
+  fillNodeBookkeeping(node, runId, missionId);
 
   // 1. Atomically upsert node into tree.json
   upsertNode(runId, node, missionId);
@@ -183,13 +219,16 @@ export function readResult(
   const paths = resolveRunPaths(runId, missionId);
   const resultPath = join(paths.nodesDir, nodeId, "results.json");
   if (!existsSync(resultPath)) {
-    return { ok: false, error: `results.json not found at ${resultPath}` };
+    return {
+      ok: false,
+      error: "no evaluation result for this node yet — confirm it finished with evor_run_status (state='done') before reading.",
+    };
   }
   try {
     const data = JSON.parse(readFileSync(resultPath, "utf8")) as unknown;
     return { ok: true, data };
-  } catch (e) {
-    return { ok: false, error: `Failed to parse results.json: ${String(e)}` };
+  } catch {
+    return { ok: false, error: "the node's evaluation result is present but could not be parsed." };
   }
 }
 
@@ -234,19 +273,19 @@ export function registerRecordTools(server: McpServer): void {
           resolveNodeRef(run_id, p, missionId),
         );
       }
-      const { pendingRemaining, treePath } = recordNode(run_id, filledNode, missionId);
+      const { pendingRemaining } = recordNode(run_id, filledNode, missionId);
       return {
         content: [
           {
             type: "text" as const,
-            // Return ONLY the name — never the internal id. On collision the name
-            // may differ from what was asked; the caller uses THIS value downstream.
+            // Return ONLY the name — never the internal id or filesystem path. On
+            // collision the name may differ from what was asked; the caller uses
+            // THIS value downstream.
             text: JSON.stringify({
               ok: true,
               name: filledNode.name,
               run_id,
               pending_remaining: pendingRemaining,
-              tree_path: treePath,
             }),
           },
         ],
@@ -259,7 +298,7 @@ export function registerRecordTools(server: McpServer): void {
     "evor_record_eval",
     "Record a node's EvaluationResult and auto-trigger the integrity check. Identify the "
     + "node by the `name` you gave evor_record_node. Always call evor_record_node first. "
-    + "Returns {ok, name, results_path, integrity_verdict, integrity_report}.",
+    + "Returns {ok, name, status, integrity_verdict, integrity_report}.",
     {
       run_id: z.string().describe("Active run identifier"),
       node_id: z.string().describe(
@@ -270,21 +309,38 @@ export function registerRecordTools(server: McpServer): void {
     async ({ run_id, node_id, result }) => {
       const missionId = process.env.EVOR_MISSION_ID;
       const resolvedId = resolveNodeRef(run_id, node_id, missionId);
-      const { resultsPath, integrityVerdict, integrityError, integrityReport } =
-        recordEval(run_id, resolvedId, result, missionId);
+      // Server-owned bookkeeping: fill node_id, run_id, eval_version, timestamp
+      // so the agent never fabricates or carries these values.
+      const filledResult = { ...result } as Record<string, unknown>;
+      if (!filledResult.node_id) filledResult.node_id = resolvedId;
+      if (!filledResult.run_id) filledResult.run_id = run_id;
+      if (!filledResult.timestamp) filledResult.timestamp = new Date().toISOString();
+      if (!filledResult.eval_version) {
+        // Read eval_version from run-state cache; fall back to "v1".
+        try {
+          const paths = resolveRunPaths(run_id, missionId);
+          const state = readRunState(paths.runStatePath, run_id);
+          filledResult.eval_version = typeof state.current_eval_version === "string"
+            ? state.current_eval_version
+            : "v1";
+        } catch {
+          filledResult.eval_version = "v1";
+        }
+      }
+      const { integrityVerdict, integrityError, integrityReport } =
+        recordEval(run_id, resolvedId, filledResult, missionId);
       return {
         content: [
           {
             type: "text" as const,
             // P1-1: integrity_report is the FULL IntegrityReport inline — the orchestrator
             // never needs a separate evor_integrity_check call for the normal flow.
-            // Echo the NAME the caller used, never the internal id.
+            // Echo the NAME the caller used, never the internal id or filesystem path.
             text: JSON.stringify({
               ok: true,
               run_id,
               name: node_id,
               status: result.status,
-              results_path: resultsPath,
               integrity_verdict: integrityVerdict,
               integrity_error: integrityError,
               integrity_report: integrityReport,
@@ -298,8 +354,8 @@ export function registerRecordTools(server: McpServer): void {
   // ── evor_read_result (P2-14) ───────────────────────────────────────────────
   server.tool(
     "evor_read_result",
-    "Read nodes/<node_id>/results.json and return parsed JSON. "
-    + "Eliminates the need to shell out 'cat results.json' or read artifact paths manually. "
+    "Return a node's full evaluation result. Identify the node by the `name` you gave it. "
+    + "This is the only way to read a result — never read files by hand. "
     + "Call after evor_run_status shows state='done'. Returns the full EvaluationResult object.",
     {
       run_id: z.string().describe("Active run identifier"),

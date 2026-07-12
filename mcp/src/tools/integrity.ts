@@ -143,8 +143,8 @@ export function registerIntegrityTools(server: McpServer): void {
   server.tool(
     "evor_integrity_check",
     "Auto-triggered by evor_record_eval; call explicitly only for re-checks or manual spot-checks. "
-    + "Runs all 13 IntegrityGate checks via integrity_bridge.py and writes IntegrityReport to "
-    + "evaluations/<node-id>.json. Checks: reward-hacking, split-purity, telemetry-sane, "
+    + "Run all integrity checks for a node and return the IntegrityReport. "
+    + "Checks: reward-hacking, split-purity, telemetry-sane, "
     + "acquisition-provenance, grad-norm-health, loss-monotonic, eval-consistency, "
     + "config-reproducibility, dataset-frozen, license-gate, leakage-probe, "
     + "performance-ceiling, and coverage-gap.",

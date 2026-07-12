@@ -42,7 +42,7 @@ const RunStatePatchSchema = z.object({
   pending_node_ids: z
     .array(z.string())
     .optional()
-    .describe("Node IDs started in this tick but not yet written to tree.json"),
+    .describe("Node names started in this tick but not yet recorded to the tree"),
   strategy: StrategyStateSchema.partial().optional().describe("Strategy delta to merge into strategy.json"),
   // ── Extended fields (spec §1 evor_state_write extension) ─────────────────
   mission_status: z
@@ -270,17 +270,17 @@ export function readGoalContract(
   if (!existsSync(contractPath)) {
     return {
       ok: false,
-      error: `goal-contract.json not found at ${contractPath}`,
+      error: "no goal contract for this run — initialize the run with evor_init_run first.",
     };
   }
 
   let raw: unknown;
   try {
     raw = JSON.parse(readFileSync(contractPath, "utf8"));
-  } catch (err) {
+  } catch {
     return {
       ok: false,
-      error: `failed to parse goal-contract.json: ${(err as Error).message}`,
+      error: "the run's goal contract is present but could not be parsed.",
     };
   }
 
@@ -288,7 +288,7 @@ export function readGoalContract(
   if (!parsed.success) {
     return {
       ok: false,
-      error: `goal-contract.json validation failed: ${parsed.error.message}`,
+      error: `the run's goal contract failed validation: ${parsed.error.message}`,
     };
   }
 
@@ -320,7 +320,7 @@ export function registerStateTools(server: McpServer): void {
   // ── evor_state_read ────────────────────────────────────────────────────────
   server.tool(
     "evor_state_read",
-    "Read run-state.json (+ tick-state.json when present) and return the current RunState. " +
+    "Return the current RunState for the run (including tick state when present). " +
     "tick_state is merged into the response when tick-state.json exists.",
     {
       run_id: z.string().describe("Active run identifier"),
@@ -342,13 +342,13 @@ export function registerStateTools(server: McpServer): void {
   // ── evor_state_write ───────────────────────────────────────────────────────
   server.tool(
     "evor_state_write",
-    "Merge-patch run-state.json with the given fields. " +
+    "Merge-patch the run's RunState with the given fields. " +
     "Optional side-effects: strategy→strategy.json, mission_status→mission-state.json, " +
     "active_run→active-run.json (include job_id to enable monitor lookup), " +
     "tick_state→tick-state.json (atomic; 10 read sites per tick).",
     {
       run_id: z.string().describe("Active run identifier"),
-      patch: RunStatePatchSchema.describe("Fields to merge into run-state.json"),
+      patch: RunStatePatchSchema.describe("Fields to merge into the RunState"),
     },
     async ({ run_id, patch }) => {
       const missionId = process.env.EVOR_MISSION_ID;
@@ -367,7 +367,7 @@ export function registerStateTools(server: McpServer): void {
   // ── evor_check_plateau ─────────────────────────────────────────────────────
   server.tool(
     "evor_check_plateau",
-    "Read tick history scores from run-state.json and detect plateau or consecutive regression. " +
+    "Read the run's tick-history scores and detect plateau or consecutive regression. " +
     "Returns {plateau, consecutive_regression, ticks_checked, scores[]}. " +
     "plateau=true when last 3 scores are within 0.5% of each other (no meaningful improvement). " +
     "consecutive_regression=true when last 2 ticks both regressed below their predecessor. " +
@@ -392,9 +392,8 @@ export function registerStateTools(server: McpServer): void {
   // ── evor_read_goal_contract ────────────────────────────────────────────────
   server.tool(
     "evor_read_goal_contract",
-    "Read and validate goal-contract.json from the run directory. " +
-    "Returns the parsed GoalContract or {error:'...'} when missing or invalid. " +
-    "The contract is validated against the GoalContractSchema (Zod).",
+    "Read the run's validated GoalContract. " +
+    "Returns the parsed GoalContract, or {error:'...'} when it is missing or invalid.",
     {
       run_id: z.string().describe("Active run identifier"),
     },

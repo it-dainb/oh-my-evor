@@ -2,14 +2,14 @@
  * tools/compute.ts
  * Compute-wrapper MCP tools (WS-B): async training-job launcher + sync harness wrappers.
  *
- * evor_run_start       — launch `python -m evor run` detached; returns {job_id,...} instantly
- * evor_run_status      — read job status.json + tail log
+ * evor_run_start       — launch `python -m evor run` detached; returns {status, job_id} instantly
+ * evor_run_status      — read job status (no internal paths or cmd exposed)
  * evor_capability      — probe hardware (wraps `evor capability`)
  * evor_preflight       — smoke-test environment (wraps `evor preflight`)
- * evor_validate        — validate goal-contract + state (wraps `evor validate`)
+ * evor_validate        — validate run configuration and split integrity
  * evor_doctor          — environment + .evor integrity (wraps `evor doctor`)
  * evor_freeze_splits   — freeze test/val splits (wraps `evor.freeze freeze-splits`)
- * evor_init_eval_suite — create initial EvalSuite (wraps `evor.benchmark init-eval-suite`)
+ * evor_init_eval_suite — create initial evaluation suite (wraps `evor.benchmark init-eval-suite`)
  * evor_meta_evolve     — update strategy.json (wraps `evor.tree meta-evolve`)
  * evor_distill_scan    — brownfield workspace scan (wraps `evor distill scan`)
  * evor_plot_report     — render tree png/html (wraps `evor.plot_tree`)
@@ -17,7 +17,8 @@
  * evor_gotchas_list    — list accumulated gotchas (wraps `evor gotchas`)
  */
 
-import { existsSync, readFileSync, renameSync, writeFileSync } from "fs";
+import { chmodSync, existsSync, readFileSync, renameSync, statSync, writeFileSync } from "fs";
+import { createHash } from "crypto";
 import { join } from "path";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
@@ -40,7 +41,7 @@ function err(msg: string) {
 /**
  * Spawn `python -m evor run …` detached via evor.jobs.  Returns {job_id, status_path,
  * log_path} from the jobs start script instantly — the training run itself continues
- * in the background; use evor_run_status or Monitor(tail -f log_path) to watch it.
+ * in the background; use evor_run_status to poll it.
  */
 export function jobStart(
   nodeId: string,
@@ -79,7 +80,7 @@ export function jobStatus(jobId: string, runDir: string): PyResult {
 }
 
 /**
- * Validate goal-contract.json schema, MetricSpec guards, frozen-splits, tree.json.
+ * Validate run configuration and split integrity.
  */
 export function validateRun(runDir: string): PyResult {
   return callPythonModule("evor", [
@@ -176,9 +177,9 @@ export function distillScan(path: string, evorRoot?: string): PyResult {
  * Dispatch multiple candidate training jobs in parallel to the compute backend.
  * Returns job results for all candidates immediately without blocking — each
  * job is started via jobStart (evor.jobs start), which spawns a detached
- * supervisor and returns instantly. Monitor each with Monitor(tail -f log_path)
- * or evor_run_status. Use instead of sequential evor_run_start calls when
- * VRAM allows parallel training (P0-3).
+ * supervisor and returns instantly. Poll each with evor_run_status.
+ * Use instead of sequential evor_run_start calls when VRAM allows parallel
+ * training (P0-3).
  */
 export interface BatchCandidate {
   node_id: string;
@@ -284,25 +285,84 @@ export function gotchasList(
 
 // ── Tool registrations ────────────────────────────────────────────────────────
 
+/**
+ * Lock a node's evaluate.py: make it read-only and record its sha256 fingerprint
+ * for later integrity verification. Replaces the agent shelling out `sha256sum`
+ * + `chmod 444` (the hash is persisted internally and never surfaced).
+ * Fail-open on fs errors — the name-only surface must never crash the agent.
+ */
+export function lockEvaluate(
+  runId: string,
+  nodeRef: string,
+  missionId?: string,
+): { ok: boolean; node_name: string; error?: string } {
+  const nodeId = resolveNodeRef(runId, nodeRef, missionId);
+  const worktree = join(getEvorRoot(), "worktrees", nodeId);
+  const evalPath = join(worktree, "evaluate.py");
+  if (!existsSync(evalPath)) {
+    return {
+      ok: false,
+      node_name: nodeRef,
+      error: "evaluate.py is not present in the node worktree — materialize the genome first.",
+    };
+  }
+  try {
+    const hash = createHash("sha256").update(readFileSync(evalPath)).digest("hex");
+    // Persist the fingerprint internally; the agent never sees the hash.
+    writeFileSync(join(worktree, "evaluate.py.lock"), hash, "utf8");
+    chmodSync(evalPath, 0o444);
+    return { ok: true, node_name: nodeRef };
+  } catch {
+    return { ok: false, node_name: nodeRef, error: "could not lock evaluate.py" };
+  }
+}
+
+/**
+ * Verify a node externalized its training deliverables. Returns booleans only —
+ * no filesystem paths cross to the agent. Replaces the agent walking
+ * `nodes/<id>/results.json` / `telemetry.jsonl` by hand.
+ */
+export function verifyArtifacts(
+  runId: string,
+  nodeRef: string,
+  missionId?: string,
+): { ok: boolean; node_name: string; has_results: boolean; has_telemetry: boolean } {
+  const nodeId = resolveNodeRef(runId, nodeRef, missionId);
+  const nodeDir = join(resolveRunPaths(runId, missionId).runDir, "nodes", nodeId);
+  const present = (rel: string, minBytes: number): boolean => {
+    try {
+      const p = join(nodeDir, rel);
+      return existsSync(p) && statSync(p).size > minBytes;
+    } catch {
+      return false;
+    }
+  };
+  const has_results = present("results.json", 2);
+  const has_telemetry = present("telemetry.jsonl", 0);
+  return { ok: has_results && has_telemetry, node_name: nodeRef, has_results, has_telemetry };
+}
+
 export function registerComputeTools(server: McpServer): void {
 
   // ── evor_run_start ──────────────────────────────────────────────────────────
   server.tool(
     "evor_run_start",
     "Launch candidate node as a detached background job. "
-    + "Returns {job_id, status_path, log_path} instantly — watch with evor_run_status "
-    + "or Monitor(command: 'tail -f <log_path> | grep -E --line-buffered \"elapsed_steps=|val_|Error|OOM\"').",
+    + "Returns {status, job_id} instantly — poll progress with evor_run_status.",
     {
       run_id: z.string().describe("Active run identifier"),
       node_id: z.string().describe("The node's name (e.g. 'immune-memory-02')"),
-      run_dir: z.string().describe("Absolute path to .evor/runs/<mission>/<run-id>/"),
+      run_dir: z.string().optional().describe(
+        "Absolute path to the run directory; derived from run_id when omitted",
+      ),
       worktree: z.string().describe("Absolute path to the candidate git worktree"),
       eval_version: z.string().optional().describe("Eval suite version override (e.g. v1)"),
     },
     async ({ run_id, node_id, run_dir, worktree, eval_version }) => {
       const missionId = process.env.EVOR_MISSION_ID;
+      const resolvedDir = run_dir ?? resolveRunPaths(run_id, missionId).runDir;
       const resolvedNodeId = resolveNodeRef(run_id, node_id, missionId);
-      const result = jobStart(resolvedNodeId, run_id, run_dir, worktree, eval_version);
+      const result = jobStart(resolvedNodeId, run_id, resolvedDir, worktree, eval_version);
       if (!result.ok) return err(result.error ?? "evor_run_start failed");
 
       // Record job_id + run_dir into active-run.json so the run-watcher monitor
@@ -319,7 +379,7 @@ export function registerComputeTools(server: McpServer): void {
           const ar: Record<string, unknown> = {
             ...existing,
             run_id,
-            run_dir,
+            run_dir: resolvedDir,
             job_id: jobId,
           };
           if (missionId && !ar.mission_id) ar.mission_id = missionId;
@@ -331,27 +391,53 @@ export function registerComputeTools(server: McpServer): void {
         }
       }
 
-      return ok(result.data);
+      // Return only the job handle the agent needs — strip internal paths.
+      return ok({ status: "started", job_id: jobId ?? null });
     },
   );
 
   // ── evor_run_status ─────────────────────────────────────────────────────────
   server.tool(
     "evor_run_status",
-    "Read status.json and tail the log for a running or completed job. "
-    + "Returns {state, exit_code?, started_at?, finished_at?, cmd?, tail?}.",
+    "Read status for a running or completed job. "
+    + "Returns {state, exit_code?, started_at?, finished_at?, tail?}.",
     {
       run_id: z.string().describe("Active run identifier"),
-      job_id: z.string().describe("Job identifier returned by evor_run_start"),
+      job_id: z.string().optional().describe(
+        "Job identifier; looked up from active-run state when omitted",
+      ),
       run_dir: z.string().optional().describe(
-        "Explicit run_dir; falls back to resolveRunPaths(run_id) when omitted",
+        "Explicit run directory; derived from run_id when omitted",
       ),
     },
     async ({ run_id, job_id, run_dir }) => {
       const missionId = process.env.EVOR_MISSION_ID;
       const resolvedDir = run_dir ?? resolveRunPaths(run_id, missionId).runDir;
-      const result = jobStatus(job_id, resolvedDir);
+
+      // Resolve job_id from active-run state when the caller omits it.
+      let resolvedJobId = job_id;
+      if (!resolvedJobId) {
+        try {
+          const arPath = getActiveRunPath();
+          if (existsSync(arPath)) {
+            const ar = JSON.parse(readFileSync(arPath, "utf8")) as Record<string, unknown>;
+            if (typeof ar.job_id === "string") resolvedJobId = ar.job_id;
+          }
+        } catch {
+          // fail-open — fall through; jobStatus will surface its own error
+        }
+      }
+      if (!resolvedJobId) return err("job_id required: no active job found for run_id");
+
+      const result = jobStatus(resolvedJobId, resolvedDir);
       if (!result.ok) return err(result.error ?? "evor_run_status failed");
+
+      // Strip internal `cmd` field (contains full FS path + python invocation).
+      const data = result.data as Record<string, unknown> | undefined;
+      if (data && "cmd" in data) {
+        const { cmd: _cmd, ...clean } = data;
+        return ok(clean);
+      }
       return ok(result.data);
     },
   );
@@ -382,8 +468,8 @@ export function registerComputeTools(server: McpServer): void {
         return ok(cap);
       } catch {
         return err(
-          `evor capability ran but capability.json not found at ${root}: `
-          + (result.stderr ?? result.error ?? ""),
+          "evor capability succeeded but capability.json was not written — check EVOR_ROOT configuration."
+          + (result.stderr ? ` (${result.stderr})` : ""),
         );
       }
     },
@@ -421,8 +507,7 @@ export function registerComputeTools(server: McpServer): void {
   // ── evor_validate ───────────────────────────────────────────────────────────
   server.tool(
     "evor_validate",
-    "Validate goal-contract.json schema, MetricSpec gameability guards, "
-    + "frozen-splits, and tree.json format. Returns a JSON ValidationReport.",
+    "Validate run configuration and split integrity. Returns a JSON ValidationReport.",
     {
       run_id: z.string().describe("Active run identifier"),
     },
@@ -438,15 +523,15 @@ export function registerComputeTools(server: McpServer): void {
   // ── evor_doctor ─────────────────────────────────────────────────────────────
   server.tool(
     "evor_doctor",
-    "Check environment and .evor integrity: Python, torch, Node.js, env vars, "
-    + "tree.json format, mission-state, orphan pending nodes, frozen-split hashes. "
+    "Health-check the run and environment: Python, torch, Node.js, env vars, "
+    + "tree consistency, mission state, orphan pending nodes, and frozen-split integrity. "
     + "Pass repair=true to auto-fix obvious issues.",
     {
       run_id: z.string().optional().describe(
         "Active run identifier (omit for env-only check)",
       ),
       repair: z.boolean().optional().describe(
-        "Auto-repair obvious issues (e.g. list-format tree.json → DICT)",
+        "Auto-repair obvious issues found during the health check",
       ),
     },
     async ({ run_id, repair }) => {
@@ -463,9 +548,8 @@ export function registerComputeTools(server: McpServer): void {
   // ── evor_freeze_splits ──────────────────────────────────────────────────────
   server.tool(
     "evor_freeze_splits",
-    "Freeze test and val splits from a dataset directory. "
-    + "Writes frozen-splits/ and returns {locked_split_hash, val_split_hash, "
-    + "test_item_count, val_item_count}.",
+    "Freeze the test and val splits for reproducible evaluation. "
+    + "Returns {ok, test_item_count, val_item_count}.",
     {
       dataset_ref: z.string().describe("Path to dataset directory or file"),
       eval_version: z.string().describe("Eval version string (e.g. v1)"),
@@ -477,6 +561,13 @@ export function registerComputeTools(server: McpServer): void {
       const { runDir } = resolveRunPaths(run_id, resolvedMission);
       const result = freezeSplits(dataset_ref, eval_version, runDir, resolvedMission);
       if (!result.ok) return err(result.error ?? "evor_freeze_splits failed");
+
+      // Strip internal hash fields — the agent must not carry them.
+      const data = result.data as Record<string, unknown> | undefined;
+      if (data) {
+        const { locked_split_hash: _lh, val_split_hash: _vh, ...clean } = data;
+        return ok({ ok: true, ...clean });
+      }
       return ok(result.data);
     },
   );
@@ -484,8 +575,7 @@ export function registerComputeTools(server: McpServer): void {
   // ── evor_init_eval_suite ────────────────────────────────────────────────────
   server.tool(
     "evor_init_eval_suite",
-    "Create the initial EvalSuite v1 for a new mission. "
-    + "Writes eval-suites/v1.json and angle-registry.json. "
+    "Create the initial evaluation suite for a new mission. "
     + "Returns {eval_version, mission_id, domains, created_at}.",
     {
       mission_id: z.string().describe("Mission identifier"),
@@ -562,13 +652,12 @@ export function registerComputeTools(server: McpServer): void {
     "evor_forge_dispatch_batch",
     "Dispatch multiple candidate training jobs in parallel to the compute backend. "
     + "Returns job_ids for all candidates immediately without waiting for completion. "
-    + "Monitor each job with Monitor(command: 'tail -f <log_path>') or evor_run_status. "
+    + "Poll each job with evor_run_status. "
     + "Use instead of sequential evor_run_start calls when VRAM allows parallel training.",
     {
       run_id: z.string().describe("Active run identifier"),
       candidates: z.array(z.object({
-        node_id: z.string().describe("Candidate node ID to train"),
-        worktree: z.string().describe("Path to candidate worktree"),
+        node_name: z.string().describe("Logical node name (e.g. 'immune-memory-02')"),
         eval_version: z.string().optional().describe("Eval suite version override (e.g. v1)"),
       })).min(1).max(8).describe("Candidate nodes to train in parallel (max 8)"),
       gpu_fraction: z.number().min(0.1).max(1.0).optional().describe(
@@ -578,8 +667,17 @@ export function registerComputeTools(server: McpServer): void {
     },
     async ({ run_id, candidates, gpu_fraction }) => {
       const missionId = process.env.EVOR_MISSION_ID;
+      const evorRoot = getEvorRoot();
       const { runDir } = resolveRunPaths(run_id, missionId);
-      const result = forgeDispatchBatch(run_id, candidates, runDir, gpu_fraction);
+
+      // Resolve each logical node name → node_id + worktree path server-side.
+      const resolvedCandidates: BatchCandidate[] = candidates.map((c) => {
+        const nodeId = resolveNodeRef(run_id, c.node_name, missionId);
+        const worktree = join(evorRoot, "worktrees", nodeId);
+        return { node_id: nodeId, worktree, eval_version: c.eval_version };
+      });
+
+      const result = forgeDispatchBatch(run_id, resolvedCandidates, runDir, gpu_fraction);
       return ok(result);
     },
   );
@@ -639,6 +737,40 @@ export function registerComputeTools(server: McpServer): void {
       const result = gotchasList(kind, scope, min_confidence, evor_root, runDir);
       if (!result.ok) return err(result.error ?? "evor_gotchas_list failed");
       return ok(result.data);
+    },
+  );
+
+  // ── evor_lock_evaluate ────────────────────────────────────────────────────────
+  server.tool(
+    "evor_lock_evaluate",
+    "Lock a node's evaluate.py so it cannot be mutated after evaluation begins. "
+    + "Fingerprints the script and makes it read-only. Call once, right before "
+    + "scoring a node. Returns {ok, node_name}.",
+    {
+      run_id: z.string().describe("Active run identifier"),
+      node: z.string().describe("The node's name (e.g. 'immune-memory-02')"),
+    },
+    async ({ run_id, node }) => {
+      const missionId = process.env.EVOR_MISSION_ID;
+      const result = lockEvaluate(run_id, node, missionId);
+      return ok(result);
+    },
+  );
+
+  // ── evor_verify_artifacts ─────────────────────────────────────────────────────
+  server.tool(
+    "evor_verify_artifacts",
+    "Confirm a node externalized its training deliverables (results + telemetry). "
+    + "Returns {ok, has_results, has_telemetry, node_name} — booleans only. "
+    + "Use after a node finishes to verify it actually produced output.",
+    {
+      run_id: z.string().describe("Active run identifier"),
+      node: z.string().describe("The node's name (e.g. 'immune-memory-02')"),
+    },
+    async ({ run_id, node }) => {
+      const missionId = process.env.EVOR_MISSION_ID;
+      const result = verifyArtifacts(run_id, node, missionId);
+      return ok(result);
     },
   );
 }

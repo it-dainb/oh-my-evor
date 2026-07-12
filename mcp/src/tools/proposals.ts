@@ -13,12 +13,14 @@
  */
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { randomUUID } from "crypto";
 import { z } from "zod";
 
 // ── Input schemas ─────────────────────────────────────────────────────────────
 
 const ProposalInputSchema = z.object({
-  proposal_id: z.string().describe("Unique ID for this proposal (correlates results)"),
+  // Server-owned: generated server-side if absent (crypto.randomUUID / prop-<short> slug).
+  proposal_id: z.string().optional().describe("Unique ID for this proposal (correlates results); generated server-side if omitted"),
   parent_node_ids: z
     .array(z.string())
     .min(1)
@@ -135,11 +137,11 @@ export function gateH004(
 }
 
 /**
- * Schema gate: all required fields non-null / non-empty.
+ * Schema gate: all required semantic fields non-null / non-empty.
+ * proposal_id is now server-generated — excluded from schema gate.
  */
 export function gateSchema(proposal: z.infer<typeof ProposalInputSchema>): GateResult {
-  const { proposal_id, parent_node_ids, approach_family, hypothesis, wildness } = proposal;
-  if (!proposal_id?.trim()) return "fail";
+  const { parent_node_ids, approach_family, hypothesis, wildness } = proposal;
   if (!parent_node_ids?.length) return "fail";
   if (!approach_family?.trim()) return "fail";
   if (!hypothesis?.prediction?.trim()) return "fail";
@@ -164,12 +166,20 @@ export function validateProposals(
   proposals: z.infer<typeof ProposalInputSchema>[],
   strategy: z.infer<typeof StrategyContextSchema>,
 ): ValidationSummary {
-  const N = proposals.length;
+  // Server-owned: assign proposal_id if the agent omitted it.
+  const filledProposals = proposals.map((p, i) => ({
+    ...p,
+    proposal_id: p.proposal_id?.trim()
+      ? p.proposal_id
+      : `prop-${randomUUID().slice(0, 8)}-${i}`,
+  }));
+
+  const N = filledProposals.length;
   const winningFamilies = strategy.winning_families ?? [];
 
   // Pre-compute primary-parent share counts for H004.
   const parentShareCounts = new Map<string, number>();
-  for (const p of proposals) {
+  for (const p of filledProposals) {
     const primary = p.parent_node_ids[0] ?? "";
     parentShareCounts.set(primary, (parentShareCounts.get(primary) ?? 0) + 1);
   }
@@ -177,7 +187,7 @@ export function validateProposals(
   // Track approach families seen within this batch (H003 — order-dependent).
   const familiesSeen = new Set<string>();
 
-  const results: ProposalVerdict[] = proposals.map(proposal => {
+  const results: ProposalVerdict[] = filledProposals.map(proposal => {
     const schemaGate = gateSchema(proposal);
 
     // Schema failure → reject immediately; skip remaining gates.
@@ -280,11 +290,26 @@ export function registerProposalTools(server: McpServer): void {
     },
     async ({ proposals, strategy }) => {
       const summary = validateProposals(proposals, strategy);
+      // Server-owned: populate critic_review from gate results so the agent
+      // never has to parrot internal gate codes back.
+      const resultsWithReview = summary.results.map(r => ({
+        ...r,
+        critic_review: {
+          h001_one_hypothesis: r.h001,
+          h002_family_streak: r.h002,
+          h003_intra_tick_diversity: r.h003,
+          integrity_risk: "pass" as const,       // gate not agent-supplied; default pass
+          instrumentation_check: "pass" as const, // gate not agent-supplied; default pass
+          schema_valid: r.schema,
+          verdict: r.verdict === "reject" ? "rejected" : "approved",
+          ...(r.verdict === "reject" ? { rejection_reason: r.reason } : {}),
+        },
+      }));
       return {
         content: [
           {
             type: "text" as const,
-            text: JSON.stringify({ ok: true, ...summary }),
+            text: JSON.stringify({ ok: true, ...summary, results: resultsWithReview }),
           },
         ],
       };

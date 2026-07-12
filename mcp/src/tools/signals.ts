@@ -246,7 +246,7 @@ export function emitSignal(
     }
 
     throw new Error(
-      `emitSignal: signal "${input.signature}" failed to persist in signals.jsonl after 3 attempts (concurrent clobber detected)`,
+      `signal "${input.signature}" could not be persisted after 3 attempts (concurrent write contention) — retry the emit.`,
     );
   });
 }
@@ -358,7 +358,7 @@ export function registerSignalTools(server: McpServer): void {
   // ── evor_signal_emit ────────────────────────────────────────────────────────
   server.tool(
     "evor_signal_emit",
-    "Emit (upsert/dedup by signature) a Signal onto the run's signal bus at <run_dir>/signals.jsonl. " +
+    "Emit (upsert/dedup by signature) a Signal onto the run's signal bus. " +
     "Repeat emits with the same signature aggregate: occurrences+1, confidence raised toward 1.0, severity escalates to MAX seen.",
     {
       run_id: z.string().describe("Active run identifier"),
@@ -392,7 +392,12 @@ export function registerSignalTools(server: McpServer): void {
         missionId,
       );
       return {
-        content: [{ type: "text" as const, text: JSON.stringify(signal) }],
+        content: [{ type: "text" as const, text: JSON.stringify({
+          ok: true,
+          signature: signal.signature,
+          severity: signal.severity,
+          occurrences: signal.occurrences,
+        }) }],
       };
     },
   );

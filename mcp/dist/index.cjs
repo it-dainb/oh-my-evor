@@ -21116,8 +21116,9 @@ var GoalContractSchema = external_exports.object({
   }),
   framework: external_exports.string().optional(),
   seed_repo_path: external_exports.string().optional(),
-  locked_split_hash: external_exports.string(),
-  eval_script_hash: external_exports.string(),
+  // Server-owned: harness computes at freeze — agent must never supply.
+  locked_split_hash: external_exports.string().optional(),
+  eval_script_hash: external_exports.string().optional(),
   expansion_policy: ExpansionPolicySchema.optional(),
   allowed_licenses: external_exports.array(external_exports.string()),
   evolution_bounds: EvolutionBoundsSchema.optional().describe(
@@ -21126,7 +21127,8 @@ var GoalContractSchema = external_exports.object({
   autonomy_charter: AutonomyCharterSchema.default({
     invariant: "Every autonomous decision MUST be monotonic: it may make the evaluation harder or more honest, never easier or comparability-shifting. Forbidden directions (softening the metric, shifting comparability to inflate a score, leaking test into train) are routed around \u2014 never executed, never halted on."
   }).describe("full-autonomy charter; always present \u2014 charter is mandatory for all missions."),
-  created_at: ISODate
+  // Server-owned: filled via now() at creation time.
+  created_at: ISODate.optional()
 });
 var HypothesisSchema = external_exports.object({
   id: external_exports.string(),
@@ -21171,19 +21173,21 @@ var TreeNodeSchema = external_exports.object({
   eval_version: external_exports.string(),
   fitness_value: external_exports.number().optional(),
   telemetry_ref: external_exports.string().optional(),
-  lesson_ids: external_exports.array(external_exports.string()),
-  citations: external_exports.array(external_exports.string()),
-  integrity_status: external_exports.enum(["pending", "passed", "failed"]),
-  status: external_exports.enum(["pending", "running", "done", "pruned"]),
-  is_crossover: external_exports.boolean(),
+  // Server-owned bookkeeping — optional in input; server fills defaults before persist.
+  lesson_ids: external_exports.array(external_exports.string()).optional().default([]),
+  citations: external_exports.array(external_exports.string()).optional().default([]),
+  integrity_status: external_exports.enum(["pending", "passed", "failed"]).optional().default("pending"),
+  status: external_exports.enum(["pending", "running", "done", "pruned"]).optional().default("pending"),
+  is_crossover: external_exports.boolean().optional().default(false),
   ucb1_score: external_exports.number().optional(),
-  visit_count: external_exports.number().int().min(0),
-  depth: external_exports.number().int().min(0),
-  created_at: ISODate,
+  visit_count: external_exports.number().int().min(0).optional().default(0),
+  depth: external_exports.number().int().min(0).optional().default(0),
+  created_at: ISODate.optional(),
   completed_at: ISODate.optional()
 });
 var MutationProposalSchema = external_exports.object({
-  proposal_id: external_exports.string(),
+  // Server-owned: generated server-side if absent.
+  proposal_id: external_exports.string().optional(),
   parent_node_ids: external_exports.array(external_exports.string()),
   approach_family: ApproachFamilySchema,
   idea: external_exports.string(),
@@ -21191,6 +21195,8 @@ var MutationProposalSchema = external_exports.object({
   citations: external_exports.array(external_exports.string()),
   wildness: external_exports.number().min(0).max(1),
   critic_approved: external_exports.boolean(),
+  // Server-owned: evor_validate_proposals computes gate codes deterministically.
+  // Agent must NOT supply internal gate codes; the server populates critic_review.
   critic_review: external_exports.object({
     h001_one_hypothesis: external_exports.enum(["pass", "fail"]),
     h002_family_streak: external_exports.enum(["pass", "fail"]),
@@ -21200,12 +21206,13 @@ var MutationProposalSchema = external_exports.object({
     schema_valid: external_exports.enum(["pass", "fail"]),
     verdict: external_exports.enum(["approved", "rejected"]),
     rejection_reason: external_exports.string().optional()
-  })
+  }).optional()
 });
 var EvaluationResultSchema = external_exports.object({
-  node_id: external_exports.string(),
-  run_id: external_exports.string(),
-  eval_version: external_exports.string(),
+  // Server-owned bookkeeping — filled server-side from tool args + cache + now().
+  node_id: external_exports.string().optional(),
+  run_id: external_exports.string().optional(),
+  eval_version: external_exports.string().optional(),
   metrics: external_exports.record(external_exports.string(), external_exports.number()),
   per_domain: external_exports.record(external_exports.string(), external_exports.record(external_exports.string(), external_exports.number())),
   fitness_value: external_exports.number(),
@@ -21227,7 +21234,8 @@ var EvaluationResultSchema = external_exports.object({
   }),
   status: external_exports.enum(["success", "regression", "error", "timeout", "oom"]),
   benchmark_raw: external_exports.string(),
-  timestamp: ISODate
+  // Server-owned: filled via now().
+  timestamp: ISODate.optional()
 });
 var IntegrityReportSchema = external_exports.object({
   node_id: external_exports.string(),
@@ -21267,15 +21275,18 @@ var TelemetryRecordSchema = external_exports.object({
   gpu_util: external_exports.number().min(0).max(100).optional(),
   mem_used_gb: external_exports.number().optional(),
   mem_total_gb: external_exports.number().optional(),
-  node_id: external_exports.string(),
-  run_id: external_exports.string(),
-  timestamp: ISODate
+  // Server-owned bookkeeping — telemetry.ts worker fills these from tool args + now().
+  node_id: external_exports.string().optional(),
+  run_id: external_exports.string().optional(),
+  timestamp: ISODate.optional()
 });
 var LessonEntrySchema = external_exports.object({
-  lesson_id: external_exports.string(),
-  node_id: external_exports.string(),
-  run_id: external_exports.string(),
-  mission_id: external_exports.string(),
+  // Server-owned bookkeeping — optional at agent-facing input; server fills before persist.
+  // Defaults to "" so the stored TypeScript type remains `string` (wiki.ts sorts/files on these).
+  lesson_id: external_exports.string().optional().default(""),
+  node_id: external_exports.string().optional().default(""),
+  run_id: external_exports.string().optional().default(""),
+  mission_id: external_exports.string().optional().default(""),
   approach_family: ApproachFamilySchema,
   hypothesis_verdict: external_exports.enum(["confirmed", "refuted", "inconclusive"]),
   observation: external_exports.string(),
@@ -21284,7 +21295,8 @@ var LessonEntrySchema = external_exports.object({
   citations: external_exports.array(external_exports.string()),
   telemetry_evidence: external_exports.string().optional(),
   tags: external_exports.array(external_exports.string()),
-  created_at: ISODate
+  // Server-owned: filled via now(); defaults to "" to keep stored type as string.
+  created_at: ISODate.optional().default("")
 });
 var StrategyStateSchema = external_exports.object({
   meta_iteration: external_exports.number().int().min(0),
@@ -21822,6 +21834,44 @@ function resolveNodeRef(runId, ref, missionId) {
   }
   return ref;
 }
+function nameForId(runId, id, missionId) {
+  if (!id) return id;
+  let nodes;
+  try {
+    nodes = readTree(runId, missionId);
+  } catch {
+    return id;
+  }
+  const node = nodes[id];
+  if (!node) return id;
+  if (node.name) return node.name;
+  const base = (node.approach_family || "node").toLowerCase().replace(/[^a-z0-9-]/g, "-");
+  const sameFamily = Object.values(nodes).filter(
+    (n) => n && n.approach_family === node.approach_family
+  );
+  const pos = sameFamily.findIndex((n) => n && n.id === id);
+  return `${base}-${pos + 1}`;
+}
+function namesForIds(runId, ids, missionId) {
+  if (ids.length === 0) return [];
+  let nodes;
+  try {
+    nodes = readTree(runId, missionId);
+  } catch {
+    return ids.slice();
+  }
+  return ids.map((id) => {
+    const node = nodes[id];
+    if (!node) return id;
+    if (node.name) return node.name;
+    const base = (node.approach_family || "node").toLowerCase().replace(/[^a-z0-9-]/g, "-");
+    const sameFamily = Object.values(nodes).filter(
+      (n) => n && n.approach_family === node.approach_family
+    );
+    const pos = sameFamily.findIndex((n) => n && n.id === id);
+    return `${base}-${pos + 1}`;
+  });
+}
 function deriveName(runId, approachFamily, missionId) {
   const base = (approachFamily || "node").toLowerCase().replace(/[^a-z0-9-]/g, "-");
   let nodes = {};
@@ -21916,7 +21966,7 @@ function integrityCheck(runId, nodeId, missionId) {
 function registerIntegrityTools(server) {
   server.tool(
     "evor_integrity_check",
-    "Auto-triggered by evor_record_eval; call explicitly only for re-checks or manual spot-checks. Runs all 13 IntegrityGate checks via integrity_bridge.py and writes IntegrityReport to evaluations/<node-id>.json. Checks: reward-hacking, split-purity, telemetry-sane, acquisition-provenance, grad-norm-health, loss-monotonic, eval-consistency, config-reproducibility, dataset-frozen, license-gate, leakage-probe, performance-ceiling, and coverage-gap.",
+    "Auto-triggered by evor_record_eval; call explicitly only for re-checks or manual spot-checks. Run all integrity checks for a node and return the IntegrityReport. Checks: reward-hacking, split-purity, telemetry-sane, acquisition-provenance, grad-norm-health, loss-monotonic, eval-consistency, config-reproducibility, dataset-frozen, license-gate, leakage-probe, performance-ceiling, and coverage-gap.",
     {
       run_id: external_exports.string().describe("Active run identifier"),
       node_id: external_exports.string().describe("The node's name (e.g. 'immune-memory-02')")
@@ -21974,8 +22024,32 @@ function fillNodeId(node) {
   }
   return node;
 }
+function fillNodeBookkeeping(node, runId, missionId) {
+  if (!node.created_at) node.created_at = (/* @__PURE__ */ new Date()).toISOString();
+  if (node.visit_count === void 0 || node.visit_count === null) node.visit_count = 0;
+  if (node.integrity_status === void 0) node.integrity_status = "pending";
+  if (node.status === void 0) node.status = "pending";
+  if (!node.lesson_ids) node.lesson_ids = [];
+  const parentCount = node.parent_ids.length;
+  if (node.is_crossover === void 0) node.is_crossover = parentCount > 1;
+  if (node.depth === void 0 || node.depth === null) {
+    if (parentCount === 0) {
+      node.depth = 0;
+    } else {
+      try {
+        const nodes = readTree(runId, missionId);
+        const primaryParentId = node.parent_ids[0];
+        const parentNode = primaryParentId ? nodes[primaryParentId] : void 0;
+        node.depth = parentNode ? (parentNode.depth ?? 0) + 1 : 1;
+      } catch {
+        node.depth = 1;
+      }
+    }
+  }
+}
 function recordNode(runId, node, missionId) {
   const paths = ensureRunDirs(runId, missionId);
+  fillNodeBookkeeping(node, runId, missionId);
   upsertNode(runId, node, missionId);
   const logLine = [
     `
@@ -22030,13 +22104,16 @@ function readResult(runId, nodeId, missionId) {
   const paths = resolveRunPaths(runId, missionId);
   const resultPath = (0, import_path6.join)(paths.nodesDir, nodeId, "results.json");
   if (!(0, import_fs5.existsSync)(resultPath)) {
-    return { ok: false, error: `results.json not found at ${resultPath}` };
+    return {
+      ok: false,
+      error: "no evaluation result for this node yet \u2014 confirm it finished with evor_run_status (state='done') before reading."
+    };
   }
   try {
     const data = JSON.parse((0, import_fs5.readFileSync)(resultPath, "utf8"));
     return { ok: true, data };
-  } catch (e) {
-    return { ok: false, error: `Failed to parse results.json: ${String(e)}` };
+  } catch {
+    return { ok: false, error: "the node's evaluation result is present but could not be parsed." };
   }
 }
 function registerRecordTools(server) {
@@ -22061,19 +22138,19 @@ function registerRecordTools(server) {
           (p) => resolveNodeRef(run_id, p, missionId)
         );
       }
-      const { pendingRemaining, treePath } = recordNode(run_id, filledNode, missionId);
+      const { pendingRemaining } = recordNode(run_id, filledNode, missionId);
       return {
         content: [
           {
             type: "text",
-            // Return ONLY the name — never the internal id. On collision the name
-            // may differ from what was asked; the caller uses THIS value downstream.
+            // Return ONLY the name — never the internal id or filesystem path. On
+            // collision the name may differ from what was asked; the caller uses
+            // THIS value downstream.
             text: JSON.stringify({
               ok: true,
               name: filledNode.name,
               run_id,
-              pending_remaining: pendingRemaining,
-              tree_path: treePath
+              pending_remaining: pendingRemaining
             })
           }
         ]
@@ -22082,7 +22159,7 @@ function registerRecordTools(server) {
   );
   server.tool(
     "evor_record_eval",
-    "Record a node's EvaluationResult and auto-trigger the integrity check. Identify the node by the `name` you gave evor_record_node. Always call evor_record_node first. Returns {ok, name, results_path, integrity_verdict, integrity_report}.",
+    "Record a node's EvaluationResult and auto-trigger the integrity check. Identify the node by the `name` you gave evor_record_node. Always call evor_record_node first. Returns {ok, name, status, integrity_verdict, integrity_report}.",
     {
       run_id: external_exports.string().describe("Active run identifier"),
       node_id: external_exports.string().describe(
@@ -22093,20 +22170,32 @@ function registerRecordTools(server) {
     async ({ run_id, node_id, result }) => {
       const missionId = process.env.EVOR_MISSION_ID;
       const resolvedId = resolveNodeRef(run_id, node_id, missionId);
-      const { resultsPath, integrityVerdict, integrityError, integrityReport } = recordEval(run_id, resolvedId, result, missionId);
+      const filledResult = { ...result };
+      if (!filledResult.node_id) filledResult.node_id = resolvedId;
+      if (!filledResult.run_id) filledResult.run_id = run_id;
+      if (!filledResult.timestamp) filledResult.timestamp = (/* @__PURE__ */ new Date()).toISOString();
+      if (!filledResult.eval_version) {
+        try {
+          const paths = resolveRunPaths(run_id, missionId);
+          const state = readRunState(paths.runStatePath, run_id);
+          filledResult.eval_version = typeof state.current_eval_version === "string" ? state.current_eval_version : "v1";
+        } catch {
+          filledResult.eval_version = "v1";
+        }
+      }
+      const { integrityVerdict, integrityError, integrityReport } = recordEval(run_id, resolvedId, filledResult, missionId);
       return {
         content: [
           {
             type: "text",
             // P1-1: integrity_report is the FULL IntegrityReport inline — the orchestrator
             // never needs a separate evor_integrity_check call for the normal flow.
-            // Echo the NAME the caller used, never the internal id.
+            // Echo the NAME the caller used, never the internal id or filesystem path.
             text: JSON.stringify({
               ok: true,
               run_id,
               name: node_id,
               status: result.status,
-              results_path: resultsPath,
               integrity_verdict: integrityVerdict,
               integrity_error: integrityError,
               integrity_report: integrityReport
@@ -22118,7 +22207,7 @@ function registerRecordTools(server) {
   );
   server.tool(
     "evor_read_result",
-    "Read nodes/<node_id>/results.json and return parsed JSON. Eliminates the need to shell out 'cat results.json' or read artifact paths manually. Call after evor_run_status shows state='done'. Returns the full EvaluationResult object.",
+    "Return a node's full evaluation result. Identify the node by the `name` you gave it. This is the only way to read a result \u2014 never read files by hand. Call after evor_run_status shows state='done'. Returns the full EvaluationResult object.",
     {
       run_id: external_exports.string().describe("Active run identifier"),
       node_id: external_exports.string().describe(
@@ -22171,21 +22260,31 @@ function dfsCollect(rootId, childrenMap, maxDepth) {
   }
   return collected;
 }
+function toNamedNode(node, runId, missionId) {
+  return {
+    name: nameForId(runId, node.id, missionId),
+    status: node.status,
+    depth: node.depth,
+    approach_family: node.approach_family,
+    score: node.ucb1_score,
+    parent_names: namesForIds(runId, node.parent_ids, missionId)
+  };
+}
 function treeRead(runId, subtreeRoot, depth, missionId) {
   const nodes = readTree(runId, missionId);
+  let raw;
   if (subtreeRoot !== void 0) {
     if (!(subtreeRoot in nodes)) {
       return [];
     }
     const childrenMap = buildChildrenMap(nodes);
     const collected = dfsCollect(subtreeRoot, childrenMap, depth);
-    return [...collected].map((id) => nodes[id]).filter(Boolean);
+    raw = [...collected].map((id) => nodes[id]).filter(Boolean);
+  } else {
+    const all = Object.values(nodes);
+    raw = depth === void 0 ? all : all.filter((n) => n.depth <= depth);
   }
-  const all = Object.values(nodes);
-  if (depth === void 0) {
-    return all;
-  }
-  return all.filter((n) => n.depth <= depth);
+  return raw.map((n) => toNamedNode(n, runId, missionId));
 }
 function treeSelect(runId, strategy, count, missionId) {
   const paths = resolveRunPaths(runId, missionId);
@@ -22202,7 +22301,7 @@ function treeSelect(runId, strategy, count, missionId) {
   const pyResult = callPythonModule("evor.tree", args);
   if (!pyResult.ok || pyResult.data == null) {
     return {
-      selected: [],
+      selected_names: [],
       scores: {},
       error: pyResult.error ?? "evor_select failed"
     };
@@ -22217,12 +22316,13 @@ function treeSelect(runId, strategy, count, missionId) {
     state.pending_node_ids = merged;
     writeRunState(paths.runStatePath, state);
   }
-  return { selected, scores };
+  const selected_names = namesForIds(runId, selected, missionId);
+  return { selected_names, scores };
 }
 function registerTreeTools(server) {
   server.tool(
     "evor_tree_read",
-    "Read tree.json for a run, optionally filtered to a subtree rooted at subtree_root up to depth levels.",
+    "Read the evolution tree for a run, optionally filtered to a subtree rooted at subtree_root up to depth levels.",
     {
       run_id: external_exports.string().describe("Active run identifier"),
       subtree_root: external_exports.string().optional().describe("Node ID to root the subtree at; omit for full tree"),
@@ -22243,7 +22343,7 @@ function registerTreeTools(server) {
   );
   server.tool(
     "evor_select",
-    "Select the next parent node(s) to expand by the active policy (UCB1 by default); returns ranked parent node IDs.",
+    "Select the next parent node(s) to expand by the active policy (UCB1 by default); returns ranked parent node names.",
     {
       run_id: external_exports.string().describe("Active run identifier"),
       strategy: StrategyStateSchema.partial().optional().describe("Strategy overrides for this selection"),
@@ -22302,7 +22402,7 @@ function scheduleJob(runId, nodeId, worktree, opts) {
 function registerScheduleTools(server) {
   server.tool(
     "evor_schedule",
-    "Submit a training job to ResourceScheduler.submit() via scheduler_bridge.py; returns job_id and pid.",
+    "Submit a training job to the ResourceScheduler and return immediately. Returns a job_handle to track the job and its current status.",
     {
       run_id: external_exports.string().describe("Active run identifier"),
       node_id: external_exports.string().describe("Node being trained"),
@@ -22315,17 +22415,24 @@ function registerScheduleTools(server) {
         runDir: paths.runDir,
         timeoutSeconds: job_spec.timeout_seconds
       });
+      if (!result.ok) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify({ error: result.error ?? "schedule failed" })
+            }
+          ]
+        };
+      }
       return {
         content: [
           {
             type: "text",
             text: JSON.stringify({
-              run_id,
-              node_id,
-              job_id: result.jobId ?? null,
-              pid: result.pid ?? null,
-              status: result.status ?? "failed",
-              error: result.error ?? null
+              ok: true,
+              job_handle: result.jobId ?? null,
+              status: result.status ?? "submitted"
             })
           }
         ]
@@ -22589,12 +22696,12 @@ function registerWikiTools(server) {
     },
     async ({ run_id, entry }) => {
       const missionId = process.env.EVOR_MISSION_ID;
-      const { lessonId, indexPath } = wikiAdd(run_id, entry, missionId);
+      const { lessonId } = wikiAdd(run_id, entry, missionId);
       return {
         content: [
           {
             type: "text",
-            text: JSON.stringify({ ok: true, lesson_id: lessonId, run_id, index_path: indexPath })
+            text: JSON.stringify({ ok: true, lesson_id: lessonId, run_id })
           }
         ]
       };
@@ -22675,7 +22782,7 @@ var RunStatePatchSchema = external_exports.object({
   best_score: external_exports.number().optional().describe("Best primary metric value achieved so far"),
   frontier_ids: external_exports.array(external_exports.string()).optional().describe("Node IDs currently on the frontier"),
   current_eval_version: external_exports.string().optional().describe("Active EvalSuite version"),
-  pending_node_ids: external_exports.array(external_exports.string()).optional().describe("Node IDs started in this tick but not yet written to tree.json"),
+  pending_node_ids: external_exports.array(external_exports.string()).optional().describe("Node names started in this tick but not yet recorded to the tree"),
   strategy: StrategyStateSchema.partial().optional().describe("Strategy delta to merge into strategy.json"),
   // ── Extended fields (spec §1 evor_state_write extension) ─────────────────
   mission_status: external_exports.enum(["draft", "locked", "running", "paused", "completed", "failed"]).optional().describe("If set, patches mission-state.json .status (gate: draft\u2192locked requires contract validation)"),
@@ -22807,23 +22914,23 @@ function readGoalContract(runId, missionId) {
   if (!(0, import_fs7.existsSync)(contractPath)) {
     return {
       ok: false,
-      error: `goal-contract.json not found at ${contractPath}`
+      error: "no goal contract for this run \u2014 initialize the run with evor_init_run first."
     };
   }
   let raw;
   try {
     raw = JSON.parse((0, import_fs7.readFileSync)(contractPath, "utf8"));
-  } catch (err2) {
+  } catch {
     return {
       ok: false,
-      error: `failed to parse goal-contract.json: ${err2.message}`
+      error: "the run's goal contract is present but could not be parsed."
     };
   }
   const parsed = GoalContractSchema.safeParse(raw);
   if (!parsed.success) {
     return {
       ok: false,
-      error: `goal-contract.json validation failed: ${parsed.error.message}`
+      error: `the run's goal contract failed validation: ${parsed.error.message}`
     };
   }
   return { ok: true, contract: parsed.data };
@@ -22831,7 +22938,7 @@ function readGoalContract(runId, missionId) {
 function registerStateTools(server) {
   server.tool(
     "evor_state_read",
-    "Read run-state.json (+ tick-state.json when present) and return the current RunState. tick_state is merged into the response when tick-state.json exists.",
+    "Return the current RunState for the run (including tick state when present). tick_state is merged into the response when tick-state.json exists.",
     {
       run_id: external_exports.string().describe("Active run identifier")
     },
@@ -22850,10 +22957,10 @@ function registerStateTools(server) {
   );
   server.tool(
     "evor_state_write",
-    "Merge-patch run-state.json with the given fields. Optional side-effects: strategy\u2192strategy.json, mission_status\u2192mission-state.json, active_run\u2192active-run.json (include job_id to enable monitor lookup), tick_state\u2192tick-state.json (atomic; 10 read sites per tick).",
+    "Merge-patch the run's RunState with the given fields. Optional side-effects: strategy\u2192strategy.json, mission_status\u2192mission-state.json, active_run\u2192active-run.json (include job_id to enable monitor lookup), tick_state\u2192tick-state.json (atomic; 10 read sites per tick).",
     {
       run_id: external_exports.string().describe("Active run identifier"),
-      patch: RunStatePatchSchema.describe("Fields to merge into run-state.json")
+      patch: RunStatePatchSchema.describe("Fields to merge into the RunState")
     },
     async ({ run_id, patch }) => {
       const missionId = process.env.EVOR_MISSION_ID;
@@ -22870,7 +22977,7 @@ function registerStateTools(server) {
   );
   server.tool(
     "evor_check_plateau",
-    "Read tick history scores from run-state.json and detect plateau or consecutive regression. Returns {plateau, consecutive_regression, ticks_checked, scores[]}. plateau=true when last 3 scores are within 0.5% of each other (no meaningful improvement). consecutive_regression=true when last 2 ticks both regressed below their predecessor. Returns plateau=false when fewer than 3 ticks are available (insufficient data).",
+    "Read the run's tick-history scores and detect plateau or consecutive regression. Returns {plateau, consecutive_regression, ticks_checked, scores[]}. plateau=true when last 3 scores are within 0.5% of each other (no meaningful improvement). consecutive_regression=true when last 2 ticks both regressed below their predecessor. Returns plateau=false when fewer than 3 ticks are available (insufficient data).",
     {
       run_id: external_exports.string().describe("Active run identifier")
     },
@@ -22889,7 +22996,7 @@ function registerStateTools(server) {
   );
   server.tool(
     "evor_read_goal_contract",
-    "Read and validate goal-contract.json from the run directory. Returns the parsed GoalContract or {error:'...'} when missing or invalid. The contract is validated against the GoalContractSchema (Zod).",
+    "Read the run's validated GoalContract. Returns the parsed GoalContract, or {error:'...'} when it is missing or invalid.",
     {
       run_id: external_exports.string().describe("Active run identifier")
     },
@@ -22912,10 +23019,11 @@ function registerStateTools(server) {
 
 // src/tools/cite.ts
 function addCitation(runId, nodeId, citation, missionId) {
+  const resolvedId = resolveNodeRef(runId, nodeId, missionId);
   const nodes = readTree(runId, missionId);
-  const node = nodes[nodeId];
+  const node = nodes[resolvedId];
   if (!node) {
-    return { ok: false, error: `Node ${nodeId} not found in tree.json for run ${runId}` };
+    return { ok: false, error: `node '${nodeId}' not found in this run's tree \u2014 check the name with evor_tree_read.` };
   }
   if (node.citations.includes(citation)) {
     return { ok: true, citations: node.citations };
@@ -22927,10 +23035,10 @@ function addCitation(runId, nodeId, citation, missionId) {
 function registerCiteTools(server) {
   server.tool(
     "evor_cite",
-    "Append a citation (bib entry, arXiv URL, or dataset URL) to the TreeNode's citations[] in tree.json.",
+    "Append a citation (bib entry, arXiv URL, or dataset URL) to a node's citations. Identify the node by name.",
     {
       run_id: external_exports.string().describe("Active run identifier"),
-      node_id: external_exports.string().describe("Node to annotate"),
+      node_id: external_exports.string().describe("The node's name (e.g. 'immune-memory-02')"),
       citation: external_exports.string().min(1).describe("Citation string: bib entry, arXiv URL, or dataset URL")
     },
     async ({ run_id, node_id, citation }) => {
@@ -22957,15 +23065,22 @@ function telemetryIngest(runId, nodeId, records, missionId) {
   if (!(0, import_fs8.existsSync)(nodeDir)) {
     (0, import_fs8.mkdirSync)(nodeDir, { recursive: true });
   }
+  const now = (/* @__PURE__ */ new Date()).toISOString();
+  const filled = records.map((r) => ({
+    ...r,
+    node_id: r.node_id || nodeId,
+    run_id: r.run_id || runId,
+    timestamp: r.timestamp || now
+  }));
   const telemetryPath = (0, import_path9.join)(nodeDir, "telemetry.jsonl");
-  const lines = records.map((r) => JSON.stringify(r)).join("\n") + "\n";
+  const lines = filled.map((r) => JSON.stringify(r)).join("\n") + "\n";
   (0, import_fs8.appendFileSync)(telemetryPath, lines, "utf8");
   return { telemetryPath, count: records.length };
 }
 function registerTelemetryTools(server) {
   server.tool(
     "evor_telemetry_ingest",
-    "Validate each TelemetryRecord against schema and append JSONL lines to nodes/<node_id>/telemetry.jsonl.",
+    "Validate each TelemetryRecord and append it to the node's telemetry stream. Identify the node by name.",
     {
       run_id: external_exports.string().describe("Active run identifier"),
       node_id: external_exports.string().describe("Node emitting telemetry"),
@@ -22973,12 +23088,12 @@ function registerTelemetryTools(server) {
     },
     async ({ run_id, node_id, records }) => {
       const missionId = process.env.EVOR_MISSION_ID;
-      const { telemetryPath, count } = telemetryIngest(run_id, node_id, records, missionId);
+      const { count } = telemetryIngest(run_id, node_id, records, missionId);
       return {
         content: [
           {
             type: "text",
-            text: JSON.stringify({ ok: true, count, run_id, node_id, telemetry_path: telemetryPath })
+            text: JSON.stringify({ ok: true, count, run_id, node_id })
           }
         ]
       };
@@ -23134,7 +23249,7 @@ function emitSignal(runId, input, missionId) {
       }
     }
     throw new Error(
-      `emitSignal: signal "${input.signature}" failed to persist in signals.jsonl after 3 attempts (concurrent clobber detected)`
+      `signal "${input.signature}" could not be persisted after 3 attempts (concurrent write contention) \u2014 retry the emit.`
     );
   });
 }
@@ -23186,7 +23301,7 @@ function digestSignals(runId, params, missionId) {
 function registerSignalTools(server) {
   server.tool(
     "evor_signal_emit",
-    "Emit (upsert/dedup by signature) a Signal onto the run's signal bus at <run_dir>/signals.jsonl. Repeat emits with the same signature aggregate: occurrences+1, confidence raised toward 1.0, severity escalates to MAX seen.",
+    "Emit (upsert/dedup by signature) a Signal onto the run's signal bus. Repeat emits with the same signature aggregate: occurrences+1, confidence raised toward 1.0, severity escalates to MAX seen.",
     {
       run_id: external_exports.string().describe("Active run identifier"),
       mission_id: external_exports.string().optional().describe("Mission identifier (resolved automatically when omitted)"),
@@ -23209,7 +23324,12 @@ function registerSignalTools(server) {
         missionId
       );
       return {
-        content: [{ type: "text", text: JSON.stringify(signal) }]
+        content: [{ type: "text", text: JSON.stringify({
+          ok: true,
+          signature: signal.signature,
+          severity: signal.severity,
+          occurrences: signal.occurrences
+        }) }]
       };
     }
   );
@@ -23295,12 +23415,10 @@ function registerInitTools(server) {
   server.tool(
     "evor_init_run",
     [
-      "Construct, validate, and atomically write all run artifacts for a new mission run:",
-      "goal-contract.json, run-state.json, strategy.json, tree.json, mission-state.json,",
-      "decision-log.md (into run_dir) and active-run.json (into evor_root).",
-      "Returns {ok:true, mission_id, run_id, run_dir, goal_contract_path} on success,",
-      "or {ok:false, error:<validation message>} on GoalContract validation failure.",
-      "Replaces the hand-authored python <<'PY' GoalContract heredoc in evor-setup."
+      "Construct, validate, and atomically write everything a new mission run needs.",
+      "This is the single entry point for standing up a run \u2014 no files to author by hand.",
+      "Returns {ok:true, mission_id, run_id} on success,",
+      "or {ok:false, error:<validation message>} on GoalContract validation failure."
     ].join(" "),
     {
       answers: external_exports.record(external_exports.string(), external_exports.unknown()).describe(
@@ -23308,7 +23426,7 @@ function registerInitTools(server) {
       ),
       run_id: external_exports.string().optional().describe("Override the auto-generated run ID (default: <mission_id>-<UTC compact timestamp>)"),
       mission_id: external_exports.string().optional().describe("Override the mission_id from answers (takes precedence over answers.mission_id)"),
-      run_dir: external_exports.string().optional().describe("Override the run directory path (default: <evor_root>/runs/<mission_id>/<run_id>)")
+      run_dir: external_exports.string().optional().describe("Optional override for the run storage location (advanced use only)")
     },
     async ({ answers, run_id, mission_id, run_dir }) => {
       const outcome = initRun(answers, {
@@ -23316,8 +23434,17 @@ function registerInitTools(server) {
         missionId: mission_id,
         runDir: run_dir
       });
+      if (!outcome.ok) {
+        return {
+          content: [{ type: "text", text: JSON.stringify(outcome) }]
+        };
+      }
       return {
-        content: [{ type: "text", text: JSON.stringify(outcome) }]
+        content: [{ type: "text", text: JSON.stringify({
+          ok: true,
+          mission_id: outcome.mission_id,
+          run_id: outcome.run_id
+        }) }]
       };
     }
   );
@@ -23422,8 +23549,8 @@ function registerArtifactTools(server) {
     "evor_write_artifact",
     [
       "Validate and atomically write a tick artifact for the given agent kind.",
-      "The path is derived from the agent and tick per the spec \xA71 mapping.",
-      "Payload is validated against Pydantic contracts where one exists;",
+      "The destination is derived automatically from the agent and tick.",
+      "Payload is validated against the contract for that agent kind where one exists;",
       "unknown/loose agents pass through as plain JSON."
     ].join(" "),
     {
@@ -23454,8 +23581,7 @@ function registerArtifactTools(server) {
               ok: true,
               run_id,
               tick,
-              agent,
-              path: result.path
+              agent
             })
           }
         ]
@@ -23487,7 +23613,7 @@ function registerArtifactTools(server) {
           {
             type: "text",
             text: JSON.stringify(
-              result.ok ? { ok: true, run_id, tick, agent, payload: result.payload, path: result.path } : { error: result.error }
+              result.ok ? { ok: true, run_id, tick, agent, payload: result.payload } : { error: result.error }
             )
           }
         ]
@@ -23641,8 +23767,7 @@ function registerLineageTools(server) {
             text: JSON.stringify({
               ok: true,
               run_id,
-              node_id,
-              patch_path: result.patchPath
+              node_id
             })
           }
         ]
@@ -23652,8 +23777,9 @@ function registerLineageTools(server) {
   server.tool(
     "evor_write_handoff",
     [
-      "Write a tick handoff payload to handoffs/<tick>-<seq>.json atomically.",
-      "Sequence numbers are auto-incremented so multiple handoffs per tick are supported."
+      "Write a tick handoff payload atomically.",
+      "Multiple handoffs per tick are supported; seq is a server-assigned sequence number",
+      "that preserves ordering within a tick."
     ].join(" "),
     {
       run_id: external_exports.string().describe("Active run identifier"),
@@ -23678,7 +23804,6 @@ function registerLineageTools(server) {
               ok: true,
               run_id,
               tick,
-              path: result.path,
               seq: result.seq
             })
           }
@@ -23763,6 +23888,7 @@ function registerLineageTools(server) {
 
 // src/tools/compute.ts
 var import_fs13 = require("fs");
+var import_crypto4 = require("crypto");
 var import_path14 = require("path");
 function ok(data) {
   return { content: [{ type: "text", text: JSON.stringify(data) }] };
@@ -23907,21 +24033,59 @@ function gotchasList(kind, scope, minConfidence, evorRoot, runDir) {
   if (runDir) args.push("--run-dir", runDir);
   return callPythonModule("evor", args, { timeout: 3e4 });
 }
+function lockEvaluate(runId, nodeRef, missionId) {
+  const nodeId = resolveNodeRef(runId, nodeRef, missionId);
+  const worktree = (0, import_path14.join)(getEvorRoot(), "worktrees", nodeId);
+  const evalPath = (0, import_path14.join)(worktree, "evaluate.py");
+  if (!(0, import_fs13.existsSync)(evalPath)) {
+    return {
+      ok: false,
+      node_name: nodeRef,
+      error: "evaluate.py is not present in the node worktree \u2014 materialize the genome first."
+    };
+  }
+  try {
+    const hash = (0, import_crypto4.createHash)("sha256").update((0, import_fs13.readFileSync)(evalPath)).digest("hex");
+    (0, import_fs13.writeFileSync)((0, import_path14.join)(worktree, "evaluate.py.lock"), hash, "utf8");
+    (0, import_fs13.chmodSync)(evalPath, 292);
+    return { ok: true, node_name: nodeRef };
+  } catch {
+    return { ok: false, node_name: nodeRef, error: "could not lock evaluate.py" };
+  }
+}
+function verifyArtifacts(runId, nodeRef, missionId) {
+  const nodeId = resolveNodeRef(runId, nodeRef, missionId);
+  const nodeDir = (0, import_path14.join)(resolveRunPaths(runId, missionId).runDir, "nodes", nodeId);
+  const present = (rel, minBytes) => {
+    try {
+      const p = (0, import_path14.join)(nodeDir, rel);
+      return (0, import_fs13.existsSync)(p) && (0, import_fs13.statSync)(p).size > minBytes;
+    } catch {
+      return false;
+    }
+  };
+  const has_results = present("results.json", 2);
+  const has_telemetry = present("telemetry.jsonl", 0);
+  return { ok: has_results && has_telemetry, node_name: nodeRef, has_results, has_telemetry };
+}
 function registerComputeTools(server) {
   server.tool(
     "evor_run_start",
-    `Launch candidate node as a detached background job. Returns {job_id, status_path, log_path} instantly \u2014 watch with evor_run_status or Monitor(command: 'tail -f <log_path> | grep -E --line-buffered "elapsed_steps=|val_|Error|OOM"').`,
+    "Launch candidate node as a detached background job. Returns {status, job_id} instantly \u2014 poll progress with evor_run_status.",
     {
       run_id: external_exports.string().describe("Active run identifier"),
       node_id: external_exports.string().describe("The node's name (e.g. 'immune-memory-02')"),
-      run_dir: external_exports.string().describe("Absolute path to .evor/runs/<mission>/<run-id>/"),
+      run_dir: external_exports.string().optional().describe(
+        "Absolute path to the run directory; derived from run_id when omitted"
+      ),
       worktree: external_exports.string().describe("Absolute path to the candidate git worktree"),
       eval_version: external_exports.string().optional().describe("Eval suite version override (e.g. v1)")
     },
     async ({ run_id, node_id, run_dir, worktree, eval_version }) => {
       const missionId = process.env.EVOR_MISSION_ID;
+      const resolvedDir = run_dir ?? resolveRunPaths(run_id, missionId).runDir;
       const resolvedNodeId = resolveNodeRef(run_id, node_id, missionId);
-      const result = jobStart(resolvedNodeId, run_id, run_dir, worktree, eval_version);
+      const result = jobStart(resolvedNodeId, run_id, resolvedDir, worktree, eval_version);
       if (!result.ok) return err(result.error ?? "evor_run_start failed");
       const jobData = result.data;
       const jobId = typeof jobData?.job_id === "string" ? jobData.job_id : void 0;
@@ -23938,7 +24102,7 @@ function registerComputeTools(server) {
           const ar = {
             ...existing,
             run_id,
-            run_dir,
+            run_dir: resolvedDir,
             job_id: jobId
           };
           if (missionId && !ar.mission_id) ar.mission_id = missionId;
@@ -23948,24 +24112,43 @@ function registerComputeTools(server) {
         } catch {
         }
       }
-      return ok(result.data);
+      return ok({ status: "started", job_id: jobId ?? null });
     }
   );
   server.tool(
     "evor_run_status",
-    "Read status.json and tail the log for a running or completed job. Returns {state, exit_code?, started_at?, finished_at?, cmd?, tail?}.",
+    "Read status for a running or completed job. Returns {state, exit_code?, started_at?, finished_at?, tail?}.",
     {
       run_id: external_exports.string().describe("Active run identifier"),
-      job_id: external_exports.string().describe("Job identifier returned by evor_run_start"),
+      job_id: external_exports.string().optional().describe(
+        "Job identifier; looked up from active-run state when omitted"
+      ),
       run_dir: external_exports.string().optional().describe(
-        "Explicit run_dir; falls back to resolveRunPaths(run_id) when omitted"
+        "Explicit run directory; derived from run_id when omitted"
       )
     },
     async ({ run_id, job_id, run_dir }) => {
       const missionId = process.env.EVOR_MISSION_ID;
       const resolvedDir = run_dir ?? resolveRunPaths(run_id, missionId).runDir;
-      const result = jobStatus(job_id, resolvedDir);
+      let resolvedJobId = job_id;
+      if (!resolvedJobId) {
+        try {
+          const arPath = getActiveRunPath();
+          if ((0, import_fs13.existsSync)(arPath)) {
+            const ar = JSON.parse((0, import_fs13.readFileSync)(arPath, "utf8"));
+            if (typeof ar.job_id === "string") resolvedJobId = ar.job_id;
+          }
+        } catch {
+        }
+      }
+      if (!resolvedJobId) return err("job_id required: no active job found for run_id");
+      const result = jobStatus(resolvedJobId, resolvedDir);
       if (!result.ok) return err(result.error ?? "evor_run_status failed");
+      const data = result.data;
+      if (data && "cmd" in data) {
+        const { cmd: _cmd, ...clean } = data;
+        return ok(clean);
+      }
       return ok(result.data);
     }
   );
@@ -23992,7 +24175,7 @@ function registerComputeTools(server) {
         return ok(cap);
       } catch {
         return err(
-          `evor capability ran but capability.json not found at ${root}: ` + (result.stderr ?? result.error ?? "")
+          "evor capability succeeded but capability.json was not written \u2014 check EVOR_ROOT configuration." + (result.stderr ? ` (${result.stderr})` : "")
         );
       }
     }
@@ -24020,7 +24203,7 @@ function registerComputeTools(server) {
   );
   server.tool(
     "evor_validate",
-    "Validate goal-contract.json schema, MetricSpec gameability guards, frozen-splits, and tree.json format. Returns a JSON ValidationReport.",
+    "Validate run configuration and split integrity. Returns a JSON ValidationReport.",
     {
       run_id: external_exports.string().describe("Active run identifier")
     },
@@ -24034,13 +24217,13 @@ function registerComputeTools(server) {
   );
   server.tool(
     "evor_doctor",
-    "Check environment and .evor integrity: Python, torch, Node.js, env vars, tree.json format, mission-state, orphan pending nodes, frozen-split hashes. Pass repair=true to auto-fix obvious issues.",
+    "Health-check the run and environment: Python, torch, Node.js, env vars, tree consistency, mission state, orphan pending nodes, and frozen-split integrity. Pass repair=true to auto-fix obvious issues.",
     {
       run_id: external_exports.string().optional().describe(
         "Active run identifier (omit for env-only check)"
       ),
       repair: external_exports.boolean().optional().describe(
-        "Auto-repair obvious issues (e.g. list-format tree.json \u2192 DICT)"
+        "Auto-repair obvious issues found during the health check"
       )
     },
     async ({ run_id, repair }) => {
@@ -24053,7 +24236,7 @@ function registerComputeTools(server) {
   );
   server.tool(
     "evor_freeze_splits",
-    "Freeze test and val splits from a dataset directory. Writes frozen-splits/ and returns {locked_split_hash, val_split_hash, test_item_count, val_item_count}.",
+    "Freeze the test and val splits for reproducible evaluation. Returns {ok, test_item_count, val_item_count}.",
     {
       dataset_ref: external_exports.string().describe("Path to dataset directory or file"),
       eval_version: external_exports.string().describe("Eval version string (e.g. v1)"),
@@ -24065,12 +24248,17 @@ function registerComputeTools(server) {
       const { runDir } = resolveRunPaths(run_id, resolvedMission);
       const result = freezeSplits(dataset_ref, eval_version, runDir, resolvedMission);
       if (!result.ok) return err(result.error ?? "evor_freeze_splits failed");
+      const data = result.data;
+      if (data) {
+        const { locked_split_hash: _lh, val_split_hash: _vh, ...clean } = data;
+        return ok({ ok: true, ...clean });
+      }
       return ok(result.data);
     }
   );
   server.tool(
     "evor_init_eval_suite",
-    "Create the initial EvalSuite v1 for a new mission. Writes eval-suites/v1.json and angle-registry.json. Returns {eval_version, mission_id, domains, created_at}.",
+    "Create the initial evaluation suite for a new mission. Returns {eval_version, mission_id, domains, created_at}.",
     {
       mission_id: external_exports.string().describe("Mission identifier"),
       eval_version: external_exports.string().describe("Eval version string (e.g. v1)"),
@@ -24133,12 +24321,11 @@ function registerComputeTools(server) {
   );
   server.tool(
     "evor_forge_dispatch_batch",
-    "Dispatch multiple candidate training jobs in parallel to the compute backend. Returns job_ids for all candidates immediately without waiting for completion. Monitor each job with Monitor(command: 'tail -f <log_path>') or evor_run_status. Use instead of sequential evor_run_start calls when VRAM allows parallel training.",
+    "Dispatch multiple candidate training jobs in parallel to the compute backend. Returns job_ids for all candidates immediately without waiting for completion. Poll each job with evor_run_status. Use instead of sequential evor_run_start calls when VRAM allows parallel training.",
     {
       run_id: external_exports.string().describe("Active run identifier"),
       candidates: external_exports.array(external_exports.object({
-        node_id: external_exports.string().describe("Candidate node ID to train"),
-        worktree: external_exports.string().describe("Path to candidate worktree"),
+        node_name: external_exports.string().describe("Logical node name (e.g. 'immune-memory-02')"),
         eval_version: external_exports.string().optional().describe("Eval suite version override (e.g. v1)")
       })).min(1).max(8).describe("Candidate nodes to train in parallel (max 8)"),
       gpu_fraction: external_exports.number().min(0.1).max(1).optional().describe(
@@ -24147,8 +24334,14 @@ function registerComputeTools(server) {
     },
     async ({ run_id, candidates, gpu_fraction }) => {
       const missionId = process.env.EVOR_MISSION_ID;
+      const evorRoot = getEvorRoot();
       const { runDir } = resolveRunPaths(run_id, missionId);
-      const result = forgeDispatchBatch(run_id, candidates, runDir, gpu_fraction);
+      const resolvedCandidates = candidates.map((c) => {
+        const nodeId = resolveNodeRef(run_id, c.node_name, missionId);
+        const worktree = (0, import_path14.join)(evorRoot, "worktrees", nodeId);
+        return { node_id: nodeId, worktree, eval_version: c.eval_version };
+      });
+      const result = forgeDispatchBatch(run_id, resolvedCandidates, runDir, gpu_fraction);
       return ok(result);
     }
   );
@@ -24199,6 +24392,32 @@ function registerComputeTools(server) {
       const result = gotchasList(kind, scope, min_confidence, evor_root, runDir);
       if (!result.ok) return err(result.error ?? "evor_gotchas_list failed");
       return ok(result.data);
+    }
+  );
+  server.tool(
+    "evor_lock_evaluate",
+    "Lock a node's evaluate.py so it cannot be mutated after evaluation begins. Fingerprints the script and makes it read-only. Call once, right before scoring a node. Returns {ok, node_name}.",
+    {
+      run_id: external_exports.string().describe("Active run identifier"),
+      node: external_exports.string().describe("The node's name (e.g. 'immune-memory-02')")
+    },
+    async ({ run_id, node }) => {
+      const missionId = process.env.EVOR_MISSION_ID;
+      const result = lockEvaluate(run_id, node, missionId);
+      return ok(result);
+    }
+  );
+  server.tool(
+    "evor_verify_artifacts",
+    "Confirm a node externalized its training deliverables (results + telemetry). Returns {ok, has_results, has_telemetry, node_name} \u2014 booleans only. Use after a node finishes to verify it actually produced output.",
+    {
+      run_id: external_exports.string().describe("Active run identifier"),
+      node: external_exports.string().describe("The node's name (e.g. 'immune-memory-02')")
+    },
+    async ({ run_id, node }) => {
+      const missionId = process.env.EVOR_MISSION_ID;
+      const result = verifyArtifacts(run_id, node, missionId);
+      return ok(result);
     }
   );
 }
@@ -24456,8 +24675,9 @@ function registerGotchaTools(server) {
   server.tool(
     "evor_store_blob",
     [
-      "Store a file or text blob in the ContentAddressedStore (sha256-addressed, dedup via hardlink).",
-      "Returns the content_ref (sha256 hex) which can be passed to evor_record_node or stored in tree artifacts.",
+      "Store a file or text blob durably so it can be referenced across nodes and runs.",
+      "Identical blobs are stored only once (dedup). Returns acquisition_id as the logical handle",
+      "to pass to evor_record_node or store in tree artifacts.",
       "If acquisition_id is provided, the blob is registered under the 'train' namespace (ADR-015 enforcement)."
     ].join(" "),
     {
@@ -24493,7 +24713,7 @@ function registerGotchaTools(server) {
         content: [
           {
             type: "text",
-            text: JSON.stringify({ ok: true, run_id, content_ref: result.content_ref })
+            text: JSON.stringify({ ok: true, acquisition_id: acquisition_id ?? null })
           }
         ]
       };
@@ -24502,8 +24722,10 @@ function registerGotchaTools(server) {
 }
 
 // src/tools/proposals.ts
+var import_crypto5 = require("crypto");
 var ProposalInputSchema = external_exports.object({
-  proposal_id: external_exports.string().describe("Unique ID for this proposal (correlates results)"),
+  // Server-owned: generated server-side if absent (crypto.randomUUID / prop-<short> slug).
+  proposal_id: external_exports.string().optional().describe("Unique ID for this proposal (correlates results); generated server-side if omitted"),
   parent_node_ids: external_exports.array(external_exports.string()).min(1).describe("Parent node IDs; first element is the primary lineage parent"),
   approach_family: external_exports.string().describe("Approach family (arch, training, data-curation, augmentation, regularization, other)"),
   hypothesis: external_exports.object({
@@ -24541,8 +24763,7 @@ function gateH004(primaryParentId, parentShareCounts, N) {
   return share <= Math.floor(N / 2) ? "pass" : "fail";
 }
 function gateSchema(proposal) {
-  const { proposal_id, parent_node_ids, approach_family, hypothesis, wildness } = proposal;
-  if (!proposal_id?.trim()) return "fail";
+  const { parent_node_ids, approach_family, hypothesis, wildness } = proposal;
   if (!parent_node_ids?.length) return "fail";
   if (!approach_family?.trim()) return "fail";
   if (!hypothesis?.prediction?.trim()) return "fail";
@@ -24550,15 +24771,19 @@ function gateSchema(proposal) {
   return "pass";
 }
 function validateProposals(proposals, strategy) {
-  const N = proposals.length;
+  const filledProposals = proposals.map((p, i) => ({
+    ...p,
+    proposal_id: p.proposal_id?.trim() ? p.proposal_id : `prop-${(0, import_crypto5.randomUUID)().slice(0, 8)}-${i}`
+  }));
+  const N = filledProposals.length;
   const winningFamilies = strategy.winning_families ?? [];
   const parentShareCounts = /* @__PURE__ */ new Map();
-  for (const p of proposals) {
+  for (const p of filledProposals) {
     const primary = p.parent_node_ids[0] ?? "";
     parentShareCounts.set(primary, (parentShareCounts.get(primary) ?? 0) + 1);
   }
   const familiesSeen = /* @__PURE__ */ new Set();
-  const results = proposals.map((proposal) => {
+  const results = filledProposals.map((proposal) => {
     const schemaGate = gateSchema(proposal);
     if (schemaGate === "fail") {
       return {
@@ -24633,11 +24858,26 @@ function registerProposalTools(server) {
     },
     async ({ proposals, strategy }) => {
       const summary = validateProposals(proposals, strategy);
+      const resultsWithReview = summary.results.map((r) => ({
+        ...r,
+        critic_review: {
+          h001_one_hypothesis: r.h001,
+          h002_family_streak: r.h002,
+          h003_intra_tick_diversity: r.h003,
+          integrity_risk: "pass",
+          // gate not agent-supplied; default pass
+          instrumentation_check: "pass",
+          // gate not agent-supplied; default pass
+          schema_valid: r.schema,
+          verdict: r.verdict === "reject" ? "rejected" : "approved",
+          ...r.verdict === "reject" ? { rejection_reason: r.reason } : {}
+        }
+      }));
       return {
         content: [
           {
             type: "text",
-            text: JSON.stringify({ ok: true, ...summary })
+            text: JSON.stringify({ ok: true, ...summary, results: resultsWithReview })
           }
         ]
       };
