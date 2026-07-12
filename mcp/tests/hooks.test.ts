@@ -128,7 +128,9 @@ describe("session-start hook", () => {
     const result = runHook(SESSION_START, { EVOR_ROOT: tmpDir });
     expect(result.status).toBe(0);
     const output = JSON.parse(result.stdout.trim());
-    expect(output.message).toMatch(/run-007/);
+    // Must emit [EVOR CONTEXT] — raw run_id must NOT appear (context-leak fix)
+    expect(output.message).toMatch(/\[EVOR CONTEXT\]/);
+    expect(output.message).not.toMatch(/run-007/);
   });
 
   it("exits 0 gracefully on corrupt active-run.json (invalid JSON)", () => {
@@ -215,6 +217,11 @@ describe("stop hook (continuation guard)", () => {
   it("exits 2 and outputs continuation guard when pending_node_ids is non-empty", () => {
     const runDir = join(tmpDir, "runs", "run-001");
     mkdirSync(runDir, { recursive: true });
+    // Write tree.json with named nodes so the hook can resolve names
+    writeFileSync(
+      join(runDir, "tree.json"),
+      JSON.stringify({ nodes: { n1: { id: "n1", name: "node-alpha", status: "pending" }, n2: { id: "n2", name: "node-beta", status: "pending" } } })
+    );
     writeFileSync(
       join(runDir, "run-state.json"),
       JSON.stringify({ tick_count: 5, pending_node_ids: ["n1", "n2"], status: "running" })
@@ -225,14 +232,20 @@ describe("stop hook (continuation guard)", () => {
     });
     expect(result.status).toBe(2);
     expect(result.stdout).toMatch(/EVOR CONTINUATION GUARD/);
-    expect(result.stdout).toMatch(/n1/);
-    expect(result.stdout).toMatch(/n2/);
+    // Hook resolves names from tree.json — expect readable names not raw ids
+    expect(result.stdout).toMatch(/node-alpha/);
+    expect(result.stdout).toMatch(/node-beta/);
     expect(result.stdout).toMatch(/evor_record_node/);
   });
 
   it("includes the correct tick count in the guard message", () => {
     const runDir = join(tmpDir, "runs", "run-001");
     mkdirSync(runDir, { recursive: true });
+    // Write tree.json with named node
+    writeFileSync(
+      join(runDir, "tree.json"),
+      JSON.stringify({ nodes: { "node-abc": { id: "node-abc", name: "my-candidate", status: "pending" } } })
+    );
     writeFileSync(
       join(runDir, "run-state.json"),
       JSON.stringify({ tick_count: 7, pending_node_ids: ["node-abc"], status: "running" })
@@ -243,12 +256,18 @@ describe("stop hook (continuation guard)", () => {
     });
     expect(result.status).toBe(2);
     expect(result.stdout).toMatch(/Tick 7/);
-    expect(result.stdout).toMatch(/node-abc/);
+    // Hook uses name from tree.json
+    expect(result.stdout).toMatch(/my-candidate/);
   });
 
   it("resolves the nested run directory when EVOR_MISSION_ID is set", () => {
     const runDir = join(tmpDir, "runs", "mission-001", "run-001");
     mkdirSync(runDir, { recursive: true });
+    // Write tree.json with named node
+    writeFileSync(
+      join(runDir, "tree.json"),
+      JSON.stringify({ nodes: { n1: { id: "n1", name: "node-gamma", status: "pending" } } })
+    );
     writeFileSync(
       join(runDir, "run-state.json"),
       JSON.stringify({ tick_count: 1, pending_node_ids: ["n1"], status: "running" })
@@ -259,7 +278,7 @@ describe("stop hook (continuation guard)", () => {
       EVOR_ROOT: tmpDir,
     });
     expect(result.status).toBe(2);
-    expect(result.stdout).toMatch(/n1/);
+    expect(result.stdout).toMatch(/node-gamma/);
   });
 
   it("exits 0 (fail-open) on corrupt run-state.json and logs to stderr", () => {
@@ -572,7 +591,8 @@ describe("stop hook — drift-guard (Phase 2)", () => {
     );
 
     // tree.json DICT format: one "done" node WITHOUT an evaluations/<id>.json
-    const node = { id: nodeId, status: "done", integrity_status: "pending" };
+    // Include a `name` field so the hook can surface the readable name (not raw id)
+    const node = { id: nodeId, name: "drift-candidate-a", status: "done", integrity_status: "pending" };
     writeFileSync(
       join(runDir, "tree.json"),
       JSON.stringify({ nodes: { [nodeId]: node }, updated_at: new Date().toISOString() })
@@ -585,7 +605,8 @@ describe("stop hook — drift-guard (Phase 2)", () => {
     });
     expect(result.status).toBe(2);
     expect(result.stdout).toMatch(/EVOR DRIFT GUARD/);
-    expect(result.stdout).toMatch(nodeId);
+    // Hook uses node.name — expect readable name, not raw nodeId
+    expect(result.stdout).toMatch(/drift-candidate-a/);
     expect(result.stdout).toMatch(/integrity/i);
   });
 
@@ -901,8 +922,11 @@ describe("pre-compact hook", () => {
     expect(output.continue).toBe(true);
     expect(output.systemMessage).toContain("<evor-restore>");
     expect(output.systemMessage).toContain("</evor-restore>");
-    expect(output.systemMessage).toContain(runId.slice(0, 20));
+    // Must contain the mission objective (not raw run_id) per leak-fix requirement
+    expect(output.systemMessage).toContain("maximise val_acc on CIFAR-10");
     expect(output.systemMessage).toContain("Tick 3");
+    // Must NOT contain raw run_id or mission_id
+    expect(output.systemMessage).not.toContain(runId);
     // systemMessage must be ≤ 500 chars
     expect(output.systemMessage.length).toBeLessThanOrEqual(500);
   });
@@ -1031,7 +1055,9 @@ describe("subagent-stop hook", () => {
     expect(result.status).toBe(0); // advisory — never blocks
     expect(result.stdout).toContain("[EVOR SUBAGENT WARNING]");
     expect(result.stdout).toContain("sage");
-    expect(result.stdout).toContain("findings.json");
+    // Must NOT expose filename/path — instead directs to evor_read_artifact
+    expect(result.stdout).not.toContain("findings.json");
+    expect(result.stdout).toContain("evor_read_artifact");
   });
 
   it("exits 0 without warning when artifact is present and non-trivially sized", () => {
@@ -1357,7 +1383,9 @@ describe("subagent-stop — STDIN agent_type fallback", () => {
     expect(result.status).toBe(0); // advisory — never blocks
     expect(result.stdout).toContain("[EVOR SUBAGENT WARNING]");
     expect(result.stdout).toContain("sage");
-    expect(result.stdout).toContain("findings.json");
+    // Must NOT expose filename/path — instead directs to evor_read_artifact
+    expect(result.stdout).not.toContain("findings.json");
+    expect(result.stdout).toContain("evor_read_artifact");
   });
 
   it("warns for evor-forge via STDIN when forge-report.json is absent", () => {
@@ -1375,7 +1403,10 @@ describe("subagent-stop — STDIN agent_type fallback", () => {
     );
     expect(result.status).toBe(0);
     expect(result.stdout).toContain("[EVOR SUBAGENT WARNING]");
-    expect(result.stdout).toContain("forge-report.json");
+    expect(result.stdout).toContain("forge");
+    // Must NOT expose filename/path — instead directs to evor_read_artifact
+    expect(result.stdout).not.toContain("forge-report.json");
+    expect(result.stdout).toContain("evor_read_artifact");
   });
 
   it("exits 0 silently when STDIN agent_type is a sub-sub-agent (evor-forge-junior, untracked)", () => {
@@ -3309,7 +3340,7 @@ describe("subagent-start hook — run-state context injection (P1-6)", () => {
     rmSync(tmpDir, { recursive: true, force: true });
   });
 
-  it("includes [CONTEXT] block with run_id when active-run.json + run-state.json exist", () => {
+  it("includes [CONTEXT] block with tick info when active-run.json + run-state.json exist", () => {
     const runId = "run-ctx-001";
     const missionId = "mission-ctx-001";
     const runDir = join(tmpDir, "runs", missionId, runId);
@@ -3337,7 +3368,9 @@ describe("subagent-start hook — run-state context injection (P1-6)", () => {
     const out = JSON.parse(result.stdout.trim());
     const ctx = out.hookSpecificOutput.additionalContext;
     expect(ctx).toContain("[CONTEXT]");
-    expect(ctx).toContain(runId);
+    // Must contain tick info (not raw run_id) per context-leak fix
+    expect(ctx).toMatch(/tick=4/);
+    expect(ctx).not.toContain(runId);
   });
 
   it("context block includes tick and step info", () => {

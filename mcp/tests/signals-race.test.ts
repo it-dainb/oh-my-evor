@@ -99,7 +99,7 @@ describe("Bug D: emitSignal has no verify-after-write (sibling of upsertNode clo
         evidence: { batch_size: 512 },
         source: "evor-forge-analyst",
       }, "test-mission"),
-    ).toThrow(/failed to persist.*after.*attempts/i);
+    ).toThrow(/could not be persisted.*attempts/i);
   });
 
   it("signal is absent from signals.jsonl after all renames are blocked", () => {

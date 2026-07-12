@@ -13,7 +13,7 @@
  *   - evor_run_start tool returns job handle without blocking
  */
 
-import { mkdtempSync, rmSync } from "fs";
+import { mkdtempSync, rmSync, mkdirSync, writeFileSync, statSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
@@ -37,6 +37,8 @@ import {
   distillScan,
   plotReport,
   forgeDispatchBatch,
+  lockEvaluate,
+  verifyArtifacts,
 } from "../src/tools/compute.js";
 import { callPythonModule } from "../src/subprocess-bridge.js";
 
@@ -359,6 +361,47 @@ describe("plotReport", () => {
   });
 });
 
+// ── Surface-leak fixes ────────────────────────────────────────────────────────
+
+describe("freezeSplits response — hash stripping (tool layer)", () => {
+  it("raw freezeSplits result still carries hashes (bridge owns them)", () => {
+    mockedCall.mockReturnValue({
+      ok: true,
+      data: {
+        locked_split_hash: "abc123",
+        val_split_hash: "def456",
+        test_item_count: 800,
+        val_item_count: 200,
+      },
+    });
+    const r = freezeSplits("/data", "v1", tmpRoot, "m1");
+    expect(r.ok).toBe(true);
+    // The wrapper function returns raw data — stripping happens at the tool layer.
+    const d = r.data as Record<string, unknown>;
+    expect(d.locked_split_hash).toBe("abc123");
+    expect(d.test_item_count).toBe(800);
+  });
+});
+
+describe("jobStatus — cmd field present in raw result (stripped at tool layer)", () => {
+  it("raw jobStatus result may include cmd", () => {
+    mockedCall.mockReturnValue({
+      ok: true,
+      data: {
+        state: "running",
+        job_id: "job-abc-123",
+        cmd: "python -m evor run --node-id n1 --run-dir /secret/path",
+        started_at: "2026-01-01T00:00:00Z",
+      },
+    });
+    const r = jobStatus("job-abc-123", tmpRoot);
+    expect(r.ok).toBe(true);
+    // Core function returns raw bridge data — cmd present here is expected.
+    const d = r.data as Record<string, unknown>;
+    expect(d.cmd).toBeDefined();
+  });
+});
+
 // ── P0-3: evor_forge_dispatch_batch ──────────────────────────────────────────
 
 describe("forgeDispatchBatch (P0-3)", () => {
@@ -491,5 +534,77 @@ describe("forgeDispatchBatch (P0-3)", () => {
     const failed = result.dispatched.find((d) => d.node_id === "n2");
     expect(failed?.ok).toBe(false);
     expect(failed?.error).toBeDefined();
+  });
+});
+
+// ── lockEvaluate ──────────────────────────────────────────────────────────────
+// Replaces the agent shelling out `sha256sum` + `chmod 444`. The hash is
+// persisted internally (evaluate.py.lock) and NEVER surfaced — the response is
+// name-only ({ok, node_name}).
+
+describe("lockEvaluate", () => {
+  it("locks evaluate.py read-only and returns name-only response", () => {
+    const wt = join(tmpRoot, "worktrees", "immune-memory-02");
+    mkdirSync(wt, { recursive: true });
+    writeFileSync(join(wt, "evaluate.py"), "print('eval')\n", "utf8");
+
+    const result = lockEvaluate("run-1", "immune-memory-02");
+
+    expect(result.ok).toBe(true);
+    expect(result.node_name).toBe("immune-memory-02");
+    // Response must NOT leak the sha256 or any path.
+    expect(JSON.stringify(result)).not.toMatch(/[a-f0-9]{64}/);
+    expect(JSON.stringify(result)).not.toContain("/");
+    // Fingerprint persisted internally; file made read-only.
+    const mode = statSync(join(wt, "evaluate.py")).mode & 0o777;
+    expect(mode).toBe(0o444);
+    expect(statSync(join(wt, "evaluate.py.lock")).size).toBeGreaterThan(0);
+  });
+
+  it("fails cleanly (no path) when evaluate.py is absent", () => {
+    mkdirSync(join(tmpRoot, "worktrees", "empty-node"), { recursive: true });
+    const result = lockEvaluate("run-1", "empty-node");
+
+    expect(result.ok).toBe(false);
+    expect(result.node_name).toBe("empty-node");
+    expect(result.error).toBeDefined();
+    // Error is action-oriented, never a filesystem path.
+    expect(result.error).not.toContain("/");
+  });
+});
+
+// ── verifyArtifacts ───────────────────────────────────────────────────────────
+// Replaces the agent walking nodes/<id>/results.json by hand. Returns booleans
+// only — no path ever crosses to the agent.
+
+describe("verifyArtifacts", () => {
+  it("reports both artifacts present without leaking paths", () => {
+    const nodeDir = join(tmpRoot, "runs", "m1", "run-1", "nodes", "immune-memory-02");
+    mkdirSync(nodeDir, { recursive: true });
+    writeFileSync(join(nodeDir, "results.json"), JSON.stringify({ score: 0.9 }), "utf8");
+    writeFileSync(join(nodeDir, "telemetry.jsonl"), '{"step":1}\n', "utf8");
+
+    const result = verifyArtifacts("run-1", "immune-memory-02", "m1");
+
+    expect(result.ok).toBe(true);
+    expect(result.has_results).toBe(true);
+    expect(result.has_telemetry).toBe(true);
+    expect(result.node_name).toBe("immune-memory-02");
+    // Boolean-only surface — no path leaked.
+    expect(JSON.stringify(result)).not.toContain("/");
+  });
+
+  it("reports missing artifacts as ok=false", () => {
+    const nodeDir = join(tmpRoot, "runs", "m1", "run-1", "nodes", "half-node");
+    mkdirSync(nodeDir, { recursive: true });
+    writeFileSync(join(nodeDir, "results.json"), JSON.stringify({ score: 0.5 }), "utf8");
+    // telemetry.jsonl absent
+
+    const result = verifyArtifacts("run-1", "half-node", "m1");
+
+    expect(result.ok).toBe(false);
+    expect(result.has_results).toBe(true);
+    expect(result.has_telemetry).toBe(false);
+    expect(result.node_name).toBe("half-node");
   });
 });

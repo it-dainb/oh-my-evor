@@ -294,7 +294,10 @@ describe("readGoalContract", () => {
 
     const result = readGoalContract(runId);
     expect(result.ok).toBe(false);
-    expect(result.error).toContain("not found");
+    expect(result.error).toContain("no goal contract");
+    // Name-only contract: no filesystem path or filename in the error.
+    expect(result.error).not.toContain("/");
+    expect(result.error).not.toMatch(/goal-contract\.json/);
   });
 
   it("returns error when goal-contract.json is corrupt JSON", () => {
@@ -319,7 +322,7 @@ describe("readGoalContract", () => {
 
     const result = readGoalContract(runId);
     expect(result.ok).toBe(false);
-    expect(result.error).toContain("validation failed");
+    expect(result.error).toContain("failed validation");
   });
 });
 

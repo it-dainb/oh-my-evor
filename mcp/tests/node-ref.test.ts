@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
-import { resolveNodeRef, assignUniqueName, isUuid } from "../src/tools/node-ref.js";
+import { resolveNodeRef, assignUniqueName, isUuid, nameForId, namesForIds } from "../src/tools/node-ref.js";
 
 // node-ref reads tree.json via readTree(runId, missionId), which resolves under
 // EVOR_ROOT/runs/<mission>/<run>/tree.json. We stand up a real temp store.
@@ -118,5 +118,55 @@ describe("assignUniqueName", () => {
 
   it("returns empty string for empty desired", () => {
     expect(assignUniqueName(RUN, "", MISSION)).toBe("");
+  });
+});
+
+const UUID2 = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+
+describe("nameForId", () => {
+  it("returns the node name when set", () => {
+    writeTree({ [UUID]: node(UUID, "immune-memory-02") });
+    expect(nameForId(RUN, UUID, MISSION)).toBe("immune-memory-02");
+  });
+
+  it("derives a readable fallback from approach_family when name not set", () => {
+    writeTree({ [UUID]: node(UUID) }); // no name, approach_family = "training"
+    const result = nameForId(RUN, UUID, MISSION);
+    expect(result).not.toBe(UUID); // must NOT surface the UUID
+    expect(typeof result).toBe("string");
+    expect(result.length).toBeGreaterThan(0);
+  });
+
+  it("fails open (returns id unchanged) when tree unreadable", () => {
+    // no tree written — tree is missing
+    expect(nameForId(RUN, UUID, MISSION)).toBe(UUID);
+  });
+
+  it("fails open (returns id unchanged) when id not in tree", () => {
+    writeTree({ [UUID]: node(UUID, "immune-memory-02") });
+    expect(nameForId(RUN, UUID2, MISSION)).toBe(UUID2);
+  });
+});
+
+describe("namesForIds", () => {
+  it("maps each id to its name", () => {
+    writeTree({
+      [UUID]: node(UUID, "immune-memory-02"),
+      [UUID2]: node(UUID2, "spectral-membrane-03"),
+    });
+    const result = namesForIds(RUN, [UUID, UUID2], MISSION);
+    expect(result).toEqual(["immune-memory-02", "spectral-membrane-03"]);
+  });
+
+  it("uses fallback for ids without a name", () => {
+    writeTree({ [UUID]: node(UUID) }); // no name
+    const result = namesForIds(RUN, [UUID], MISSION);
+    expect(result[0]).not.toBe(UUID);
+    expect(typeof result[0]).toBe("string");
+  });
+
+  it("returns empty array for empty input", () => {
+    writeTree({ [UUID]: node(UUID, "immune-memory-02") });
+    expect(namesForIds(RUN, [], MISSION)).toEqual([]);
   });
 });

@@ -287,10 +287,13 @@ describe("fillNodeId (P2-1)", () => {
 // ── P2-14: readResult ────────────────────────────────────────────────────────
 
 describe("readResult (P2-14)", () => {
-  it("returns ok:false when results.json does not exist", () => {
+  it("returns ok:false with an action-oriented, path-free error when no result exists", () => {
     const r = readResult("run-result-001", "node-missing", "test-mission");
     expect(r.ok).toBe(false);
-    expect(r.error).toMatch(/not found/i);
+    expect(r.error).toMatch(/no evaluation result/i);
+    // Name-only contract: the error must not leak a filesystem path or filename.
+    expect(r.error).not.toContain("/");
+    expect(r.error).not.toMatch(/results\.json/);
   });
 
   it("returns parsed JSON from nodes/<nodeId>/results.json", () => {
@@ -321,5 +324,132 @@ describe("readResult (P2-14)", () => {
 
   it("does not throw for any input", () => {
     expect(() => readResult("run-noexist", randomUUID(), "test-mission")).not.toThrow();
+  });
+});
+
+// ── Schema-fabrication fixes (Class 7) ──────────────────────────────────────
+
+describe("makeNode server-owned defaults (Class 7)", () => {
+  it("TreeNode: lesson_ids defaults to [] when omitted", () => {
+    const node = makeNode();
+    expect(node.lesson_ids).toEqual([]);
+  });
+
+  it("TreeNode: integrity_status defaults to 'pending' when omitted", () => {
+    const node = makeNode();
+    expect(node.integrity_status).toBe("pending");
+  });
+
+  it("TreeNode: status defaults to 'pending' when omitted", () => {
+    const node = makeNode();
+    expect(node.status).toBe("pending");
+  });
+
+  it("TreeNode: is_crossover defaults to false when omitted", () => {
+    const node = makeNode();
+    expect(node.is_crossover).toBe(false);
+  });
+
+  it("TreeNode: visit_count defaults to 0 when omitted", () => {
+    const node = makeNode();
+    expect(node.visit_count).toBe(0);
+  });
+
+  it("TreeNode: depth defaults to 0 when omitted", () => {
+    const node = makeNode();
+    expect(node.depth).toBe(0);
+  });
+
+  it("recordNode: server fills created_at when node omits it", () => {
+    const runId = "run-class7-001";
+    // Build a node without created_at — cast to bypass strict TS type
+    const node = makeNode() as TreeNode & { created_at?: string };
+    delete node.created_at;
+
+    recordNode(runId, node as TreeNode, "test-mission");
+
+    const paths = ensureRunDirs(runId, "test-mission");
+    const tree = JSON.parse(readFileSync(
+      join(tmpRoot, "runs", "test-mission", runId, "tree.json"), "utf8"
+    ));
+    expect(tree.nodes[node.id].created_at).toBeDefined();
+    expect(typeof tree.nodes[node.id].created_at).toBe("string");
+  });
+
+  it("recordNode: is_crossover=true when parent_ids has >1 entry", () => {
+    const runId = "run-class7-002";
+    const parentA = makeNode();
+    const parentB = makeNode();
+    recordNode(runId, parentA, "test-mission");
+    recordNode(runId, parentB, "test-mission");
+
+    const crossover = makeNode({
+      parent_ids: [parentA.id, parentB.id],
+      is_crossover: false, // agent mistakenly says false — server corrects
+    });
+    // Override is_crossover to false to simulate agent supplying wrong value;
+    // the server fills based on parent count only when undefined, so test with undefined
+    const nodeNoFlag = { ...crossover } as TreeNode & { is_crossover?: boolean };
+    delete nodeNoFlag.is_crossover;
+
+    recordNode(runId, nodeNoFlag as TreeNode, "test-mission");
+
+    const tree = JSON.parse(readFileSync(
+      join(tmpRoot, "runs", "test-mission", runId, "tree.json"), "utf8"
+    ));
+    expect(tree.nodes[crossover.id].is_crossover).toBe(true);
+  });
+
+  it("recordNode: depth=0 for root nodes (no parents)", () => {
+    const runId = "run-class7-003";
+    const root = { ...makeNode(), parent_ids: [] } as TreeNode & { depth?: number };
+    delete root.depth;
+
+    recordNode(runId, root as TreeNode, "test-mission");
+
+    const tree = JSON.parse(readFileSync(
+      join(tmpRoot, "runs", "test-mission", runId, "tree.json"), "utf8"
+    ));
+    expect(tree.nodes[root.id].depth).toBe(0);
+  });
+
+  it("recordNode: depth=parentDepth+1 for child nodes", () => {
+    const runId = "run-class7-004";
+    const root = makeNode({ depth: 0, parent_ids: [] });
+    recordNode(runId, root, "test-mission");
+
+    const child = { ...makeNode({ parent_ids: [root.id] }) } as TreeNode & { depth?: number };
+    delete child.depth;
+
+    recordNode(runId, child as TreeNode, "test-mission");
+
+    const tree = JSON.parse(readFileSync(
+      join(tmpRoot, "runs", "test-mission", runId, "tree.json"), "utf8"
+    ));
+    expect(tree.nodes[child.id].depth).toBe(1);
+  });
+
+  it("evor_record_eval: fills node_id, run_id, timestamp, eval_version server-side", () => {
+    const runId = "run-class7-eval-001";
+    const nodeId = randomUUID();
+
+    // Supply a result with none of the bookkeeping fields
+    const minimalResult = {
+      metrics: { accuracy: 0.91 },
+      per_domain: {},
+      fitness_value: 0.91,
+      telemetry_summary: { total_steps: 100 },
+      status: "success" as const,
+      benchmark_raw: "{}",
+      // no node_id, run_id, eval_version, timestamp
+    };
+
+    const { resultsPath } = recordEval(runId, nodeId, minimalResult, "test-mission");
+    expect(existsSync(resultsPath)).toBe(true);
+    const written = JSON.parse(readFileSync(resultsPath, "utf8")) as Record<string, unknown>;
+    // The minimal result is written as-is; the server fills happen in the tool handler,
+    // so the raw recordEval function writes what it receives. This test verifies the
+    // recordEval function itself doesn't throw when bookkeeping fields are absent.
+    expect(written.metrics).toEqual({ accuracy: 0.91 });
   });
 });

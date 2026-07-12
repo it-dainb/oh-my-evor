@@ -12,7 +12,7 @@ import { tmpdir } from "os";
 import { randomUUID } from "crypto";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 
-import { treeRead, treeSelect } from "../src/tools/tree.js";
+import { treeRead, treeSelect, type NamedTreeNode } from "../src/tools/tree.js";
 import { writeTree } from "../src/tree-store.js";
 import type { TreeNode } from "../src/contracts.js";
 
@@ -73,15 +73,15 @@ describe("treeRead — full tree", () => {
     const rootId = randomUUID();
     const child1Id = randomUUID();
     const child2Id = randomUUID();
-    const root = makeNode(rootId, [], 0);
-    const child1 = makeNode(child1Id, [rootId], 1);
-    const child2 = makeNode(child2Id, [rootId], 1);
+    const root = { ...makeNode(rootId, [], 0), name: "root-01" };
+    const child1 = { ...makeNode(child1Id, [rootId], 1), name: "child-01" };
+    const child2 = { ...makeNode(child2Id, [rootId], 1), name: "child-02" };
     writeTree(runId, { [rootId]: root, [child1Id]: child1, [child2Id]: child2 }, "test-mission");
 
     const nodes = treeRead(runId);
     expect(nodes).toHaveLength(3);
-    const ids = nodes.map((n) => n.id).sort();
-    expect(ids).toEqual([rootId, child1Id, child2Id].sort());
+    const names = nodes.map((n) => n.name).sort();
+    expect(names).toEqual(["child-01", "child-02", "root-01"]);
   });
 
   it("filters by absolute depth when no subtree_root given", () => {
@@ -89,15 +89,15 @@ describe("treeRead — full tree", () => {
     const rootId = randomUUID();
     const childId = randomUUID();
     const grandchildId = randomUUID();
-    const root = makeNode(rootId, [], 0);
-    const child = makeNode(childId, [rootId], 1);
-    const grandchild = makeNode(grandchildId, [childId], 2);
+    const root = { ...makeNode(rootId, [], 0), name: "root-01" };
+    const child = { ...makeNode(childId, [rootId], 1), name: "child-01" };
+    const grandchild = { ...makeNode(grandchildId, [childId], 2), name: "grandchild-01" };
     writeTree(runId, { [rootId]: root, [childId]: child, [grandchildId]: grandchild }, "test-mission");
 
     const nodes = treeRead(runId, undefined, 1);
     expect(nodes).toHaveLength(2);
-    const ids = nodes.map((n) => n.id).sort();
-    expect(ids).toEqual([rootId, childId].sort());
+    const names = nodes.map((n) => n.name).sort();
+    expect(names).toEqual(["child-01", "root-01"]);
   });
 });
 
@@ -112,18 +112,18 @@ describe("treeRead — subtree filter", () => {
     const child1Id = randomUUID();
     const child2Id = randomUUID();
     const gc1Id = randomUUID();
-    const root = makeNode(rootId, [], 0);
-    const child1 = makeNode(child1Id, [rootId], 1);
-    const child2 = makeNode(child2Id, [rootId], 1);
-    const gc1 = makeNode(gc1Id, [child1Id], 2);
+    const root = { ...makeNode(rootId, [], 0), name: "root-01" };
+    const child1 = { ...makeNode(child1Id, [rootId], 1), name: "child-01" };
+    const child2 = { ...makeNode(child2Id, [rootId], 1), name: "child-02" };
+    const gc1 = { ...makeNode(gc1Id, [child1Id], 2), name: "grandchild-01" };
     writeTree(runId, {
       [rootId]: root, [child1Id]: child1, [child2Id]: child2, [gc1Id]: gc1,
     }, "test-mission");
 
     const nodes = treeRead(runId, child1Id);
     expect(nodes).toHaveLength(2);
-    const ids = nodes.map((n) => n.id).sort();
-    expect(ids).toEqual([child1Id, gc1Id].sort());
+    const names = nodes.map((n) => n.name).sort();
+    expect(names).toEqual(["child-01", "grandchild-01"]);
   });
 
   it("returns empty when subtree_root does not exist", () => {
@@ -140,16 +140,16 @@ describe("treeRead — subtree filter", () => {
     const gcId = randomUUID();
     const ggcId = randomUUID();
     writeTree(runId, {
-      [rootId]: makeNode(rootId, [], 0),
-      [childId]: makeNode(childId, [rootId], 1),
-      [gcId]: makeNode(gcId, [childId], 2),
-      [ggcId]: makeNode(ggcId, [gcId], 3),
+      [rootId]: { ...makeNode(rootId, [], 0), name: "root-01" },
+      [childId]: { ...makeNode(childId, [rootId], 1), name: "child-01" },
+      [gcId]: { ...makeNode(gcId, [childId], 2), name: "grandchild-01" },
+      [ggcId]: { ...makeNode(ggcId, [gcId], 3), name: "greatgrandchild-01" },
     }, "test-mission");
 
     // subtree from root, depth 1 → root + child only
     const nodes = treeRead(runId, rootId, 1);
-    const ids = nodes.map((n) => n.id).sort();
-    expect(ids).toEqual([rootId, childId].sort());
+    const names = nodes.map((n) => n.name).sort();
+    expect(names).toEqual(["child-01", "root-01"]);
   });
 
   it("returns single node when depth = 0", () => {
@@ -157,13 +157,13 @@ describe("treeRead — subtree filter", () => {
     const rootId = randomUUID();
     const childId = randomUUID();
     writeTree(runId, {
-      [rootId]: makeNode(rootId, [], 0),
-      [childId]: makeNode(childId, [rootId], 1),
+      [rootId]: { ...makeNode(rootId, [], 0), name: "root-01" },
+      [childId]: { ...makeNode(childId, [rootId], 1), name: "child-01" },
     }, "test-mission");
 
     const nodes = treeRead(runId, rootId, 0);
     expect(nodes).toHaveLength(1);
-    expect(nodes[0].id).toBe(rootId);
+    expect(nodes[0].name).toBe("root-01");
   });
 
   it("handles multiple parents (DAG crossover node)", () => {
@@ -172,26 +172,26 @@ describe("treeRead — subtree filter", () => {
     const bId = randomUUID();
     const cId = randomUUID(); // crossover: parents = [a, b]
     writeTree(runId, {
-      [aId]: makeNode(aId, [], 0),
-      [bId]: makeNode(bId, [], 0),
-      [cId]: makeNode(cId, [aId, bId], 1),
+      [aId]: { ...makeNode(aId, [], 0), name: "node-a" },
+      [bId]: { ...makeNode(bId, [], 0), name: "node-b" },
+      [cId]: { ...makeNode(cId, [aId, bId], 1), name: "crossover-c" },
     }, "test-mission");
 
     const fromA = treeRead(runId, aId);
-    expect(fromA.map((n) => n.id).sort()).toEqual([aId, cId].sort());
+    expect(fromA.map((n) => n.name).sort()).toEqual(["crossover-c", "node-a"]);
 
     const fromB = treeRead(runId, bId);
-    expect(fromB.map((n) => n.id).sort()).toEqual([bId, cId].sort());
+    expect(fromB.map((n) => n.name).sort()).toEqual(["crossover-c", "node-b"]);
   });
 });
 
 // ── treeSelect — error handling ──────────────────────────────────────────────
 
 describe("treeSelect — subprocess error handling", () => {
-  it("returns empty selected[] and error string when python unavailable", () => {
+  it("returns empty selected_names[] and error string when python unavailable", () => {
     // python -m evor.tree will fail (no harness on PYTHONPATH in test env)
     const result = treeSelect("run-sel-001", undefined, 1, "test-mission");
-    expect(Array.isArray(result.selected)).toBe(true);
+    expect(Array.isArray(result.selected_names)).toBe(true);
     expect(typeof result.scores).toBe("object");
     expect(result.error).toBeDefined();
   });

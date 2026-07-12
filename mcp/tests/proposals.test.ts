@@ -155,8 +155,9 @@ describe("gateSchema — required fields", () => {
     expect(gateSchema(makeProposal())).toBe("pass");
   });
 
-  it("fails when proposal_id is empty", () => {
-    expect(gateSchema(makeProposal({ proposal_id: "" }))).toBe("fail");
+  it("passes when proposal_id is empty (server-generated — no longer a schema gate)", () => {
+    // proposal_id is now server-owned; gateSchema must not fail on absent/empty id.
+    expect(gateSchema(makeProposal({ proposal_id: "" }))).toBe("pass");
   });
 
   it("fails when parent_node_ids is empty array", () => {
@@ -221,10 +222,11 @@ describe("validateProposals — verdict routing", () => {
     expect(summary.results[0].reason).toMatch(/h001/);
   });
 
-  it("verdict=reject when schema fails (missing proposal_id)", () => {
-    // Cast to bypass TS — gateSchema is what we're testing here
+  it("verdict=reject when schema fails (blank approach_family)", () => {
+    // proposal_id is now server-generated and no longer a schema gate field.
+    // Use blank approach_family as the schema failure trigger instead.
     const proposals = [
-      { proposal_id: "", parent_node_ids: ["nodeA"], approach_family: "training",
+      { parent_node_ids: ["nodeA"], approach_family: "   ",
         hypothesis: { prediction: "improve by 5%" }, wildness: 0.3 },
     ];
     const summary = validateProposals(proposals as never, EMPTY_STRATEGY);
@@ -309,5 +311,101 @@ describe("validateProposals — verdict routing", () => {
     expect(summary.pass_count).toBe(1);
     expect(summary.needs_llm_count).toBe(1);
     expect(summary.reject_count).toBe(1);
+  });
+});
+
+// ── Class 7 schema-fabrication fixes ─────────────────────────────────────────
+
+describe("proposal_id — server-generated when absent (Class 7)", () => {
+  it("assigns a non-empty proposal_id when agent omits it", () => {
+    const proposals = [
+      {
+        // no proposal_id
+        parent_node_ids: ["nodeA"],
+        approach_family: "training",
+        hypothesis: { prediction: "improve accuracy by 2%" },
+        wildness: 0.3,
+      },
+    ];
+    const summary = validateProposals(proposals as never, EMPTY_STRATEGY);
+    expect(summary.results[0].proposal_id).toBeTruthy();
+    expect(summary.results[0].proposal_id.length).toBeGreaterThan(0);
+  });
+
+  it("each absent proposal_id gets a distinct generated value", () => {
+    const proposals = [
+      {
+        parent_node_ids: ["nodeA"],
+        approach_family: "training",
+        hypothesis: { prediction: "improve by 2%" },
+        wildness: 0.3,
+      },
+      {
+        parent_node_ids: ["nodeB"],
+        approach_family: "arch",
+        hypothesis: { prediction: "reduce loss by 0.05 over baseline" },
+        wildness: 0.4,
+      },
+    ];
+    const summary = validateProposals(proposals as never, EMPTY_STRATEGY);
+    expect(summary.results[0].proposal_id).not.toBe(summary.results[1].proposal_id);
+  });
+
+  it("preserves agent-supplied proposal_id when present", () => {
+    const proposals = [makeProposal({ proposal_id: "my-explicit-id" })];
+    const summary = validateProposals(proposals, EMPTY_STRATEGY);
+    expect(summary.results[0].proposal_id).toBe("my-explicit-id");
+  });
+
+  it("gateSchema passes when proposal_id is absent (no longer required)", () => {
+    const proposal = {
+      parent_node_ids: ["nodeA"],
+      approach_family: "training",
+      hypothesis: { prediction: "improve accuracy by 2%" },
+      wildness: 0.3,
+    };
+    expect(gateSchema(proposal as never)).toBe("pass");
+  });
+
+  it("gateSchema still fails when parent_node_ids is empty (semantic field)", () => {
+    const proposal = {
+      parent_node_ids: [],
+      approach_family: "training",
+      hypothesis: { prediction: "improve accuracy by 2%" },
+      wildness: 0.3,
+    };
+    expect(gateSchema(proposal as never)).toBe("fail");
+  });
+});
+
+describe("critic_review — server-populated (Class 7)", () => {
+  it("validateProposals result has all gate fields set (for server critic_review wiring)", () => {
+    // The tool handler populates critic_review from gate results;
+    // validateProposals itself returns the gate fields that are used to build it.
+    // Use 2 proposals with distinct parents so H004 passes (share=1 <= floor(2/2)=1).
+    const proposals = [
+      makeProposal({ proposal_id: "p-cr-001", prediction: "improve by 2%",
+                     approach_family: "training", parent_node_ids: ["nodeA"] }),
+      makeProposal({ proposal_id: "p-cr-002", prediction: "reduce latency 50ms",
+                     approach_family: "arch", parent_node_ids: ["nodeB"] }),
+    ];
+    const summary = validateProposals(proposals, EMPTY_STRATEGY);
+    const r = summary.results[0];
+    // Gate fields are always present — these are what the tool maps to critic_review.
+    expect(r.h001).toBe("pass");
+    expect(r.h002).toBe("pass");
+    expect(r.h003).toBe("pass");
+    expect(r.h004).toBe("pass");
+    expect(r.schema).toBe("pass");
+    expect(r.verdict).toBe("pass");
+  });
+
+  it("rejected proposal has h001=fail gate result available for critic_review mapping", () => {
+    const proposals = [makeProposal({ proposal_id: "p-cr-rej", prediction: "maybe better" })];
+    const summary = validateProposals(proposals, EMPTY_STRATEGY);
+    const r = summary.results[0];
+    expect(r.h001).toBe("fail");
+    expect(r.verdict).toBe("reject");
+    expect(r.reason).toMatch(/h001/);
   });
 });
