@@ -9,7 +9,7 @@ import { join } from "path";
 import { tmpdir } from "os";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 
-import { stateRead, stateWrite, readGoalContract } from "../src/tools/state.js";
+import { stateRead, stateWrite, readGoalContract, checkPlateauCondition } from "../src/tools/state.js";
 import { ensureRunDirs, resolveRunPaths } from "../src/run-store.js";
 
 // ── Lifecycle ────────────────────────────────────────────────────────────────
@@ -320,5 +320,146 @@ describe("readGoalContract", () => {
     const result = readGoalContract(runId);
     expect(result.ok).toBe(false);
     expect(result.error).toContain("validation failed");
+  });
+});
+
+// ── P1-3 checkPlateauCondition ───────────────────────────────────────────────
+
+describe("checkPlateauCondition (P1-3 — adaptive meta-trigger)", () => {
+  it("returns plateau=true when last 3 tick scores are within 0.5% of each other", () => {
+    const runId = "run-plateau-001";
+    ensureRunDirs(runId, "test-mission");
+
+    // Scores within 0.5%: 0.8380, 0.8382, 0.8379 — max spread = 0.0003 / 0.8380 ≈ 0.036%
+    stateWrite(runId, {
+      tick_history_scores: [0.8200, 0.8300, 0.8380, 0.8382, 0.8379],
+    } as any);
+
+    const result = checkPlateauCondition(runId);
+    expect(result.plateau).toBe(true);
+    expect(result.consecutive_regression).toBe(false);
+    expect(result.ticks_checked).toBeGreaterThanOrEqual(3);
+    expect(result.scores.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it("returns consecutive_regression=true when last 2 ticks regressed", () => {
+    const runId = "run-plateau-002";
+    ensureRunDirs(runId, "test-mission");
+
+    // Scores: improving then two regressions
+    stateWrite(runId, {
+      tick_history_scores: [0.8200, 0.8500, 0.8400, 0.8350],
+    } as any);
+
+    const result = checkPlateauCondition(runId);
+    expect(result.consecutive_regression).toBe(true);
+    expect(result.plateau).toBe(false);
+  });
+
+  it("returns plateau=false and consecutive_regression=false when scores are improving", () => {
+    const runId = "run-plateau-003";
+    ensureRunDirs(runId, "test-mission");
+
+    stateWrite(runId, {
+      tick_history_scores: [0.80, 0.82, 0.84, 0.86, 0.88],
+    } as any);
+
+    const result = checkPlateauCondition(runId);
+    expect(result.plateau).toBe(false);
+    expect(result.consecutive_regression).toBe(false);
+  });
+
+  it("returns plateau=false when fewer than 3 ticks available (insufficient data)", () => {
+    const runId = "run-plateau-004";
+    ensureRunDirs(runId, "test-mission");
+
+    stateWrite(runId, {
+      tick_history_scores: [0.80, 0.81],
+    } as any);
+
+    const result = checkPlateauCondition(runId);
+    expect(result.plateau).toBe(false);
+    expect(result.ticks_checked).toBeLessThan(3);
+  });
+
+  it("returns plateau=false when no tick history exists", () => {
+    const runId = "run-plateau-005";
+    ensureRunDirs(runId, "test-mission");
+
+    const result = checkPlateauCondition(runId);
+    expect(result.plateau).toBe(false);
+    expect(result.consecutive_regression).toBe(false);
+    expect(result.ticks_checked).toBe(0);
+    expect(result.scores).toEqual([]);
+  });
+});
+
+// ── P1-4 prediction_bias_history state passthrough ────────────────────────────
+
+describe("prediction_bias_history state passthrough (P1-4)", () => {
+  it("roundtrips prediction_bias_history via state_write / state_read", () => {
+    const runId = "run-bias-001";
+    ensureRunDirs(runId, "test-mission");
+
+    stateWrite(runId, {
+      prediction_bias_history: { avg_bias: 0.4, n_samples: 5 },
+    } as any);
+
+    const state = stateRead(runId);
+    const bias = state.prediction_bias_history as { avg_bias: number; n_samples: number };
+    expect(bias).toBeDefined();
+    expect(bias.avg_bias).toBe(0.4);
+    expect(bias.n_samples).toBe(5);
+  });
+
+  it("overwrites prediction_bias_history on subsequent writes", () => {
+    const runId = "run-bias-002";
+    ensureRunDirs(runId, "test-mission");
+
+    stateWrite(runId, { prediction_bias_history: { avg_bias: 0.4, n_samples: 3 } } as any);
+    stateWrite(runId, { prediction_bias_history: { avg_bias: -0.1, n_samples: 7 } } as any);
+
+    const state = stateRead(runId);
+    const bias = state.prediction_bias_history as { avg_bias: number; n_samples: number };
+    expect(bias.avg_bias).toBe(-0.1);
+    expect(bias.n_samples).toBe(7);
+  });
+});
+
+// ── P1-14 dream_k strategy field roundtrip ───────────────────────────────────
+
+describe("dream_k strategy field roundtrip (P1-14)", () => {
+  it("stores and retrieves dream_k in strategy.json", () => {
+    const runId = "run-dreamk-001";
+    const paths = ensureRunDirs(runId, "test-mission");
+
+    stateWrite(runId, {
+      strategy: { dream_k: 7 } as any,
+    });
+
+    const strategy = JSON.parse(readFileSync(paths.strategyPath, "utf8"));
+    expect(strategy.dream_k).toBe(7);
+  });
+
+  it("dream_k survives a strategy merge (other fields preserved)", () => {
+    const runId = "run-dreamk-002";
+    const paths = ensureRunDirs(runId, "test-mission");
+
+    stateWrite(runId, { strategy: { dream_k: 6, wildness: 0.5 } as any });
+    stateWrite(runId, { strategy: { wildness: 0.8 } as any });
+
+    const strategy = JSON.parse(readFileSync(paths.strategyPath, "utf8"));
+    expect(strategy.dream_k).toBe(6);   // preserved from first write
+    expect(strategy.wildness).toBe(0.8); // updated
+  });
+
+  it("dream_k defaults semantics: absent field returns undefined (not error)", () => {
+    const runId = "run-dreamk-003";
+    const paths = ensureRunDirs(runId, "test-mission");
+
+    stateWrite(runId, { strategy: { wildness: 0.5 } as any });
+
+    const strategy = JSON.parse(readFileSync(paths.strategyPath, "utf8"));
+    expect(strategy.dream_k).toBeUndefined();
   });
 });

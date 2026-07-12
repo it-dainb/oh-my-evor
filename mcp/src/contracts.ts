@@ -412,6 +412,14 @@ export const StrategyStateSchema = z.object({
   post_upgrade_exploration_ticks: z.number().int().min(0),
   /** SINGLE source of truth for BenchmarkUpgrade re-score mode (Q1) */
   rescore_mode: z.enum(["sync", "async"]),
+  /**
+   * dream_k — number of proposals Mutagen generates per tick (P1-14).
+   * Decoupled from concurrency (train_k): dream more, gate with Selector,
+   * train only the approved subset. Default = max(concurrency * 2, 5).
+   */
+  dream_k: z.number().int().positive().optional().describe(
+    "Proposals Mutagen generates per tick; Selector gates to at most concurrency for Forge. Default = max(concurrency*2, 5)."
+  ),
   updated_at: ISODate,
 });
 export type StrategyState = z.infer<typeof StrategyStateSchema>;

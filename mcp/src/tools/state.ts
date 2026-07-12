@@ -3,6 +3,7 @@
  * evor_state_read        — read run-state.json (+ tick-state.json when present)
  * evor_state_write       — merge-patch run-state.json; strategy delta; tick-state; active-run
  * evor_read_goal_contract — read and validate goal-contract.json → GoalContract
+ * evor_check_plateau     — read tick history scores and detect plateau / consecutive regression
  */
 
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "fs";
@@ -186,6 +187,62 @@ export function stateWrite(
   return updated;
 }
 
+// ── Plateau detection (P1-3 — adaptive meta-trigger) ───────────────────────
+
+/** Result shape for checkPlateauCondition */
+export interface PlateauResult {
+  plateau: boolean;
+  consecutive_regression: boolean;
+  ticks_checked: number;
+  scores: number[];
+}
+
+/**
+ * Read `tick_history_scores` from run-state.json and detect:
+ *   - plateau: last 3 scores all within 0.5% relative spread of each other
+ *   - consecutive_regression: last 2 scores each lower than the one before them
+ *
+ * Returns {plateau:false, consecutive_regression:false, ticks_checked:0, scores:[]}
+ * when no history exists or fewer than the required ticks are available.
+ */
+export function checkPlateauCondition(runId: string, missionId?: string): PlateauResult {
+  const state = stateRead(runId, missionId);
+  const rawScores = state.tick_history_scores;
+
+  if (!Array.isArray(rawScores) || rawScores.length === 0) {
+    return { plateau: false, consecutive_regression: false, ticks_checked: 0, scores: [] };
+  }
+
+  const scores = rawScores as number[];
+  const ticks_checked = scores.length;
+
+  // Plateau: last 3 scores within 0.5% relative spread (need at least 3)
+  let plateau = false;
+  if (scores.length >= 3) {
+    const last3 = scores.slice(-3);
+    const maxVal = Math.max(...last3);
+    const minVal = Math.min(...last3);
+    // relative spread = (max - min) / max
+    const spread = maxVal > 0 ? (maxVal - minVal) / maxVal : 0;
+    plateau = spread <= 0.005; // 0.5%
+  }
+
+  // Consecutive regression: last 2 scores each lower than the tick before them (need at least 3)
+  let consecutive_regression = false;
+  if (scores.length >= 3) {
+    const n = scores.length;
+    const reg1 = scores[n - 1] < scores[n - 2]; // most recent tick regressed
+    const reg2 = scores[n - 2] < scores[n - 3]; // tick before that also regressed
+    consecutive_regression = reg1 && reg2;
+    // A plateau and regression are mutually exclusive in definition but we keep them separate
+    if (consecutive_regression) {
+      plateau = false;
+    }
+  }
+
+  return { plateau, consecutive_regression, ticks_checked, scores };
+}
+
 /**
  * Read and validate goal-contract.json from the run directory.
  *
@@ -271,6 +328,31 @@ export function registerStateTools(server: McpServer): void {
           {
             type: "text" as const,
             text: JSON.stringify({ ok: true, run_id, state: updated }),
+          },
+        ],
+      };
+    }
+  );
+
+  // ── evor_check_plateau ─────────────────────────────────────────────────────
+  server.tool(
+    "evor_check_plateau",
+    "Read tick history scores from run-state.json and detect plateau or consecutive regression. " +
+    "Returns {plateau, consecutive_regression, ticks_checked, scores[]}. " +
+    "plateau=true when last 3 scores are within 0.5% of each other (no meaningful improvement). " +
+    "consecutive_regression=true when last 2 ticks both regressed below their predecessor. " +
+    "Returns plateau=false when fewer than 3 ticks are available (insufficient data).",
+    {
+      run_id: z.string().describe("Active run identifier"),
+    },
+    async ({ run_id }) => {
+      const missionId = process.env.EVOR_MISSION_ID;
+      const result = checkPlateauCondition(run_id, missionId);
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: JSON.stringify({ ok: true, run_id, ...result }),
           },
         ],
       };

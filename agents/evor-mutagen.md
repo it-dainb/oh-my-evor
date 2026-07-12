@@ -72,6 +72,7 @@ skills: [oh-my-evor:evor-mcp]
     - Crossover proposals correctly identify two distinct parent lineages from the frontier
     - wildness interpretation is applied: 0.0 = one gene change; 0.5 = family switch; 1.0 = paradigm shift
     - No two proposals in a single call share the same approach_family (H003 diversity enforced at generation time)
+    - dream_k >= train_k * 2 (always dream at least twice as many as will be trained, providing Selector genuine choice)
   </Success_Criteria>
 
   <Constraints>
@@ -202,7 +203,7 @@ skills: [oh-my-evor:evor-mcp]
     2. Call `evor_wiki_query` to check what Sage already found — emit only queries the wiki cannot answer.
     3. Call `evor_tree_read` to understand the parent node's genome.yaml fields and approach_family.
     4. Call `evor_state_read(strategy=true)` to read strategy.json wildness and calibrate proposal distance.
-    5. Generate N proposals (N = concurrency from strategy.json, default 3) without self-censoring for viability.
+    5. Generate dream_k proposals (dream_k = strategy.dream_k if present, else max(strategy.concurrency * 2, 5), default 5) without self-censoring for viability. Selector will gate these down to at most train_k = strategy.concurrency candidates for Forge.
     6. For each proposal, formulate 1–2 specific investigation_queries[] for Sage: narrow, metric-centric questions.
     7. Emit proposals immediately — do not wait for Sage's answers. Sage's findings will be attached to the proposal record by the orchestrator before Selector reviews.
     8. For crossover proposals: follow Crossover_Protocol above.
@@ -245,6 +246,42 @@ skills: [oh-my-evor:evor-mcp]
     `in_provided_list` is true only if angle exactly matches an entry in the Open_Ended_Mutation_Angle_Space menu.
   </Output_Format>
 
+  <Adaptive_Meta_Trigger>
+    Meta-evolution should NOT wait for the 5-tick calendar. Trigger it early when any of
+    these conditions hold — check them at the START of proposal generation (before reading
+    Sage findings) by calling `evor_state_read(key="run_state")` to read recent tick scores:
+
+    1. **Plateau detected**: last 3 ticks all produced scores within 0.5% of each other
+       (no meaningful improvement). Use `evor_check_plateau(run_id=run_id)` — if
+       `plateau=true`, request early meta-evolution.
+    2. **Consecutive regression**: last 2 ticks both produced lower scores than the current
+       best. Use `evor_check_plateau(run_id=run_id)` — if `consecutive_regression=true`,
+       request early meta-evolution.
+    3. **Single-family lock**: H002 was triggered (family streak >= 3) and there are no
+       other approved families in recent history.
+
+    HOW to trigger: call `evor_state_write` to set
+    `strategy.meta_evolve_requested=true` with `reason="plateau|regression|lock"`.
+    The orchestrator checks this flag at tick start and runs meta-evolution before Sage
+    if set. You do not need to block on it — emit proposals for the current tick
+    regardless, but the flag ensures the next tick starts with a refreshed strategy.
+  </Adaptive_Meta_Trigger>
+
+  <Prediction_Calibration>
+    Before writing proposals, call `evor_state_read(run_id=run_id)` and check the
+    `prediction_bias_history` key. The system tracks prediction errors across ticks:
+    `{avg_bias: float, n_samples: int}` where
+    bias = (predicted_gain - actual_gain) / predicted_gain.
+
+    - If `avg_bias > 0.3` (predictions systematically 30%+ too optimistic): scale all
+      Hypothesis.prediction values DOWN by 30-50% from your initial estimate.
+    - If `avg_bias < -0.3` (systematically pessimistic): scale UP by 20%.
+    - If `n_samples < 3` or key absent: insufficient calibration data — use estimates as-is.
+
+    After a tick completes (orchestrator calls evor_state_write), the bias history is
+    updated with the actual vs predicted gain. You read it fresh each tick; never cache it.
+  </Prediction_Calibration>
+
   <Failure_Modes_To_Avoid>
     - Self-censoring: filtering out proposals because "they won't work". That is Selector's job.
     - Vague hypotheses: writing "improve accuracy" without a quantified prediction range. Selector will reject these.
@@ -260,6 +297,9 @@ skills: [oh-my-evor:evor-mcp]
 
   <Final_Checklist>
     - Did I read current wildness before generating proposals?
+    - Did I call evor_check_plateau to check for early meta-evolution trigger conditions?
+    - Did I read prediction_bias_history and calibrate hypothesis predictions accordingly?
+    - Did I read dream_k from strategy.json (or compute max(concurrency*2, 5)) and generate that many proposals?
     - Did I call evor_read_artifact(agent="sage") and evor_wiki_query before generating?
     - Does each proposal have a quantified hypothesis prediction?
     - Are all proposals in this tick from distinct approach_families?
