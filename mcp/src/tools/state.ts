@@ -4,6 +4,8 @@
  * evor_state_write       — merge-patch run-state.json; strategy delta; tick-state; active-run
  * evor_read_goal_contract — read and validate goal-contract.json → GoalContract
  * evor_check_plateau     — read tick history scores and detect plateau / consecutive regression
+ * evor_lock_mission      — validate-then-lock atomically (Area 1)
+ * evor_check_stop        — server-side stop verdict by StopCondition type (Area 4)
  */
 
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "fs";
@@ -13,6 +15,7 @@ import { z } from "zod";
 import { GoalContractSchema, StrategyStateSchema } from "../contracts.js";
 import { resolveRunPaths, ensureRunDirs, getActiveRunPath, getEvorRoot } from "../run-store.js";
 import { readRunState, writeRunState } from "./record.js";
+import { callPythonModule } from "../subprocess-bridge.js";
 
 // ── Tick-state schema (spec §15B) ──────────────────────────────────────────
 
@@ -43,7 +46,7 @@ export const RunStatePatchSchema = z.object({
     .array(z.string())
     .optional()
     .describe("Node names started in this tick but not yet recorded to the tree"),
-  strategy: StrategyStateSchema.partial().optional().describe("Strategy delta to merge into strategy.json"),
+  strategy: StrategyStateSchema.partial().optional().describe("Strategy fields to update"),
   // ── Extended fields (spec §1 evor_state_write extension) ─────────────────
   mission_status: z
     .preprocess(
@@ -67,7 +70,7 @@ export const RunStatePatchSchema = z.object({
       started_at: z.string().optional(),
     })
     .optional()
-    .describe("If set, writes <evor_root>/active-run.json atomically"),
+    .describe("If set, records the active run pointer"),
   // ── Tick-state extension (spec §15B) ──────────────────────────────────────
   tick_state: TickStateSchema.optional().describe(
     "If set, atomically writes tick-state.json in the run directory; " +
@@ -83,6 +86,27 @@ export const RunStatePatchSchema = z.object({
       "Number of Forge attempts made for the current node in this tick. " +
       "Increment on each attempt; check with shouldAbortForge() before spawning a new one. " +
       "Reset to 0 at the start of each new tick/node.",
+    ),
+  // ── Area 4 prereq: cost tracking ──────────────────────────────────────────
+  total_cost_usd: z
+    .number()
+    .min(0)
+    .optional()
+    .describe(
+      "Cumulative cost in USD for this run so far. " +
+      "Used by evor_check_stop to evaluate budget-based stop conditions.",
+    ),
+  // ── Area 3: prediction bias sample (server-side rolling avg) ──────────────
+  prediction_bias_sample: z
+    .object({
+      predicted_gain: z.number().describe("Predicted gain from the mutation proposal"),
+      actual_gain: z.number().describe("Actual gain observed after evaluation"),
+    })
+    .optional()
+    .describe(
+      "When present, compute bias=(predicted-actual)/(predicted+1e-9) and accumulate " +
+      "into prediction_bias_history (rolling avg_bias + n_samples) server-side. " +
+      "Must not be set together with a direct prediction_bias_history write.",
     ),
 });
 
@@ -134,6 +158,7 @@ export function stateWrite(
     mission_status: missionStatus,
     active_run: activeRun,
     tick_state: tickState,
+    prediction_bias_sample: biasSample,
     ...statePatch
   } = patch;
 
@@ -143,6 +168,27 @@ export function stateWrite(
   for (const [k, v] of Object.entries(statePatch)) {
     if (v !== undefined) {
       updated[k] = v;
+    }
+  }
+  // Area 3: when prediction_bias_sample is present, compute and accumulate
+  // the rolling bias into run-state.json before the final write.
+  // This must not conflict with callers that write prediction_bias_history directly.
+  if (biasSample !== undefined) {
+    const bias = (biasSample.predicted_gain - biasSample.actual_gain)
+      / (biasSample.predicted_gain + 1e-9);
+    // Read existing bias history from the pre-patch state (current, not disk-re-read).
+    const prevHistory = typeof current.prediction_bias_history === "object"
+      && current.prediction_bias_history !== null
+      ? current.prediction_bias_history as Record<string, unknown>
+      : {};
+    const prevAvg = typeof prevHistory.avg_bias === "number" ? prevHistory.avg_bias : 0;
+    const prevN = typeof prevHistory.n_samples === "number" ? prevHistory.n_samples : 0;
+    const newN = prevN + 1;
+    const newAvg = (prevAvg * prevN + bias) / newN;
+    const newHistory = { avg_bias: newAvg, n_samples: newN };
+    // Only set if the caller did NOT also set prediction_bias_history directly.
+    if (updated.prediction_bias_history === prevHistory || updated.prediction_bias_history === undefined) {
+      updated.prediction_bias_history = newHistory;
     }
   }
   writeRunState(paths.runStatePath, updated);
@@ -322,6 +368,127 @@ export function shouldAbortForge(forge_attempt: number, max = 2): boolean {
   return forge_attempt >= max;
 }
 
+// ── Area 1: evor_lock_mission core logic ───────────────────────────────────
+
+/** Result shape for lockMission */
+export interface LockMissionResult {
+  ok: boolean;
+  run_id?: string;
+  mission_status?: string;
+  validation_report?: unknown;
+  error?: string;
+}
+
+/**
+ * Validate the run's contracts via `python -m evor validate --run-id <runDir>`,
+ * then atomically flip mission-state.json status to "locked" on pass.
+ *
+ * Returns { ok: true, mission_status: "locked", validation_report } on success,
+ * or { ok: false, error, validation_report } on validation failure.
+ */
+export function lockMission(runId: string, missionId?: string): LockMissionResult {
+  const paths = resolveRunPaths(runId, missionId);
+
+  // Run validation via subprocess (same pattern as evor_validate).
+  const pyResult = callPythonModule("evor", ["validate", "--run-id", paths.runDir]);
+  const validationReport = pyResult.data ?? null;
+
+  if (!pyResult.ok) {
+    return {
+      ok: false,
+      error: pyResult.error ?? "validation failed",
+      validation_report: validationReport,
+    };
+  }
+
+  // Check that the report itself says ok=true.
+  if (
+    validationReport === null ||
+    typeof validationReport !== "object" ||
+    !(validationReport as Record<string, unknown>).ok
+  ) {
+    return {
+      ok: false,
+      error: "validation report returned ok=false",
+      validation_report: validationReport,
+    };
+  }
+
+  // Atomically flip mission-state.json status to "locked".
+  const missionStatePath = join(paths.runDir, "mission-state.json");
+  let ms: Record<string, unknown> = {};
+  if (existsSync(missionStatePath)) {
+    try {
+      ms = JSON.parse(readFileSync(missionStatePath, "utf8"));
+    } catch {
+      // corrupt mission-state.json — start fresh
+    }
+  }
+  ms.status = "locked";
+  ms.updated_at = new Date().toISOString();
+  const msTmp = `${missionStatePath}.tmp`;
+  writeFileSync(msTmp, JSON.stringify(ms, null, 2), "utf8");
+  renameSync(msTmp, missionStatePath);
+
+  return {
+    ok: true,
+    run_id: runId,
+    mission_status: "locked",
+    validation_report: validationReport,
+  };
+}
+
+// ── Area 4: evor_check_stop core logic ─────────────────────────────────────
+
+/** Result shape for checkStop */
+export interface StopVerdictResult {
+  ok: boolean;
+  should_stop: boolean;
+  reason: string;
+  tick_count: number;
+  best_score: number;
+  frontier_count: number;
+  budget_remaining?: Record<string, unknown>;
+  error?: string;
+}
+
+/**
+ * Evaluate all stop conditions for the run by calling
+ * `python -m evor.tree check-stop --run-id <runDir>`.
+ *
+ * Returns a StopVerdict with should_stop + reason + run metrics.
+ */
+export function checkStop(runId: string, missionId?: string): StopVerdictResult {
+  const paths = resolveRunPaths(runId, missionId);
+
+  const pyResult = callPythonModule("evor.tree", ["check-stop", "--run-id", paths.runDir]);
+
+  if (!pyResult.ok || pyResult.data == null) {
+    return {
+      ok: false,
+      should_stop: false,
+      reason: pyResult.error ?? "evor_check_stop failed",
+      tick_count: 0,
+      best_score: 0,
+      frontier_count: 0,
+      error: pyResult.error ?? "evor_check_stop failed",
+    };
+  }
+
+  const data = pyResult.data as Record<string, unknown>;
+  return {
+    ok: true,
+    should_stop: Boolean(data.should_stop),
+    reason: String(data.reason ?? ""),
+    tick_count: typeof data.tick_count === "number" ? data.tick_count : 0,
+    best_score: typeof data.best_score === "number" ? data.best_score : 0,
+    frontier_count: typeof data.frontier_count === "number" ? data.frontier_count : 0,
+    budget_remaining: typeof data.budget_remaining === "object" && data.budget_remaining !== null
+      ? data.budget_remaining as Record<string, unknown>
+      : undefined,
+  };
+}
+
 // ── Tool registrations ──────────────────────────────────────────────────────
 
 export function registerStateTools(server: McpServer): void {
@@ -417,6 +584,58 @@ export function registerStateTools(server: McpServer): void {
                 ? { ok: true, run_id, contract: result.contract }
                 : { error: result.error }
             ),
+          },
+        ],
+      };
+    }
+  );
+
+  // ── evor_lock_mission (Area 1) ─────────────────────────────────────────────
+  server.tool(
+    "evor_lock_mission",
+    "Validate the run's goal-contract, frozen splits, tree, and run-state via the harness, " +
+    "then atomically flip mission-state.json status to 'locked' on pass. " +
+    "Returns { ok, mission_status, validation_report } on success; " +
+    "{ ok:false, error, validation_report } when validation fails (status stays draft). " +
+    "Replaces agent self-lock — always call this instead of writing mission_status='locked' directly.",
+    {
+      run_id: z.string().describe("Active run identifier"),
+      mission_id: z.string().optional().describe("Mission identifier (inferred when omitted)"),
+    },
+    async ({ run_id, mission_id }) => {
+      const missionId = mission_id ?? process.env.EVOR_MISSION_ID;
+      const result = lockMission(run_id, missionId);
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: JSON.stringify(result),
+          },
+        ],
+      };
+    }
+  );
+
+  // ── evor_check_stop (Area 4) ───────────────────────────────────────────────
+  server.tool(
+    "evor_check_stop",
+    "Evaluate all stop conditions for the run (beat-baseline, target, evolve-n, " +
+    "maximize-under-budget, evolve-until-plateau, evolve-until-regression, " +
+    "worst-angle-plateau, coverage-target) plus the circuit-breaker override. " +
+    "Returns { should_stop, reason, tick_count, best_score, frontier_count, budget_remaining }. " +
+    "Replaces inline stop predicates in the evor skill; call once per tick before proposing.",
+    {
+      run_id: z.string().describe("Active run identifier"),
+      mission_id: z.string().optional().describe("Mission identifier (inferred when omitted)"),
+    },
+    async ({ run_id, mission_id }) => {
+      const missionId = mission_id ?? process.env.EVOR_MISSION_ID;
+      const result = checkStop(run_id, missionId);
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: JSON.stringify(result),
           },
         ],
       };

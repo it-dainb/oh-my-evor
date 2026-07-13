@@ -9,6 +9,11 @@ dependencies = [
     "uvicorn[standard]>=0.23.0",
     "httpx>=0.24.0",
     "pyyaml>=6.0",
+    # AREA 2 — acquisition dedup/near-dup (graceful-degrade if absent)
+    "imagehash>=4.3",
+    "Pillow>=10.0",
+    "datasketch>=1.5",
+    "numpy>=1.24",
 ]
 
 [tool.pytest.ini_options]

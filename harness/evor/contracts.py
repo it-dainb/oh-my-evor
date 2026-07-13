@@ -761,6 +761,11 @@ class StrategyState(BaseEvorModel):
     rescore_mode: Literal["sync", "async"]
     """SINGLE source of truth for BenchmarkUpgrade re-score mode (Q1)"""
     updated_at: str
+    # ── Area 6: meta-evolve request flag (server-side) ────────────────────────
+    meta_evolve_requested: bool = False
+    """True when an agent has requested a meta-evolve cycle; cleared by orchestrator at tick-start."""
+    meta_evolve_reason: Optional[Literal["plateau", "regression", "lock"]] = None
+    """Why the meta-evolve was requested; None when meta_evolve_requested is False."""
 
 
 # ────────────────────────────────────────────────────────────────────────────

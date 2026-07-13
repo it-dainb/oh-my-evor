@@ -665,6 +665,183 @@ def _load_engine(run_dir: Path, strategy_override: dict | None = None) -> TreeEn
 # ─────────────────────────────────────────────────────────────────────────────
 
 
+@dataclass
+class StopVerdict:
+    """Result of check_stop_condition."""
+    should_stop: bool
+    reason: str
+    tick_count: int
+    best_score: float
+    frontier_count: int
+    budget_remaining: dict[str, Any]
+
+
+def check_stop_condition(
+    goal: GoalContract,
+    run_state: dict[str, Any],
+    engine: "TreeEngine",
+) -> StopVerdict:
+    """Evaluate all stop conditions for the run.
+
+    Stop logic by StopCondition.type:
+      beat-baseline         — best_score > baseline_value
+      target                — best_score >= target_value
+      evolve-n              — tick >= stop_condition.n
+      maximize-under-budget — tick >= budget.max_iterations OR cost >= budget.max_cost_usd
+      evolve-until-plateau  — delegate to checkPlateauCondition (last 3 scores within 0.5%)
+      evolve-until-regression — 2 consecutive regressions in tick_history_scores
+      worst-angle-plateau   — open_ended: no improvement signal (treated as open_ended)
+      coverage-target       — coverage >= coverage_target
+
+    Circuit-breaker override: tick >= budget.circuit_breaker (always stops regardless).
+
+    Returns StopVerdict with should_stop + reason + run metrics.
+    """
+    tick = int(run_state.get("tick_count", 0))
+    best_score = float(run_state.get("best_score", 0.0))
+    total_cost = float(run_state.get("total_cost_usd", 0.0))
+    frontier = engine.best_frontier()
+    frontier_count = len(frontier)
+    tick_history: list[float] = [
+        float(x) for x in run_state.get("tick_history_scores", [])
+        if isinstance(x, (int, float))
+    ]
+
+    budget = goal.budget
+    stop = goal.stop_condition
+
+    # ── Budget remaining ──────────────────────────────────────────────────────
+    budget_remaining: dict[str, Any] = {
+        "iterations_left": max(0, budget.max_iterations - tick),
+        "cost_left_usd": max(0.0, budget.max_cost_usd - total_cost),
+    }
+
+    # ── Circuit-breaker override (always wins) ─────────────────────────────────
+    if tick >= budget.circuit_breaker:
+        return StopVerdict(
+            should_stop=True,
+            reason=f"circuit_breaker: tick {tick} >= circuit_breaker {budget.circuit_breaker}",
+            tick_count=tick,
+            best_score=best_score,
+            frontier_count=frontier_count,
+            budget_remaining=budget_remaining,
+        )
+
+    # ── Per-type stop evaluation ───────────────────────────────────────────────
+    stop_type = stop.type
+
+    if stop_type == "beat-baseline":
+        if best_score > goal.baseline_value:
+            return StopVerdict(
+                should_stop=True,
+                reason=f"beat-baseline: best_score {best_score:.4f} > baseline {goal.baseline_value:.4f}",
+                tick_count=tick, best_score=best_score,
+                frontier_count=frontier_count, budget_remaining=budget_remaining,
+            )
+
+    elif stop_type == "target":
+        if goal.target_value is not None and best_score >= goal.target_value:
+            return StopVerdict(
+                should_stop=True,
+                reason=f"target: best_score {best_score:.4f} >= target {goal.target_value:.4f}",
+                tick_count=tick, best_score=best_score,
+                frontier_count=frontier_count, budget_remaining=budget_remaining,
+            )
+
+    elif stop_type == "evolve-n":
+        n = stop.n or budget.max_iterations
+        if tick >= n:
+            return StopVerdict(
+                should_stop=True,
+                reason=f"evolve-n: tick {tick} >= n {n}",
+                tick_count=tick, best_score=best_score,
+                frontier_count=frontier_count, budget_remaining=budget_remaining,
+            )
+
+    elif stop_type == "maximize-under-budget":
+        if tick >= budget.max_iterations:
+            return StopVerdict(
+                should_stop=True,
+                reason=f"maximize-under-budget: tick {tick} >= max_iterations {budget.max_iterations}",
+                tick_count=tick, best_score=best_score,
+                frontier_count=frontier_count, budget_remaining=budget_remaining,
+            )
+        if total_cost >= budget.max_cost_usd:
+            return StopVerdict(
+                should_stop=True,
+                reason=f"maximize-under-budget: cost ${total_cost:.2f} >= max_cost_usd ${budget.max_cost_usd:.2f}",
+                tick_count=tick, best_score=best_score,
+                frontier_count=frontier_count, budget_remaining=budget_remaining,
+            )
+
+    elif stop_type == "evolve-until-plateau":
+        # Delegate to the same plateau logic used by evor_check_plateau.
+        if len(tick_history) >= 3:
+            last3 = tick_history[-3:]
+            max_val = max(last3)
+            min_val = min(last3)
+            spread = (max_val - min_val) / max_val if max_val > 0 else 0.0
+            if spread <= 0.005:
+                return StopVerdict(
+                    should_stop=True,
+                    reason=f"evolve-until-plateau: last 3 scores within 0.5% spread ({spread:.4%})",
+                    tick_count=tick, best_score=best_score,
+                    frontier_count=frontier_count, budget_remaining=budget_remaining,
+                )
+
+    elif stop_type == "evolve-until-regression":
+        if len(tick_history) >= 3:
+            n_h = len(tick_history)
+            reg1 = tick_history[n_h - 1] < tick_history[n_h - 2]
+            reg2 = tick_history[n_h - 2] < tick_history[n_h - 3]
+            if reg1 and reg2:
+                return StopVerdict(
+                    should_stop=True,
+                    reason="evolve-until-regression: 2 consecutive regressions in tick_history_scores",
+                    tick_count=tick, best_score=best_score,
+                    frontier_count=frontier_count, budget_remaining=budget_remaining,
+                )
+
+    elif stop_type == "worst-angle-plateau":
+        # open_ended: if no improvement across last plateau_window ticks
+        plateau_window = budget.plateau_window
+        if len(tick_history) >= plateau_window:
+            window = tick_history[-plateau_window:]
+            max_val = max(window)
+            min_val = min(window)
+            spread = (max_val - min_val) / max_val if max_val > 0 else 0.0
+            if spread <= 0.005:
+                return StopVerdict(
+                    should_stop=True,
+                    reason=(
+                        f"worst-angle-plateau: no improvement in last {plateau_window} ticks "
+                        f"(spread {spread:.4%})"
+                    ),
+                    tick_count=tick, best_score=best_score,
+                    frontier_count=frontier_count, budget_remaining=budget_remaining,
+                )
+
+    elif stop_type == "coverage-target":
+        coverage = float(run_state.get("worst_angle_coverage", 0.0))
+        coverage_target = goal.coverage_target or 1.0
+        if coverage >= coverage_target:
+            return StopVerdict(
+                should_stop=True,
+                reason=f"coverage-target: coverage {coverage:.4f} >= target {coverage_target:.4f}",
+                tick_count=tick, best_score=best_score,
+                frontier_count=frontier_count, budget_remaining=budget_remaining,
+            )
+
+    return StopVerdict(
+        should_stop=False,
+        reason=f"no stop condition triggered (stop_type={stop_type!r}, tick={tick})",
+        tick_count=tick,
+        best_score=best_score,
+        frontier_count=frontier_count,
+        budget_remaining=budget_remaining,
+    )
+
+
 def _cli() -> None:  # pragma: no cover
     parser = argparse.ArgumentParser(prog="python -m evor.tree")
     sub = parser.add_subparsers(dest="cmd", required=True)
@@ -690,6 +867,9 @@ def _cli() -> None:  # pragma: no cover
     meta = sub.add_parser("meta-evolve")
     meta.add_argument("--run-id", required=True)
 
+    check_stop_p = sub.add_parser("check-stop")
+    check_stop_p.add_argument("--run-id", required=True)
+
     args = parser.parse_args()
 
     # Resolve run_dir from run-id (relative to cwd .evor/runs/*/*/)
@@ -714,6 +894,26 @@ def _cli() -> None:  # pragma: no cover
         engine = _load_engine(run_dir)
         updated = engine.meta_evolve(decision_log=[])
         print(updated.model_dump_json(indent=2))
+
+    elif args.cmd == "check-stop":
+        engine = _load_engine(run_dir)
+        # Load run-state.json for tick_count, best_score, total_cost_usd.
+        run_state_path = run_dir / "run-state.json"
+        run_state: dict[str, Any] = {}
+        if run_state_path.exists():
+            try:
+                run_state = json.loads(run_state_path.read_text())
+            except Exception:
+                pass
+        verdict = check_stop_condition(engine._goal, run_state, engine)
+        print(json.dumps({
+            "should_stop": verdict.should_stop,
+            "reason": verdict.reason,
+            "tick_count": verdict.tick_count,
+            "best_score": verdict.best_score,
+            "frontier_count": verdict.frontier_count,
+            "budget_remaining": verdict.budget_remaining,
+        }))
 
     else:
         print(json.dumps({"error": f"command '{args.cmd}' requires additional wiring (M6)"}))

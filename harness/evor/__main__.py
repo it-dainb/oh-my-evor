@@ -10,7 +10,8 @@ Subcommands:
                      instrumentation, submits job via ResourceScheduler,
                      supervises via SelfHealMonitor, runs EvaluatorAdapter on
                      completion, writes EvaluationResult.
-                     Requires mission-state.json status=="locked" (Phase-2 gate).
+                     Requires mission-state.json past the Phase-2 gate
+                     (status in locked/running/paused).
 
   preflight        — 5-step micro-train smoke-test (spec R3 / §evor-setup).
                      Verifies environment: imports, loss decreasing, GPU active.
@@ -357,7 +358,12 @@ def _cmd_run(args: argparse.Namespace) -> int:
                 run_dir = _run_id_path.resolve()
 
     # ── Phase-2 lock guard ────────────────────────────────────────────
-    # mission-state.json must exist and status must be "locked" before running.
+    # mission-state.json must exist and the mission must be past the Phase-2
+    # lock gate before running. Any post-lock state is valid: "locked" (freshly
+    # gated), "running" (tick loop active — every node-training subprocess runs
+    # under this state), or "paused" (resumed run). Only pre-lock "draft" (or a
+    # missing file) is rejected.
+    _RUNNABLE_MISSION_STATES = ("locked", "running", "paused")
     if run_dir:
         ms_path = run_dir / "mission-state.json"
         if not ms_path.exists():
@@ -370,7 +376,7 @@ def _cmd_run(args: argparse.Namespace) -> int:
         try:
             ms = json.loads(ms_path.read_text())
             ms_status = ms.get("status", "")
-            if ms_status != "locked":
+            if ms_status not in _RUNNABLE_MISSION_STATES:
                 print(
                     f"[evor run] ERROR: mission-state.status={ms_status!r}. "
                     "Contract must be locked before running. "

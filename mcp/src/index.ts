@@ -24,6 +24,7 @@ import { registerLineageTools } from "./tools/lineage.js";
 import { registerComputeTools } from "./tools/compute.js";
 import { registerGotchaTools } from "./tools/gotcha.js";
 import { registerProposalTools } from "./tools/proposals.js";
+import { registerAcquireTools } from "./tools/acquire.js";
 
 /**
  * Server instructions — loaded upfront (<=2KB) even with MCP tool-search deferral,
@@ -68,6 +69,7 @@ async function main(): Promise<void> {
   registerComputeTools(server);   // evor_run_start/status + compute wrappers + wiki_summarize, gotchas_list
   registerGotchaTools(server);    // evor_gotcha_query, evor_gotcha_add, evor_store_blob
   registerProposalTools(server);  // evor_validate_proposals (P1-7 deterministic gate)
+  registerAcquireTools(server);   // evor_check_leakage
 
   const transport = new StdioServerTransport();
   await server.connect(transport);

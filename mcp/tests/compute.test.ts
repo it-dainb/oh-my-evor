@@ -13,7 +13,8 @@
  *   - evor_run_start tool returns job handle without blocking
  */
 
-import { mkdtempSync, rmSync, mkdirSync, writeFileSync, statSync } from "fs";
+import { mkdtempSync, rmSync, mkdirSync, writeFileSync, statSync, readFileSync, existsSync } from "fs";
+import { createHash } from "crypto";
 import { join } from "path";
 import { tmpdir } from "os";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
@@ -676,5 +677,134 @@ describe("evor_freeze_splits zero-item guard", () => {
     });
     const out = await callTool("evor_freeze_splits", FREEZE_ARGS);
     expect(out.ok).toBe(true);
+  });
+});
+
+// ── evor_seal_eval_script ─────────────────────────────────────────────────────
+
+describe("evor_seal_eval_script", () => {
+  it("hashes eval script and writes eval_script_hash into goal-contract.json", async () => {
+    // Set up a run directory with eval-suites/v1.py and goal-contract.json
+    const runDir = join(tmpRoot, "runs", "m1", "run-seal");
+    const evalSuitesDir = join(runDir, "eval-suites");
+    mkdirSync(evalSuitesDir, { recursive: true });
+    const scriptContent = "# canonical evaluator\nprint('score')\n";
+    writeFileSync(join(evalSuitesDir, "v1.py"), scriptContent, "utf8");
+    writeFileSync(join(runDir, "goal-contract.json"), JSON.stringify({ eval_script_hash: null }), "utf8");
+
+    // EVOR_ROOT is tmpRoot; resolveRunPaths("run-seal", "m1") → tmpRoot/runs/m1/run-seal
+    const out = await callTool("evor_seal_eval_script", {
+      run_id: "run-seal",
+      eval_version: "v1",
+      mission_id: "m1",
+    });
+
+    expect(out.ok).toBe(true);
+    expect(out.eval_version).toBe("v1");
+
+    // Verify the hash written matches sha256 of the script
+    const contract = JSON.parse(readFileSync(join(runDir, "goal-contract.json"), "utf8")) as Record<string, unknown>;
+    const expectedHash = createHash("sha256").update(scriptContent, "utf8").digest("hex");
+    expect(contract.eval_script_hash).toBe(expectedHash);
+  });
+
+  it("returns error (no absolute path) when eval script is absent", async () => {
+    // Run dir exists but no eval-suites/v1.py
+    const runDir = join(tmpRoot, "runs", "m1", "run-noseal");
+    mkdirSync(join(runDir, "eval-suites"), { recursive: true });
+    writeFileSync(join(runDir, "goal-contract.json"), JSON.stringify({}), "utf8");
+
+    const out = await callTool("evor_seal_eval_script", {
+      run_id: "run-noseal",
+      eval_version: "v1",
+      mission_id: "m1",
+    });
+
+    expect(out.ok).toBeUndefined();
+    expect(typeof out.error).toBe("string");
+    // Error must be actionable and name-only — no absolute path, no .evor fragments
+    expect(out.error).not.toContain("/");
+    expect(out.error).not.toMatch(/\.evor|eval-suites|\.py/);
+
+    // goal-contract.json must NOT have eval_script_hash written
+    const contract = JSON.parse(readFileSync(join(runDir, "goal-contract.json"), "utf8")) as Record<string, unknown>;
+    expect(contract.eval_script_hash).toBeUndefined();
+  });
+});
+
+// ── evor_lock_evaluate — eval_script_hash contract verification ───────────────
+
+describe("lockEvaluate — eval_script_hash contract verification", () => {
+  function makeWorktree(content: string): string {
+    const wt = join(tmpRoot, "worktrees", `node-${Math.random().toString(36).slice(2)}`);
+    mkdirSync(wt, { recursive: true });
+    writeFileSync(join(wt, "evaluate.py"), content, "utf8");
+    return wt;
+  }
+
+  function makeRunDir(contractPatch?: Record<string, unknown>): string {
+    const runDir = join(tmpRoot, "runs", "m1", `run-${Math.random().toString(36).slice(2)}`);
+    mkdirSync(runDir, { recursive: true });
+    writeFileSync(join(runDir, "goal-contract.json"), JSON.stringify(contractPatch ?? {}), "utf8");
+    return runDir;
+  }
+
+  it("passes (ok:true) when worktree evaluate.py hash matches contract eval_script_hash", () => {
+    const content = "# canonical\nprint('score')\n";
+    const hash = createHash("sha256").update(content, "utf8").digest("hex");
+
+    // The node name is used as the worktree dir name (resolveNodeRef returns it as-is when it matches)
+    const nodeId = "match-node-01";
+    const wt = join(tmpRoot, "worktrees", nodeId);
+    mkdirSync(wt, { recursive: true });
+    writeFileSync(join(wt, "evaluate.py"), content, "utf8");
+
+    const runDir = join(tmpRoot, "runs", "m1", "run-match");
+    mkdirSync(runDir, { recursive: true });
+    writeFileSync(join(runDir, "goal-contract.json"), JSON.stringify({ eval_script_hash: hash }), "utf8");
+
+    const result = lockEvaluate("run-match", nodeId, "m1");
+    expect(result.ok).toBe(true);
+    expect(result.node_name).toBe(nodeId);
+  });
+
+  it("fails (ok:false) with name-only mismatch error when hashes differ", () => {
+    const canonicalContent = "# canonical evaluator\nprint('score')\n";
+    const canonicalHash = createHash("sha256").update(canonicalContent, "utf8").digest("hex");
+
+    const nodeId = "tampered-node-01";
+    const wt = join(tmpRoot, "worktrees", nodeId);
+    mkdirSync(wt, { recursive: true });
+    // Write a DIFFERENT script to the worktree
+    writeFileSync(join(wt, "evaluate.py"), "# tampered!\nprint('hacked')\n", "utf8");
+
+    const runDir = join(tmpRoot, "runs", "m1", "run-tamper");
+    mkdirSync(runDir, { recursive: true });
+    writeFileSync(join(runDir, "goal-contract.json"), JSON.stringify({ eval_script_hash: canonicalHash }), "utf8");
+
+    const result = lockEvaluate("run-tamper", nodeId, "m1");
+    expect(result.ok).toBe(false);
+    expect(result.node_name).toBe(nodeId);
+    expect(typeof result.error).toBe("string");
+    // Error must mention the mismatch but contain NO absolute paths or internal fragments
+    expect(result.error).toMatch(/does not match/i);
+    expect(result.error).not.toContain("/");
+    expect(result.error).not.toMatch(/\.evor|eval-suites|worktrees/);
+  });
+
+  it("passes (ok:true) when contract has no eval_script_hash set (backward compat)", () => {
+    const nodeId = "compat-node-01";
+    const wt = join(tmpRoot, "worktrees", nodeId);
+    mkdirSync(wt, { recursive: true });
+    writeFileSync(join(wt, "evaluate.py"), "print('eval')\n", "utf8");
+
+    const runDir = join(tmpRoot, "runs", "m1", "run-compat");
+    mkdirSync(runDir, { recursive: true });
+    // Contract exists but has no eval_script_hash field
+    writeFileSync(join(runDir, "goal-contract.json"), JSON.stringify({ split_hash: "abc" }), "utf8");
+
+    const result = lockEvaluate("run-compat", nodeId, "m1");
+    expect(result.ok).toBe(true);
+    expect(result.node_name).toBe(nodeId);
   });
 });

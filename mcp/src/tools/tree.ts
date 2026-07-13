@@ -6,6 +6,10 @@
  * Agent surface is UUID-free: node ids never appear in tool responses.
  * Internal pending_node_ids in run-state.json stays as ids — only the
  * agent-facing output is name-mapped via nameForId / namesForIds.
+ *
+ * Area 5: evor_tree_read accepts optional filters:
+ *   status, integrity_status, min_score, approach_family
+ * NamedTreeNode now includes integrity_status.
  */
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -21,10 +25,12 @@ import { nameForId, namesForIds } from "./node-ref.js";
  * Agent-facing node shape: readable names only, no internal UUIDs.
  * parent_names resolves parent_ids via nameForId so the agent can reference
  * parents by name in subsequent calls.
+ * integrity_status surfaces the node's integrity gate result (Area 5).
  */
 export type NamedTreeNode = {
   name: string;
   status: TreeNode["status"];
+  integrity_status: TreeNode["integrity_status"];
   depth: number;
   approach_family: TreeNode["approach_family"];
   score?: number;
@@ -78,11 +84,20 @@ function toNamedNode(node: TreeNode, runId: string, missionId: string | undefine
   return {
     name: nameForId(runId, node.id, missionId),
     status: node.status,
+    integrity_status: node.integrity_status,
     depth: node.depth,
     approach_family: node.approach_family,
     score: node.ucb1_score,
     parent_names: namesForIds(runId, node.parent_ids, missionId),
   };
+}
+
+/** Optional filters for treeRead (Area 5). */
+export interface TreeReadFilters {
+  status?: TreeNode["status"];
+  integrity_status?: TreeNode["integrity_status"];
+  min_score?: number;
+  approach_family?: TreeNode["approach_family"];
 }
 
 /**
@@ -92,12 +107,15 @@ function toNamedNode(node: TreeNode, runId: string, missionId: string | undefine
  * If `subtreeRoot` is provided, only nodes reachable from that root are
  * returned.  `depth` limits the relative depth below the root (or the
  * absolute `node.depth` when no subtree root is given).
+ *
+ * Area 5: optional `filters` applied after depth/subtree filtering.
  */
 export function treeRead(
   runId: string,
   subtreeRoot?: string,
   depth?: number,
-  missionId?: string
+  missionId?: string,
+  filters?: TreeReadFilters
 ): NamedTreeNode[] {
   const nodes = readTree(runId, missionId);
 
@@ -114,6 +132,23 @@ export function treeRead(
     // No subtree root — return all nodes, optionally depth-capped
     const all = Object.values(nodes) as TreeNode[];
     raw = depth === undefined ? all : all.filter((n) => n.depth <= depth);
+  }
+
+  // Apply optional post-filters (Area 5)
+  if (filters) {
+    if (filters.status !== undefined) {
+      raw = raw.filter((n) => n.status === filters.status);
+    }
+    if (filters.integrity_status !== undefined) {
+      raw = raw.filter((n) => n.integrity_status === filters.integrity_status);
+    }
+    if (filters.min_score !== undefined) {
+      const minScore = filters.min_score;
+      raw = raw.filter((n) => n.ucb1_score !== undefined && n.ucb1_score >= minScore);
+    }
+    if (filters.approach_family !== undefined) {
+      raw = raw.filter((n) => n.approach_family === filters.approach_family);
+    }
   }
 
   return raw.map((n) => toNamedNode(n, runId, missionId));
@@ -182,15 +217,37 @@ export function registerTreeTools(server: McpServer): void {
   // ── evor_tree_read ─────────────────────────────────────────────────────────
   server.tool(
     "evor_tree_read",
-    "Read the evolution tree for a run, optionally filtered to a subtree rooted at subtree_root up to depth levels.",
+    "Read the evolution tree for a run, optionally filtered to a subtree rooted at subtree_root up to depth levels. " +
+    "Optional filters: status, integrity_status, min_score, approach_family (all applied after depth/subtree filter). " +
+    "Each NamedTreeNode includes integrity_status for downstream gate checks.",
     {
       run_id: z.string().describe("Active run identifier"),
       subtree_root: z.string().optional().describe("Node ID to root the subtree at; omit for full tree"),
       depth: z.number().int().positive().optional().describe("Maximum depth to return (omit = unlimited)"),
+      status: z.enum(["pending", "running", "done", "pruned", "failed"]).optional().describe(
+        "Filter: only return nodes with this status"
+      ),
+      integrity_status: z.enum(["passed", "failed", "pending"]).optional().describe(
+        "Filter: only return nodes with this integrity_status; nodes lacking integrity_status are excluded"
+      ),
+      min_score: z.number().optional().describe(
+        "Filter: only return nodes with ucb1_score >= min_score; nodes without a score are excluded"
+      ),
+      approach_family: z.enum([
+        "arch", "training", "data-curation", "data-augmentation",
+        "data-acquisition", "algo", "other",
+      ]).optional().describe(
+        "Filter: only return nodes from this approach family"
+      ),
     },
-    async ({ run_id, subtree_root, depth }) => {
+    async ({ run_id, subtree_root, depth, status, integrity_status, min_score, approach_family }) => {
       const missionId = process.env.EVOR_MISSION_ID;
-      const nodes = treeRead(run_id, subtree_root, depth, missionId);
+      const filters: TreeReadFilters = {};
+      if (status !== undefined) filters.status = status as TreeNode["status"];
+      if (integrity_status !== undefined) filters.integrity_status = integrity_status as TreeNode["integrity_status"];
+      if (min_score !== undefined) filters.min_score = min_score;
+      if (approach_family !== undefined) filters.approach_family = approach_family as TreeNode["approach_family"];
+      const nodes = treeRead(run_id, subtree_root, depth, missionId, filters);
       return {
         content: [
           {

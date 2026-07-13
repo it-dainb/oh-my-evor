@@ -437,6 +437,11 @@ export const StrategyStateSchema = z.object({
     "Proposals Mutagen generates per tick; Selector gates to at most concurrency for Forge. Default = max(concurrency*2, 5)."
   ),
   updated_at: ISODate,
+  // ── Area 6: meta-evolve request flag (server-side) ────────────────────────
+  /** True when an agent has requested a meta-evolve cycle; cleared by orchestrator at tick-start. */
+  meta_evolve_requested: z.boolean().optional(),
+  /** Why the meta-evolve was requested; absent when meta_evolve_requested is false. */
+  meta_evolve_reason: z.enum(["plateau", "regression", "lock"]).optional(),
 });
 export type StrategyState = z.infer<typeof StrategyStateSchema>;
 

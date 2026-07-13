@@ -61,6 +61,16 @@ def main() -> int:
         "--run-dir", default=None, type=Path,
         help="Explicit run directory; inferred from EVOR_ROOT + run-id if omitted",
     )
+    parser.add_argument(
+        "--eval-script", default=None, type=Path,
+        help="Path to the canonical eval script (.py); overrides the default "
+             "<run_dir>/eval-suites/<eval_version>.py",
+    )
+    parser.add_argument(
+        "--split-path", default=None, type=Path,
+        help="Path to the frozen test split JSON; tried before the default "
+             "candidate list",
+    )
     args = parser.parse_args()
 
     # ── Resolve run_dir ───────────────────────────────────────────────────────
@@ -138,7 +148,15 @@ def main() -> int:
     # ── Load FrozenSplit (degrade gracefully if absent) ───────────────────────
     frozen_test: FrozenSplit | None = None
     frozen_dir = run_dir / "frozen-splits"
-    for candidate in [frozen_dir / "test.json", frozen_dir / "frozen-test.json"]:
+    candidates: list[Path] = []
+    if args.split_path:
+        candidates.append(args.split_path)
+    candidates += [
+        frozen_dir / f"{goal.eval_version}-test.json",  # canonical (matches freeze.py output)
+        frozen_dir / "test.json",                        # legacy
+        frozen_dir / "frozen-test.json",                 # legacy
+    ]
+    for candidate in candidates:
         if candidate.exists():
             try:
                 frozen_test = FrozenSplit.model_validate_json(candidate.read_text())
@@ -153,7 +171,12 @@ def main() -> int:
 
     # ── Support paths ─────────────────────────────────────────────────────────
     telemetry_path = run_dir / "nodes" / args.node_id / "telemetry.jsonl"
+    # Prefer an explicitly-passed --eval-script when it actually exists; otherwise
+    # fall back to the canonical <run_dir>/eval-suites/<eval_version>.py path (which
+    # the downstream check treats as an eval-shift if absent).
     eval_script_path = run_dir / "eval-suites" / f"{goal.eval_version}.py"
+    if args.eval_script is not None and args.eval_script.exists():
+        eval_script_path = args.eval_script
     provenance_path: Path | None = run_dir / "nodes" / args.node_id / "provenance.jsonl"
     if not (provenance_path and provenance_path.exists()):
         provenance_path = None

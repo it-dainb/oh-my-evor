@@ -60,6 +60,8 @@ The MCP server ships **prebuilt** (no Node build on your machine), and the bundl
 
 > If anything is missing, oh-my-evor tells you exactly what to run on your next session — it never fails cryptically.
 
+> **Using a virtualenv or a non-default Python?** The MCP server runs the compute harness through the interpreter named by the `EVOR_PYTHON` environment variable (default: `python3`). If you install the harness deps into a venv or any interpreter other than the default `python3` (e.g. `EVOR_PYTHON=/path/to/venv/bin/python ./install.sh`), export that **same** `EVOR_PYTHON` in the environment where you launch Claude Code. Otherwise the server falls back to bare `python3`, which won't have the deps, and harness-backed tools (setup, freeze, preflight, run) will report a missing-dependency error.
+
 Then start a mission — **one setup conversation** (a structured interview) locks the goal, metrics, and benchmark; after that it runs autonomously:
 
 | Command | What it does |

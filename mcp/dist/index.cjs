@@ -21322,7 +21322,12 @@ var StrategyStateSchema = external_exports.object({
   dream_k: external_exports.number().int().positive().optional().describe(
     "Proposals Mutagen generates per tick; Selector gates to at most concurrency for Forge. Default = max(concurrency*2, 5)."
   ),
-  updated_at: ISODate
+  updated_at: ISODate,
+  // ── Area 6: meta-evolve request flag (server-side) ────────────────────────
+  /** True when an agent has requested a meta-evolve cycle; cleared by orchestrator at tick-start. */
+  meta_evolve_requested: external_exports.boolean().optional(),
+  /** Why the meta-evolve was requested; absent when meta_evolve_requested is false. */
+  meta_evolve_reason: external_exports.enum(["plateau", "regression", "lock"]).optional()
 });
 var ResourcePlanSchema = external_exports.object({
   concurrency: external_exports.number().int().positive(),
@@ -22165,7 +22170,7 @@ function registerRecordTools(server) {
       node_id: external_exports.string().describe(
         "The node's name (e.g. 'immune-memory-02'), as returned by evor_record_node"
       ),
-      result: EvaluationResultSchema.describe("EvaluationResult to record")
+      result: EvaluationResultSchema.describe("The evaluation result to record")
     },
     async ({ run_id, node_id, result }) => {
       const missionId = process.env.EVOR_MISSION_ID;
@@ -22264,13 +22269,14 @@ function toNamedNode(node, runId, missionId) {
   return {
     name: nameForId(runId, node.id, missionId),
     status: node.status,
+    integrity_status: node.integrity_status,
     depth: node.depth,
     approach_family: node.approach_family,
     score: node.ucb1_score,
     parent_names: namesForIds(runId, node.parent_ids, missionId)
   };
 }
-function treeRead(runId, subtreeRoot, depth, missionId) {
+function treeRead(runId, subtreeRoot, depth, missionId, filters) {
   const nodes = readTree(runId, missionId);
   let raw;
   if (subtreeRoot !== void 0) {
@@ -22283,6 +22289,21 @@ function treeRead(runId, subtreeRoot, depth, missionId) {
   } else {
     const all = Object.values(nodes);
     raw = depth === void 0 ? all : all.filter((n) => n.depth <= depth);
+  }
+  if (filters) {
+    if (filters.status !== void 0) {
+      raw = raw.filter((n) => n.status === filters.status);
+    }
+    if (filters.integrity_status !== void 0) {
+      raw = raw.filter((n) => n.integrity_status === filters.integrity_status);
+    }
+    if (filters.min_score !== void 0) {
+      const minScore = filters.min_score;
+      raw = raw.filter((n) => n.ucb1_score !== void 0 && n.ucb1_score >= minScore);
+    }
+    if (filters.approach_family !== void 0) {
+      raw = raw.filter((n) => n.approach_family === filters.approach_family);
+    }
   }
   return raw.map((n) => toNamedNode(n, runId, missionId));
 }
@@ -22322,15 +22343,40 @@ function treeSelect(runId, strategy, count, missionId) {
 function registerTreeTools(server) {
   server.tool(
     "evor_tree_read",
-    "Read the evolution tree for a run, optionally filtered to a subtree rooted at subtree_root up to depth levels.",
+    "Read the evolution tree for a run, optionally filtered to a subtree rooted at subtree_root up to depth levels. Optional filters: status, integrity_status, min_score, approach_family (all applied after depth/subtree filter). Each NamedTreeNode includes integrity_status for downstream gate checks.",
     {
       run_id: external_exports.string().describe("Active run identifier"),
       subtree_root: external_exports.string().optional().describe("Node ID to root the subtree at; omit for full tree"),
-      depth: external_exports.number().int().positive().optional().describe("Maximum depth to return (omit = unlimited)")
+      depth: external_exports.number().int().positive().optional().describe("Maximum depth to return (omit = unlimited)"),
+      status: external_exports.enum(["pending", "running", "done", "pruned", "failed"]).optional().describe(
+        "Filter: only return nodes with this status"
+      ),
+      integrity_status: external_exports.enum(["passed", "failed", "pending"]).optional().describe(
+        "Filter: only return nodes with this integrity_status; nodes lacking integrity_status are excluded"
+      ),
+      min_score: external_exports.number().optional().describe(
+        "Filter: only return nodes with ucb1_score >= min_score; nodes without a score are excluded"
+      ),
+      approach_family: external_exports.enum([
+        "arch",
+        "training",
+        "data-curation",
+        "data-augmentation",
+        "data-acquisition",
+        "algo",
+        "other"
+      ]).optional().describe(
+        "Filter: only return nodes from this approach family"
+      )
     },
-    async ({ run_id, subtree_root, depth }) => {
+    async ({ run_id, subtree_root, depth, status, integrity_status, min_score, approach_family }) => {
       const missionId = process.env.EVOR_MISSION_ID;
-      const nodes = treeRead(run_id, subtree_root, depth, missionId);
+      const filters = {};
+      if (status !== void 0) filters.status = status;
+      if (integrity_status !== void 0) filters.integrity_status = integrity_status;
+      if (min_score !== void 0) filters.min_score = min_score;
+      if (approach_family !== void 0) filters.approach_family = approach_family;
+      const nodes = treeRead(run_id, subtree_root, depth, missionId, filters);
       return {
         content: [
           {
@@ -22783,7 +22829,7 @@ var RunStatePatchSchema = external_exports.object({
   frontier_ids: external_exports.array(external_exports.string()).optional().describe("Node IDs currently on the frontier"),
   current_eval_version: external_exports.string().optional().describe("Active EvalSuite version"),
   pending_node_ids: external_exports.array(external_exports.string()).optional().describe("Node names started in this tick but not yet recorded to the tree"),
-  strategy: StrategyStateSchema.partial().optional().describe("Strategy delta to merge into strategy.json"),
+  strategy: StrategyStateSchema.partial().optional().describe("Strategy fields to update"),
   // ── Extended fields (spec §1 evor_state_write extension) ─────────────────
   mission_status: external_exports.preprocess(
     // The run lifecycle uses "initialized"; the mission lifecycle's equivalent
@@ -22800,7 +22846,7 @@ var RunStatePatchSchema = external_exports.object({
     job_id: external_exports.string().optional().describe("Job identifier from evor_run_start; enables monitor lookup"),
     status: external_exports.string().optional(),
     started_at: external_exports.string().optional()
-  }).optional().describe("If set, writes <evor_root>/active-run.json atomically"),
+  }).optional().describe("If set, records the active run pointer"),
   // ── Tick-state extension (spec §15B) ──────────────────────────────────────
   tick_state: TickStateSchema.optional().describe(
     "If set, atomically writes tick-state.json in the run directory; read by all agents to determine current tick and step progress"
@@ -22808,6 +22854,17 @@ var RunStatePatchSchema = external_exports.object({
   // ── P2-8: Forge attempt tracking ──────────────────────────────────────────
   forge_attempt: external_exports.number().int().min(0).optional().describe(
     "Number of Forge attempts made for the current node in this tick. Increment on each attempt; check with shouldAbortForge() before spawning a new one. Reset to 0 at the start of each new tick/node."
+  ),
+  // ── Area 4 prereq: cost tracking ──────────────────────────────────────────
+  total_cost_usd: external_exports.number().min(0).optional().describe(
+    "Cumulative cost in USD for this run so far. Used by evor_check_stop to evaluate budget-based stop conditions."
+  ),
+  // ── Area 3: prediction bias sample (server-side rolling avg) ──────────────
+  prediction_bias_sample: external_exports.object({
+    predicted_gain: external_exports.number().describe("Predicted gain from the mutation proposal"),
+    actual_gain: external_exports.number().describe("Actual gain observed after evaluation")
+  }).optional().describe(
+    "When present, compute bias=(predicted-actual)/(predicted+1e-9) and accumulate into prediction_bias_history (rolling avg_bias + n_samples) server-side. Must not be set together with a direct prediction_bias_history write."
   )
 });
 function stateRead(runId, missionId) {
@@ -22829,6 +22886,7 @@ function stateWrite(runId, patch, missionId) {
     mission_status: missionStatus,
     active_run: activeRun,
     tick_state: tickState,
+    prediction_bias_sample: biasSample,
     ...statePatch
   } = patch;
   const current = readRunState(paths.runStatePath, runId);
@@ -22836,6 +22894,18 @@ function stateWrite(runId, patch, missionId) {
   for (const [k, v] of Object.entries(statePatch)) {
     if (v !== void 0) {
       updated[k] = v;
+    }
+  }
+  if (biasSample !== void 0) {
+    const bias = (biasSample.predicted_gain - biasSample.actual_gain) / (biasSample.predicted_gain + 1e-9);
+    const prevHistory = typeof current.prediction_bias_history === "object" && current.prediction_bias_history !== null ? current.prediction_bias_history : {};
+    const prevAvg = typeof prevHistory.avg_bias === "number" ? prevHistory.avg_bias : 0;
+    const prevN = typeof prevHistory.n_samples === "number" ? prevHistory.n_samples : 0;
+    const newN = prevN + 1;
+    const newAvg = (prevAvg * prevN + bias) / newN;
+    const newHistory = { avg_bias: newAvg, n_samples: newN };
+    if (updated.prediction_bias_history === prevHistory || updated.prediction_bias_history === void 0) {
+      updated.prediction_bias_history = newHistory;
     }
   }
   writeRunState(paths.runStatePath, updated);
@@ -22942,6 +23012,69 @@ function readGoalContract(runId, missionId) {
   }
   return { ok: true, contract: parsed.data };
 }
+function lockMission(runId, missionId) {
+  const paths = resolveRunPaths(runId, missionId);
+  const pyResult = callPythonModule("evor", ["validate", "--run-id", paths.runDir]);
+  const validationReport = pyResult.data ?? null;
+  if (!pyResult.ok) {
+    return {
+      ok: false,
+      error: pyResult.error ?? "validation failed",
+      validation_report: validationReport
+    };
+  }
+  if (validationReport === null || typeof validationReport !== "object" || !validationReport.ok) {
+    return {
+      ok: false,
+      error: "validation report returned ok=false",
+      validation_report: validationReport
+    };
+  }
+  const missionStatePath = (0, import_path8.join)(paths.runDir, "mission-state.json");
+  let ms = {};
+  if ((0, import_fs7.existsSync)(missionStatePath)) {
+    try {
+      ms = JSON.parse((0, import_fs7.readFileSync)(missionStatePath, "utf8"));
+    } catch {
+    }
+  }
+  ms.status = "locked";
+  ms.updated_at = (/* @__PURE__ */ new Date()).toISOString();
+  const msTmp = `${missionStatePath}.tmp`;
+  (0, import_fs7.writeFileSync)(msTmp, JSON.stringify(ms, null, 2), "utf8");
+  (0, import_fs7.renameSync)(msTmp, missionStatePath);
+  return {
+    ok: true,
+    run_id: runId,
+    mission_status: "locked",
+    validation_report: validationReport
+  };
+}
+function checkStop(runId, missionId) {
+  const paths = resolveRunPaths(runId, missionId);
+  const pyResult = callPythonModule("evor.tree", ["check-stop", "--run-id", paths.runDir]);
+  if (!pyResult.ok || pyResult.data == null) {
+    return {
+      ok: false,
+      should_stop: false,
+      reason: pyResult.error ?? "evor_check_stop failed",
+      tick_count: 0,
+      best_score: 0,
+      frontier_count: 0,
+      error: pyResult.error ?? "evor_check_stop failed"
+    };
+  }
+  const data = pyResult.data;
+  return {
+    ok: true,
+    should_stop: Boolean(data.should_stop),
+    reason: String(data.reason ?? ""),
+    tick_count: typeof data.tick_count === "number" ? data.tick_count : 0,
+    best_score: typeof data.best_score === "number" ? data.best_score : 0,
+    frontier_count: typeof data.frontier_count === "number" ? data.frontier_count : 0,
+    budget_remaining: typeof data.budget_remaining === "object" && data.budget_remaining !== null ? data.budget_remaining : void 0
+  };
+}
 function registerStateTools(server) {
   server.tool(
     "evor_state_read",
@@ -23017,6 +23150,46 @@ function registerStateTools(server) {
             text: JSON.stringify(
               result.ok ? { ok: true, run_id, contract: result.contract } : { error: result.error }
             )
+          }
+        ]
+      };
+    }
+  );
+  server.tool(
+    "evor_lock_mission",
+    "Validate the run's goal-contract, frozen splits, tree, and run-state via the harness, then atomically flip mission-state.json status to 'locked' on pass. Returns { ok, mission_status, validation_report } on success; { ok:false, error, validation_report } when validation fails (status stays draft). Replaces agent self-lock \u2014 always call this instead of writing mission_status='locked' directly.",
+    {
+      run_id: external_exports.string().describe("Active run identifier"),
+      mission_id: external_exports.string().optional().describe("Mission identifier (inferred when omitted)")
+    },
+    async ({ run_id, mission_id }) => {
+      const missionId = mission_id ?? process.env.EVOR_MISSION_ID;
+      const result = lockMission(run_id, missionId);
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(result)
+          }
+        ]
+      };
+    }
+  );
+  server.tool(
+    "evor_check_stop",
+    "Evaluate all stop conditions for the run (beat-baseline, target, evolve-n, maximize-under-budget, evolve-until-plateau, evolve-until-regression, worst-angle-plateau, coverage-target) plus the circuit-breaker override. Returns { should_stop, reason, tick_count, best_score, frontier_count, budget_remaining }. Replaces inline stop predicates in the evor skill; call once per tick before proposing.",
+    {
+      run_id: external_exports.string().describe("Active run identifier"),
+      mission_id: external_exports.string().optional().describe("Mission identifier (inferred when omitted)")
+    },
+    async ({ run_id, mission_id }) => {
+      const missionId = mission_id ?? process.env.EVOR_MISSION_ID;
+      const result = checkStop(run_id, missionId);
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(result)
           }
         ]
       };
@@ -23568,7 +23741,7 @@ function registerArtifactTools(server) {
         "Kind slug: required for sage-junior (finding kind) and acquirer (source slug)"
       ),
       payload: external_exports.record(external_exports.unknown()).describe("Artifact payload object to write"),
-      partial: external_exports.boolean().optional().describe("If true, write as <name>-partial.json (in-progress artifact)")
+      partial: external_exports.boolean().optional().describe("If true, write as an in-progress (partial) artifact")
     },
     async ({ run_id, tick, agent, kind, payload, partial: partial2 }) => {
       const missionId = process.env.EVOR_MISSION_ID;
@@ -23610,7 +23783,7 @@ function registerArtifactTools(server) {
       kind: external_exports.string().optional().describe(
         "Kind slug: required for sage-junior (finding kind) and acquirer (source slug)"
       ),
-      partial: external_exports.boolean().optional().describe("If true, read the <name>-partial.json variant")
+      partial: external_exports.boolean().optional().describe("If true, read the in-progress (partial) variant")
     },
     async ({ run_id, tick, agent, kind, partial: partial2 }) => {
       const missionId = process.env.EVOR_MISSION_ID;
@@ -24051,8 +24224,25 @@ function lockEvaluate(runId, nodeRef, missionId) {
       error: "evaluate.py is not present in the node worktree \u2014 materialize the genome first."
     };
   }
+  let contractHash = "";
+  try {
+    const { runDir } = resolveRunPaths(runId, missionId);
+    const contractPath = (0, import_path14.join)(runDir, "goal-contract.json");
+    if ((0, import_fs13.existsSync)(contractPath)) {
+      const contract = JSON.parse((0, import_fs13.readFileSync)(contractPath, "utf8"));
+      contractHash = typeof contract.eval_script_hash === "string" ? contract.eval_script_hash : "";
+    }
+  } catch {
+  }
   try {
     const hash = (0, import_crypto4.createHash)("sha256").update((0, import_fs13.readFileSync)(evalPath)).digest("hex");
+    if (contractHash && contractHash !== hash) {
+      return {
+        ok: false,
+        node_name: nodeRef,
+        error: "this node's evaluate.py does not match the mission's locked evaluation script \u2014 it must be an exact copy of the canonical evaluator, not a modified or re-authored one"
+      };
+    }
     (0, import_fs13.writeFileSync)((0, import_path14.join)(worktree, "evaluate.py.lock"), hash, "utf8");
     (0, import_fs13.chmodSync)(evalPath, 292);
     return { ok: true, node_name: nodeRef };
@@ -24074,6 +24264,24 @@ function verifyArtifacts(runId, nodeRef, missionId) {
   const has_results = present("results.json", 2);
   const has_telemetry = present("telemetry.jsonl", 0);
   return { ok: has_results && has_telemetry, node_name: nodeRef, has_results, has_telemetry };
+}
+function patchGoalContract(runDir, patch) {
+  const contractPath = `${runDir}/goal-contract.json`;
+  if (!(0, import_fs13.existsSync)(contractPath)) return;
+  try {
+    const contract = JSON.parse((0, import_fs13.readFileSync)(contractPath, "utf8"));
+    let changed = false;
+    for (const [k, v] of Object.entries(patch)) {
+      if (v && contract[k] !== v) {
+        contract[k] = v;
+        changed = true;
+      }
+    }
+    if (changed) {
+      (0, import_fs13.writeFileSync)(contractPath, JSON.stringify(contract, null, 2), "utf8");
+    }
+  } catch {
+  }
 }
 function registerComputeTools(server) {
   server.tool(
@@ -24258,6 +24466,9 @@ function registerComputeTools(server) {
       const data = result.data;
       if (data) {
         const { locked_split_hash: _lh, val_split_hash: _vh, ...clean } = data;
+        if (typeof _lh === "string" && _lh) {
+          patchGoalContract(runDir, { locked_split_hash: _lh });
+        }
         const testCount = Number(clean.test_item_count ?? 0);
         const valCount = Number(clean.val_item_count ?? 0);
         if (testCount === 0 && valCount === 0) {
@@ -24284,7 +24495,34 @@ function registerComputeTools(server) {
       const { runDir } = resolveRunPaths(run_id, resolvedMission);
       const result = initEvalSuite(mission_id, eval_version, task_description, runDir);
       if (!result.ok) return err(result.error ?? "evor_init_eval_suite failed");
+      const evalScriptPath = `${runDir}/eval-suites/${eval_version}.py`;
+      if ((0, import_fs13.existsSync)(evalScriptPath)) {
+        const hash = (0, import_crypto4.createHash)("sha256").update((0, import_fs13.readFileSync)(evalScriptPath)).digest("hex");
+        patchGoalContract(runDir, { eval_script_hash: hash });
+      }
       return ok(result.data);
+    }
+  );
+  server.tool(
+    "evor_seal_eval_script",
+    "Hash the canonical evaluator script (eval-suites/<eval_version>.py) and lock its sha256 into goal-contract.json so the integrity gate's no_eval_shift check verifies against a real value. Call once after the canonical evaluator is written.",
+    {
+      run_id: external_exports.string().describe("Active run identifier"),
+      eval_version: external_exports.string().describe("Eval version string (e.g. v1)"),
+      mission_id: external_exports.string().optional().describe("Mission ID; defaults to EVOR_MISSION_ID env")
+    },
+    async ({ run_id, eval_version, mission_id }) => {
+      const resolvedMission = mission_id ?? process.env.EVOR_MISSION_ID;
+      const { runDir } = resolveRunPaths(run_id, resolvedMission);
+      const evalScriptPath = `${runDir}/eval-suites/${eval_version}.py`;
+      if (!(0, import_fs13.existsSync)(evalScriptPath)) {
+        return err(
+          "no evaluation script found for this version \u2014 write the canonical evaluator before sealing it, then try again."
+        );
+      }
+      const hash = (0, import_crypto4.createHash)("sha256").update((0, import_fs13.readFileSync)(evalScriptPath)).digest("hex");
+      patchGoalContract(runDir, { eval_script_hash: hash });
+      return ok({ ok: true, eval_version });
     }
   );
   server.tool(
@@ -24899,6 +25137,82 @@ function registerProposalTools(server) {
   );
 }
 
+// src/tools/acquire.ts
+function checkLeakage(candidatePaths, modality, forbiddenSplitPath, runDir, nearDup = true, intraBatch = true) {
+  return callPythonModule("evor.acquire", [
+    "check-leakage",
+    "--run-id",
+    runDir,
+    "--candidate-paths",
+    JSON.stringify(candidatePaths),
+    "--modality",
+    modality,
+    "--forbidden-split",
+    forbiddenSplitPath,
+    "--near-dup",
+    nearDup ? "true" : "false",
+    "--intra-batch",
+    intraBatch ? "true" : "false"
+  ], { timeout: 12e4 });
+}
+function registerAcquireTools(server) {
+  server.tool(
+    "evor_check_leakage",
+    "Acquisition dedup / near-dup gate. Call before integrating any new data to ensure zero candidates collide with the frozen eval split (exact sha256 match or near-dup). Checks: exact content hash collision, per-modality near-dup (image phash Hamming\u22648, text MinHashLSH Jaccard\u22650.8, tabular L2<1% of feature range), and optional intra-batch dedup. Returns the accepted set, per-category drop counts, and a collision_log (path + collision_type only \u2014 no internal paths or thresholds exposed). A false negative (letting a collision through) is an inviolable integrity failure.",
+    {
+      run_id: external_exports.string().describe("Active run identifier"),
+      candidate_paths: external_exports.array(external_exports.string()).describe("Absolute paths to candidate data files to check"),
+      modality: external_exports.enum(["image", "text", "tabular"]).describe("Data modality \u2014 determines which near-dup algorithm is applied"),
+      forbidden_split: external_exports.string().describe(
+        "Path to the frozen test split JSON (e.g. frozen-splits/<eval_version>-test.json) that candidates must not collide with"
+      ),
+      near_dup: external_exports.boolean().optional().describe("Enable per-modality near-dup check (default true)"),
+      intra_batch: external_exports.boolean().optional().describe("Enable intra-batch dedup across the candidate set (default true)")
+    },
+    async ({ run_id, candidate_paths, modality, forbidden_split, near_dup, intra_batch }) => {
+      const missionId = process.env.EVOR_MISSION_ID;
+      const paths = resolveRunPaths(run_id, missionId);
+      const result = checkLeakage(
+        candidate_paths,
+        modality,
+        forbidden_split,
+        paths.runDir,
+        near_dup ?? true,
+        intra_batch ?? true
+      );
+      if (!result.ok) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify({ ok: false, error: result.error })
+            }
+          ]
+        };
+      }
+      const data = result.data;
+      const safeData = data && typeof data === "object" ? {
+        ...data,
+        collision_log: Array.isArray(data.collision_log) ? data.collision_log.map(
+          ({ path, collision_type }) => ({
+            // Return only the basename so no internal paths leak
+            path: path.split("/").at(-1) ?? path,
+            collision_type
+          })
+        ) : []
+      } : data;
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(safeData)
+          }
+        ]
+      };
+    }
+  );
+}
+
 // src/index.ts
 var EVOR_INSTRUCTIONS = "Evor runs an autonomous ML-research evolution: it evolves a model+dataset by mutation tree search under integrity gates. USE these evor_* tools whenever a mission is being set up, run, resumed, or inspected \u2014 any time you change or read .evor state, record a node/eval, launch or check a training run, write or read a tick artifact, cite a paper, emit/query a signal, or manage the run. These evor_* tools are the only sanctioned way to operate a run; do not author .evor state files by hand. Search for them whenever an evor run is active. Core loop: evor_init_run -> evor_record_node -> evor_run_start (async; watch with the native Monitor tool) -> evor_run_status -> evor_record_eval -> evor_integrity_check -> evor_wiki_add. Read upstream tick artifacts with evor_read_artifact before acting. Full catalog, lifecycle recipes, and artifact schemas: invoke the `oh-my-evor:evor-mcp` skill.";
 async function main() {
@@ -24924,6 +25238,7 @@ async function main() {
   registerComputeTools(server);
   registerGotchaTools(server);
   registerProposalTools(server);
+  registerAcquireTools(server);
   const transport = new StdioServerTransport();
   await server.connect(transport);
   process.on("SIGINT", async () => {

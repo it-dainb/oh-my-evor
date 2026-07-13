@@ -304,7 +304,7 @@ export function registerRecordTools(server: McpServer): void {
       node_id: z.string().describe(
         "The node's name (e.g. 'immune-memory-02'), as returned by evor_record_node",
       ),
-      result: EvaluationResultSchema.describe("EvaluationResult to record"),
+      result: EvaluationResultSchema.describe("The evaluation result to record"),
     },
     async ({ run_id, node_id, result }) => {
       const missionId = process.env.EVOR_MISSION_ID;

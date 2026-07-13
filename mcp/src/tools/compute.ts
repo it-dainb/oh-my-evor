@@ -9,8 +9,9 @@
  * evor_validate        — validate run configuration and split integrity
  * evor_doctor          — environment + .evor integrity (wraps `evor doctor`)
  * evor_freeze_splits   — freeze test/val splits (wraps `evor.freeze freeze-splits`)
- * evor_init_eval_suite — create initial evaluation suite (wraps `evor.benchmark init-eval-suite`)
- * evor_meta_evolve     — update strategy.json (wraps `evor.tree meta-evolve`)
+ * evor_init_eval_suite    — create initial evaluation suite (wraps `evor.benchmark init-eval-suite`)
+ * evor_seal_eval_script   — hash the canonical evaluator and lock its sha256 into goal-contract.json
+ * evor_meta_evolve        — update strategy.json (wraps `evor.tree meta-evolve`)
  * evor_distill_scan    — brownfield workspace scan (wraps `evor distill scan`)
  * evor_plot_report     — render tree png/html (wraps `evor.plot_tree`)
  * evor_wiki_summarize  — summarise wiki lessons by family/verdict (wraps `evor.wiki summarize`)
@@ -306,8 +307,31 @@ export function lockEvaluate(
       error: "evaluate.py is not present in the node worktree — materialize the genome first.",
     };
   }
+  // Verify against the mission's locked canonical evaluator hash before locking.
+  // Done outside the fs try/catch so resolveRunPaths errors don't mask hash errors.
+  let contractHash = "";
+  try {
+    const { runDir } = resolveRunPaths(runId, missionId);
+    const contractPath = join(runDir, "goal-contract.json");
+    if (existsSync(contractPath)) {
+      const contract = JSON.parse(readFileSync(contractPath, "utf8")) as Record<string, unknown>;
+      contractHash = typeof contract.eval_script_hash === "string" ? contract.eval_script_hash : "";
+    }
+  } catch {
+    // Fail-open: if we can't read the contract (run dir missing, parse error, etc.), proceed.
+  }
+
   try {
     const hash = createHash("sha256").update(readFileSync(evalPath)).digest("hex");
+
+    if (contractHash && contractHash !== hash) {
+      return {
+        ok: false,
+        node_name: nodeRef,
+        error: "this node's evaluate.py does not match the mission's locked evaluation script — it must be an exact copy of the canonical evaluator, not a modified or re-authored one",
+      };
+    }
+
     // Persist the fingerprint internally; the agent never sees the hash.
     writeFileSync(join(worktree, "evaluate.py.lock"), hash, "utf8");
     chmodSync(evalPath, 0o444);
@@ -340,6 +364,39 @@ export function verifyArtifacts(
   const has_results = present("results.json", 2);
   const has_telemetry = present("telemetry.jsonl", 0);
   return { ok: has_results && has_telemetry, node_name: nodeRef, has_results, has_telemetry };
+}
+
+/**
+ * Persist server-owned integrity anchors into goal-contract.json.
+ *
+ * The freeze + eval-suite tools compute hashes that the integrity gate later
+ * verifies (split_hash_match, no_eval_shift). These anchors are SERVER-OWNED:
+ * the agent never carries them, but they MUST be written into the contract so
+ * the gate has a real value to compare against. Without this, those checks
+ * compare a real hash against `null` and can never pass — the gate is inert.
+ *
+ * Only known GoalContract fields are patched; the file is read-modify-written so
+ * every other field is preserved, and failures are non-fatal (the gate still
+ * fails closed if the anchor is missing).
+ */
+function patchGoalContract(runDir: string, patch: Record<string, string>): void {
+  const contractPath = `${runDir}/goal-contract.json`;
+  if (!existsSync(contractPath)) return;
+  try {
+    const contract = JSON.parse(readFileSync(contractPath, "utf8")) as Record<string, unknown>;
+    let changed = false;
+    for (const [k, v] of Object.entries(patch)) {
+      if (v && contract[k] !== v) {
+        contract[k] = v;
+        changed = true;
+      }
+    }
+    if (changed) {
+      writeFileSync(contractPath, JSON.stringify(contract, null, 2), "utf8");
+    }
+  } catch {
+    // Best-effort: the integrity gate still fails closed if the anchor is absent.
+  }
 }
 
 export function registerComputeTools(server: McpServer): void {
@@ -567,6 +624,14 @@ export function registerComputeTools(server: McpServer): void {
       if (data) {
         const { locked_split_hash: _lh, val_split_hash: _vh, ...clean } = data;
 
+        // Persist the server-owned split hash into the contract so the integrity
+        // gate's split_hash_match check verifies against a real value. It stays
+        // stripped from the agent-facing payload above — the agent never carries
+        // it, but the gate reads it from goal-contract.json.
+        if (typeof _lh === "string" && _lh) {
+          patchGoalContract(runDir, { locked_split_hash: _lh });
+        }
+
         // Zero-item guard: a freeze that captured nothing means the location
         // held no data files (usually it points at a folder of sub-folders, or
         // the wrong folder). Freezing an empty eval set silently would let the
@@ -604,7 +669,46 @@ export function registerComputeTools(server: McpServer): void {
       const { runDir } = resolveRunPaths(run_id, resolvedMission);
       const result = initEvalSuite(mission_id, eval_version, task_description, runDir);
       if (!result.ok) return err(result.error ?? "evor_init_eval_suite failed");
+
+      // Arm eval-shift detection: if the canonical eval script for this version
+      // has been materialised, lock its hash into the contract so the integrity
+      // gate's no_eval_shift check verifies against a real value. If the script
+      // does not exist yet (a from-scratch mission whose evaluator is authored
+      // during the run), the anchor is left unset and arms when the suite is
+      // re-sealed after the script lands — the gate fails closed until then.
+      const evalScriptPath = `${runDir}/eval-suites/${eval_version}.py`;
+      if (existsSync(evalScriptPath)) {
+        const hash = createHash("sha256").update(readFileSync(evalScriptPath)).digest("hex");
+        patchGoalContract(runDir, { eval_script_hash: hash });
+      }
+
       return ok(result.data);
+    },
+  );
+
+  // ── evor_seal_eval_script ───────────────────────────────────────────────────
+  server.tool(
+    "evor_seal_eval_script",
+    "Hash the canonical evaluator script (eval-suites/<eval_version>.py) and lock its "
+    + "sha256 into goal-contract.json so the integrity gate's no_eval_shift check "
+    + "verifies against a real value. Call once after the canonical evaluator is written.",
+    {
+      run_id: z.string().describe("Active run identifier"),
+      eval_version: z.string().describe("Eval version string (e.g. v1)"),
+      mission_id: z.string().optional().describe("Mission ID; defaults to EVOR_MISSION_ID env"),
+    },
+    async ({ run_id, eval_version, mission_id }) => {
+      const resolvedMission = mission_id ?? process.env.EVOR_MISSION_ID;
+      const { runDir } = resolveRunPaths(run_id, resolvedMission);
+      const evalScriptPath = `${runDir}/eval-suites/${eval_version}.py`;
+      if (!existsSync(evalScriptPath)) {
+        return err(
+          "no evaluation script found for this version — write the canonical evaluator before sealing it, then try again.",
+        );
+      }
+      const hash = createHash("sha256").update(readFileSync(evalScriptPath)).digest("hex");
+      patchGoalContract(runDir, { eval_script_hash: hash });
+      return ok({ ok: true, eval_version });
     },
   );
 

@@ -180,7 +180,7 @@ export function registerArtifactTools(server: McpServer): void {
       partial: z
         .boolean()
         .optional()
-        .describe("If true, write as <name>-partial.json (in-progress artifact)"),
+        .describe("If true, write as an in-progress (partial) artifact"),
     },
     async ({ run_id, tick, agent, kind, payload, partial }) => {
       const missionId = process.env.EVOR_MISSION_ID;
@@ -231,7 +231,7 @@ export function registerArtifactTools(server: McpServer): void {
       partial: z
         .boolean()
         .optional()
-        .describe("If true, read the <name>-partial.json variant"),
+        .describe("If true, read the in-progress (partial) variant"),
     },
     async ({ run_id, tick, agent, kind, partial }) => {
       const missionId = process.env.EVOR_MISSION_ID;

@@ -604,6 +604,75 @@ print(json.dumps(result))
     return p
 
 
+def test_evor_run_lock_guard_accepts_running_mission(tmp_path: Path) -> None:
+    """Regression: the Phase-2 lock guard must accept a mission already flipped
+    to "running". `/evor-run` sets mission_status="running" once the tick loop
+    starts, and every node-training subprocess runs under that state — an
+    exact-"locked" check would reject every tick's training with exit 6.
+    """
+    run_dir, _ = _build_fixture_run_dir(tmp_path)
+    # Simulate the state the tick loop leaves behind: mission is running.
+    ms_path = run_dir / "mission-state.json"
+    ms = json.loads(ms_path.read_text())
+    ms["status"] = "running"
+    ms_path.write_text(json.dumps(ms, indent=2))
+
+    worktree = tmp_path / f"worktree-running-{_NODE_A}"
+    worktree.mkdir()
+    _write_stub_evaluate_py(worktree)
+
+    result = _run([
+        "-m", "evor", "run",
+        "--node-id", _NODE_A,
+        "--run-id", _RUN_ID,
+        "--worktree", str(worktree),
+        "--run-dir", str(run_dir),
+        "--eval-script", str(worktree / "evaluate.py"),
+        "--no-selfheal",
+    ])
+
+    # The lock guard must NOT reject a running mission.
+    assert "Contract must be locked before running" not in result.stderr, (
+        f"Phase-2 lock guard wrongly rejected a running mission:\n{result.stderr}"
+    )
+    assert "mission-state.status='running'" not in result.stderr, (
+        f"Lock guard flagged the running status as invalid:\n{result.stderr}"
+    )
+
+
+def test_evor_run_lock_guard_rejects_draft_mission(tmp_path: Path) -> None:
+    """The Phase-2 lock guard must still reject a pre-lock "draft" mission
+    (exit 6) — broadening to accept running/paused must not open the gate to
+    an unvalidated contract.
+    """
+    run_dir, _ = _build_fixture_run_dir(tmp_path)
+    ms_path = run_dir / "mission-state.json"
+    ms = json.loads(ms_path.read_text())
+    ms["status"] = "draft"
+    ms_path.write_text(json.dumps(ms, indent=2))
+
+    worktree = tmp_path / f"worktree-draft-{_NODE_A}"
+    worktree.mkdir()
+    _write_stub_evaluate_py(worktree)
+
+    result = _run([
+        "-m", "evor", "run",
+        "--node-id", _NODE_A,
+        "--run-id", _RUN_ID,
+        "--worktree", str(worktree),
+        "--run-dir", str(run_dir),
+        "--eval-script", str(worktree / "evaluate.py"),
+        "--no-selfheal",
+    ])
+
+    assert result.returncode == 6, (
+        f"draft mission must be rejected with exit 6, got {result.returncode}:\n{result.stderr}"
+    )
+    assert "Contract must be locked before running" in result.stderr, (
+        f"draft rejection message missing:\n{result.stderr}"
+    )
+
+
 def test_evor_run_c3_dict_format_node_found(tmp_path: Path) -> None:
     """P2/C3: `python -m evor run` must find a node in DICT-format tree.json.
 
