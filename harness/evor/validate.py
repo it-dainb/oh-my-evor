@@ -458,6 +458,33 @@ def _check_goal_contract(run_dir: Path) -> list[CheckResult]:
             ),
         ))
 
+    # Integrity anchor checks
+    if not gc.locked_split_hash:
+        checks.append(CheckResult(
+            name="goal_contract_split_anchor",
+            ok=False,
+            detail="the frozen split has not been sealed — re-run the freeze step before locking",
+        ))
+    else:
+        checks.append(CheckResult(
+            name="goal_contract_split_anchor",
+            ok=True,
+            detail="split anchor present",
+        ))
+
+    if not gc.eval_script_hash:
+        checks.append(CheckResult(
+            name="goal_contract_eval_anchor",
+            ok=False,
+            detail="the evaluation script has not been sealed — write the canonical evaluator and seal it before locking",
+        ))
+    else:
+        checks.append(CheckResult(
+            name="goal_contract_eval_anchor",
+            ok=True,
+            detail="eval-script anchor present",
+        ))
+
     # Gameability checks (two layers)
     checks.extend(_check_gameability_registry(gc))
     checks.extend(_check_gameability_probe(gc, run_dir))

@@ -286,8 +286,32 @@ Environment discovered:
 ```
 </Environment_Discovery>
 
+<Setup_Mechanics_Order>
+## MANDATORY setup sequence
+
+The setup tools have a strict dependency order. Run them in EXACTLY this order — the
+sections below detail each step, but THIS ordering governs (do not follow section order
+blindly):
+
+1. **`evor_init_run`** (see Run_Initialization) — creates the run and its contract. This runs
+   FIRST; every other setup tool takes the `run_id` it returns. Freezing or sealing before the
+   run exists silently does nothing.
+2. **`evor_freeze_splits`** (see Frozen_Split_Setup) — freeze the splits and seal the split
+   anchor into the run's contract. Runs AFTER step 1 so the contract exists to seal into.
+3. **Write `eval-suites/<eval_version>.py`, then `evor_seal_eval_script`** (see
+   EvalSuite_Initialization) — materialize the canonical evaluator and seal its anchor. This is
+   MANDATORY. If you skip writing the evaluator, the seal reports it missing — write it, then
+   seal. Do not continue with an unsealed evaluator.
+4. **`evor_preflight`** — environment smoke-test.
+5. **`evor_lock_mission`** (see Validate_And_Lock) — validates and locks. It will REFUSE to lock
+   unless BOTH the split anchor (step 2) and the evaluator anchor (step 3) are sealed. If it
+   reports a missing anchor, complete that step and retry — never proceed without a clean lock.
+
+Re-running `evor_init_run` after steps 2–3 preserves already-sealed anchors, but is unnecessary.
+</Setup_Mechanics_Order>
+
 <Frozen_Split_Setup>
-After environment discovery, initialize frozen data splits (Addendum v2 Pillar 2).
+After the run is created (step 1 above), initialize frozen data splits (Addendum v2 Pillar 2).
 
 Call `evor_freeze_splits` with the dataset path and eval version:
 

@@ -158,7 +158,20 @@ def run_init_run(
     now = _now_iso()
 
     # ── 1. goal-contract.json ─────────────────────────────────────────────────
-    _atomic_write_json(run_dir / "goal-contract.json", contract.model_dump())
+    # Preserve any server-owned integrity anchors already written by freeze/seal
+    # so that freeze→init or init→freeze ordering is non-destructive.
+    gc_path = run_dir / "goal-contract.json"
+    contract_data = contract.model_dump()
+    if gc_path.exists():
+        try:
+            existing = json.loads(gc_path.read_text())
+            for anchor in ("locked_split_hash", "eval_script_hash"):
+                existing_val = existing.get(anchor)
+                if existing_val and not contract_data.get(anchor):
+                    contract_data[anchor] = existing_val
+        except (json.JSONDecodeError, OSError):
+            pass  # corrupt/unreadable existing file — overwrite cleanly
+    _atomic_write_json(gc_path, contract_data)
 
     # ── 2. run-state.json ─────────────────────────────────────────────────────
     _atomic_write_json(run_dir / "run-state.json", {

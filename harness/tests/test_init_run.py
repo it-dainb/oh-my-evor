@@ -452,6 +452,71 @@ def test_cli_invalid_exits_1(tmp_path: Path) -> None:
     assert "error" in data, f"Expected 'error' key in stdout JSON, got: {data}"
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# 12. Anchor preservation: init_run over existing contract keeps server anchors
+# ─────────────────────────────────────────────────────────────────────────────
+
+def test_init_run_preserves_existing_anchors(tmp_path: Path) -> None:
+    """init_run over an existing goal-contract.json keeps already-set anchors.
+
+    Simulates the freeze→init ordering: freeze writes anchors first, then
+    init-run is called again (e.g. to update strategy).  The anchors written
+    by freeze must survive and not be overwritten by None.
+    """
+    evor_root = tmp_path / ".evor"
+    answers = _minimal_answers()
+    # Supply answers WITHOUT anchors (as if the agent omitted them)
+    answers["locked_split_hash"] = None
+    answers["eval_script_hash"] = None
+    answers_path = _write_answers(tmp_path, answers)
+
+    # Pre-write a goal-contract.json that already has real anchors (freeze step)
+    run_dir = evor_root / "runs" / "test-mission" / "run-anchor"
+    run_dir.mkdir(parents=True, exist_ok=True)
+    existing_contract = {
+        "locked_split_hash": "preexisting-split-hash-abc",
+        "eval_script_hash": "preexisting-eval-hash-def",
+        "some_other_field": "ignored",
+    }
+    (run_dir / "goal-contract.json").write_text(json.dumps(existing_contract))
+
+    rc = run_init_run(
+        str(answers_path),
+        run_id_arg="run-anchor",
+        evor_root_arg=str(evor_root),
+    )
+    assert rc == 0
+
+    gc = json.loads((run_dir / "goal-contract.json").read_text())
+    assert gc["locked_split_hash"] == "preexisting-split-hash-abc", (
+        f"locked_split_hash was overwritten: {gc['locked_split_hash']!r}"
+    )
+    assert gc["eval_script_hash"] == "preexisting-eval-hash-def", (
+        f"eval_script_hash was overwritten: {gc['eval_script_hash']!r}"
+    )
+
+
+def test_init_run_does_not_overwrite_anchors_when_answers_also_has_them(tmp_path: Path) -> None:
+    """When answers already has anchors, they win (no existing file)."""
+    evor_root = tmp_path / ".evor"
+    answers = _minimal_answers()
+    answers["locked_split_hash"] = "answers-split-hash"
+    answers["eval_script_hash"] = "answers-eval-hash"
+    answers_path = _write_answers(tmp_path, answers)
+
+    rc = run_init_run(
+        str(answers_path),
+        run_id_arg="run-anchor2",
+        evor_root_arg=str(evor_root),
+    )
+    assert rc == 0
+
+    run_dir = evor_root / "runs" / "test-mission" / "run-anchor2"
+    gc = json.loads((run_dir / "goal-contract.json").read_text())
+    assert gc["locked_split_hash"] == "answers-split-hash"
+    assert gc["eval_script_hash"] == "answers-eval-hash"
+
+
 def test_cli_help_exits_0() -> None:
     result = subprocess.run(
         [_PYTHON, "-m", "evor", "init-run", "--help"],

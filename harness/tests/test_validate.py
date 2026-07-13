@@ -548,6 +548,63 @@ def test_probe_all_positive_recall_gameable(tmp_path: Path) -> None:
     assert result["score"] >= 0.9 * 0.85, f"Expected score near target: {result['score']}"
 
 
+# ─── 12. Integrity anchor checks ─────────────────────────────────────────────
+
+def test_missing_split_anchor_fails(tmp_path: Path) -> None:
+    """validate_run must fail when locked_split_hash is None/missing."""
+    run_dir = _minimal_run_dir(tmp_path)
+    gc_path = run_dir / "goal-contract.json"
+    gc = json.loads(gc_path.read_text())
+    gc["locked_split_hash"] = None
+    gc_path.write_text(json.dumps(gc))
+
+    report = validate_run(run_dir)
+    assert not report.ok
+    failed_names = {c.name for c in report.checks if not c.ok}
+    assert "goal_contract_split_anchor" in failed_names
+
+
+def test_missing_eval_anchor_fails(tmp_path: Path) -> None:
+    """validate_run must fail when eval_script_hash is None/missing."""
+    run_dir = _minimal_run_dir(tmp_path)
+    gc_path = run_dir / "goal-contract.json"
+    gc = json.loads(gc_path.read_text())
+    gc["eval_script_hash"] = None
+    gc_path.write_text(json.dumps(gc))
+
+    report = validate_run(run_dir)
+    assert not report.ok
+    failed_names = {c.name for c in report.checks if not c.ok}
+    assert "goal_contract_eval_anchor" in failed_names
+
+
+def test_both_anchors_missing_fails_both_checks(tmp_path: Path) -> None:
+    """Both anchor checks fire independently when both are None."""
+    run_dir = _minimal_run_dir(tmp_path)
+    gc_path = run_dir / "goal-contract.json"
+    gc = json.loads(gc_path.read_text())
+    gc["locked_split_hash"] = None
+    gc["eval_script_hash"] = None
+    gc_path.write_text(json.dumps(gc))
+
+    report = validate_run(run_dir)
+    assert not report.ok
+    failed_names = {c.name for c in report.checks if not c.ok}
+    assert "goal_contract_split_anchor" in failed_names
+    assert "goal_contract_eval_anchor" in failed_names
+
+
+def test_both_anchors_present_pass(tmp_path: Path) -> None:
+    """validate_run passes when both anchors are non-empty strings."""
+    run_dir = _minimal_run_dir(tmp_path)
+    # _minimal_run_dir already sets both anchors to non-empty strings
+    report = validate_run(run_dir)
+    assert report.ok
+    passed_names = {c.name for c in report.checks if c.ok}
+    assert "goal_contract_split_anchor" in passed_names
+    assert "goal_contract_eval_anchor" in passed_names
+
+
 def test_probe_accuracy_not_gameable(tmp_path: Path) -> None:
     """Accuracy with balanced classes is not trivially gameable."""
     acc_spec = {
