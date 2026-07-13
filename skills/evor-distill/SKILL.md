@@ -88,7 +88,7 @@ If a `baseline_candidate` is present (non-null), state clearly:
 IMPORTANT: The baseline candidate value (<metric_name>=<claimed_value>) is UNVERIFIED.
 It was scraped from the repository and has NOT been measured on a controlled split.
 EVOR will re-measure it on the frozen split during /evor-setup (and on the first tick)
-before it becomes the official baseline_value in the GoalContract.
+before it becomes the official baseline value tracked by the mission.
 Never treat a scraped metric as a proven starting point.
 ```
 

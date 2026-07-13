@@ -41,7 +41,7 @@ oh-my-evor/
       hooks/             continuation-guard, auto-capture hooks
   harness/               Python compute harness
     evor/
-      contracts.py       27 Pydantic v2 data models (single source of truth)
+      contracts.py       27 data models (single source of truth)
       store.py           content-addressed artifact store
       scheduler.py       ResourcePlan + job submission (GPU-gated, see KNOWN_GAPS.md)
       tree.py            UCB1 selection, crossover, meta-evolve
@@ -59,7 +59,7 @@ oh-my-evor/
 
 ## Data Contracts (Single Source of Truth)
 
-All data shapes are defined once in `harness/evor/contracts.py` (Pydantic v2) and
+All data shapes are defined once in `harness/evor/contracts.py` and
 mirrored as TypeScript Zod schemas in `mcp/src/schemas/`. Neither side invents
 shapes; changes must land in both.
 
@@ -67,15 +67,15 @@ Core models used in the tick loop:
 
 | Model | Purpose |
 |---|---|
-| `GoalContract` | Mission spec — frozen after `evor-setup` |
-| `TreeNode` | One candidate in the evolution DAG |
+| Mission spec | Frozen after `evor-setup` |
+| Candidate node | One candidate in the evolution DAG |
 | `MutationProposal` | Mutagen's output — what Forge will implement |
 | `Hypothesis` | Quantified prediction registered before training |
-| `EvaluationResult` | Post-training metrics + per-domain breakdown |
-| `IntegrityReport` | 13-check verdict for a node |
+| Evaluation result | Post-training metrics + per-domain breakdown |
+| Integrity verdict | 13-check verdict for a node |
 | `TelemetryRecord` | One step's training metrics (streamed via SSE) |
 | `LessonEntry` | Probe's EDA conclusion — persisted to CompoundingWiki |
-| `StrategyState` | UCB1 params + wildness + family mix (updated by meta-evolution) |
+| Strategy state | UCB1 params + wildness + family mix (updated by meta-evolution) |
 | `EvalSuite` | One version of the evaluation benchmark (open_ended missions) |
 | `AngleRegistry` | Per-angle SOTA bars and coverage status |
 
@@ -87,12 +87,12 @@ The MCP server exposes tool functions that the Claude Code session calls during
 the tick loop. It wraps on-disk reads/writes in a consistent interface.
 
 Key tools:
-- `evor_tree_read` / `evor_record_node` — read/write `tree.json`
-- `evor_select` — UCB1 selection (delegates to `python -m evor.tree select`)
-- `evor_record_eval` — write `EvaluationResult`; auto-triggers integrity check
-- `evor_integrity_check` — run `python -m evor.integrity check`
+- `evor_tree_read` / `evor_record_node` — read/write the candidate tree
+- `evor_select` — UCB1 selection
+- `evor_record_eval` — record an evaluation result; auto-triggers integrity check
+- `evor_integrity_check` — run the 13-check integrity gate
 - `evor_wiki_add` / `evor_wiki_query` — CompoundingWiki CRUD
-- `evor_state_read` / `evor_state_write` — `run-state.json` management
+- `evor_state_read` / `evor_state_write` — run state management
 - `evor_schedule` — submit a training job to the ResourceScheduler
 - `evor_cite` — attach a citation to a tree node
 
@@ -140,7 +140,7 @@ polling, waking on `job_complete` or `self_heal_event` signals.
 If any of the following occur for 3 consecutive ticks:
 - Zero proposals pass Selector
 - Forge produces zero tool calls
-- All nodes are `integrity_status="failed"`
+- All nodes fail the integrity gate
 
 …Evor injects an exploration override: wildness → 0.9, requires 3 distinct
 mutation families, excludes the monopoly family if one dominates, and logs
@@ -161,7 +161,7 @@ training logic:
   model/               architecture seam
   train/
     trainer.py         training loop (TelemetryCallback injected here, unconditionally)
-  evaluate.py          LOCKED — chmod 444, hash verified against eval_script_hash
+  evaluate.py          LOCKED — chmod 444, hash verified by the integrity gate
 ```
 
 For `seed-repo` mode, Forge audits the existing codebase and produces a
@@ -179,14 +179,14 @@ Structural mutations extend `genome.yaml.extra` and add entries to
 Implemented in `harness/evor/integrity.py`, called via `evor_integrity_check`
 after every evaluation:
 
-1. `split_hash_match` — locked_split_hash still matches frozen-splits/
+1. `split_hash_match` — frozen split hash still matches frozen-splits/
 2. `frozen_split_read_only` — all frozen-split files are mode 444
 3. `no_test_leakage` — no training sample appears in the test split
 4. `near_dup_leakage` — no near-duplicate within hamming distance threshold
 5. `data_provenance_valid` — all data files have recorded provenance
 6. `no_label_contamination` — test labels not visible during training
 7. `no_eval_shift` — metric computation matches the locked evaluate.py script
-8. `eval_version_consistent` — node's eval_version matches GoalContract
+8. `eval_version_consistent` — node's eval_version matches the mission spec
 9. `telemetry_sane` — telemetry.jsonl has ≥1 record and monotone step count
 10. `reward_hacking_probe` — loss and metric move in consistent directions
 11. `acquisition_contamination_clear` — (data-acquisition only) no acquired sample in eval split
@@ -194,7 +194,7 @@ after every evaluation:
 13. `acquisition_namespace_enforced` — (data-acquisition only) data written only to allowed paths
 
 A `failed` verdict on any check excludes the node from the frontier permanently.
-The node remains in `tree.json` with `integrity_status="failed"` for auditability.
+The node remains in the candidate tree with a failed integrity status for auditability.
 
 ---
 

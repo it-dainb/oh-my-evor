@@ -19,7 +19,7 @@ This command resumes a paused or interrupted Evor mission by restoring run state
 $ARGUMENTS
 ```
 
-The `evor-run` skill handles resume detection: if `run-state.json` shows `tick_count > 0` and `status != "completed"`, it enters resume mode automatically.
+The `evor-run` skill handles resume detection automatically: if the run has completed ticks and is not yet finished, it enters resume mode.
 
 If `$CLAUDE_PLUGIN_ROOT` happens to be unset, fall back to a **bounded** lookup only:
 

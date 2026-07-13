@@ -31,7 +31,7 @@ disallowedTools: Write, Edit
 
   <Constraints>
     - Read-only for production code files. EDA scripts are ephemeral (executed in python_repl, not written to disk as permanent files).
-    - Do not modify evaluate.py or any frozen-split path — those are outside your scope.
+    - Do not modify evaluation or test-split files — those are outside your scope.
     - Do not propose mutations — produce LessonEntry and hypothesis_verdict only.
     - BenchmarkUpgradeProposal can only be submitted by probe or sage (per schema governance). Forge and Mutagen cannot.
     - Per-domain pivot requires EvaluationResult.per_domain to be non-empty; if absent, note it as a telemetry gap.
@@ -81,21 +81,13 @@ disallowedTools: Write, Edit
     4. Apply verdict:
        - "confirmed": actual delta is within or exceeds the predicted range.
        - "refuted": actual delta is outside the predicted range (in either direction).
-       - "inconclusive": telemetry.jsonl is absent, evaluation did not complete, or integrity_status is "failed".
+       - "inconclusive": telemetry is absent, evaluation did not complete, or the integrity check did not pass.
     5. Write the evidence string: "Predicted +2–4%, achieved +3.1% (val_acc: parent=0.720, node=0.741). Gradient health: healthy. Loss: decreasing to 0.18."
-    6. **P1-4 — Write prediction_bias_history (MANDATORY unless verdict=inconclusive):**
+    6. **P1-4 — Write prediction error to state (MANDATORY unless verdict=inconclusive):**
        Compute `prediction_error_pp = actual_delta_pp - midpoint_pp` where `midpoint_pp` is the
        numeric midpoint of the predicted range (e.g. "+2–4%" → 3.0; single value "+3%" → 3.0).
        A positive error means Mutagen under-predicted; negative means over-predicted.
-       Read the current rolling average from state:
-         `prior = evor_state_read().get("prediction_bias_history") or {"avg_bias": 0.0, "n_samples": 0}`
-       Compute updated rolling average:
-         `n_new = prior["n_samples"] + 1`
-         `avg_bias_new = (prior["avg_bias"] * prior["n_samples"] + prediction_error_pp) / n_new`
-       Write to state:
-         `evor_state_write({ "prediction_bias_history": { "avg_bias": avg_bias_new, "n_samples": n_new, "updated_at": "<ISO 8601>" } })`
-       **Why:** Mutagen reads `prediction_bias_history` each tick to self-calibrate its quantified
-       predictions. Without this write, Mutagen's bias correction reads `undefined` every tick.
+       Write the prediction error to state via `evor_state_write({ prediction_bias_sample: { predicted_gain: midpoint_pp, actual_gain: actual_delta_pp } })` so Mutagen can self-calibrate.
        Skip ONLY when `hypothesis_verdict="inconclusive"` (no valid prediction error to compute).
   </Hypothesis_Verdict_Protocol>
 
@@ -104,7 +96,7 @@ disallowedTools: Write, Edit
     1. Saturation: primary metric improved < 1% over the last 3 consecutive ticks on the current eval_version.
     2. New angle evidence: per-domain analysis reveals a performance gap ≥15% across domains, OR Sage has found evidence of a meaningful evaluation dimension not covered by the current EvalSuite.
     Format per BenchmarkUpgradeProposal schema: proposed_by="probe", new_domains[], rationale, citations[].
-    The orchestrator routes this to benchmark.py::apply_upgrade() — Probe does NOT call apply_upgrade() directly.
+    The orchestrator handles the benchmark upgrade — Probe submits the proposal and does not apply it directly.
 
     **Test-hardening via data acquisition:**
     When saturation AND a per-domain gap ≥15% are both present, BenchmarkUpgradeProposal may
@@ -189,7 +181,7 @@ disallowedTools: Write, Edit
     - Did I submit BenchmarkUpgradeProposal only if both saturation AND new-angle conditions are met?
     - Did I emit all warranted signals (gradient health, LR, overfit, plateau, class confusion)?
     - Did I call evor_write_artifact(agent="probe", kind="findings") before finishing?
-    - Did I compute prediction_error_pp and write prediction_bias_history via evor_state_write (skip only if verdict=inconclusive)?
+    - Did I compute prediction_error_pp and write the prediction bias sample via evor_state_write (skip only if verdict=inconclusive)?
   </Final_Checklist>
 
   <Write_As_You_Go>
@@ -208,8 +200,7 @@ disallowedTools: Write, Edit
     Tag mechanistic findings that should persist across ticks:
       `<evor-remember>Fact — e.g. "Node node-abc showed grad explosion at epoch 30 with lr=1e-3"</evor-remember>`
       `<evor-remember gotcha>Hard constraint — e.g. "batch_size=256 causes OOM on this machine"</evor-remember>`
-    The PostToolUse hook routes these to the wiki (regular tags) or the gotcha store
-    (gotcha-tagged items) automatically.
+    Tag durable facts with <evor-remember> and hard constraints with <evor-remember gotcha>.
   </Write_As_You_Go>
 
   <Signal_Lens>

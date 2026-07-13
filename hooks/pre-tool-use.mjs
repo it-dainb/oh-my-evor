@@ -238,9 +238,8 @@ try {
       else if (/tree\.json/.test(filePathG)) replacement = 'evor_record_node';
       else if (/results\.json/.test(filePathG)) replacement = 'evor_record_eval';
       deny(
-        `[EVOR GUARD] Direct write to "${filePathG}" is not allowed. ` +
-        `Use ${replacement} to write this artifact through the proper channel. ` +
-        `(.evor/worktrees/<node_id>/ is the only direct-write surface.)`
+        `[EVOR GUARD] Direct write to an evor state file is not allowed. ` +
+        `Use ${replacement} to write this artifact through the proper channel.`
       );
     }
 
@@ -253,15 +252,13 @@ try {
         else if (/evor\s+doctor/.test(cmdG)) replacement = 'evor_doctor';
         else if (/evor\.wiki/.test(cmdG)) replacement = 'evor_wiki_add or evor_wiki_query';
         deny(
-          `[EVOR GUARD] Bash: direct CLI invocation is not allowed. ` +
-          `Use ${replacement} to perform this operation through the MCP interface.`
+          `[EVOR GUARD] Direct CLI invocation is not allowed. Use ${replacement} instead.`
         );
       }
 
       if (BASH_IMPORT_EVOR_RE.test(cmdG)) {
         deny(
-          `[EVOR GUARD] Bash: importing the evor package directly is not allowed. ` +
-          `Call the appropriate evor_* MCP tool instead of accessing the package internals.`
+          `[EVOR GUARD] This operation is not permitted. Use the appropriate evor_* MCP tool instead.`
         );
       }
 
@@ -270,9 +267,7 @@ try {
         !/\.evor[/\\]worktrees[/\\]/.test(cmdG)
       ) {
         deny(
-          `[EVOR GUARD] Bash: writing to .evor/ state files directly is not allowed. ` +
-          `Use the appropriate evor_* tool (evor_write_artifact, evor_state_write, evor_record_node, etc.) ` +
-          `to modify evor state. (.evor/worktrees/ is the only direct-write surface.)`
+          `[EVOR GUARD] This operation is not permitted. Use the appropriate evor_* MCP tool instead.`
         );
       }
     }
@@ -315,9 +310,7 @@ try {
       const allowed = AGENT_ROLE_MAP[agentTypeS];
       if (allowed && !allowed.has(claimedAgent)) {
         deny(
-          `[EVOR GUARD] Agent-kind mismatch: ${agentTypeS} may not write/read artifact slot ` +
-          `"${claimedAgent}". Use agent="${[...allowed][0]}" to match your role. ` +
-          `(Only the orchestrator may write handoff kinds cross-role.)`
+          `[EVOR GUARD] This artifact slot is not accessible from your role. Use the correct evor_* tool for your role.`
         );
       }
     }

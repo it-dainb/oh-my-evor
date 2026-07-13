@@ -9,8 +9,8 @@ skills: [oh-my-evor:evor-mcp]
 <Purpose>
 evor-doctor is the diagnostic and repair tool for the oh-my-evor environment and active
 run state.  It checks: Python version, torch availability (GPU paths gated), Node.js
-(required by hooks), env vars, GNU patch, tree.json DICT format, mission-state.json,
-orphan pending_node_ids, and frozen-split hash integrity.
+(required by hooks), env vars, GNU patch, evolution tree format, mission state,
+orphaned pending nodes, and frozen-split integrity.
 </Purpose>
 
 <Use_When>
@@ -18,7 +18,7 @@ orphan pending_node_ids, and frozen-split hash integrity.
 - Environment issues (torch not available, node missing, GPU not found)
 - After a failed /evor-setup to diagnose what went wrong
 - When `/evor-validate` reports infrastructure issues (corrupt files, missing directories)
-- When orphan pending_node_ids are blocking the stop hook
+- When orphaned pending nodes are blocking the stop hook
 </Use_When>
 
 <Do_Not_Use_When>
@@ -60,11 +60,11 @@ Environment
   ✓  patch            — patch found at /usr/bin/patch
 
 .evor integrity (run: <run_dir>)
-  ✓  run_dir          — /path/to/.evor/runs/mission/run-id/
+  ✓  run_dir          — run directory found and accessible
   ✓  tree_json        — DICT format (12 nodes)
-  ⚠  mission_state    — mission-state.json not found — run /evor-setup
-  ✓  orphan_pending   — no orphan pending_node_ids
-  ✓  frozen_hash      — frozen-splits hash matches goal-contract
+  ⚠  mission_state    — mission state not found — run /evor-setup
+  ✓  orphan_pending   — no orphaned pending nodes
+  ✓  frozen_hash      — frozen-splits integrity confirmed
 
 Verdict: OK — no errors detected
 ```
@@ -84,9 +84,9 @@ For each ERROR item, provide the remediation:
 | `python_version` < 3.10 | Upgrade Python or activate a 3.10+ environment |
 | `torch` not importable | `pip install torch` or use a GPU-enabled environment |
 | `node` missing | Install Node.js (required for hooks) |
-| `mission_state` missing | Re-run `/evor-setup` to initialize mission-state.json |
-| `orphan_pending_nodes` | Call `evor_record_node` for each orphaned ID |
-| `frozen_split_hash_match` | Frozen splits were modified after locking — re-run `/evor-setup` |
+| `mission_state` missing | Re-run `/evor-setup` to initialize mission state |
+| `orphan_pending_nodes` | Use `/evor-doctor --repair` to clear orphaned state, or resolve the pending nodes through the normal tick workflow |
+| `frozen_split_integrity` | Frozen splits were modified after locking — re-run `/evor-setup` |
 | `run_dir` missing | Verify the run directory path |
 
 For WARN items:

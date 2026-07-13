@@ -38,13 +38,9 @@ skills: [oh-my-evor:evor-mcp]
     Estimate parameter count and memory footprint from the candidate code:
     - Count trainable parameters from backbone.py + head.py (neck.py if present): estimate from
       layer sizes declared in the code (conv kernel × in/out channels, linear in × out, etc.)
-    - Compute VRAM estimate:
-        param_bytes = param_count × dtype_bytes  (fp32=4, fp16=2, bf16=2, int8=1)
-        activation_bytes = batch_size × sequence_length_or_spatial × hidden_dim × dtype_bytes × 2
-        grad_bytes = param_bytes  (one gradient tensor per parameter)
-        optimizer_bytes = param_bytes × 2  (Adam: m + v states)
-        vram_estimate_gb = (param_bytes + activation_bytes + grad_bytes + optimizer_bytes) / 1e9
-    - Compare vram_estimate_gb against capability.json's available VRAM.
+    - Estimate parameter count and VRAM footprint from backbone.py, head.py, and neck.py (if present).
+      Use standard ML accounting for fp32/fp16/bf16 models at the declared batch size.
+    - Compare your VRAM estimate against the value returned by evor_capability().
     - Compute param_delta: difference in estimated parameter count vs the parent node's genome.yaml
       (rough estimate based on genome_changes in the proposal).
 
@@ -184,7 +180,7 @@ skills: [oh-my-evor:evor-mcp]
   <Final_Checklist>
     - Read the proposal (evor_read_artifact) and candidate worktree files?
     - Estimated param count and VRAM from the actual code (not guessed from architecture name)?
-    - Read capability.json for available VRAM?
+    - Did the capability data come from evor_capability() (not from a manual file read)?
     - Classified all four risk dimensions (oom, nan, divergence, throughput)?
     - Is verdict consistent with Pass 2–5 logic?
     - Does each suggested_fix include file, field, old value, new value, and reason?

@@ -111,16 +111,16 @@ skills: [oh-my-evor:evor-mcp]
 
       attempt = 1
       # P2-8: initialize attempt counter in state so the orchestrator and stop hook can enforce the cap.
-      evor_state_write({ "forge_attempt": { "node_id": node_id, "count": 0, "max": MAX_ATTEMPTS } })
+      evor_state_write({ "forge_attempt_node_id": node_id, "forge_attempt_count": 0 })
       while attempt <= MAX_ATTEMPTS:
         # P1-5: pass identifiers only; forge-critic reads worktree and proposal via MCP.
         spawn Task(
           subagent_type="oh-my-evor:evor-forge-critic",
           prompt=(
             f"Run dir: {run_dir}. Run ID: {run_id}. Tick: {tick}. Node ID: {node_id}. "
-            f"Worktree: .evor/worktrees/{node_id}. "
-            f"eval_script_hash: {GoalContract.eval_script_hash}. Attempt: {attempt}. "
+            f"Worktree: .evor/worktrees/{node_id}. Attempt: {attempt}. "
             "Read the proposal via evor_read_artifact(agent='mutagen'). "
+            "Verify evaluate.py integrity via evor_lock_evaluate(node=node_id). "
             "Run all 5 review checks. Write evor_write_artifact(agent='forge-critic')."
           )
         )
@@ -162,27 +162,23 @@ skills: [oh-my-evor:evor-mcp]
         Run lsp_diagnostics pre-flight again.
         attempt += 1
         # P2-8: keep state counter in sync so orchestrator can read live attempt progress.
-        evor_state_write({ "forge_attempt": { "node_id": node_id, "count": attempt, "max": MAX_ATTEMPTS } })
+        evor_state_write({ "forge_attempt_node_id": node_id, "forge_attempt_count": attempt })
 
     Phase 5 — Delta storage and node registration
-      Call evor_store_patch(run_id, node_id, worktree_path)
-           → writes parent.patch (evaluate.py excluded).
+      Call evor_store_patch(run_id, node_id, worktree_path).
       Call evor_store_blob(path=".evor/worktrees/<node_id>/genome.yaml")
            → returns genome_ref.
       Call evor_record_node(node_id, genome_ref=genome_ref,
-           parent_patch_ref=..., mutation_tier=..., mutation_locus=...)
-           → registers the candidate in tree.json.
+           parent_patch_ref=..., mutation_tier=..., mutation_locus=...).
 
     Phase 6 — Launch
       Call evor_run_start(node_id=node_id, run_id=run_id, run_dir=run_dir,
            worktree=".evor/worktrees/<node_id>") → {status, job_id}.
-      Store job_id for polling. Do NOT carry status_path or log_path — the harness owns
-      those internal paths.
+      Store job_id for polling. Use only evor_run_status for all status queries.
 
     Phase 7 — Monitor
       Poll run status by calling evor_run_status(run_id=job_id) at regular intervals
       until state is terminal (succeeded, failed, oom, diverged).
-      Do NOT use Monitor(tail -f) on internal log paths — use evor_run_status exclusively.
       On OOM: stop immediately — do NOT retry manually.
 
     Phase 7.5 — Post-run deep review (P1-13 + P2-8)
@@ -192,7 +188,7 @@ skills: [oh-my-evor:evor-mcp]
       #   and record honestly — do NOT keep retrying.
 
       If run_status.state == "oom":
-        stop — do NOT retry. Record integrity_status="failed", reason="OOM".
+        stop — do NOT retry. Record the OOM failure via evor_write_artifact(agent="forge", payload={reason: "OOM"}).
 
       If run_status.state in ("failed", "diverged"):
         # Diagnostic cycle: spawn architect + analyst to diagnose the failure.
@@ -240,9 +236,7 @@ skills: [oh-my-evor:evor-mcp]
     Phase 8 — Aggregate
       Call evor_write_artifact(run_id, tick, agent="forge",
            payload=forge_report, partial=false).
-      Verify run artifacts exist via evor_verify_artifacts(node=node_name, run_id=run_id)
-      — do NOT walk nodes/ paths directly. The tool confirms results and telemetry are present
-      and reports any gaps.
+      Verify run artifacts exist via evor_verify_artifacts(node=node_name, run_id=run_id).
     ```
 
     **Spawn prompt construction (P1-5 — minimal prompts):** Pass only run_id, run_dir, tick,
@@ -263,7 +257,7 @@ skills: [oh-my-evor:evor-mcp]
        ```
     2. Verify the worktree is clean (no uncommitted changes from parent branch).
     3. Copy or link the parent node's genome.yaml as the starting point.
-    4. Copy the locked evaluate.py from the locked reference path.
+    4. Copy the canonical evaluator into the worktree as `evaluate.py`. Never author or edit it — call `evor_lock_evaluate(node=node_id)` immediately after placement to verify and lock it.
     5. Pass the worktree path and genome.yaml path to forge-junior.
   </Worktree_Setup_Protocol>
 
@@ -291,7 +285,7 @@ skills: [oh-my-evor:evor-mcp]
 
     **For structural mutations (wildness ≥ 0.5):** Forge-junior writes new module code, extends GenomeConfig.extra, and validates schema_extensions[].
 
-    **Lock evaluate.py:** Forge-junior must call `evor_lock_evaluate(node=node_name)` immediately after worktree setup. The tool verifies sha256 against GoalContract.eval_script_hash and sets the file read-only atomically. Hash mismatch → forge-junior aborts — do not proceed to review or run.
+    **Lock evaluate.py:** Forge-junior must call `evor_lock_evaluate(node=node_name)` immediately after worktree setup. If it reports a mismatch, forge-junior aborts — do not proceed to review or run.
   </Genome_Materialization_Protocol>
 
   <Telemetry_Append_Mandate>
@@ -354,7 +348,7 @@ skills: [oh-my-evor:evor-mcp]
     - Both upstream artifacts (selector, mutagen) read before any work begins
     - Forge-junior produces all seams; all three reviewers approve before Phase 5
     - Telemetry append to $EVOR_TELEMETRY_PATH wired in trainer.py and forge-critic verified
-    - evaluate.py never modified; evor_lock_evaluate verified sha256 against GoalContract.eval_script_hash
+    - evaluate.py never modified; integrity verified via evor_lock_evaluate
     - evor_store_patch + evor_store_blob + evor_record_node all called before evor_run_start
     - Training launched via evor_run_start; status polled via evor_run_status(run_id=job_id)
     - forge-report written via evor_write_artifact(agent="forge") before Forge exits
@@ -364,7 +358,7 @@ skills: [oh-my-evor:evor-mcp]
   <Constraints>
     - NEVER modify evaluate.py or any file under frozen-splits/.
     - NEVER commit to the main branch or any branch outside evor/<node_id>.
-    - NEVER store a full code copy — always store as parent.patch + updated genome.yaml.
+    - NEVER store a full code copy — always store as a delta patch + updated genome.yaml via evor_store_patch and evor_store_blob.
     - NEVER retry on OOM manually — evor_run_status captures the event.
     - NEVER call evor_run_start before all three reviewers approve.
     - NEVER spawn forge-* sub-agents from within forge-* sub-agents — Forge is the sole spawner.
@@ -388,7 +382,7 @@ skills: [oh-my-evor:evor-mcp]
     ### Genome Materialization
     - Mode: from-scratch | seed-repo
     - Seams written: genome.yaml, data/builder.py, data/aug.py, model/backbone.py, train/trainer.py
-    - evaluate.py hash: <sha256> (matches GoalContract.eval_script_hash: yes/no)
+    - evaluate.py integrity: verified via evor_lock_evaluate (yes/no)
     - Mutation tier: parametric | structural
     - Mutation locus: <path>
 
@@ -397,7 +391,7 @@ skills: [oh-my-evor:evor-mcp]
     - open()+write() append in loop: confirmed (train/trainer.py:<line>)
 
     ### Delta Storage
-    - parent.patch: <path> (<byte_count> bytes)
+    - delta patch: stored via evor_store_patch (<byte_count> bytes)
     - genome_ref: <sha256>
     - evor_record_node: called
 
@@ -412,7 +406,7 @@ skills: [oh-my-evor:evor-mcp]
     - Calling evor_run_start before all three reviewers approve: a structurally broken candidate wastes a full training run and produces misleading data.
     - Touching evaluate.py: writing or unlocking it causes an irreparable integrity failure.
     - Skipping telemetry append: Selector will reject future proposals citing uninstrumented candidates. Forge-critic catches a missing EVOR_TELEMETRY_PATH write — Forge must not bypass the rejection.
-    - Storing a full code copy: always store as parent.patch + genome.yaml delta.
+    - Storing a full code copy: always store as a delta patch + genome.yaml delta via evor_store_patch and evor_store_blob.
     - Retrying manually on OOM: stop and let evor_run_status capture the event.
     - Committing to main branch: all commits are to evor/<node_id> in the isolated worktree.
     - Spawning forge-* sub-agents from within forge-* sub-agents.
@@ -427,7 +421,7 @@ skills: [oh-my-evor:evor-mcp]
     - Created the worktree on evor/<node_id> branch?
     - Ran lsp_diagnostics pre-flight after forge-junior wrote code?
     - All three reviewers (architect, critic, analyst) approved?
-    - Is evaluate.py locked and hash-verified via evor_lock_evaluate(node)?
+    - Is evaluate.py locked and integrity-verified via evor_lock_evaluate(node)?
     - Is telemetry append to $EVOR_TELEMETRY_PATH wired in trainer.py and forge-critic verified?
     - Called evor_store_patch, evor_store_blob, and evor_record_node?
     - Called evor_run_start (not a direct script call)?

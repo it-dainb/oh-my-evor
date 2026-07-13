@@ -7,7 +7,7 @@ skills: [oh-my-evor:evor-mcp]
 ---
 
 <Purpose>
-evor-report generates the final mission report for a completed or paused Evor run. It reads tree.json, renders an ASCII + graphviz tree with frontier nodes highlighted and eval_version annotations, produces a frontier table with metric deltas vs baseline, aggregates LessonEntry items from the wiki, and exports a self-contained static HTML file. The rendered PNG is delivered to the user via `SendUserFile`.
+evor-report generates the final mission report for a completed or paused Evor run. It reads the evolution tree, renders an ASCII + graphviz tree with frontier nodes highlighted and eval_version annotations, produces a frontier table with metric deltas vs baseline, aggregates lesson entries from the wiki, and exports a self-contained static HTML file. The rendered PNG is delivered to the user via `SendUserFile`.
 </Purpose>
 
 <Use_When>
@@ -25,11 +25,11 @@ evor-report generates the final mission report for a completed or paused Evor ru
 
 ## Step 1 — Resolve Run Directory
 
-Call `evor_state_read` to retrieve the active run from `active-run.json`, or use the run-id argument to resolve the run directory directly. Print the run_id being reported on.
+Call `evor_state_read` to retrieve the active run, or use the run-id argument to resolve the run directory directly. Print the run_id being reported on.
 
 ## Step 2 — Read Run State
 
-Call `evor_state_read` to load run-state.json (tick_count, best_score, frontier_ids, current_eval_version) and strategy.json (final meta_iteration, ucb1_c, wildness, wins_by_family). Call `evor_read_goal_contract` to load baseline_value, target_value, stop_condition, and metrics.
+Call `evor_state_read` to load current run state and strategy data. Call `evor_read_goal_contract` to load the run's goal and stopping criteria.
 
 Print run summary header:
 ```
@@ -63,7 +63,7 @@ For each node name in frontier_ids, call `evor_read_result({ run_id, node_name: 
 |  2   | def456  | training| 0.839  |      +10.7%       |     v2       |  passed   |    2    |
 ```
 
-If per_domain data is available in EvaluationResult, render a secondary per-domain breakdown table.
+If per-domain breakdown data is available in the evaluation result, render a secondary per-domain table.
 
 ## Step 5 — Aggregate Wiki Lessons
 
@@ -84,7 +84,7 @@ Top lessons by family:
 
 ## Step 6 — Strategy Evolution Summary
 
-Print how strategy.json evolved over the run:
+Print how the search strategy evolved over the run:
 ```
 === Strategy Evolution ===
 Meta iterations: <meta_iteration>
@@ -127,8 +127,8 @@ Write `<run_dir>/report/manifest.json`:
 </Steps>
 
 <Tool_Usage>
-- `evor_state_read` — load run-state.json and strategy.json
-- `evor_read_goal_contract` — load goal-contract.json fields
+- `evor_state_read` — load run state and strategy
+- `evor_read_goal_contract` — load the run's goal and stopping criteria
 - `evor_read_artifact` — read forge artifacts for frontier node details
 - `evor_wiki_summarize` — aggregate wiki lessons by approach_family and verdict
 - `evor_wiki_query` — retrieve individual lesson entries for the summary

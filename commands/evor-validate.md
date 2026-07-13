@@ -33,6 +33,6 @@ find "$HOME/.claude/plugins" -path "*oh-my-evor*/skills/evor-validate/SKILL.md" 
 - Usage: `/evor-validate [run-dir or run-id]`
 - If no argument given, reads `.evor/active-run.json` for the current run
 - Exits 0 (VALID) or 1 (INVALID); prints a JSON report to stdout
-- On VALID + status=draft: flips mission-state.json to "locked" and confirms
+- On VALID + status=draft: locks the mission and confirms
 - On INVALID: lists each failed check with remediation guidance
 - Redirects to `/evor-doctor` for infrastructure issues, `/evor-setup` for contract issues

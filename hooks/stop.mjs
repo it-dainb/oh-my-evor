@@ -287,13 +287,11 @@ try {
 
       if (!existsSync(proposalsPath)) {
         debtReasons.push(
-          `tick ${curTick} has no ticks/${curTick}/mutagen/proposals.json — evor-mutagen was not ` +
-            `spawned. Call Task(subagent_type="oh-my-evor:evor-mutagen", …); do not role-play the roster inline.`
+          `[EVOR DRIFT GUARD] Tick ${curTick}: evor-mutagen output not found. Spawn evor-mutagen via Task — do not role-play the roster inline.`
         );
       } else if (!existsSync(verdictPath)) {
         debtReasons.push(
-          `tick ${curTick} has proposals but no ticks/${curTick}/selector/verdict.json — spawn ` +
-            `Task(subagent_type="oh-my-evor:evor-selector", …) to gate them (never self-approve).`
+          `[EVOR DRIFT GUARD] Tick ${curTick}: evor-selector output not found. Spawn evor-selector via Task.`
         );
       }
 
@@ -303,8 +301,7 @@ try {
       const forgeReport = join(tickDir, 'forge', 'forge-report.json');
       if (existsSync(forgeReport) && nodeCount === 0) {
         debtReasons.push(
-          `tick ${curTick} has a Forge report but tree.json has 0 nodes — call evor_record_node + ` +
-            `evor_record_eval for the candidate(s) Forge trained. A trained candidate with no tree node is a failed tick.`
+          `[EVOR DRIFT GUARD] Tick ${curTick}: Forge produced output but no tree node recorded. Call evor_record_node and evor_record_eval.`
         );
       }
     }

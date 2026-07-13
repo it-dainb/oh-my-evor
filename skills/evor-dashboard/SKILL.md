@@ -7,7 +7,7 @@ skills: [oh-my-evor:evor-mcp]
 ---
 
 <Purpose>
-evor-dashboard starts the FastAPI dashboard server for the active Evor mission. The dashboard provides a live D3 tree visualization of the evolution DAG, Chart.js telemetry curves for each node, and a real-time frontier table. It reads from the run directory's `tree.json` and `telemetry.jsonl` files via SSE streams, requiring no database.
+evor-dashboard starts the FastAPI dashboard server for the active Evor mission. The dashboard provides a live D3 tree visualization of the evolution DAG, Chart.js telemetry curves for each node, and a real-time frontier table. It streams live data from the active run via SSE, requiring no separate database.
 </Purpose>
 
 <Use_When>
@@ -25,7 +25,7 @@ evor-dashboard starts the FastAPI dashboard server for the active Evor mission. 
 
 ## Step 1 — Resolve Run Directory
 
-Call `evor_state_read` to get `run_dir` from the active run. If a run-id argument was provided, resolve `run_dir = .evor/runs/<mission-slug>/<run-id>/` directly.
+Call `evor_state_read` to get `run_dir` from the active run. If a run-id argument was provided, call `evor_state_read` with the provided run-id to get `run_dir`.
 
 If no active run is found: print "No active run found. Start a mission with /evor-setup first." and stop.
 

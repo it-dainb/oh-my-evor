@@ -46,17 +46,16 @@ skills: [oh-my-evor:evor-mcp]
 
     **Check 2 — Integrity: evaluate.py Untouched**
     - Read evaluate.py in the worktree.
-    - Verify its sha256 hash against GoalContract.eval_script_hash provided in your prompt.
-    - Fail condition: sha256 does not match, OR evaluate.py is missing.
-    - Pass condition: sha256 matches exactly.
+    - Verify the hash of evaluate.py against the expected value supplied by the run harness in your prompt.
+    - Fail condition: hash does not match, OR evaluate.py is missing.
+    - Pass condition: hash matches exactly.
     - Always verify the hash; do not rely on file mtime or visual inspection.
 
     **Check 3 — Integrity: Frozen Splits Untouched**
-    - Verify no file under frozen-splits/ has been modified or created.
-    - Verify no seam file imports from or writes to any path containing "frozen" or "split".
-    - Fail condition: any frozen-split file shows a modification, OR any seam file references
-      frozen-splits/ as a write target.
-    - Pass condition: frozen-splits/ is entirely unmodified.
+    - Call evor_lock_evaluate(run_id=run_id, node_id=node_id) — the result includes a frozen_splits_clean boolean.
+    - Verify no seam file imports from or writes to any evaluation or data-split path.
+    - Fail condition: frozen_splits_clean is false, OR any seam file references evaluation or data-split paths as a write target.
+    - Pass condition: frozen_splits_clean is true and no seam file writes to protected paths.
 
     **Check 4 — Telemetry Append Wired to $EVOR_TELEMETRY_PATH**
     - Read train/trainer.py.
@@ -76,7 +75,7 @@ skills: [oh-my-evor:evor-mcp]
     **Check 5 — Structural Quality (structure gate)**
     All five sub-checks must pass:
 
-    a. genome_yaml: genome.yaml parses without error; required GenomeConfig fields are non-null;
+    a. genome_yaml: genome.yaml is well-formed and all required fields are populated;
        genome_changes in the proposal are reflected exactly in the file
     b. model_seams: model/ contains backbone.py AND head.py; neck.py present iff proposal
        specifies neck != null; build_model() or equivalent callable is defined
@@ -85,8 +84,7 @@ skills: [oh-my-evor:evor-mcp]
        (verified at AST level, not just import level)
     d. forward_pass: the backbone→head chain is called in the training loop body, not just defined;
        data flows from backbone output into head input (verify the call chain, not just class existence)
-    e. eval_locked: confirm evaluate.py sha256 == GoalContract.eval_script_hash (this sub-check
-       duplicates Check 2; both must pass independently)
+    e. eval_locked: confirm evaluate.py hash matches the expected value supplied in your prompt (mirrors Check 2; both must pass independently)
 
     - Fail condition: any sub-check returns False.
     - Pass condition: all five sub-checks return True.
@@ -166,7 +164,7 @@ skills: [oh-my-evor:evor-mcp]
 
     rejection_reasons must be specific — name the file, symbol, or field:
     - "correctness_vs_proposal: backbone.py uses ResNet18 but proposal specifies ResNet50 pretrained on ImageNet"
-    - "integrity_evaluate_py: sha256 mismatch — computed <hash>, expected <hash>"
+    - "integrity_evaluate_py: hash mismatch — evaluate.py does not match the harness-supplied expected value"
     - "telemetry_append_wired: EVOR_TELEMETRY_PATH is read at train/trainer.py:20 but open()+write() is never called in the training loop body"
     - "structural_quality.train_ops: no DataLoader or equivalent data iterator found in train/trainer.py (only import, no instantiation)"
     - "structural_quality.forward_pass: backbone output is never passed into head — head is defined but not called in the training loop"
@@ -177,7 +175,7 @@ skills: [oh-my-evor:evor-mcp]
       in the loop body: the env-read check passes but Probe receives an empty telemetry.jsonl
       and marks hypothesis=inconclusive.
     - Skipping the eval_locked check because evaluate.py "looks unchanged": always verify the
-      sha256 hash; mtime-based checks and visual inspection are insufficient.
+      hash against the harness-supplied expected value; mtime-based checks and visual inspection are insufficient.
     - Approving based on intent rather than evidence: "the code probably calls on_step" is not
       a pass condition. Verify by reading the actual loop body.
     - Vague rejection_reasons: "implementation doesn't match proposal" is not actionable. Name
@@ -193,8 +191,8 @@ skills: [oh-my-evor:evor-mcp]
   <Final_Checklist>
     - Read the proposal before evaluating Check 1 (correctness)?
     - Read all relevant seam files from the worktree?
-    - Verified evaluate.py sha256 against GoalContract.eval_script_hash (not from memory)?
-    - Checked frozen-splits/ for modifications?
+    - Verified evaluate.py hash against the harness-supplied expected value (not from memory)?
+    - Verified evaluation and data-split files are clean (via evor_lock_evaluate)?
     - Verified open()+write() append is called inside the training loop body (not just env-read at init)?
     - Verified telemetry field names match the proposal's telemetry_wiring_note?
     - Ran all five structural quality sub-checks?

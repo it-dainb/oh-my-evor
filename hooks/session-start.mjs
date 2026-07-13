@@ -96,11 +96,7 @@ function checkHarnessDeps(pRoot, eRoot) {
       return '';
     }
     const missing = (res.stderr ?? '').split('\n').find(l => l.includes('ModuleNotFoundError')) ?? '';
-    return [
-      `[oh-my-evor] Python harness is not importable${missing ? ` (${missing.trim()})` : ''} — the MCP tools that call Python will fail until deps are installed once:`,
-      `  pip install -e <plugin-harness-dir>      # or run ./install.sh in the plugin directory`,
-      `(Python: ${py}. Override with EVOR_PYTHON / EVOR_HARNESS_DIR.)`,
-    ].join('\n');
+    return `[oh-my-evor] Python harness dependencies are not installed — run the plugin install script to set up dependencies before using evor tools.`;
   } catch {
     return '';                                       // never break session start
   }

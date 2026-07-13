@@ -32,16 +32,12 @@ skills: [oh-my-evor:evor-mcp]
 
     **Step 2 — Lock evaluate.py**
     Do NOT write or edit evaluate.py. It was copied from the locked reference during worktree setup.
-    Verify and lock it immediately by calling the harness lock tool — the harness owns file
-    hashing and permission enforcement:
+    Verify and lock it immediately:
     ```
     evor_lock_evaluate(node=node_name)
     ```
-    The tool verifies the sha256 against GoalContract.eval_script_hash and sets the file
-    read-only atomically. If it reports a hash mismatch, abort immediately and report the
-    integrity violation to Forge. Do not proceed with any other seam writes.
-    (Note: `evor_lock_evaluate` is the expected harness tool; do NOT shell out via sha256sum
-    or chmod — those raw ops bypass the harness integrity chain.)
+    If it reports a mismatch, abort immediately and report the integrity violation to Forge.
+    Do not proceed with any other seam writes.
 
     **Step 3 — Seam files**
     Write each seam per the proposal's module_seams and dataloader spec:
@@ -54,8 +50,8 @@ skills: [oh-my-evor:evor-mcp]
     - `train/trainer.py`: optimizer, schedule, loss, training loop per training_recipe
 
     For seed-repo mode: fit a thin genome adapter over existing seams via harness/evor/genome.py
-    instead of rewriting from scratch. Write GenomeSeedAdapterReport to
-    `runs/<mission>/<run-id>/genome-seed-adapter-report.json`:
+    instead of rewriting from scratch. Write GenomeSeedAdapterReport via
+    `evor_write_artifact(agent='forge-junior', kind='genome-seed-adapter')` with the fields:
     ```json
     {
       "seed_repo_path": "/absolute/path/to/seed/repo",
@@ -115,7 +111,7 @@ skills: [oh-my-evor:evor-mcp]
     Confirm the result shows at least two reference sites: the `os.environ.get` read in
     `__init__` and the `open(self._tel_path, "a")` call inside the training loop body.
     If fewer than two references are found, the wiring is incomplete — fix it before
-    proceeding. Do NOT use grep against internal worktree paths.
+    proceeding. Do NOT use text search to verify telemetry wiring — use lsp_find_references only.
 
     **Step 4.5 — Numeric-stability clamp guards (P2-9)**
     For ANY loss function whose forward pass computes a ratio or complement that can reach zero
@@ -188,7 +184,7 @@ skills: [oh-my-evor:evor-mcp]
   </Architecture_Agnostic_Rules>
 
   <Success_Criteria>
-    - evaluate.py is untouched: locked and sha256 verified via evor_lock_evaluate(node) against GoalContract.eval_script_hash
+    - evaluate.py is untouched: locked and integrity-verified via evor_lock_evaluate(node)
     - genome.yaml reflects exactly the genome_changes in the proposal (no extra field changes
       for parametric mutations)
     - All seam files specified by the proposal are present and implement the design
@@ -217,7 +213,7 @@ skills: [oh-my-evor:evor-mcp]
   </Constraints>
 
   <Failure_Modes_To_Avoid>
-    - Writing to evaluate.py for any reason: any modification resets the sha256 hash and causes
+    - Writing to evaluate.py for any reason: any modification is detected and causes
       an irreparable integrity failure.
     - Reading EVOR_TELEMETRY_PATH without actually appending in the loop body: grep sees the
       env read and passes, but telemetry.jsonl is empty because open()+write() is never called.
@@ -226,7 +222,7 @@ skills: [oh-my-evor:evor-mcp]
     - Deviating from the proposal's seam spec without a comment explaining why: undocumented
       deviations produce a candidate that does not test the intended hypothesis.
     - Silently reusing a prior candidate's worktree: corrupts the delta and makes the candidate
-      unreproducible from tree.json.
+      unreproducible from the evolution tree.
     - Applying reviewer feedback selectively: every item in rejection_reasons must be resolved.
     - Skipping lsp_diagnostics pre-flight: a type error caught here saves a wasted training run.
   </Failure_Modes_To_Avoid>

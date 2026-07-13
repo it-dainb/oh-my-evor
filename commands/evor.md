@@ -32,4 +32,4 @@ find "$HOME/.claude/plugins" -path "*oh-my-evor*/skills/evor/SKILL.md" 2>/dev/nu
 - Runs the 9-step tick loop: Select → Ideate → Hypothesis Registration → Critique → Implement+Run → Evaluate+Integrity → Analyze+Learn → Record → Prune/Promote → Loop/Stop
 - Meta-evolution runs every 5 ticks by default
 - Stop with Ctrl+C or cancel with `/oh-my-claudecode:cancel`
-- Requires an active GoalContract — run `/evor-setup` first if none exists
+- Requires a set-up mission — run `/evor-setup` first if none exists

@@ -1,10 +1,10 @@
 ---
-description: Run the Evor mission setup interview to create a GoalContract and initialize run state
+description: Run the Evor mission setup interview to set up a mission and its run
 ---
 
 # /evor-setup
 
-This command conducts the Evor mission setup interview, producing a GoalContract and initializing all run infrastructure.
+This command conducts the Evor mission setup interview, setting up the mission and initializing all run infrastructure.
 
 ## Dispatch
 
@@ -35,5 +35,5 @@ find "$HOME/.claude/plugins" -path "*oh-my-evor*/skills/evor-setup/SKILL.md" 2>/
 - Creates initial EvalSuite v1 (Pillar 3)
 - Runs a preflight smoke-train to verify the environment
 - Requires explicit "start" confirmation before writing any run state
-- Output: `GoalContract` at `.evor/runs/<mission-slug>/<run-id>/goal-contract.json`
+- After setup completes, the mission and its run are fully initialized and ready to use
 - After setup completes, run `/evor-run` to start the tick loop

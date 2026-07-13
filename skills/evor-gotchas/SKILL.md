@@ -12,9 +12,9 @@ understand what constraints and failures the Evor engine has encountered.
 
 It shows:
   1. The hardware CapabilityProfile (gpu_arch, vram_gb, supported dtypes, available libs)
-     probed at preflight time and written to .evor/capability.json.
-  2. All GotchaEntry records stored under .evor/wiki/gotchas/ (global) and optionally
-     the active run's gotchas/ directory (mission-scoped).
+     probed at preflight time.
+  2. GotchaEntry records managed by the harness and queried via evor_gotchas_list (global
+     and optionally mission-scoped).
 
 Gotcha kinds:
   hardware-constraint  — probed at preflight; describes what this machine cannot do
@@ -59,7 +59,7 @@ evor_gotchas_list({
   scope: "global" | "mission",                                            // optional
   min_confidence: 0.7,                                                    // optional
   evor_root: ".evor",                                                     // optional
-  run_dir: ".evor/runs/<mission>/<run-id>"                                // optional
+  run_dir: "<active-run-dir>"                                             // optional
 })
 ```
 
@@ -116,7 +116,7 @@ If runtime-failure gotchas with confidence >= 0.8 are present:
    reproduce the triggering configuration. Review the avoidance field."
 
 If no capability.json exists:
-  "Run /evor-setup (which calls evor_preflight) to probe hardware capability and seed hardware-constraint gotchas."
+  "Run /evor-setup to probe hardware capability and register hardware-constraint gotchas."
 
 </Steps>
 

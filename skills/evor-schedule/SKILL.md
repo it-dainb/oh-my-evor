@@ -18,7 +18,7 @@ user is watching, the `evor` orchestrator's native `Monitor` watch is the right 
 
 ## Set the execution mode
 Record the mode so the loop and reflexes pick the sleep-and-wake path instead of a live watch:
-- Call `evor_state_write({ run_id, tick_state: { execution_mode: "scheduled" } })`.
+- Call `evor_schedule({ run_id, mode: "scheduled" })`.
 - Attended is the default; this flips the active run to scheduled.
 
 ## Pick the cadence — probe availability, degrade gracefully
@@ -57,7 +57,7 @@ tight polling when available.
 
 ## Stop / cancel
 Tell the user how to stop unattended operation: cancel the schedule (`CronDelete` the recurring task, or stop
-the `/loop`), or set the mission status to paused with `evor_state_write({ run_id, mission_status: "paused" })`.
+the `/loop`), or pause the mission via `evor_state_write({ run_id, mission_status: "paused" })`.
 
 ## Availability notes
 `RemoteTrigger`, `PushNotification`, and `SendUserFile` require a claude.ai plan and are unavailable on

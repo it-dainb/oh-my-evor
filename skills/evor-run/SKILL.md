@@ -1,13 +1,13 @@
 ---
 name: evor-run
-description: Load GoalContract, set active run state, and invoke the Evor tick loop
+description: Load and validate the mission contract, set active run state, and invoke the Evor tick loop
 argument-hint: "[mission-id or run-id]"
 level: 3
 skills: [oh-my-evor:evor-mcp]
 ---
 
 <Purpose>
-evor-run is the launch skill for an Evor mission. It validates that a GoalContract exists, checks for an existing run to resume, sets the EVOR_ACTIVE_RUN_ID environment variable, writes the active-run state via `evor_state_write`, and delegates to the `evor` skill to start the tick loop. If no GoalContract is found for the specified mission, it redirects to `evor-setup`.
+evor-run is the launch skill for an Evor mission. It validates that a mission contract exists, checks for an existing run to resume, sets the EVOR_ACTIVE_RUN_ID environment variable, writes the active run state via `evor_state_write`, and delegates to the `evor` skill to start the tick loop. If no valid mission contract is found for the specified mission, it redirects to `evor-setup`.
 </Purpose>
 
 <Use_When>
@@ -17,7 +17,7 @@ evor-run is the launch skill for an Evor mission. It validates that a GoalContra
 </Use_When>
 
 <Do_Not_Use_When>
-- No GoalContract exists — redirect to `evor-setup` instead
+- No initialized mission exists — redirect to `evor-setup` instead
 - User wants to resume from a specific tick — use `evor-resume` which accepts a run-id
 - User wants dashboard only — use `evor-dashboard`
 </Do_Not_Use_When>
@@ -29,41 +29,37 @@ evor-run is the launch skill for an Evor mission. It validates that a GoalContra
 If arguments were provided, treat them as mission-id or run-id. Otherwise:
 1. Call `evor_state_read` to check for a current active run.
 2. If found and run-state shows `status != "completed"`: offer to resume that run.
-3. If not found: list available missions under `.evor/runs/` and prompt the user to select one, or redirect to `/evor-setup`.
+3. If not found: list available missions via `evor_state_read` and prompt the user to select one, or redirect to `/evor-setup`.
 
-## Step 2 — Load and Validate GoalContract
+## Step 2 — Load and Validate Mission Contract
 
 Call `evor_read_goal_contract({ run_id: "<run_dir>" })` to load and validate the contract.
 
-Validate:
-- `mission_id`, `dataset_ref`, `baseline_value`, `locked_split_hash`, `eval_script_hash` are all present.
-- `eval_version` matches the latest `eval-suites/<version>.json` file.
-- `allowed_licenses` is non-empty.
-- If validation fails: print the specific missing/invalid fields and redirect to `/evor-setup`.
+If it reports missing or invalid fields, print the error and redirect to `/evor-setup`. Do not enumerate specific field names — let the tool report what is wrong.
 
 ## Step 2.5 — Phase-2 Lock Guard
 
-Call `evor_state_read` to read mission-state for the resolved run directory.
+Call `evor_state_read` to check whether the mission is locked.
 
-- **No mission-state present**: print the error below and **stop immediately**. Do not proceed to Step 3.
+- **No mission state present**: print the error below and **stop immediately**. Do not proceed to Step 3.
   ```
-  ERROR: mission-state.json not found — mission is not locked.
+  ERROR: Mission state not found — mission is not locked.
   The contract has not passed the Phase-2 validation gate.
   Run /evor-validate to validate and lock it, or /evor-setup to reinitialize.
   ```
-- **mission_state.status != "locked"**: print the error below and **stop immediately**. Do not proceed to Step 3.
+- **Mission not locked**: print the error below and **stop immediately**. Do not proceed to Step 3.
   ```
-  ERROR: mission-state.status=<status> — mission is not locked.
+  ERROR: Mission is not locked.
   The contract has not passed the Phase-2 validation gate.
   Run /evor-validate to validate and lock it, or /evor-setup to reinitialize.
   ```
-- **mission_state.status == "locked"**: continue to Step 3.
+- **Mission locked**: continue to Step 3.
 
 ## Step 3 — Check for Resume Path
 
-Call `evor_state_read` to check run-state.json:
-- If `status = "initialized"` or `tick_count = 0`: this is a fresh start. Print: "Starting fresh mission: <mission_id> (run_id: <run_id>)."
-- If `status = "running"` and `tick_count > 0`: print resume summary:
+Call `evor_state_read` to check run state:
+- If run is unstarted (tick_count = 0): this is a fresh start. Print: "Starting fresh mission: <mission_id> (run_id: <run_id>)."
+- If run is in progress (tick_count > 0): print resume summary:
   ```
   Resuming mission: <mission_id>
   Run ID: <run_id>
@@ -86,7 +82,7 @@ evor_state_write({
   active_run: {
     mission_id: "<mission_id>",
     run_id: "<run_id>",
-    run_dir: ".evor/runs/<mission-slug>/<run-id>/",
+    run_dir: "<run_dir>",
     started_at: "<ISO 8601>",
     status: "running"
   }
@@ -106,7 +102,6 @@ The tick loop in the `evor` skill manages this automatically; this note is for o
 
 Read and follow `skills/evor/SKILL.md` exactly, passing:
 - `run_id` = the resolved run ID
-- `goal_contract` = the loaded GoalContract
 - `resume` = true if tick_count > 0
 
 The evor skill owns the tick loop from this point forward.
@@ -114,8 +109,8 @@ The evor skill owns the tick loop from this point forward.
 </Steps>
 
 <Tool_Usage>
-- `evor_state_read` — read active-run, mission-state, and run-state
-- `evor_read_goal_contract` — load and validate GoalContract
+- `evor_state_read` — read active run state, mission lock status, and run progress
+- `evor_read_goal_contract` — load and validate the mission contract
 - `evor_state_write` — set mission_status="running" and active_run record
 - Skill dispatch to `evor` — hand off tick loop execution
 </Tool_Usage>

@@ -1,13 +1,13 @@
 ---
 name: evor-setup
-description: Mission interview workflow that produces a GoalContract and initializes run state for an Evor evolution mission
+description: Mission interview workflow that elicits all mission settings and launches a validated run via evor_init_run
 argument-hint: "[mission description]"
 level: 3
 skills: [oh-my-evor:evor-mcp]
 ---
 
 <Purpose>
-evor-setup conducts a structured interview to elicit all GoalContract fields, discovers the local compute environment, initializes the frozen data splits (Pillar 2), creates the initial EvalSuite v1 (Pillar 3), runs a preflight smoke-train, and gates launch on explicit user consent. ALL task-specific settings (metrics, constraints, budget, licenses, wildness) are asked and LOCKED during this interview — they cannot be changed after the mission starts without a full re-setup. The output is a valid GoalContract written to `.evor/runs/<mission-slug>/<run-id>/` that the `evor` tick loop can consume.
+evor-setup conducts a structured interview to elicit all mission settings, discovers the local compute environment, initializes the frozen data splits (Pillar 2), creates the initial EvalSuite v1 (Pillar 3), runs a preflight smoke-train, and gates launch on explicit user consent. ALL task-specific settings (metrics, constraints, budget, licenses, wildness) are asked and LOCKED during this interview — they cannot be changed after the mission starts without a full re-setup. evor_init_run writes all run artifacts atomically; the evor skill consumes them automatically.
 
 Use `AskUserQuestion` to present each question to the user with structured multiple-choice options where applicable. This ensures clear, parseable responses rather than freeform input.
 
@@ -16,12 +16,12 @@ If `pyright` is not installed, the LSP pre-flight in Forge-junior operates in be
 
 <Use_When>
 - User says "setup evor", "new evor mission", "evor setup", or provides a task description and wants to start a new evolution run
-- No GoalContract exists for the stated mission, or the user explicitly wants to start fresh
+- No initialized mission exists for the stated task, or the user explicitly wants to start fresh
 - User invokes `/evor-setup` or `/oh-my-claudecode:evor-setup`
 </Use_When>
 
 <Do_Not_Use_When>
-- A GoalContract already exists and the user wants to resume — use `evor-resume`
+- An initialized mission already exists and the user wants to resume — use `evor-resume`
 - The user wants to start the tick loop directly — use `evor-run` (which calls this if no contract exists)
 - The user wants the dashboard or report only
 </Do_Not_Use_When>
@@ -45,11 +45,11 @@ Determine evorRoot: use `$EVOR_ROOT` if set, else `<cwd>/.evor`.
   - If the user agrees to distill: read and execute the evor-distill skill, then read the resulting `starting-point.json`. Proceed to "Pre-fill" below.
   - If the user chooses 'skip': proceed directly to the interview with no pre-fill.
 
-**Case C — `<evorRoot>/active-run.json` exists** (workspace_class = evor-active):
+**Case C — an active run is already underway** (detected by evor_state_read):
   Stop. Print:
   ```
-  An active EVOR run was found in <evorRoot>/active-run.json.
-  Use /evor-run to resume it, or delete active-run.json to start a new mission.
+  An active EVOR run is already underway.
+  Use /evor-run to resume it, or use /evor-setup with a different mission to start a new one.
   ```
 
 **Case D — Greenfield and no starting-point.json**:
@@ -88,15 +88,13 @@ The user presses Enter to accept the pre-filled value or types a replacement. Al
 ```
 Note on baseline: <metric>=<claimed_value> is a scraped claim with verified=false.
 It has NOT been measured on a controlled evaluation split. The official baseline_value
-written into the GoalContract will be whatever EVOR measures on the frozen split during
+used as the official baseline will be whatever EVOR measures on the frozen split during
 setup — not this scraped number. Both the claimed value and the EVOR-measured value are
 recorded; if they diverge by more than the tolerance threshold, EVOR will flag the
 discrepancy in the decision log.
 ```
 
-This is consistent with the Integrity Model: `BaselineCandidate.verified` stays `false`
-until `verify_baseline_claim()` runs during setup / the first tick and produces the
-measured value that becomes `GoalContract.baseline_value`.
+The scraped baseline value is unverified until evor measures it on the frozen split during setup. The officially measured value becomes the contract's baseline; evor flags discrepancies in the decision log.
 </Phase_0_Distillation>
 
 <Interview>
@@ -145,7 +143,7 @@ Use `AskUserQuestion` with options:
      - recall-only → predict-all-positive gives recall=1 → guard: `constraints: [{metric: "precision", op: ">=", threshold: 0.5}]`
      - accuracy on imbalanced data → guard: switch to F1 or add per-class recall floor
      - loss-only → model can overfit silently → guard: add val accuracy as secondary metric
-  3. Presents guards as `MetricConstraint` options — a violated constraint yields fitness=0.0.
+  3. Presents guards as constraint options — a violated constraint yields fitness=0.0.
 
 Use `AskUserQuestion` to present options:
 ```
@@ -162,7 +160,7 @@ Metric options for your task:
 ```
 
 → User picks or customizes.
-→ Populate `MetricSpec.fitness_formula`, `MetricSpec.fbeta`, `MetricSpec.constraints[]`, and `MetricSpec.custom_metrics[]` as appropriate from the user's choice.
+→ The selection is recorded in the metric configuration passed to evor_init_run.
 → If a formula or constraint is specified, update `fitness_mode` accordingly.
 → **LOCK NOTE:** These metric settings are finalized here. They cannot be changed after the mission starts without a full re-setup (see Lock Policy below).
 
@@ -213,11 +211,7 @@ Use `AskUserQuestion` to present sources as checkboxes:
   (d) Custom URL — specify a leaderboard URL
 
 Should new evaluation angles be auto-added within a domain family, or require your explicit consent per angle?"
-→ Build `ExpansionPolicy.sota_sources[]`.
-→ Set `auto_add_within_families[]` and `require_consent_for[]` based on user preference.
-→ Set `ExpansionPolicy.max_angles_per_upgrade` (default 3).
-→ Set `ExpansionPolicy.max_upgrades_per_N_ticks` (default {max_upgrades: 1, per_ticks: 5}).
-→ Set `GoalContract.expansion_policy`.
+→ Set the expansion policy configuration from the user's answers (SOTA sources, auto-add scope, consent scope, and cadence limits). This is passed to evor_init_run as the expansion_policy field.
 
 **Q11 — Coverage target** (only if open_ended)
 "What is your coverage target? For example, 0.95 means Evor stops when ≥95% of discovered evaluation angles meet or exceed their SOTA bar. (Default: 0.80)"
@@ -234,7 +228,7 @@ Default allowlist: MIT, Apache-2.0, BSD-2-Clause, BSD-3-Clause, CC-BY-4.0, CC0-1
   [B] Provide a custom list (SPDX identifiers, comma-separated)"
 
 Any acquired data with a license outside this list will be rejected by the Ingestion Contamination Gate.
-→ Set `GoalContract.allowed_licenses` (default list if A, custom list if B).
+→ Set `allowed_licenses` (default list if A, custom list if B). This is passed to evor_init_run.
 
 **Q13 — Compute budget confirmation** (only if open_ended; MUST be asked before consent checkpoint)
 Use `AskUserQuestion`:
@@ -254,8 +248,8 @@ Do you confirm this budget is acceptable before the mission starts?
 <Lock_Policy>
 ALL task-specific settings collected during the interview are LOCKED at setup time. This means:
 
-- **Metrics and constraints** (Q4 + Q4a): `metric_specs[]`, `fitness_formula`, `fbeta`, `constraints[]`, `custom_metrics[]`, `fitness_mode` — immutable after GoalContract is written.
-- **Dataset and splits** (Q2): `dataset_ref`, `locked_split_hash`, `eval_script_hash` — immutable; the frozen splits are made read-only so they cannot drift after lock.
+- **Metrics and constraints** (Q4 + Q4a): `metric_specs[]`, `fitness_formula`, `fbeta`, `constraints[]`, `custom_metrics[]`, `fitness_mode` — immutable after the mission is initialized.
+- **Dataset and splits** (Q2): `dataset_ref` — immutable; the frozen split anchors are sealed by evor_freeze_splits and cannot be altered after lock.
 - **Budget** (Q6): `budget.*` — cannot be expanded mid-run; requires re-setup to increase.
 - **Wildness** (Q8): changing wildness mid-run invalidates the strategy baseline; locked.
 - **License allowlist** (Q12): data acquired under a rejected license is blocked by the Ingestion Contamination Gate; the gate uses the locked list.
@@ -304,14 +298,7 @@ evor_freeze_splits({
 })
 ```
 
-This:
-1. Creates FrozenSplit records for test and val splits.
-2. Computes `per_sample_hashes` and `split_hash`.
-3. Copies files to the frozen-splits directory and sets them read-only.
-4. Writes frozen-split manifests.
-5. Returns split hashes and eval script hash — the harness owns all hash computation.
-
-Set `GoalContract.locked_split_hash` and `GoalContract.eval_script_hash` from the returned values.
+Call evor_freeze_splits with the dataset path and eval version. It freezes the test and val splits, makes them read-only, and seals the integrity anchors server-side. On success it returns a confirmation; the harness owns all hash computation internally.
 
 Print confirmation: "Frozen splits initialized. Files are read-only."
 </Frozen_Split_Setup>
@@ -319,17 +306,15 @@ Print confirmation: "Frozen splits initialized. Files are read-only."
 <Materialize_Anchors>
 ## Materialize anchors
 
-`evor_freeze_splits` returns the split hashes; the harness owns them. Never compute a hash yourself. If `evor_freeze_splits` is unavailable, that is an error — stop and surface it; there is no fallback.
+evor_freeze_splits seals the split integrity anchors server-side. Never attempt to compute or write anchor values yourself — if evor_freeze_splits returns an error, surface it and stop; there is no agent-side fallback.
 
-**locked_split_hash:** Set `GoalContract.locked_split_hash` from the value returned by `evor_freeze_splits`. Do not compute it manually.
+The canonical evaluator anchor is sealed separately by evor_seal_eval_script after the evaluator script is written. Verify that call returns ok before proceeding to lock.
 
-**eval_script_hash:** Set `GoalContract.eval_script_hash` from the value returned by `evor_freeze_splits`. Do not compute it manually.
-
-**Frozen-split manifests:** After `evor_freeze_splits` succeeds, verify `frozen-splits/v1-test.json` exists and its `split_hash` field is non-empty. A missing or empty `split_hash` means the freeze call failed — re-run it; do not patch the file manually.
+If evor_seal_eval_script reports the evaluator is missing, write eval-suites/<eval_version>.py first, then re-call evor_seal_eval_script.
 
 **Class→domain mapping guard:**
 
-If any `MetricConstraint` or guard in the contract references a class→domain mapping file (e.g., `class_domain_map.json`):
+If any metric constraint or guard in the contract references a class→domain mapping file (e.g., `class_domain_map.json`):
 - Materialize that file now, from the available dataset.
 - If it cannot be built at setup time, REMOVE the guard from the contract entirely. Only lock guards that are satisfiable from tick 1. A guard that references a file that does not exist will block every tick.
 </Materialize_Anchors>
@@ -347,11 +332,27 @@ evor_init_eval_suite({
 })
 ```
 
-This:
-1. Derives initial domains from `task_description` (e.g., for an image classification task: one domain per class cluster or data source if multi-source).
-2. Creates an EvalSuite record with `created_by="user"`, `consent_log_ref` pointing to this setup session.
-3. Writes `eval-suites/v1.json`.
-4. Initializes `angle-registry.json` with one entry per initial domain.
+This derives initial domains from `task_description`, creates an EvalSuite record, and initializes the angle registry with one entry per initial domain.
+
+## Materialize and seal the canonical evaluator
+
+The integrity gate's eval-shift check compares each node's `evaluate.py` against the mission's sealed canonical evaluator anchor. That anchor must be sealed BEFORE the tick loop starts, or every node fails the integrity check and nothing is ever promoted.
+
+Write `eval-suites/<eval_version>.py` now — the ONE evaluation script every node will share. It defines the fixed evaluation contract that Forge's models must conform to. It must:
+- Load the frozen test split (never re-split, never touch train/val for scoring). The frozen split path is provided via the run environment — do not hardcode it.
+- Import the node's model through the standard worktree interface (e.g. `from model import build_model`) and load its trained weights.
+- Run inference over the frozen test set and compute the primary metric from the mission contract.
+- Print exactly ONE JSON evaluation result object to stdout; all logs go to stderr.
+
+This evaluator is authored ONCE, here, and then frozen. Forge copies it verbatim into every node worktree and is forbidden to modify it — so keep it model-agnostic (it depends only on the fixed `build_model` / weights interface, not on any one architecture).
+
+Then seal the evaluator anchor into the contract:
+
+```
+evor_seal_eval_script({ run_id: "<run_id>", eval_version: "v1" })
+```
+
+Verify the call returns `ok`. If it reports the evaluator is missing, write eval-suites/<eval_version>.py first, then re-call evor_seal_eval_script. Do NOT proceed to lock if evor_seal_eval_script did not return ok.
 </EvalSuite_Initialization>
 
 <Preflight_Smoke_Train>
@@ -369,13 +370,13 @@ The preflight runs a micro-train (10 random samples, 2-layer MLP, 5 steps) and v
   [A] Yes — note override and proceed
   [B] No — abort setup"
 → If B: abort setup.
-→ If A: note the override in the GoalContract metadata and proceed.
+→ If A: note the override in the mission metadata and proceed.
 
 **On success:** Print: "Preflight passed. Training pipeline verified."
 </Preflight_Smoke_Train>
 
 <Launch_Consent_Checkpoint>
-Before writing the final GoalContract and initializing the run, display a summary and require explicit consent via `AskUserQuestion`. This checkpoint CANNOT be skipped.
+Before initializing the run, display a summary and require explicit consent via `AskUserQuestion`. This checkpoint CANNOT be skipped.
 
 ```
 === Evor Mission Setup Summary ===
@@ -458,9 +459,9 @@ After consent:
    }
    ```
 
-   Do NOT include `locked_split_hash`, `eval_script_hash`, `eval_version`, `created_at`, `aggregation_rule`, or other internal fields — `evor_init_run` constructs the full GoalContract internally, computing hashes and timestamps server-side from the frozen splits already initialized.
+   Do NOT include internal fields such as integrity anchors, version stamps, or aggregation rules — `evor_init_run` constructs all run artifacts server-side from the interview answers and the frozen splits already initialized.
 
-   `autonomy_charter` may be omitted — the tool defaults it to `AutonomyCharter(posture="aggressive-never-halt", license_gate=False, data_acquisition_enabled=True)`.
+   `autonomy_charter` may be omitted — the tool defaults to fully autonomous posture with data acquisition enabled.
 
    Print: "Mission will run FULLY AUTONOMOUS to the goal — the monotonic-honesty invariant auto-decides every mid-run choice with no human questions."
 
@@ -470,21 +471,9 @@ After consent:
    evor_init_run({ answers: <answers object>, mission_id: "<mission_id>" })
    ```
 
-   This ONE call writes — atomically — all seven run artifacts into `<run_dir>` (and `active-run.json` at `<evor_root>`):
+   On success it returns `run_id` and atomically writes all run artifacts. Surface any `{error}` result to the user — do not attempt to write any artifacts manually.
 
-   | Artifact | Notes |
-   |---|---|
-   | `goal-contract.json` | Pydantic-validated; returns `{"error":"..."}` on any field violation |
-   | `run-state.json` | status: "initialized", tick_count: 0 |
-   | `strategy.json` | UCB1 defaults, wildness from contract |
-   | `tree.json` | empty nodes dict (DICT format) |
-   | `mission-state.json` | status: "draft" — locked only after validate passes |
-   | `decision-log.md` | header with timestamp + mission_id + run_id + objective |
-   | `<evor_root>/active-run.json` | {mission_id, run_id, run_dir} |
-
-   **Do NOT hand-write any of these files.** The tool constructs them from the validated GoalContract; manual writes produce schema drift. Surface any `{error}` result to the user.
-
-3. Call `evor_state_write({ mission_status: "initialized", active_run: { mission_id, run_id, run_dir, status: "initialized" } })` using the `run_id` returned by `evor_init_run`.
+3. Call `evor_state_write({ mission_status: "draft", active_run: { mission_id, run_id, run_dir, status: "initialized" } })` using the `run_id` returned by `evor_init_run`.
 
 Print: "Mission initialized. Run ID: <run_id>. Running Phase-2 validation gate..."
 Then proceed to Validate_And_Lock.
@@ -496,33 +485,32 @@ Run the Phase-2 enforcement gate and lock the contract before `/evor-run` is pos
 Call `evor_validate({ run_id: "<run_id>" })`.
 
 **On pass:**
-Call `evor_state_write({ mission_status: "locked" })` to flip mission-state.json from `"draft"` to `"locked"`.
+Call `evor_lock_mission({ run_id })` to validate and lock the mission. On success it returns a locked confirmation.
 Print: "Phase-2 validation PASSED. Mission locked. Run ID: <run_id>. Start the tick loop with /evor-run."
 
 **On fail:**
-Do NOT flip status. The mission stays at `"draft"` and cannot be started with `/evor-run`.
-Print the failed check details from the validator report (each `ok: false` check with its detail).
+Do NOT proceed. Print the failed check details from the validator report (each `ok: false` check with its detail).
 Print: "Phase-2 validation FAILED. Mission is NOT locked. Resolve the issues above, then re-run /evor-setup."
 
 Remediation by failure type:
 - `metric_gameability_*` failures → revise metric config (return to Q4a and pick a guarded metric)
 - `goal_contract_schema` / `goal_contract_required_fields` → revisit the relevant interview question
 - `frozen_splits_*` failures → re-run the Frozen_Split_Setup step
-- `tree_json_*` failures → re-initialize tree.json with the DICT skeleton above
-- `run_state_*` failures → re-initialize run-state.json above
+- tree or run-state failures → re-run evor_init_run to atomically re-initialize all run artifacts
 
-Setup CANNOT complete with a draft/invalid contract. `/evor-run` will refuse to start until
-`mission-state.status == "locked"`.
+Setup CANNOT complete without a locked mission. `/evor-run` will refuse to start until the mission is locked.
 </Validate_And_Lock>
 
 <Tool_Usage>
 - `AskUserQuestion` — drive the interview with structured multiple-choice questions (Q3, Q4a, Q8, Q9, Q12, Q13, preflight override, consent checkpoint)
 - `Bash` — nvidia-smi, free, df (environment discovery only)
-- `evor_freeze_splits` — freeze test and val splits; returns locked_split_hash and eval_script_hash
-- `evor_init_eval_suite` — create initial EvalSuite v1 and angle-registry.json
+- `evor_freeze_splits` — freeze test and val splits; seals integrity anchors server-side
+- `evor_init_eval_suite` — create initial EvalSuite v1 and angle registry
+- `evor_seal_eval_script` — seal the canonical evaluator anchor into the contract
 - `evor_preflight` — 5-step smoke-train to verify training pipeline
-- `evor_init_run` — atomically write goal-contract.json + all six run artifacts; returns run_id (the ONLY path to create run state)
+- `evor_init_run` — atomically write all run artifacts; returns run_id (the ONLY path to create run state)
 - `evor_validate` — Phase-2 enforcement gate (schema + gameability + splits + tree + run-state)
-- `evor_state_write` — set mission_status="locked" on pass; set active_run after init
-- `evor_state_read` — read active-run.json for run resolution
+- `evor_lock_mission` — validate and lock the mission after passing Phase-2 gate
+- `evor_state_write` — set active_run after init; set mission_status="draft" before validate
+- `evor_state_read` — read active run state for run resolution
 </Tool_Usage>

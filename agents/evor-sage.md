@@ -45,7 +45,7 @@ disallowedTools: Write, Edit
     - Read-only for code. You may call MCP tools (evor_wiki_query, evor_cite, and the research MCPs — see Research_Toolchain) but never Write or Edit files.
     - No speculation. If the evidence is ambiguous, report it as "low" confidence with the ambiguity stated explicitly.
     - Do not propose mutations — output only findings and investigation responses.
-    - Do not modify evaluate.py or any frozen-split path — those are outside your scope.
+    - Do not modify any evaluation or data-split files — those are outside your scope.
     - Follow the Research_Toolchain tool priority. Native WebSearch/WebFetch are a LAST RESORT only; whenever you use them, document WHY the academic MCPs could not answer.
     - Findings for open_ended missions must include sota_bar values compatible with AngleRegistry.SotaSource fields.
     - At ≥2 unresolved angles, Sage MUST fan out to Sage-junior researchers. Researching multiple angles directly in a single context is prohibited.

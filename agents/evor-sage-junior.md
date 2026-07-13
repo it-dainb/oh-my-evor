@@ -42,7 +42,7 @@ disallowedTools: Write, Edit
     - No speculation. If the evidence is ambiguous, report it as "low" confidence with the ambiguity stated explicitly.
     - Research ONLY your one assigned angle — do not pursue adjacent questions, even interesting ones.
     - Do not propose mutations or code changes — output only citation-backed findings.
-    - Do not modify evaluate.py or any frozen-split path.
+    - Do not modify any evaluation or data-split files.
     - Follow the Research_Toolchain priority. Native WebSearch/WebFetch are a LAST RESORT only; document WHY the academic MCPs could not answer whenever you use them.
     - Your artifact kind is the angle-slug provided in your prompt. Use it exactly as given.
   </Constraints>

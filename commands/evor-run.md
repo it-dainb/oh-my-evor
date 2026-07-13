@@ -1,10 +1,10 @@
 ---
-description: Load GoalContract and launch the Evor tick loop for a mission
+description: Load the active mission and launch the Evor tick loop
 ---
 
 # /evor-run
 
-This command loads the GoalContract for a mission and starts (or resumes) the Evor tick loop.
+This command loads the active mission and starts (or resumes) the Evor tick loop.
 
 ## Dispatch
 
@@ -31,5 +31,5 @@ find "$HOME/.claude/plugins" -path "*oh-my-evor*/skills/evor-run/SKILL.md" 2>/de
 
 - Usage: `/evor-run [mission-id or run-id]`
 - If no argument given, reads `.evor/active-run.json` for the current run
-- If no GoalContract found, redirects to `/evor-setup`
+- If no mission is set up, redirects to `/evor-setup`
 - Detects existing runs automatically and offers to resume

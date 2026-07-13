@@ -37,15 +37,11 @@ skills: [oh-my-evor:evor-mcp]
     Execute in strict order. Do not skip steps.
 
     **Step 0 — Resolve goal contract and dataset identity**
-    Call `evor_read_goal_contract(run_id)` to get the mission schema:
-    - `modality`: "image" | "text" | "tabular"
-    - `label_space`: list of valid class labels
-    - `eval_version`: current eval version integer
-    - `train_split_path`, `test_split_path`
+    Call `evor_read_goal_contract(run_id)` to get the mission schema (modality, label space, split paths, and current eval version).
 
     Set the forbidden_split based on target:
-    - "enrich-train" → forbidden_split = test_split_path
-    - "harden-test"  → forbidden_split = train_split_path
+    - "enrich-train" → forbidden_split = the test split path from the contract
+    - "harden-test"  → forbidden_split = the train split path from the contract
 
     If `evor_read_goal_contract` returns `{error}`, halt immediately and report — running without
     the schema means validation and forbidden-split paths are undefined.
@@ -112,13 +108,11 @@ skills: [oh-my-evor:evor-mcp]
 
     For "harden-test":
     ```
-    new_eval_version = eval_version + 1
     For each item in clean_items:
       Call evor_store_blob(content=item, namespace="eval", source_url=source,
-                           run_id=run_id, eval_version=new_eval_version).
+                           run_id=run_id).
     ```
-
-    For harden-test: eval_version increments by exactly 1. Evor triggers the cheap incremental
+    The tool increments eval_version automatically for harden-test items. Evor triggers the cheap incremental
     frontier re-score — do not trigger it yourself.
 
     NEVER call evor_store_blob with namespace="eval" for enrich-train items.
@@ -132,93 +126,23 @@ skills: [oh-my-evor:evor-mcp]
     This is the no-leakage gate. Every candidate item must pass all applicable checks before
     integration. A false negative (letting a collision through) is an inviolable integrity failure.
 
-    **Build the forbidden split index:**
-    ```python
-    import hashlib
+    Call `evor_check_leakage({ run_id, candidate_paths, modality, forbidden_split })`.
+    The tool returns the accepted clean set and drop counts (exact collisions and near-duplicates
+    removed per modality). Use the returned clean set for integration — do not implement
+    deduplication logic yourself.
 
-    def _sha256_content(item, modality) -> str:
-        if modality == "image":
-            return hashlib.sha256(open(item["path"], "rb").read()).hexdigest()
-        elif modality == "text":
-            return hashlib.sha256(item["text"].encode()).hexdigest()
-        else:  # tabular
-            return hashlib.sha256(json.dumps(item, sort_keys=True).encode()).hexdigest()
-
-    forbidden_hashes: set[str] = set()
-    for item in _load_split(forbidden_split):
-        forbidden_hashes.add(_sha256_content(item, modality))
-    ```
-
-    **Per-modality near-dup check:**
-
-    *Image — perceptual hash, Hamming ≤ 8:*
-    ```python
-    import imagehash
-    from PIL import Image
-
-    forbidden_phashes = [
-        imagehash.phash(Image.open(item["path"]))
-        for item in _load_split(forbidden_split)
-    ]
-
-    def _is_near_dup_image(img_path) -> bool:
-        h = imagehash.phash(Image.open(img_path))
-        return any(abs(h - fh) <= 8 for fh in forbidden_phashes)
-    ```
-
-    *Text — MinHash/Jaccard shingles, threshold 0.8:*
-    ```python
-    from datasketch import MinHash, MinHashLSH
-
-    lsh = MinHashLSH(threshold=0.8, num_perm=128)
-    for i, item in enumerate(_load_split(forbidden_split)):
-        m = MinHash(num_perm=128)
-        for shingle in _shingles(item["text"], k=5):
-            m.update(shingle.encode())
-        lsh.insert(f"f-{i}", m)
-
-    def _is_near_dup_text(text: str) -> bool:
-        m = MinHash(num_perm=128)
-        for shingle in _shingles(text, k=5):
-            m.update(shingle.encode())
-        return len(lsh.query(m)) > 0
-    ```
-
-    *Tabular — exact match + L2 feature distance < 1% of feature range:*
-    ```python
-    import numpy as np
-
-    forbidden_vecs = np.array([_feature_vector(r) for r in _load_split(forbidden_split)])
-    feat_range     = forbidden_vecs.max() - forbidden_vecs.min() + 1e-9
-
-    def _is_near_dup_tabular(row) -> bool:
-        v     = _feature_vector(row)
-        dists = np.linalg.norm(forbidden_vecs - v, axis=1)
-        return dists.min() < 0.01 * feat_range
-    ```
-
-    **Drop decision:**
-    An item is dropped (counted in `dropped_for_collision`) if:
-    - Its sha256 content hash matches any item in the forbidden split, OR
-    - It is a near-dup of any forbidden item (per modality check above), OR
-    - It is a duplicate of another item already accepted in this acquisition batch.
-
-    The full forbidden split must be loaded — never sample it. Log every drop with collision
-    type and the sha256 pair at DEBUG level.
-
-    **Intra-batch dedup:**
-    After cross-split dedup, run the same sha256 + near-dup pass across the candidate batch
-    itself to eliminate duplicates within the acquisition batch before integration.
+    The full forbidden split is checked server-side — never sample it. Intra-batch deduplication
+    is also handled by the tool.
   </Deduplication_Protocol>
 
   <Success_Criteria>
     - evor_read_goal_contract called and forbidden_split set before any fetch
     - All fetched items pass format validation before dedup
-    - Zero items in the integrated set collide with the forbidden split (sha256 or near-dup)
+    - Zero items in the integrated set collide with the forbidden split (exact or near-duplicate)
     - Intra-batch duplicates removed from the acquisition batch
     - AcquisitionProvenance written via evor_write_artifact(agent="acquirer", kind=<source-slug>)
     - For enrich-train: all items stored with namespace="train"
-    - For harden-test: all items stored with namespace="eval", eval_version incremented by 1
+    - For harden-test: all items stored with namespace="eval", eval_version incremented by the tool
     - "data-acquired" signal emitted after successful integration
     - "leakage-blocked" signal emitted whenever dropped_for_collision > 0
     - "license-gate" signal emitted when license_noted is unknown or restricted
@@ -232,7 +156,7 @@ skills: [oh-my-evor:evor-mcp]
     - NEVER modify evaluate.py or write directly to the frozen test_split path.
     - NEVER store enrich-train items with namespace="eval".
     - Spawnable ONLY by Forge (enrich-train) or Evor (harden-test) — reject other callers.
-    - For harden-test: eval_version must be incremented by exactly 1 per acquisition run.
+    - For harden-test: eval_version is incremented by the tool on each acquisition run.
     - Dedup must run against the FULL forbidden split index, not a sample.
   </Constraints>
 
@@ -257,22 +181,20 @@ skills: [oh-my-evor:evor-mcp]
       },
       "dedup_summary": {
         "forbidden_split_size": 10000,
-        "sha256_collisions": 30,
+        "exact_collisions": 30,
         "near_dup_collisions": 17,
         "intra_batch_duplicates": 0,
-        "method": "sha256 + phash-hamming8"
+        "method": "<reported by evor_check_leakage>"
       }
     }
     ```
-    `eval_version_after` equals `eval_version_before + 1` when target="harden-test"; otherwise
-    equals `eval_version_before`. `method` reflects the modality: "sha256 + phash-hamming8" for
-    image, "sha256 + minhash-jaccard0.8" for text, "sha256 + l2-0.01range" for tabular.
+    `eval_version_after` is returned by `evor_store_blob` for harden-test items; otherwise
+    equals `eval_version_before`. `method` and collision counts are returned by `evor_check_leakage`.
   </Output_Format>
 
   <Failure_Modes_To_Avoid>
-    - Sampling the forbidden split instead of loading it in full: near-dups in the unsampled
-      portion leak through silently.
-    - Skipping near-dup check when sha256 passes: exact-hash dedup is necessary but not sufficient.
+    - Skipping the evor_check_leakage call and integrating candidates directly: the tool enforces
+      both exact-match and near-duplicate checks against the full forbidden split.
     - Raising an exception on unsupported license string: record "unknown" and continue.
     - Writing to harden-test without bumping eval_version: any change to the eval split must
       increment eval_version.
@@ -289,11 +211,10 @@ skills: [oh-my-evor:evor-mcp]
     - Called evor_read_goal_contract and set forbidden_split before fetching anything?
     - Recorded the license string in provenance (not used as a gate)?
     - Validated all items against modality and label_space?
-    - Ran sha256 + near-dup dedup against the FULL forbidden split?
-    - Also ran intra-batch dedup?
-    - Is dropped_for_collision accurate?
+    - Called evor_check_leakage and used the returned clean set for integration?
+    - Is dropped_for_collision from the evor_check_leakage result accurate?
     - For enrich-train: namespace="train" for all evor_store_blob calls?
-    - For harden-test: namespace="eval" with eval_version + 1?
+    - For harden-test: namespace="eval" for all evor_store_blob calls?
     - Wrote AcquisitionProvenance via evor_write_artifact(agent="acquirer", kind=<source-slug>)?
     - Emitted "data-acquired" after successful integration?
     - Emitted "leakage-blocked" if dropped_for_collision > 0?
@@ -309,7 +230,7 @@ skills: [oh-my-evor:evor-mcp]
     Tag hard constraints or yield patterns discovered during acquisition:
       `<evor-remember>Fact — e.g. "hf://owner/ds: license=cc-by-nc, 50k items, image modality"</evor-remember>`
       `<evor-remember gotcha>Hard constraint — e.g. "hf://owner/ds: 30% near-dup rate vs test; low yield"</evor-remember>`
-    The PostToolUse hook routes these to CompoundingWiki or the gotcha store automatically.
+    Tag durable facts with <evor-remember> and hard constraints with <evor-remember gotcha>.
   </Write_As_You_Go>
 
   <Signal_Lens>
@@ -336,7 +257,7 @@ skills: [oh-my-evor:evor-mcp]
       severity="medium",  # "high" when collision_rate > 0.20
       evidence={"source_url": source_url, "target": target,
                 "dropped_for_collision": dropped_for_collision,
-                "sha256_collisions": sha256_collisions,
+                "exact_collisions": exact_collisions,
                 "near_dup_collisions": near_dup_collisions,
                 "forbidden_split": "test" if target == "enrich-train" else "train"},
       source="evor-acquirer", tick=tick, node_id=None)`.

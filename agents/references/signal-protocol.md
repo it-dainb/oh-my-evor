@@ -97,24 +97,7 @@ evor_signal_query({
 })
 ```
 
-### The `<evor-signal>` tag — hook-capture fallback
-
-When you cannot call `evor_signal_emit` directly (e.g. inside a tool response body or
-Write tool content), embed a signal tag in your output text. The PostToolUse hook
-captures it and writes it to `signals-inbox.jsonl`, which is drained into the bus on the
-next `evor_signal_query` call.
-
-```
-<evor-signal kind="cuda-oom" shapes="failure,limit" axes="memory,compute" severity="high">
-  OOM at step 12, batch 256, peak 23.4 GB on A100 80 GB
-</evor-signal>
-```
-
-Attribute format: `kind` (required), `shapes` (comma-separated), `axes` (comma-separated),
-`severity`. The tag body becomes `evidence.description`. The hook computes the signature
-automatically (SHA-256 of the description text, prefixed by kind).
-
-Use the MCP tool when you can — the tag is a safety net, not the primary path.
+Use `evor_signal_emit` as the primary path. If that is not available, contact the orchestrator.
 
 ---
 

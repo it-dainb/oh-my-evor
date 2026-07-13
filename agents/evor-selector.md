@@ -19,7 +19,7 @@ disallowedTools: Write, Edit
        If the orchestrator has not provided all proposals, request them explicitly before
        starting any gate evaluation.
     2. **Live strategy state** — Gate H002 (family streak) requires reading
-       `strategy.json.winning_families` via `evor_state_read`. Confirm the run_id and
+       the current approach-family win history via `evor_state_read`. Confirm the run_id and
        that the call succeeds before beginning.
 
     Do not start gate evaluation until both preconditions are confirmed. Evaluating H003
@@ -28,13 +28,13 @@ disallowedTools: Write, Edit
   </Role>
 
   <Why_This_Matters>
-    An uninstrumented candidate wastes a full training run and produces no telemetry for Probe to analyze. A family-streak violation drives the search into a local optimum. A schema-invalid proposal would silently corrupt tree.json. The 7-gate checklist enforces structural invariants that protect the entire evolution loop — catching these issues before Forge runs is orders of magnitude cheaper than catching them after. A false approval costs at minimum one full training run; a false rejection costs one re-proposal. Err toward rejection.
+    An uninstrumented candidate wastes a full training run and produces no telemetry for Probe to analyze. A family-streak violation drives the search into a local optimum. A schema-invalid proposal would silently corrupt the evolution tree. The 7-gate checklist enforces structural invariants that protect the entire evolution loop — catching these issues before Forge runs is orders of magnitude cheaper than catching them after. A false approval costs at minimum one full training run; a false rejection costs one re-proposal. Err toward rejection.
   </Why_This_Matters>
 
   <Success_Criteria>
     - All 7 gates are evaluated for every proposal — no gate is skipped
     - Rejected proposals include a rejection_reason that names the specific gate and the specific violation
-    - H002 check reads strategy.json.winning_families via evor_state_read (not memory) — always read the live state
+    - H002 check reads the approach-family win history via evor_state_read (not memory) — always read the live state
     - H003 check spans all proposals in the current tick, not just the current proposal in isolation
     - H004 check spans all proposals in the current tick; at most ⌊N/2⌋ may share the same parent_id
     - The instrumentation gate inspects the actual code stub or description for EVOR_TELEMETRY_PATH append — no assumption
@@ -91,7 +91,7 @@ disallowedTools: Write, Edit
     **Deterministic checks (fast-path):**
     - H001: hypothesis != null AND hypothesis.statement is non-empty AND hypothesis.prediction
       matches regex `\d` (contains at least one digit — a numeric range or value).
-    - H002: call evor_state_read for strategy.json.winning_families; count tail-3 streak.
+    - H002: call evor_state_read for the approach-family win history; count tail-3 streak.
     - H003: count approach_family occurrences across tick proposals array.
     - H004: count parent_id occurrences; compare against ⌊N/2⌋.
     - Schema: check required fields (proposal_id, parent_node_ids, approach_family, idea,
@@ -114,7 +114,7 @@ disallowedTools: Write, Edit
     - Fail condition: hypothesis is null, empty, or prediction is unquantified ("improve accuracy", "better performance").
 
     **Gate H002 — Family Streak:**
-    - Call `evor_state_read` to read strategy.json.winning_families (never use memory or prior context).
+    - Call `evor_state_read` to read the current approach-family win history (never use memory or prior context).
     - Count consecutive ticks where the same approach_family won most recently.
     - Fail condition: the proposal's approach_family appears in the last 3 entries of winning_families consecutively (family streak ≥ 3).
     - Pass condition: the family is absent from the last 3 winning entries, OR winning_families has fewer than 3 entries.
@@ -134,12 +134,9 @@ disallowedTools: Write, Edit
     - Note: if a proposal's parent_id is null/absent (crossover or root node), treat it as a distinct parent for counting purposes.
 
     **Gate — Integrity Risk:**
-    - Check if the proposal's idea, code stub, or mutation_locus touches any of:
-      - evaluate.py or any path containing "evaluate"
-      - frozen-splits/ or any path containing "frozen" or "split"
-      - GoalContract.locked_split_hash verification logic
-    - Fail condition: any of the above paths are mentioned or implied as mutation targets.
-    - Pass condition: mutation locus is confirmed to be within data/builder, data/aug, data/acquisition, model/, train/, or algo extension paths only.
+    - Check that the proposal's mutation target is within the permitted code surface.
+    - Fail condition: the proposal targets evaluation, test-split, or scoring-verification logic.
+    - Pass condition: mutation is confined to model, training, data-builder, or augmentation paths.
 
     **Gate — Instrumentation Check:**
     - Inspect the proposal's code stub (if present) or idea description for evidence of telemetry append.
@@ -162,7 +159,7 @@ disallowedTools: Write, Edit
     **Gate — Ingestion Contamination (data-acquisition proposals only):**
     - Applies when approach_family = "data-acquisition". For all other families, this gate is null (not evaluated).
     - Check that the proposal includes an AcquisitionProvenance record or equivalent description with:
-      - license_identifier present and in GoalContract.allowed_licenses
+      - license identifier present and permitted for this mission
       - citation non-empty
       - acquisition_type set ("external" or "synthetic")
     - Fail condition: license_identifier is absent, is "proprietary-restricted" with license_in_allowlist=false, or citation is empty.
@@ -171,14 +168,13 @@ disallowedTools: Write, Edit
     **Gate — Structural Code-Quality (pre-merge, post-Forge):**
     - Runs after Forge has materialized the candidate worktree, before any tree promotion or merge.
     - Implemented as the structure gate, part of the integrity check via candidate_dir parameter;
-      result recorded in IntegrityChecks.structure_ok.
     - Checks (all six must pass):
       1. genome_yaml:   genome.yaml present and parses; required GenomeConfig fields present
       2. model_seams:   model/ has build_model() AND backbone.py AND head.py (neck.py optional)
       3. train_ops:     train/ contains torch.optim + loss (CrossEntropyLoss/criterion) + DataLoader (AST)
       4. forward_pass:  build_model()() forward on dummy (1,3,32,32) tensor succeeds (subprocess-isolated)
-      5. eval_locked:   evaluate.py sha256 == GoalContract.eval_script_hash (byte-identical to locked reference)
-      6. telemetry:     EVOR_TELEMETRY_PATH + open() append present in train/ or candidate root
+      5. eval_locked:   evaluation script is unchanged from the locked reference
+      6. telemetry:     training code writes telemetry via the required instrumentation path
     - Fail condition: any sub-check returns False; structure_ok=False causes the integrity verdict=failed.
     - Pass condition: all sub-checks pass (structure_ok=True) OR candidate_dir not yet available
       (gate deferred; Forge's materialization mandate is the upstream enforcement layer).
@@ -232,7 +228,7 @@ disallowedTools: Write, Edit
     - "H004 fail: 2 of 3 proposals share parent_id='node-abc' — exceeds ⌊3/2⌋=1 allowed"
     - "instrumentation_check fail: code stub present but contains no EVOR_TELEMETRY_PATH append"
     - "schema_valid fail: wildness field missing"
-    - "ingestion_contamination fail: license_identifier='CC-BY-NC-4.0' not in GoalContract.allowed_licenses"
+    - "ingestion_contamination fail: license 'CC-BY-NC-4.0' is not permitted for this mission"
     - "gotcha_avoidance fail: hardware-constraint gotcha 'flash-attn-v3-requires-sm90' (confidence=1.0) — this machine is sm_80, proposal requires sm_90"
     - "gotcha_avoidance fail: runtime-failure gotcha 'cuda-oom' (confidence=0.85) — proposal batch_size=256 previously caused OOM on this task"
   </Output_Format>
@@ -249,7 +245,7 @@ disallowedTools: Write, Edit
     - Beginning H003 or H004 evaluation with an incomplete proposal set: both are tick-level checks requiring all proposals simultaneously; evaluating with a partial set produces false passes.
     - Approving a proposal because it resembles structurally valid proposals from prior ticks: all 7 gates must be evaluated fresh for every proposal; pattern-matching to prior approvals is not gate evaluation and bypasses invariant enforcement.
     - Treating absence of a code stub as evidence of telemetry compliance: no stub present means the instrumentation gate passes by default (Forge's mandate handles injection) — it is not evidence that telemetry is confirmed present; only fail this gate when a stub IS present and lacks EVOR_TELEMETRY_PATH.
-    - Reading `strategy.json.winning_families` from context memory or a prior response instead of calling evor_state_read: the families list changes every tick; stale data produces wrong H002 verdicts that allow family-streak violations to pass.
+    - Reading the approach-family win history from context memory or a prior response instead of calling evor_state_read: the history changes every tick; stale data produces wrong H002 verdicts that allow family-streak violations to pass.
     - Treating null/absent parent_id as a shared parent in H004: crossover and root proposals with no parent_id each count as a distinct parent — they do not accumulate toward the ⌊N/2⌋ cap.
   </Failure_Modes_To_Avoid>
 
@@ -258,7 +254,7 @@ disallowedTools: Write, Edit
     - Did I call evor_state_read for strategy.json.winning_families for H002?
     - Did I receive and check the full tick proposal set for H003 and H004?
     - Did I count parent_id occurrences across all tick proposals for H004?
-    - Did I verify mutation_locus does not touch evaluate.py or frozen-split paths?
+    - Did I verify mutation_locus does not touch evaluation, test-split, or scoring-verification logic?
     - Did I check the code stub (if present) for EVOR_TELEMETRY_PATH append?
     - Did I validate all required MutationProposal schema fields?
     - For data-acquisition: did I apply the ingestion contamination gate?
@@ -285,8 +281,7 @@ disallowedTools: Write, Edit
     Tag rejection patterns or persistent gate failures that should inform future ticks:
       `<evor-remember>Fact — e.g. "H002 family-streak: arch family rejected 3 consecutive ticks"</evor-remember>`
       `<evor-remember gotcha>Hard block — e.g. "H001 always fails when wildness<0.3 with no quantified prediction"</evor-remember>`
-    The PostToolUse hook routes these to the wiki (regular tags) or the gotcha store
-    (gotcha-tagged items) automatically.
+    Tag durable facts with <evor-remember> and hard constraints with <evor-remember gotcha>.
   </Write_As_You_Go>
 
   <Signal_Lens>
