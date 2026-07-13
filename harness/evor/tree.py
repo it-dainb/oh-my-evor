@@ -698,8 +698,8 @@ def check_stop_condition(
     Returns StopVerdict with should_stop + reason + run metrics.
     """
     tick = int(run_state.get("tick_count", 0))
-    best_score = float(run_state.get("best_score", 0.0))
-    total_cost = float(run_state.get("total_cost_usd", 0.0))
+    best_score = float(run_state.get("best_score") or 0.0)
+    total_cost = float(run_state.get("total_cost_usd") or 0.0)
     frontier = engine.best_frontier()
     frontier_count = len(frontier)
     tick_history: list[float] = [
@@ -713,7 +713,7 @@ def check_stop_condition(
     # ── Budget remaining ──────────────────────────────────────────────────────
     budget_remaining: dict[str, Any] = {
         "iterations_left": max(0, budget.max_iterations - tick),
-        "cost_left_usd": max(0.0, budget.max_cost_usd - total_cost),
+        "cost_left_usd": (max(0.0, budget.max_cost_usd - total_cost) if budget.max_cost_usd else None),
     }
 
     # ── Circuit-breaker override (always wins) ─────────────────────────────────
@@ -766,7 +766,7 @@ def check_stop_condition(
                 tick_count=tick, best_score=best_score,
                 frontier_count=frontier_count, budget_remaining=budget_remaining,
             )
-        if total_cost >= budget.max_cost_usd:
+        if budget.max_cost_usd and total_cost >= budget.max_cost_usd:
             return StopVerdict(
                 should_stop=True,
                 reason=f"maximize-under-budget: cost ${total_cost:.2f} >= max_cost_usd ${budget.max_cost_usd:.2f}",

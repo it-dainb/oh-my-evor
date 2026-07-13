@@ -181,6 +181,13 @@ skills: [oh-my-evor:evor-mcp]
       until state is terminal (succeeded, failed, oom, diverged).
       On OOM: stop immediately — do NOT retry manually.
 
+      MANDATORY: Forge MUST NOT end its turn while the training job is still running or
+      while forge-report.json has not yet been written. Continue polling evor_run_status
+      until a terminal state is reached, then complete Phase 7.5 and Phase 8 (write
+      forge-report via evor_write_artifact(agent="forge")) before returning. Returning
+      before the job reaches a terminal state or before the forge-report is written is a
+      protocol violation — the orchestrator will re-spawn Forge to finish, wasting a tick.
+
     Phase 7.5 — Post-run deep review (P1-13 + P2-8)
       # P1-13: architect + analyst run POST-training (not pre-training), only when needed.
       # P2-8: MAX_DIAGNOSTIC_CYCLES = 2 — if training produced a soft failure (NaN, divergence),

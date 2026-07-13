@@ -633,9 +633,9 @@ class TestRewardHackingProbeMetricScale:
         result = self._make_result(98.0)
         goal = self._make_goal(metric_scale=100.0)
         # reward_hacking_probe returns True when hacking detected (bad)
-        flagged = gate._check_reward_hacking(result, goal)
-        # 98/100 == 0.98 == LEAK_CEILING → triggers (>= is inclusive)
-        assert flagged, "98/100 = 0.98 at the ceiling should be flagged (>= is inclusive)"
+        flagged = gate._check_reward_hacking(result, goal, corroborated=True)
+        # 98/100 == 0.98 == LEAK_CEILING → triggers (>= is inclusive) when corroborated
+        assert flagged, "98/100 = 0.98 at the ceiling should be flagged (>= is inclusive) when corroborated"
 
     def test_score_97_scale_100_does_not_trigger(self) -> None:
         """97.0 / 100.0 = 0.97 — clearly below ceiling; must not trigger."""
@@ -652,8 +652,8 @@ class TestRewardHackingProbeMetricScale:
         gate = IntegrityGate()
         result = self._make_result(99.0)
         goal = self._make_goal(metric_scale=100.0)
-        flagged = gate._check_reward_hacking(result, goal)
-        assert flagged, "99/100 = 0.99 should be flagged as reward hacking ceiling"
+        flagged = gate._check_reward_hacking(result, goal, corroborated=True)
+        assert flagged, "99/100 = 0.99 should be flagged as reward hacking ceiling when corroborated"
 
     def test_score_0_98_scale_1_triggers(self) -> None:
         """Legacy scale=1.0: raw score 0.98 still triggers (no change to existing behaviour)."""
@@ -661,8 +661,8 @@ class TestRewardHackingProbeMetricScale:
         gate = IntegrityGate()
         result = self._make_result(0.98)
         goal = self._make_goal(metric_scale=1.0)
-        flagged = gate._check_reward_hacking(result, goal)
-        assert flagged, "0.98 with scale=1.0 must still trigger (backward compat)"
+        flagged = gate._check_reward_hacking(result, goal, corroborated=True)
+        assert flagged, "0.98 with scale=1.0 must still trigger when corroborated (backward compat)"
 
 
 # ─── P0-2: Contract seal ──────────────────────────────────────────────────────

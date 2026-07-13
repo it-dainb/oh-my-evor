@@ -1112,9 +1112,9 @@ class TestRewardHackingDirectionAware:
         )
 
         result = SimpleNamespace(metrics={"mse": 0.001}, telemetry_summary={})
-        assert gate._check_reward_hacking(result, goal) is True, (
-            "near-perfect lower-is-better metric (mse=0.001) not flagged; "
-            "LEAK_CEILING=0.98 is direction-blind and misses lower-is-better ceiling"
+        assert gate._check_reward_hacking(result, goal, corroborated=True) is True, (
+            "near-perfect lower-is-better metric (mse=0.001) not flagged even when corroborated; "
+            "ceiling branch should fire when concrete leakage evidence is present"
         )
 
     def test_sudden_drop_in_lower_is_better_spike_flagged(self):
@@ -1163,7 +1163,93 @@ class TestRewardHackingDirectionAware:
         assert gate._check_reward_hacking(
             SimpleNamespace(metrics={"accuracy": 0.82}, telemetry_summary={}), goal
         ) is False
-        # Near-perfect on hard task — must be flagged
+        # Near-perfect with corroboration — must be flagged
         assert gate._check_reward_hacking(
-            SimpleNamespace(metrics={"accuracy": 0.99}, telemetry_summary={}), goal
+            SimpleNamespace(metrics={"accuracy": 0.99}, telemetry_summary={}), goal, corroborated=True
         ) is True
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# FIX 2: reward_hacking ceiling false-positive fix
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestRewardHackingCorroboration:
+    """FIX 2: near-perfect val (>=0.98) should only fail when corroborated by a
+    concrete leakage check (no_test_leakage / no_label_contamination). An
+    uncorroborated near-perfect score on an easy task is legitimate and must pass.
+    Per-step val spikes remain an unconditional hard-fail regardless of corroboration.
+    """
+
+    def _make_gate_and_goal(self, direction: str = "higher", metric_name: str = "accuracy"):
+        from evor.integrity import IntegrityGate
+        from types import SimpleNamespace
+        gate = IntegrityGate.__new__(IntegrityGate)
+        goal = SimpleNamespace(
+            metric_specs=[SimpleNamespace(
+                metric_name=metric_name,
+                role="primary_fitness",
+                direction=direction,
+            )],
+            metric_scale=1.0,
+        )
+        return gate, goal
+
+    def test_near_perfect_uncorroborated_does_not_flag(self):
+        """val=0.99 (>= LEAK_CEILING) with no concrete leakage → reward_hacking_probe False.
+
+        This is the false-positive fix: legitimately easy tasks with 4/4 clean models
+        at 99% were rejected because the ceiling fired unconditionally. Now the ceiling
+        only fires when a concrete leakage check (no_test_leakage / no_label_contamination)
+        also fails.
+        """
+        from types import SimpleNamespace
+        gate, goal = self._make_gate_and_goal()
+        result = SimpleNamespace(metrics={"accuracy": 0.99}, telemetry_summary={})
+        # All concrete leakage checks passed → corroborated=False
+        flagged = gate._check_reward_hacking(result, goal, corroborated=False)
+        assert flagged is False, (
+            "near-perfect val (0.99) with all concrete leakage checks clean must NOT "
+            "be flagged — this was the live false-positive: easy tasks rejected unfairly"
+        )
+
+    def test_near_perfect_with_leakage_evidence_flags(self):
+        """val=0.99 AND a concrete leakage failure → reward_hacking_probe True.
+
+        When no_test_leakage=False the ceiling is corroborated and must still fire.
+        """
+        from types import SimpleNamespace
+        gate, goal = self._make_gate_and_goal()
+        result = SimpleNamespace(metrics={"accuracy": 0.99}, telemetry_summary={})
+        # no_test_leakage failed → corroborated=True
+        flagged = gate._check_reward_hacking(result, goal, corroborated=True)
+        assert flagged is True, (
+            "near-perfect val (0.99) WITH a concrete leakage failure must still be flagged"
+        )
+
+    def test_val_spike_flags_regardless_of_corroboration(self):
+        """A per-step val spike is an unconditional hard-fail even without corroboration.
+
+        The spike branch must remain unchanged — only the ceiling branch requires
+        corroboration. A spike of 0.9-0.25=0.65 > SPIKE_THRESH (0.30) must fire
+        even when corroborated=False.
+        """
+        from evor.contracts import TelemetrySummary
+        from evor.integrity import IntegrityGate
+        from types import SimpleNamespace
+
+        gate = IntegrityGate.__new__(IntegrityGate)
+        goal = SimpleNamespace(
+            metric_specs=[SimpleNamespace(
+                metric_name="acc",
+                role="primary_fitness",
+                direction="higher",
+            )],
+            metric_scale=1.0,
+        )
+        # val is sub-ceiling (0.5) but val_series has a spike: 0.9-0.25=0.65 > 0.30
+        ts = TelemetrySummary(total_steps=3, val_series=[0.2, 0.25, 0.9])
+        result = SimpleNamespace(metrics={"acc": 0.5}, telemetry_summary=ts)
+        flagged = gate._check_reward_hacking(result, goal, corroborated=False)
+        assert flagged is True, (
+            "per-step val spike must be flagged unconditionally regardless of corroboration"
+        )

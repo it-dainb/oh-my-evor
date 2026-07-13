@@ -98,8 +98,8 @@ def test_reward_hacking_flags_leakage_not_success():
     )
     # baseline 0.20 -> 0.38 = +88% relative but sub-ceiling → legitimate SUCCESS, NOT hacking
     assert gate._check_reward_hacking(SimpleNamespace(metrics={"acc": 0.382}, telemetry_summary={}), goal) is False
-    # near-perfect on a hard task → leakage signature → flagged
-    assert gate._check_reward_hacking(SimpleNamespace(metrics={"acc": 0.99}, telemetry_summary={}), goal) is True
+    # near-perfect on a hard task with corroboration → leakage signature → flagged
+    assert gate._check_reward_hacking(SimpleNamespace(metrics={"acc": 0.99}, telemetry_summary={}), goal, corroborated=True) is True
     # sudden per-step val spike → flagged
     assert gate._check_reward_hacking(SimpleNamespace(metrics={"acc": 0.5}, telemetry_summary={"val_series": [0.2, 0.25, 0.9]}), goal) is True
 

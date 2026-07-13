@@ -220,7 +220,9 @@ class IntegrityGate:
 
         # ── Check 6: reward_hacking_probe ─────────────────────────────────
         # True = hacking detected (bad); False = no hacking (good)
-        reward_hacking_probe = self._check_reward_hacking(result, goal)
+        # Ceiling branch requires corroboration from concrete leakage checks (2/3).
+        corroborated_leakage = (not no_test_leakage) or (not no_label_contamination)
+        reward_hacking_probe = self._check_reward_hacking(result, goal, corroborated=corroborated_leakage)
         if reward_hacking_probe:
             failures.append(
                 "reward_hacking_probe: near-perfect val (leakage ceiling) or a "
@@ -445,7 +447,7 @@ class IntegrityGate:
         return True
 
     def _check_reward_hacking(
-        self, result: EvaluationResult, goal: GoalContract
+        self, result: EvaluationResult, goal: GoalContract, corroborated: bool = False
     ) -> bool:
         """Check 6: detect leakage signatures — a near-perfect val (leakage ceiling) or
         a sudden per-step val SPIKE. A large but sub-ceiling improvement over baseline is
@@ -456,6 +458,13 @@ class IntegrityGate:
                             spike     = series[i] - series[i-1] > SPIKE_THRESH
           lower-is-better:  ceiling hit = val <= LEAK_FLOOR (0.02)
                             spike     = series[i-1] - series[i] > SPIKE_THRESH
+
+        Corroboration rule (false-positive fix):
+          A near-perfect absolute value (LEAK_CEILING / LEAK_FLOOR) is flagged as hacking
+          ONLY when a concrete leakage check (no_test_leakage / no_label_contamination) also
+          fails (corroborated=True). An uncorroborated near-perfect score on an easy task is
+          legitimate and must not fail.
+          Per-step val spikes are always an unconditional hard-fail regardless of corroboration.
 
         Returns True when hacking is flagged (bad); False when clean.
         """
@@ -488,9 +497,9 @@ class IntegrityGate:
         metric_scale = getattr(goal, "metric_scale", 1.0) or 1.0
         normalised_val = candidate_val / metric_scale
 
-        if direction == "higher" and normalised_val >= LEAK_CEILING:
+        if direction == "higher" and normalised_val >= LEAK_CEILING and corroborated:
             return True
-        if direction == "lower"  and normalised_val <= LEAK_FLOOR:
+        if direction == "lower"  and normalised_val <= LEAK_FLOOR   and corroborated:
             return True
 
         # Best-effort per-step spike check when a val series is present in telemetry.

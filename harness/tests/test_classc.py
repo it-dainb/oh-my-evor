@@ -439,6 +439,50 @@ def test_stop_worst_angle_plateau(tmp_path: Path) -> None:
     assert "plateau" in verdict.reason
 
 
+# ── FIX 1 new tests: check_stop_condition null/zero edge cases ────────────────
+
+
+def test_stop_max_cost_zero_does_not_stop_at_tick_zero(tmp_path: Path) -> None:
+    """max_cost_usd=0 means no cost cap (local-only); must NOT stop at tick 0 with cost 0."""
+    budget = _make_budget(max_iterations=50, circuit_breaker=100, max_cost_usd=0.0)
+    goal = _make_goal(stop_type="maximize-under-budget", target=None, budget=budget)
+    engine = _make_engine(goal=goal, tmp_path=tmp_path)
+    # tick=0, total_cost=0 — with the old 0>=0 bug this would stop immediately
+    state = _run_state(tick=0, best_score=0.0, total_cost_usd=0.0)
+    verdict = check_stop_condition(goal, state, engine)
+    assert verdict.should_stop is False, (
+        "max_cost_usd=0 (no cap) must not stop at tick 0; only circuit-breaker/max_iterations should gate"
+    )
+
+
+def test_stop_best_score_none_does_not_crash(tmp_path: Path) -> None:
+    """best_score present-but-None must not crash and must be treated as 0.0."""
+    goal = _make_goal(stop_type="target", baseline=0.70, target=0.90)
+    engine = _make_engine(goal=goal, tmp_path=tmp_path)
+    state: dict = {
+        "tick_count": 2,
+        "best_score": None,          # present-but-None
+        "total_cost_usd": None,      # present-but-None
+        "tick_history_scores": [],
+        "worst_angle_coverage": 0.0,
+    }
+    verdict = check_stop_condition(goal, state, engine)
+    # 0.0 < 0.90 target → should not stop; the key point is it must not raise
+    assert verdict.should_stop is False
+    assert verdict.best_score == pytest.approx(0.0)
+
+
+def test_stop_real_cost_cap_fires(tmp_path: Path) -> None:
+    """A real max_cost_usd > 0 DOES stop when total_cost exceeds it."""
+    budget = _make_budget(max_iterations=50, circuit_breaker=100, max_cost_usd=10.0)
+    goal = _make_goal(stop_type="maximize-under-budget", target=None, budget=budget)
+    engine = _make_engine(goal=goal, tmp_path=tmp_path)
+    state = _run_state(tick=3, best_score=0.80, total_cost_usd=12.0)
+    verdict = check_stop_condition(goal, state, engine)
+    assert verdict.should_stop is True
+    assert "max_cost_usd" in verdict.reason
+
+
 def test_stop_verdict_budget_remaining(tmp_path: Path) -> None:
     """StopVerdict always includes budget_remaining with iterations_left and cost_left_usd."""
     budget = _make_budget(max_iterations=20, max_cost_usd=50.0, circuit_breaker=100)
