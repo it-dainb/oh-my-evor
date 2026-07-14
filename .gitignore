@@ -42,3 +42,5 @@ mcp/.uv/
 
 # generated CI evidence artifacts
 ci/out/
+
+logs/
