@@ -188,6 +188,80 @@ describe("Sage's self-directed angle is stated where Sage will read it", () => {
   });
 });
 
+describe("Selector's artifact has no enforced schema — the analyzer must survive that", () => {
+  // Three consecutive ticks of ONE real run used three different shapes:
+  //   tick 1  reviews[]              -> critic_review.verdict
+  //   tick 2  per_proposal_reviews[] -> verdict: "deferred"
+  //   tick 3  reviews[]              -> critic_approved: true
+  // Reading only the first shape reported "0 approved" for tick 2 and a confident
+  // "0% selector precision" that was pure parser artifact.
+  let multi: string;
+
+  beforeAll(() => {
+    multi = mkdtempSync(join(tmpdir(), "evor-sq-schema-"));
+    const w = (p: string, o: unknown) => {
+      mkdirSync(dirname(p), { recursive: true });
+      writeFileSync(p, JSON.stringify(o));
+    };
+    w(join(multi, "tree.json"), { nodes: {} });
+    w(join(multi, "run-state.json"), { run_id: "schema-run" });
+    for (const t of [1, 2, 3]) {
+      w(join(multi, "ticks", String(t), "mutagen", "proposals.json"), { proposals: [{ approach_family: "a", mutation_tier: "p" }] });
+    }
+    w(join(multi, "ticks", "1", "selector", "verdict.json"), {
+      reviews: [{ proposal_id: "p1", critic_review: { verdict: "approved" } }],
+    });
+    w(join(multi, "ticks", "2", "selector", "verdict.json"), {
+      per_proposal_reviews: [{ proposal_id: "p2", verdict: "approved" }, { proposal_id: "p3", verdict: "deferred" }],
+    });
+    w(join(multi, "ticks", "3", "selector", "verdict.json"), {
+      reviews: [{ proposal_id: "p4", critic_approved: true }],
+    });
+  });
+
+  afterAll(() => rmSync(multi, { recursive: true, force: true }));
+
+  function run(dir: string) {
+    const r = spawnSync("node", [SCRIPT, dir, "--json"], { encoding: "utf8" });
+    if (r.status !== 0) throw new Error(`analyzer exited ${r.status}: ${r.stderr}`);
+    return JSON.parse(r.stdout);
+  }
+
+  it("reads approvals from all three shapes", () => {
+    expect(run(multi).per_tick.map((t: { approved: number }) => t.approved)).toEqual([1, 1, 1]);
+  });
+
+  it("reports the drift instead of silently averaging over it", () => {
+    expect(run(multi).summary.selector_schema_drift).toBe(true);
+  });
+
+  it("never reports an unrecognised review as a rejection", () => {
+    const odd = mkdtempSync(join(tmpdir(), "evor-sq-odd-"));
+    mkdirSync(join(odd, "ticks", "1", "selector"), { recursive: true });
+    writeFileSync(join(odd, "run-state.json"), JSON.stringify({ run_id: "odd" }));
+    writeFileSync(join(odd, "tree.json"), JSON.stringify({ nodes: {} }));
+    writeFileSync(
+      join(odd, "ticks", "1", "selector", "verdict.json"),
+      JSON.stringify({ reviews: [{ proposal_id: "x", some_future_field: "yes" }] }),
+    );
+    const out = run(odd);
+    rmSync(odd, { recursive: true, force: true });
+    expect(out.summary.reviews_undecidable, "an unknown shape must be flagged, not counted as rejected").toBe(1);
+    expect(out.per_tick[0].approved).toBe(0);
+  });
+
+  it("distinguishes an unparseable verdict file from a genuine zero", () => {
+    const empty = mkdtempSync(join(tmpdir(), "evor-sq-empty-"));
+    mkdirSync(join(empty, "ticks", "1", "selector"), { recursive: true });
+    writeFileSync(join(empty, "run-state.json"), JSON.stringify({ run_id: "e" }));
+    writeFileSync(join(empty, "tree.json"), JSON.stringify({ nodes: {} }));
+    writeFileSync(join(empty, "ticks", "1", "selector", "verdict.json"), JSON.stringify({ unknown_root_key: [] }));
+    const out = run(empty);
+    rmSync(empty, { recursive: true, force: true });
+    expect(out.summary.verdicts_unparsed).toBe(1);
+  });
+});
+
 function readFileSyncSafe(p: string): string {
   // eslint-disable-next-line @typescript-eslint/no-var-requires
   return require("fs").readFileSync(p, "utf8");

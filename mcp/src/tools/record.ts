@@ -254,6 +254,12 @@ export function recordEval(
   // Cascade status → "done" and write integrity_status back to tree.json.
   // Without this, tree nodes stay status="running" forever after Forge writes results —
   // the orchestrator had to call evor_record_node 4+ extra times per run to fix it (P0-5).
+  //
+  // A1: the tree node's own metrics/fitness_value are also cascaded here, from the
+  // very `result` object this function just wrote to results.json. Before this, the
+  // scoreboard lived only in nodes/<id>/results.json — tree.json kept whatever
+  // (usually empty) metrics the node had at evor_record_node time, so evor_tree_read
+  // (what evor-mutagen calls to pick a parent) returned a frontier with no fitness.
   try {
     const nodes = readTree(runId, missionId);
     const node = nodes[nodeId];
@@ -261,6 +267,13 @@ export function recordEval(
       const updates: Partial<TreeNode> = { status: "done" };
       if (integrityVerdict === "passed" || integrityVerdict === "failed") {
         updates.integrity_status = integrityVerdict as "passed" | "failed";
+      }
+      const r = result as Record<string, unknown> | null;
+      if (r && typeof r.metrics === "object" && r.metrics !== null) {
+        updates.metrics = r.metrics as Record<string, number>;
+      }
+      if (typeof r?.fitness_value === "number") {
+        updates.fitness_value = r.fitness_value;
       }
       upsertNode(runId, { ...node, ...updates }, missionId);
     }

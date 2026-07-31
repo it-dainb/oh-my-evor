@@ -34,6 +34,11 @@ export type NamedTreeNode = {
   depth: number;
   approach_family: TreeNode["approach_family"];
   score?: number;
+  // A1: the node's own scoreboard. Undefined whenever integrity_status is
+  // "failed" — a cheating candidate must never look like a scored, selectable
+  // frontier node just because evor-mutagen forgot to pass the integrity filter.
+  metrics?: TreeNode["metrics"];
+  fitness_value?: number;
   parent_names: string[];
 };
 
@@ -81,6 +86,7 @@ function dfsCollect(
 
 /** Map a raw TreeNode to the agent-facing name-only shape. */
 function toNamedNode(node: TreeNode, runId: string, missionId: string | undefined): NamedTreeNode {
+  const scored = node.integrity_status !== "failed";
   return {
     name: nameForId(runId, node.id, missionId),
     status: node.status,
@@ -88,6 +94,8 @@ function toNamedNode(node: TreeNode, runId: string, missionId: string | undefine
     depth: node.depth,
     approach_family: node.approach_family,
     score: node.ucb1_score,
+    metrics: scored ? node.metrics : undefined,
+    fitness_value: scored ? node.fitness_value : undefined,
     parent_names: namesForIds(runId, node.parent_ids, missionId),
   };
 }

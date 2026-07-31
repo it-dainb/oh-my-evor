@@ -100,13 +100,37 @@ for (const t of ticks) {
     if (locus && !seenLoci.has(locus)) { novelLoci++; seenLoci.add(locus); }
   }
 
-  const reviews = verdict?.reviews ?? [];
-  const approved = reviews.filter((r) => r.critic_review?.verdict === 'approved');
+  // Selector's artifact has NO ENFORCED SCHEMA and drifts within a single run.
+  // Observed across three consecutive ticks of one run:
+  //   tick 1  reviews[]              -> critic_review.verdict
+  //   tick 2  per_proposal_reviews[] -> verdict: "deferred"
+  //   tick 3  reviews[]              -> critic_approved: true
+  // Reading only the first shape reported "0 approved" for tick 2 and a confident
+  // 0% selector precision. That is the third time in this work that a parser miss
+  // has been indistinguishable from a finding about the search, so unparseable is
+  // now tracked separately from zero and surfaced in the output.
+  const reviews = verdict?.reviews ?? verdict?.per_proposal_reviews ?? [];
+  const verdictUnparsed = Boolean(verdict) && reviews.length === 0;
+
+  const approvalOf = (r) => {
+    const cr = r.critic_review ?? {};
+    if (typeof r.critic_approved === 'boolean') return r.critic_approved;
+    for (const v of [cr.verdict, r.verdict]) {
+      if (typeof v === 'string') return v === 'approved';
+    }
+    if (typeof r.selected === 'boolean') return r.selected;
+    if (typeof r.selected_for_forge === 'boolean') return r.selected_for_forge;
+    return null; // shape not recognised — do NOT silently count as a rejection
+  };
+
+  const decisions = reviews.map(approvalOf);
+  const approved = decisions.filter((d) => d === true).length;
+  const undecidable = decisions.filter((d) => d === null).length;
+
   const rejectedGates = {};
   for (const r of reviews) {
-    const cr = r.critic_review ?? {};
-    if (cr.verdict === 'approved') continue;
-    for (const [gate, res] of Object.entries(cr)) {
+    if (approvalOf(r) === true) continue;
+    for (const [gate, res] of Object.entries({ ...(r.critic_review ?? {}), ...r })) {
       if (res === 'fail') rejectedGates[gate] = (rejectedGates[gate] ?? 0) + 1;
     }
   }
@@ -136,13 +160,19 @@ for (const t of ticks) {
     novel_family_tier_combos: novelCombos,
     novel_loci: novelLoci,
     reviewed: reviews.length,
-    approved: approved.length,
+    approved,
+    undecidable,
+    verdict_unparsed: verdictUnparsed,
+    schema_shape: verdict?.reviews ? 'reviews' : verdict?.per_proposal_reviews ? 'per_proposal_reviews' : 'none',
     rejection_gates: rejectedGates,
     sage_present: Boolean(sage),
     sage_findings: sageFindings.length,
     sage_queries_asked: queries.length,
     sage_disconfirming: disconfirming,
     sage_proactive_findings: proactive,
+    // C3: Sage answered how much of what it was asked? One real run wrote
+    // quorum_met:true over a findings set covering 1 of 6 queries.
+    sage_coverage: queries.length ? Math.min(1, sageFindings.length / queries.length) : null,
     probe_present: Boolean(probe),
   });
 }
@@ -161,6 +191,26 @@ for (const t of ticks.map(Number)) {
 }
 const improvingTicks = trajectory.filter((x) => x.improved).length;
 
+// C1 — Selector calibration. Its verdicts are PREDICTIONS ("this is worth a
+// training run") and the realized fitness is ground truth, so it is the one agent
+// that can be scored against reality rather than against a rubric.
+//
+// Coarse by necessity: a proposal is linked to its outcome through the tick, not
+// individually, because only the tick's forge-report names the node. And there is
+// no recall term at all — see the censoring note at the bottom of the output.
+const decided = perTick.filter((t) => t.reviewed > 0);
+const withApproval = decided.filter((t) => t.approved > 0);
+const approvedAndImproved = withApproval.filter((t) => trajectory.find((x) => x.tick === t.tick)?.improved).length;
+const selectorPrecision = withApproval.length ? approvedAndImproved / withApproval.length : null;
+
+// C2 — did wildness translate into actually-different proposals, or is the dial
+// decorative? Compares Mutagen's declared wildness against the novel-loci rate it
+// produced. A rising dial with a flat novelty rate is the silent-conservatism
+// failure the moonshot prose exists to prevent and does not enforce.
+const wildnessVsNovelty = perTick
+  .filter((t) => typeof t.wildness === 'number' && t.proposals > 0)
+  .map((t) => ({ tick: t.tick, wildness: t.wildness, novel_locus_rate: t.novel_loci / t.proposals }));
+
 const summary = {
   run_id: runState.run_id ?? null,
   ticks: ticks.length,
@@ -178,8 +228,14 @@ const summary = {
     return r ? a2 / r : null;
   })(),
   ticks_without_sage: perTick.filter((t) => !t.sage_present).length,
+  verdicts_unparsed: perTick.filter((t) => t.verdict_unparsed).length,
+  reviews_undecidable: perTick.reduce((a, t) => a + t.undecidable, 0),
+  selector_schema_drift: new Set(perTick.filter((t) => t.reviewed > 0).map((t) => t.schema_shape)).size > 1,
   nodes_with_empty_tree_metrics: nodes.filter((n) => n.tree_metrics_empty).length,
   sage_proactive_total: perTick.reduce((a, t) => a + t.sage_proactive_findings, 0),
+  selector_precision: selectorPrecision,
+  selector_ticks_scored: withApproval.length,
+  wildness_vs_novelty: wildnessVsNovelty,
   distinct_fitness_values: [...new Set(scored.map((n) => n.fitness))].sort((a, b) => a - b),
 };
 
@@ -197,6 +253,15 @@ console.log(`ticks ${summary.ticks} · proposals ${summary.total_proposals} · n
 console.log(`best_score ${summary.best_score} · families explored ${summary.distinct_families_explored} · approval rate ${pct(summary.approval_rate)}`);
 console.log(`\nIMPROVING TICKS  ${summary.improving_ticks}/${summary.ticks}  (${pct(summary.improving_tick_ratio)})` +
             `${summary.improving_tick_ratio !== null && summary.improving_tick_ratio < 0.5 ? '   <-- the search is mostly not finding anything' : ''}`);
+if (summary.verdicts_unparsed || summary.reviews_undecidable) {
+  console.log(`SELECTOR ARTIFACTS UNREADABLE — ${summary.verdicts_unparsed} verdict file(s) parsed to zero reviews, ` +
+              `${summary.reviews_undecidable} review(s) had no recognisable approval field.`);
+  console.log('  Treat every Selector number below as incomplete, not as a result.');
+}
+if (summary.selector_schema_drift) {
+  console.log('SELECTOR SCHEMA DRIFTS BETWEEN TICKS in this run — the artifact has no enforced');
+  console.log('  shape, so any consumer of it (including the orchestrator) is guessing.');
+}
 if (summary.sage_proactive_total === 0 && summary.ticks > 1) {
   console.log('SAGE PROACTIVE FINDINGS 0 — every answer stayed inside the question set');
   console.log('  Mutagen already had. Nothing new can enter the hypothesis space this way.');
@@ -214,6 +279,29 @@ for (const t of perTick) {
     `${String(t.wildness ?? '-').padStart(5)} ${String(t.novel_family_tier_combos).padStart(8)} ${String(t.novel_loci).padStart(8)} ` +
     `${String(t.sage_present ? t.sage_findings : 'MISS').padStart(5)} ${String(t.sage_disconfirming).padStart(7)}  ${t.families.join(',')}`
   );
+}
+
+console.log('\nSELECTOR calibration (precision only, no recall — see note):');
+if (summary.selector_precision === null) {
+  console.log('  no tick had an approval to score');
+} else {
+  console.log(`  ${pct(summary.selector_precision)} of ticks where Selector approved something improved the running best` +
+              `  (n=${summary.selector_ticks_scored})`);
+}
+
+console.log('\nMUTAGEN wildness vs realized novelty:');
+for (const w of summary.wildness_vs_novelty) {
+  console.log(`  tick ${w.tick}: wildness ${w.wildness} -> novel-locus rate ${w.novel_locus_rate.toFixed(2)}`);
+}
+if (summary.wildness_vs_novelty.length > 1) {
+  const first = summary.wildness_vs_novelty[0], last = summary.wildness_vs_novelty.at(-1);
+  const saturated = summary.wildness_vs_novelty.every((w) => w.novel_locus_rate >= 1);
+  if (saturated) {
+    console.log('  (novel-locus rate is pinned at 1.00 — every proposal touched a fresh locus,');
+    console.log('   so this metric is at ceiling and cannot discriminate. Needs a distance measure.)');
+  } else if (last.wildness > first.wildness && last.novel_locus_rate < first.novel_locus_rate) {
+    console.log('  ! the dial went up and novelty went down — wildness may be decorative');
+  }
 }
 
 console.log('\ntrajectory:');
