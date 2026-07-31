@@ -201,21 +201,35 @@ Spawn Mutagen and Sage as REAL sub-agents. Do NOT write proposals or citations y
    Before spawning Sage, call `evor_wiki_query` and `evor_gotcha_query` for each angle in
    `investigation_queries[]`. Classify each query as wiki-resolved, gotcha-resolved, or unresolved.
 
-   **Skip Sage entirely** (and mark all queries resolved from wiki/gotcha) when ALL of the
-   following hold:
+   **Narrow Sage to its self-directed angle only** (and mark Mutagen's queries resolved from
+   wiki/gotcha) when ALL of the following hold:
    - All investigation_queries are wiki-resolved (wiki returned a confirmed lesson for each angle)
    - The proposal's approach_family is a known recipe already run this mission (not new to the run)
    - wildness < 0.7 (parametric / familiar territory; low surprise risk)
    - approach_family != "data-acquisition" (no sourcing due diligence needed)
 
-   **Spawn Sage** when ANY of the following is true:
+   **Spawn Sage at FULL scope** when ANY of the following is true (otherwise it still runs,
+   narrowed to the self-directed angle — Sage is never skipped outright):
    - One or more investigation_queries are NOT wiki-resolved after the wiki+gotcha check
    - approach_family is new to this run (first tick using this family in this mission)
    - wildness >= 0.7 (structural or high-exploration proposal; external grounding adds value)
    - approach_family == "data-acquisition" (license sourcing requires Sage's Tier-1 search)
 
+   **Why the narrow path is not a skip.** Every condition above is a CONVERGENCE signal:
+   the wiki already answers everything Mutagen thought to ask, the family has been tried,
+   wildness is low. Skipping Sage there switches off the only channel that can widen the
+   hypothesis space at exactly the moment the search is settling into familiar ground.
+   Mutagen can only ask about what it already suspects, and Sage only ever answered
+   Mutagen — so a mission that stops asking new questions stops receiving new ideas, and
+   nothing in the loop notices. Measured: Sage ran in 1 of 3 ticks of a real run, all at
+   wildness 0.3-0.55, and produced zero self-directed findings because it was never given
+   the chance. The narrow path costs one junior instead of N and keeps the channel alive.
+
    When spawning Sage (narrowed scope): pass the UNRESOLVED angles only; wiki-resolved angles
    are already handled. Include the wiki hit IDs in the spawn prompt so Sage skips them.
+   When there are NO unresolved angles, still spawn Sage for its self-directed angle alone
+   (`Sage_Fan_Out_Protocol` Step 1b) — it must answer a question nobody asked, not re-answer
+   one the wiki already covered.
 
    `Task(subagent_type="oh-my-evor:evor-sage", description="Tick <n> grounding", prompt="Run dir: <run_dir>. Tick: <n>. Read the tick handoff via evor_read_handoff and answer the UNRESOLVED investigation_queries (wiki-resolved angle IDs already handled: [<ids>]). Write ticks/<n>/sage/findings.json.")`.
    - **POST-CONDITION:** call `evor_read_artifact({ run_id, tick: n, agent: "sage" })`. If it returns `{error:"not found"}`, re-spawn Sage.
