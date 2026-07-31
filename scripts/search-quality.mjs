@@ -65,29 +65,41 @@ function fitnessOf(id) {
   return null;
 }
 
-/** Tick a node belongs to, inferred from which tick's artifacts name it. */
+/**
+ * Tick a node belongs to, inferred from which tick's artifacts name it.
+ *
+ * Scans EVERY artifact under ticks/<t>/, not just forge/forge-report.json. The
+ * first version looked only at the final forge report, and a real run ended tick 3
+ * with `forge-report-partial.json` — so its node (fitness 0.905302, the run's best)
+ * was attributed to no tick and silently reported as "tick 3: nodes 0, no gain".
+ * That read as a search that stalled. It had not; the parser had.
+ *
+ * Anything still unattributed is counted and surfaced rather than dropped.
+ */
 function tickOfNode(id, name) {
   for (const t of ticks) {
-    const blob = JSON.stringify(readJson(join(ticksDir, t, 'forge', 'forge-report.json')) ?? {});
-    if (blob.includes(id) || (name && blob.includes(name))) return Number(t);
+    const dir = join(ticksDir, t);
+    let blob = '';
+    for (const agent of readdirSync(dir, { withFileTypes: true })) {
+      if (!agent.isDirectory()) continue;
+      for (const f of readdirSync(join(dir, agent.name))) {
+        if (f.endsWith('.json')) blob += readFileSync(join(dir, agent.name, f), 'utf8');
+      }
+    }
+    // Match the QUOTED value, not a raw substring: a short id like "a" otherwise
+    // matches any artifact containing that letter, and every node collapses onto
+    // the first tick. Real ids are UUIDs, but names are author-chosen and short.
+    for (const key of [id, name].filter(Boolean)) {
+      if (blob.includes(`"${key}"`)) return Number(t);
+    }
   }
   return null;
 }
 
-
 /**
- * Proposal distance, for C2.
- *
- * The first novelty metric counted distinct (family, tier) pairs and distinct file
- * loci. On real runs it pinned at 1.00 — every proposal touched a fresh locus — so
- * it was at ceiling and could not discriminate. Counting whether two things differ
- * says nothing about how much.
- *
- * This measures the `idea` text instead, as Jaccard distance over word shingles.
- * Crude, but it is a continuous quantity with a real ceiling, and it can tell "five
- * rewordings of one idea" from "five different ideas" — which is exactly the
- * silent-conservatism failure Mutagen's moonshot quota exists to prevent and does
- * not enforce.
+ * Proposal distance. Kept as a fallback: it saturates on real data (see the
+ * output note), but it still catches outright duplication, which is the failure it
+ * can see. Mechanism-level novelty via technique_tags[] is the primary measure.
  */
 function shingles(text, n = 2) {
   const words = String(text ?? '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter(Boolean);
@@ -255,14 +267,24 @@ const nodes = Object.entries(tree).map(([id, n]) => ({ id, name: n.name, tick: n
 const scored = nodes.filter((n) => typeof n.fitness === 'number');
 let best = -Infinity;
 const trajectory = [];
+// Gains below the metric's own resampling noise are not improvements. For the
+// ladder mission (2000 test samples) the bootstrap sd of roc_auc is ~0.006-0.010;
+// EVOR_NOISE_FLOOR overrides for other missions.
+const NOISE_FLOOR = Number(process.env.EVOR_NOISE_FLOOR ?? 0.006);
 for (const t of ticks.map(Number)) {
   const tickNodes = scored.filter((n) => n.tick === t);
   const tickBest = tickNodes.length ? Math.max(...tickNodes.map((n) => n.fitness)) : null;
+  const prevBest = best === -Infinity ? null : best;
   const improved = tickBest !== null && tickBest > best;
   if (improved) best = tickBest;
-  trajectory.push({ tick: t, nodes: tickNodes.length, tick_best: tickBest, running_best: best === -Infinity ? null : best, improved });
+  trajectory.push({
+    tick: t, nodes: tickNodes.length, tick_best: tickBest,
+    running_best: best === -Infinity ? null : best, improved,
+    gain: improved && prevBest !== null ? tickBest - prevBest : null,
+  });
 }
 const improvingTicks = trajectory.filter((x) => x.improved).length;
+const significantTicks = trajectory.filter((x) => x.gain !== null && x.gain >= NOISE_FLOOR).length;
 
 // C1 — Selector calibration. Its verdicts are PREDICTIONS ("this is worth a
 // training run") and the realized fitness is ground truth, so it is the one agent
@@ -292,6 +314,8 @@ const summary = {
   nodes_integrity_passed: nodes.filter((n) => n.integrity === 'passed').length,
   best_score: runState.best_score ?? null,
   improving_ticks: improvingTicks,
+  improving_ticks_above_noise: significantTicks,
+  noise_floor: NOISE_FLOOR,
   improving_tick_ratio: ticks.length ? improvingTicks / ticks.length : null,
   distinct_families_explored: new Set(perTick.flatMap((t) => t.families)).size,
   total_proposals: perTick.reduce((a, t) => a + t.proposals, 0),
@@ -305,6 +329,7 @@ const summary = {
   reviews_undecidable: perTick.reduce((a, t) => a + t.undecidable, 0),
   selector_schema_drift: new Set(perTick.filter((t) => t.reviewed > 0).map((t) => t.schema_shape)).size > 1,
   nodes_with_empty_tree_metrics: nodes.filter((n) => n.tree_metrics_empty).length,
+  scored_nodes_not_attributed_to_a_tick: scored.filter((n) => n.tick === null).length,
   sage_proactive_total: perTick.reduce((a, t) => a + t.sage_proactive_findings, 0),
   selector_precision: selectorPrecision,
   technique_tag_vocabulary: seenTags.size,
@@ -340,6 +365,10 @@ if (summary.selector_schema_drift) {
 if (summary.sage_proactive_total === 0 && summary.ticks > 1) {
   console.log('SAGE PROACTIVE FINDINGS 0 — every answer stayed inside the question set');
   console.log('  Mutagen already had. Nothing new can enter the hypothesis space this way.');
+}
+if (summary.scored_nodes_not_attributed_to_a_tick) {
+  console.log(`${summary.scored_nodes_not_attributed_to_a_tick} SCORED NODE(S) COULD NOT BE ATTRIBUTED TO A TICK —`);
+  console.log('  they are missing from the per-tick view below. Do not read that as a stalled tick.');
 }
 if (summary.ticks_without_sage) {
   console.log(`SAGE ABSENT in ${summary.ticks_without_sage} tick(s) — grounding gate was skipped, not enforced`);
@@ -404,7 +433,9 @@ if (summary.wildness_vs_novelty.length > 1) {
 console.log('\ntrajectory:');
 for (const x of trajectory) {
   console.log(`  tick ${x.tick}: nodes ${x.nodes} · best ${x.tick_best ?? '-'} · running ${x.running_best ?? '-'}` +
-              `${x.improved ? '  IMPROVED' : '  (no gain)'}`);
+              `${x.improved ? `  IMPROVED +${x.gain === null ? '?' : x.gain.toFixed(6)}` +
+                  (x.gain !== null && x.gain < NOISE_FLOOR ? ' (BELOW noise floor — not a real gain)' : '')
+                : '  (no gain)'}`);
 }
 
 const gates = {};

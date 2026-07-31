@@ -356,3 +356,94 @@ function readFileSyncSafe(p: string): string {
   // eslint-disable-next-line @typescript-eslint/no-var-requires
   return require("fs").readFileSync(p, "utf8");
 }
+
+describe("a node whose tick ended without a final forge report is not lost", () => {
+  // The ladder run ended tick 3 with only `forge-report-partial.json`. Attribution
+  // looked solely at `forge-report.json`, so that tick's node — fitness 0.905302,
+  // the best in the run — was attributed to no tick and reported as
+  // "tick 3: nodes 0 · no gain". That reads as a search that stalled. It had not.
+  let dir: string;
+
+  beforeAll(() => {
+    dir = mkdtempSync(join(tmpdir(), "evor-sq-partial-"));
+    const w = (p: string, o: unknown) => {
+      mkdirSync(dirname(p), { recursive: true });
+      writeFileSync(p, JSON.stringify(o));
+    };
+    w(join(dir, "tree.json"), {
+      nodes: { z1: { id: "z1", name: "late-node", metrics: {}, integrity_status: "passed", status: "done" } },
+    });
+    w(join(dir, "nodes", "z1", "results.json"), { fitness_value: 0.9, metrics: { roc_auc: 0.9 }, status: "success" });
+    w(join(dir, "run-state.json"), { run_id: "partial", best_score: 0.9 });
+    w(join(dir, "ticks", "1", "mutagen", "proposals.json"), { proposals: [{ idea: "x", technique_tags: ["t"] }] });
+    // ONLY a partial report, and the node is named in the critic artifact instead.
+    w(join(dir, "ticks", "1", "forge", "forge-report-partial.json"), { status: "in_progress" });
+    w(join(dir, "ticks", "1", "forge", "critic.json"), { node_id: "z1", verdict: "ok" });
+  });
+
+  afterAll(() => rmSync(dir, { recursive: true, force: true }));
+
+  const run = () => JSON.parse(spawnSync("node", [SCRIPT, dir, "--json"], { encoding: "utf8" }).stdout);
+
+  it("attributes the node by scanning every artifact in the tick, not just forge-report.json", () => {
+    expect(run().trajectory[0].nodes).toBe(1);
+  });
+
+  it("counts nothing as unattributed once it can be placed", () => {
+    expect(run().summary.scored_nodes_not_attributed_to_a_tick).toBe(0);
+  });
+});
+
+describe("gains below the metric's noise floor are not called improvements", () => {
+  // The ladder run's tick 3 gained +0.001446 against a bootstrap sd of ~0.006-0.010
+  // at n=2000. Raw comparison says 3/3 ticks improved; only 2 of those are real.
+  let dir: string;
+
+  beforeAll(() => {
+    dir = mkdtempSync(join(tmpdir(), "evor-sq-noise-"));
+    const w = (p: string, o: unknown) => {
+      mkdirSync(dirname(p), { recursive: true });
+      writeFileSync(p, JSON.stringify(o));
+    };
+    const nodes = { a: 0.80, b: 0.90, c: 0.9005 }; // c beats b by 0.0005 — noise.
+    w(join(dir, "tree.json"), {
+      nodes: Object.fromEntries(
+        Object.keys(nodes).map((k) => [k, { id: k, name: k, metrics: {}, integrity_status: "passed", status: "done" }]),
+      ),
+    });
+    for (const [k, v] of Object.entries(nodes)) {
+      w(join(dir, "nodes", k, "results.json"), { fitness_value: v, status: "success" });
+    }
+    w(join(dir, "run-state.json"), { run_id: "noise", best_score: 0.9005 });
+    let t = 0;
+    for (const k of Object.keys(nodes)) {
+      t++;
+      w(join(dir, "ticks", String(t), "mutagen", "proposals.json"), { proposals: [{ idea: k, technique_tags: [k] }] });
+      w(join(dir, "ticks", String(t), "forge", "forge-report.json"), { node_id: k });
+    }
+  });
+
+  afterAll(() => rmSync(dir, { recursive: true, force: true }));
+
+  const run = () => JSON.parse(spawnSync("node", [SCRIPT, dir, "--json"], { encoding: "utf8" }).stdout);
+
+  it("counts the raw improvements", () => {
+    expect(run().summary.improving_ticks).toBe(3);
+  });
+
+  it("but reports separately how many clear the noise floor", () => {
+    // 1, not 2. Tick 1 arrives from nothing, so there is no previous best and no
+    // delta to compare against the floor — counting it would assert a gain that
+    // cannot be computed. Only tick 2 (+0.10) clears; tick 3 (+0.0005) does not.
+    expect(run().summary.improving_ticks_above_noise, "0.0005 is resampling, not a gain").toBe(1);
+  });
+
+  it("the first scored tick has no gain, because there is nothing to gain over", () => {
+    expect(run().trajectory[0].improved).toBe(true);
+    expect(run().trajectory[0].gain).toBeNull();
+  });
+
+  it("labels the sub-noise gain in the trajectory", () => {
+    expect(run().trajectory[2].gain).toBeLessThan(run().summary.noise_floor);
+  });
+});
