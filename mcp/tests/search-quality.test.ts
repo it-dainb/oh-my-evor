@@ -83,9 +83,13 @@ beforeAll(() => {
     reviews: [{ proposal_id: "p3", critic_review: { verdict: "approved" } }],
   });
   w(join(runDir, "ticks", "2", "sage", "findings.json"), {
+    // `self_directed` is the per-finding marker. The fixture originally used
+    // `investigation_query_ref: null`, which is an ARTIFACT-level field — findings
+    // never carry it, so the analyzer's count was pinned at 0 on real runs while
+    // this fixture "passed" by asserting the same wrong thing the code did.
     findings: [
-      { finding: "x improves y", investigation_query_ref: "q1" },
-      { finding: "no evidence found for z", investigation_query_ref: null },
+      { finding: "x improves y", self_directed: false },
+      { finding: "no evidence found for z", self_directed: true },
     ],
   });
   w(join(runDir, "ticks", "2", "forge", "forge-report.json"), { node_id: "n2" });
