@@ -72,8 +72,13 @@ const walk = (d) => {
 };
 walk(sessionsRoot);
 
+// The plugin root is named explicitly. Naming the skill by a RELATIVE path cost
+// the last measured run 11 of the orchestrator's 18 Read calls, hunting nine
+// candidate roots (/tmp/home/.claude/plugins/…, /tmp/bench/plugins/…) before
+// finding /plugin. That noise lands in the metric we are trying to measure.
 const PROMPT = [
-  'Read the file skills/evor-run/SKILL.md inside the oh-my-evor plugin and follow it exactly.',
+  `Read the file ${PLUGIN}/skills/evor-run/SKILL.md and follow it exactly.`,
+  `The plugin root is ${PLUGIN}; every other plugin file is under it.`,
   'The mission is already set up, locked and validated: EVOR_ROOT is set and',
   '.evor/active-run.json names the active run (mission bench-cpu-tabular).',
   'Do NOT run setup and do NOT ask any questions.',
@@ -87,6 +92,12 @@ const tick = spawnSync('claude', [
   '--plugin-dir', PLUGIN,
   '--permission-mode', 'bypassPermissions',
   '--max-turns', String(process.env.BENCH_MAX_TURNS ?? 150),
+  // §S4. The orchestrator's own reasoning is the largest term in its context
+  // growth: ~22K of its 31,677 output tokens over 3 measured ticks were thinking,
+  // and thinking accumulates across turns. Opus 5 runs adaptive thinking at `high`
+  // by default; the orchestrator's job is spawn / record / decide, which does not
+  // need it. Override with BENCH_EFFORT to A/B this.
+  '--effort', String(process.env.BENCH_EFFORT ?? 'medium'),
   '--output-format', 'json',
   '-p', PROMPT,
 ], {

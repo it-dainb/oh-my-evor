@@ -85,6 +85,10 @@ code=$?
 # Transcripts live in the staged HOME, which the trap is about to delete — copy
 # the analysis input out first so a failed run can still be diagnosed.
 if [ -d "$BENCH_HOME/.claude/projects" ]; then
+  # Fresh each run. This directory is what every downstream analysis reads, and
+  # leaving the previous run's files in it silently blends two runs into one set
+  # of numbers — which already produced one wrong measurement.
+  rm -rf ci/out/bench-transcripts
   mkdir -p ci/out/bench-transcripts
   find "$BENCH_HOME/.claude/projects" -name "*.jsonl" -exec cp {} ci/out/bench-transcripts/ \; 2>/dev/null
   echo "▶ transcripts: ci/out/bench-transcripts/ ($(ls ci/out/bench-transcripts 2>/dev/null | wc -l) file(s))"
