@@ -74,7 +74,48 @@ function tickOfNode(id, name) {
   return null;
 }
 
+
+/**
+ * Proposal distance, for C2.
+ *
+ * The first novelty metric counted distinct (family, tier) pairs and distinct file
+ * loci. On real runs it pinned at 1.00 — every proposal touched a fresh locus — so
+ * it was at ceiling and could not discriminate. Counting whether two things differ
+ * says nothing about how much.
+ *
+ * This measures the `idea` text instead, as Jaccard distance over word shingles.
+ * Crude, but it is a continuous quantity with a real ceiling, and it can tell "five
+ * rewordings of one idea" from "five different ideas" — which is exactly the
+ * silent-conservatism failure Mutagen's moonshot quota exists to prevent and does
+ * not enforce.
+ */
+function shingles(text, n = 2) {
+  const words = String(text ?? '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter(Boolean);
+  const out = new Set();
+  for (let i = 0; i + n <= words.length; i++) out.add(words.slice(i, i + n).join(' '));
+  return out;
+}
+
+function jaccardDistance(a, b) {
+  if (!a.size && !b.size) return 0;
+  let inter = 0;
+  for (const x of a) if (b.has(x)) inter++;
+  const union = a.size + b.size - inter;
+  return union ? 1 - inter / union : 0;
+}
+
+/** Mean pairwise distance within a set; null when there are fewer than two. */
+function meanPairwise(sets) {
+  if (sets.length < 2) return null;
+  let total = 0, n = 0;
+  for (let i = 0; i < sets.length; i++) {
+    for (let j = i + 1; j < sets.length; j++) { total += jaccardDistance(sets[i], sets[j]); n++; }
+  }
+  return n ? total / n : null;
+}
+
 const perTick = [];
+const priorShingles = [];
 const seenCombos = new Set();
 const seenLoci = new Set();
 
@@ -109,6 +150,14 @@ for (const t of ticks) {
   // 0% selector precision. That is the third time in this work that a parser miss
   // has been indistinguishable from a finding about the search, so unparseable is
   // now tracked separately from zero and surfaced in the output.
+  // C2: continuous diversity, replacing the ceiling-pinned locus count.
+  const ideaSets = props.map((p) => shingles(p.idea ?? p.hypothesis ?? ''));
+  const intraTickDiversity = meanPairwise(ideaSets);
+  const vsHistory = priorShingles.length && ideaSets.length
+    ? ideaSets.reduce((a, s2) => a + Math.min(...priorShingles.map((h) => jaccardDistance(s2, h))), 0) / ideaSets.length
+    : null;
+  priorShingles.push(...ideaSets);
+
   const reviews = verdict?.reviews ?? verdict?.per_proposal_reviews ?? [];
   const verdictUnparsed = Boolean(verdict) && reviews.length === 0;
 
@@ -157,6 +206,8 @@ for (const t of ticks) {
     tiers: [...tiers],
     wildness: proposals?.wildness_used ?? null,
     crossover: proposals?.crossover_triggered ?? null,
+    intra_tick_diversity: intraTickDiversity,
+    distance_from_history: vsHistory,
     novel_family_tier_combos: novelCombos,
     novel_loci: novelLoci,
     reviewed: reviews.length,
@@ -289,18 +340,26 @@ if (summary.selector_precision === null) {
               `  (n=${summary.selector_ticks_scored})`);
 }
 
-console.log('\nMUTAGEN wildness vs realized novelty:');
-for (const w of summary.wildness_vs_novelty) {
-  console.log(`  tick ${w.tick}: wildness ${w.wildness} -> novel-locus rate ${w.novel_locus_rate.toFixed(2)}`);
+console.log('\nMUTAGEN wildness vs realized diversity (Jaccard on proposal text):');
+const f2 = (x) => (x === null ? ' n/a' : x.toFixed(2));
+for (const t of perTick) {
+  console.log(`  tick ${t.tick}: wildness ${String(t.wildness ?? '-').padStart(4)} ` +
+              `-> intra-tick ${f2(t.intra_tick_diversity)}  vs-history ${f2(t.distance_from_history)}`);
 }
 if (summary.wildness_vs_novelty.length > 1) {
   const first = summary.wildness_vs_novelty[0], last = summary.wildness_vs_novelty.at(-1);
-  const saturated = summary.wildness_vs_novelty.every((w) => w.novel_locus_rate >= 1);
-  if (saturated) {
-    console.log('  (novel-locus rate is pinned at 1.00 — every proposal touched a fresh locus,');
-    console.log('   so this metric is at ceiling and cannot discriminate. Needs a distance measure.)');
-  } else if (last.wildness > first.wildness && last.novel_locus_rate < first.novel_locus_rate) {
-    console.log('  ! the dial went up and novelty went down — wildness may be decorative');
+  const vals = perTick.map((t) => t.intra_tick_diversity).filter((x) => x !== null);
+  const lexSaturated = vals.length > 0 && vals.every((v) => v > 0.9);
+  const locusSaturated = summary.wildness_vs_novelty.every((w) => w.novel_locus_rate >= 1);
+  if (lexSaturated && locusSaturated) {
+    console.log('  ! BOTH cheap novelty proxies are at ceiling here: every proposal touches a');
+    console.log('    fresh locus (rate 1.00) and shares almost no wording with the others');
+    console.log('    (Jaccard > 0.9). Neither can distinguish five genuinely different ideas');
+    console.log('    from five different phrasings of one. Conceptual novelty needs a semantic');
+    console.log('    measure — embedding proposals against each other and the citation corpus.');
+    console.log('    Until then, treat Mutagen diversity as UNMEASURED, not as good.');
+  } else if (last && first && last.wildness > first.wildness && vals.length > 1 && vals.at(-1) < vals[0]) {
+    console.log('  ! the dial went up and diversity went down — wildness may be decorative');
   }
 }
 
