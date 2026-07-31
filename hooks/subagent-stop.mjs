@@ -59,7 +59,16 @@ const TICK_OUTCOMES = ['scored', 'rejected', 'skipped', 'failed'];
 const MAX_RETURN_CHARS = 1500;   // ~400 tokens, per the agent's own budget
 const MAX_RETRIES = 2;
 
-if ((payload.agent_type ?? '').toLowerCase().endsWith('evor-tick')) {
+// Every OTHER agent gets a size bound only — no schema. evor-tick's four returns
+// totalled 2,304 chars while one generic Explore spawn returned 9,306, four times
+// all of them combined and the single largest thing the orchestrator ingested.
+// Bounding one doorway and leaving the others open does not bound context.
+const MAX_GENERIC_RETURN_CHARS = 2000;
+
+const agentType = String(payload.agent_type ?? '').toLowerCase();
+const isTick = agentType.endsWith('evor-tick');
+
+if (isTick) {
   const msg = String(payload.last_assistant_message ?? '');
   const violation = checkTickReturn(msg);
   // stop_hook_active is the platform's own loop guard; our counter bounds the
@@ -77,6 +86,70 @@ if ((payload.agent_type ?? '').toLowerCase().endsWith('evor-tick')) {
     }) + '\n');
     process.exit(0);
   }
+} else {
+  const msg = String(payload.last_assistant_message ?? '');
+  if (
+    msg.length > MAX_GENERIC_RETURN_CHARS &&
+    !payload.stop_hook_active &&
+    bumpRetries(payload.agent_id) <= MAX_RETRIES
+  ) {
+    process.stdout.write(JSON.stringify({
+      decision: 'block',
+      reason:
+        `Your return is ${msg.length} characters, over the ${MAX_GENERIC_RETURN_CHARS}-character ` +
+        `budget. Whoever spawned you carries every byte of it for the rest of the mission.\n` +
+        `Re-emit the conclusion only. Anything already written to an artifact or a file should be ` +
+        `a pointer to it (run_id / tick / agent, or a path), not its contents.`,
+    }) + '\n');
+    process.exit(0);
+  }
+}
+
+// ── Near-cap warning (PM1 detector) ───────────────────────────────────────────
+// Raising the turn caps in §S3 removed the truncate-then-resume cycle, but a cap
+// is still a runaway backstop. An agent that lands within a few turns of its cap
+// is the signal that the cap is wrong — or that the agent is looping. Advisory,
+// never blocking: this reports, it does not correct.
+try {
+  const declaredCap = capFor(agentType);
+  if (declaredCap) {
+    const turns = countTurns(payload.agent_transcript_path);
+    if (turns && declaredCap - turns <= 3) {
+      process.stderr.write(
+        `[EVOR CAP] ${agentType} stopped at ${turns}/${declaredCap} turns. ` +
+          `At the cap the agent is truncated mid-task and resuming it re-primes its whole ` +
+          `context as cache_creation — raise the cap or narrow the role.\n`
+      );
+    }
+  }
+} catch { /* advisory only */ }
+
+/** Declared maxTurns for an agent type, read from its definition file. */
+function capFor(type) {
+  const bare = type.replace(/^oh-my-evor:/, '');
+  if (!/^evor-[a-z-]+$/.test(bare)) return 0; // not one of ours; no declaration to read
+  const root = process.env.CLAUDE_PLUGIN_ROOT ?? process.cwd();
+  try {
+    const src = readFileSync(join(root, 'agents', `${bare}.md`), 'utf8');
+    const m = src.match(/^maxTurns:\s*(\d+)\s*$/m);
+    return m ? Number(m[1]) : 0;
+  } catch { return 0; }
+}
+
+/** Assistant turns in an agent transcript, deduped by message id. */
+function countTurns(transcriptPath) {
+  if (!transcriptPath || !existsSync(transcriptPath)) return 0;
+  const ids = new Set();
+  for (const line of readFileSync(transcriptPath, 'utf8').split('\n')) {
+    if (!line) continue;
+    try {
+      const m = JSON.parse(line)?.message;
+      // usage is stamped on every content block of a message, so the id is what
+      // makes this a turn count rather than a block count.
+      if (m?.usage && m?.id) ids.add(m.id);
+    } catch { /* skip malformed line */ }
+  }
+  return ids.size;
 }
 
 /** null if the return conforms, else a one-line description of the violation. */

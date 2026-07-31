@@ -143,13 +143,43 @@ describe("evor-tick return contract — retry is bounded", () => {
   });
 });
 
-describe("evor-tick return contract — scope", () => {
-  it("does not apply to the other lead agents", () => {
+describe("every other spawn is size-bounded, but not schema-bounded (S5)", () => {
+  // The tick contract governs one doorway. A single generic Explore spawn returned
+  // 9,306 chars into the orchestrator — 4x all four evor-tick returns combined —
+  // so bounding only evor-tick does not bound the orchestrator's context.
+  const long = "x".repeat(2500);
+
+  it("prose is fine for other agents — no schema is imposed", () => {
     freshScope();
-    for (const t of ["oh-my-evor:evor-sage", "oh-my-evor:evor-forge", "general-purpose"]) {
+    for (const t of ["oh-my-evor:evor-sage", "oh-my-evor:evor-forge", "general-purpose", "Explore"]) {
       const { json } = run({ agent_type: t, last_assistant_message: "free-form prose is fine here" });
       expect(json?.decision, t).not.toBe("block");
     }
+  });
+
+  it("but an oversized return is blocked, whatever the agent type", () => {
+    for (const t of ["oh-my-evor:evor-sage", "general-purpose", "Explore"]) {
+      freshScope();
+      const { json } = run({ agent_type: t, last_assistant_message: long });
+      expect(json?.decision, t).toBe("block");
+      expect(String(json?.reason)).toMatch(/pointer/i);
+    }
+  });
+
+  it("the generic bound is looser than the tick bound", () => {
+    freshScope();
+    // 1,800 chars: over evor-tick's 1500 budget, under the generic 2000.
+    const mid = "y".repeat(1800);
+    expect(run({ agent_type: "Explore", last_assistant_message: mid }).json?.decision).not.toBe("block");
+    freshScope();
+    expect(run({ agent_type: "oh-my-evor:evor-tick", last_assistant_message: mid }).json?.decision).toBe("block");
+  });
+
+  it("gives up after the cap here too — an agent that cannot shrink must not loop", () => {
+    freshScope();
+    const d = [1, 2, 3].map(() => run({ agent_type: "Explore", last_assistant_message: long }).json?.decision);
+    expect(d.slice(0, 2)).toEqual(["block", "block"]);
+    expect(d[2]).not.toBe("block");
   });
 
   it("respects the kill switches", () => {
@@ -164,10 +194,20 @@ describe("the contract is reachable at runtime", () => {
   // The defect class this session kept producing: a rule whose unit tests pass
   // while hooks.json never routes the event to it.
   const config = JSON.parse(readFileSync(join(HOOKS, "hooks.json"), "utf8"));
-  const matcher = new RegExp(config.hooks.SubagentStop[0].matcher);
+  const declared = config.hooks.SubagentStop[0].matcher;
+  // "*" is the wildcard, not a regex — `new RegExp("*")` throws "Nothing to repeat".
+  const matcher = { test: (t: string) => declared === "*" || new RegExp(declared).test(t) };
 
   it("hooks.json routes evor-tick to subagent-stop.mjs", () => {
     expect(matcher.test("oh-my-evor:evor-tick")).toBe(true);
+  });
+
+  it("and routes generic spawns too — S5 is worthless if they are not matched", () => {
+    // The TaskOutput deny earlier this session had passing unit tests and was
+    // unreachable because the matcher excluded it. Same failure shape, so: pin it.
+    for (const t of ["general-purpose", "Explore", "oh-my-evor:evor-forge-junior"]) {
+      expect(matcher.test(t), `${t} is not routed to subagent-stop.mjs`).toBe(true);
+    }
   });
 
   it("agents/evor-tick.md documents the same required keys the hook enforces", () => {

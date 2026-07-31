@@ -99,7 +99,7 @@
     ],
     "SubagentStop": [
       {
-        "matcher": "^oh-my-evor:evor-(sage|mutagen|probe|forge|selector|acquirer|tick)$",
+        "matcher": "*",
         "hooks": [
           {
             "type": "command",
