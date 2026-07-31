@@ -6,6 +6,22 @@ UCB1 CORRECTNESS CONTRACT:
   Unvisited nodes (visit_count==0) → score = +inf (always selected first).
   C = strategy.ucb1_c (default 1.41) is valid on [0,1] normalized inputs.
 
+VISIT-COUNT PERSISTENCE (A5 fix):
+  select() used to be a pure read/compute function — nothing ever wrote the
+  visit increment back to tree.json, so every node's visit_count stayed 0
+  forever and the UCB1 exploration term was either +inf (cold start) or a
+  division by a permanent zero, collapsing the ranking to raw fitness with
+  no real exploration ever happening.
+
+  select() now increments visit_count on SELECTION (not on eval-complete),
+  and persists it to tree.json before returning. Rationale: a node's
+  evaluation can crash, hang, or simply never call back into the harness —
+  incrementing at eval-complete would let such a node keep scoring +inf (or
+  keep its stale low visit_count) and be reselected forever. Incrementing at
+  selection time means "we tried this arm" is recorded the moment the arm is
+  pulled, independent of whether the pull ever finishes — the classic MCTS
+  convention, and the only version of this that can't wedge on a stuck node.
+
 Diversity constraints:
   H002: family winning ≥ 3 of last N ticks → family_mix weight reduced.
   H003: enforced at proposal time by Selector (not here).
@@ -232,7 +248,50 @@ class TreeEngine:
             return norm + C * math.sqrt(math.log(max(N, 1)) / node.visit_count)
 
         ranked = sorted(eligible, key=_score, reverse=True)
-        return ranked[:count]
+        selected = ranked[:count]
+
+        # Increment on SELECTION and persist immediately (see VISIT-COUNT
+        # PERSISTENCE note above). Update self._nodes/_node_map in-memory too
+        # so a caller doing several select() calls in one process (e.g. the
+        # ordering test) sees consistent visit counts without reloading.
+        self._persist_visit_increments({n.id for n in selected})
+
+        bumped: list[TreeNode] = []
+        for node in selected:
+            updated = node.model_copy(update={"visit_count": node.visit_count + 1})
+            self._node_map[node.id] = updated
+            idx = next(i for i, n in enumerate(self._nodes) if n.id == node.id)
+            self._nodes[idx] = updated
+            bumped.append(updated)
+
+        return bumped
+
+    def _persist_visit_increments(self, node_ids: set[str]) -> None:
+        """Bump visit_count for `node_ids` directly in tree.json (tmp+replace).
+
+        Re-reads the file fresh (rather than dumping self._nodes) so a
+        concurrent writer's fields (status, metrics, fitness_value from a
+        recordEval landing mid-selection) are never clobbered by a stale
+        in-memory copy — only the selected nodes' visit_count is touched.
+        """
+        if self._run_dir is None:
+            return
+        tree_path = Path(self._run_dir) / "tree.json"
+        if tree_path.exists():
+            with open(tree_path) as fh:
+                tree_data = json.load(fh)
+            nodes_dict = tree_data.get("nodes", {})
+        else:
+            nodes_dict = {n.id: json.loads(n.model_dump_json()) for n in self._nodes}
+
+        for nid in node_ids:
+            if nid in nodes_dict:
+                nodes_dict[nid]["visit_count"] = nodes_dict[nid].get("visit_count", 0) + 1
+
+        payload = {"nodes": nodes_dict, "updated_at": datetime.now(timezone.utc).isoformat()}
+        tmp_path = tree_path.with_name(tree_path.name + ".tmp")
+        tmp_path.write_text(json.dumps(payload, indent=2))
+        os.replace(tmp_path, tree_path)
 
     def should_crossover(self, top_nodes: list[TreeNode]) -> bool:
         """True if the top-2 nodes are from distinct lineages (crossover warranted)."""
