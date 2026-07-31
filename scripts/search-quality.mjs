@@ -221,8 +221,14 @@ for (const t of ticks) {
   // the only channel by which a concept Mutagen did not already suspect can enter
   // the system — Sage is otherwise purely reactive and can only ever deepen the
   // hypothesis space Mutagen arrived with.
-  const proactive = sageFindings.filter((f) => f && 'investigation_query_ref' in f
-    ? f.investigation_query_ref === null : false).length;
+  // Measured on `self_directed`, a per-finding boolean. The first version looked
+  // for `investigation_query_ref === null` on each finding — but that field is
+  // ARTIFACT-level, one per tick, so no finding ever carried it and the count was
+  // structurally pinned at 0. Two runs reported "0 proactive findings" as though it
+  // said something about Sage's behaviour; it only said the measurement was aimed
+  // at a field that does not exist at that level.
+  const proactive = sageFindings.filter((f) => f?.self_directed === true).length;
+  const proactiveMeasurable = sageFindings.some((f) => f && 'self_directed' in f);
   const queries = props.flatMap((p) => p.investigation_queries ?? []);
   const disconfirming = sageFindings.filter((f) => {
     const s = JSON.stringify(f).toLowerCase();
@@ -255,6 +261,7 @@ for (const t of ticks) {
     sage_queries_asked: queries.length,
     sage_disconfirming: disconfirming,
     sage_proactive_findings: proactive,
+    sage_proactive_measurable: proactiveMeasurable,
     // C3: Sage answered how much of what it was asked? One real run wrote
     // quorum_met:true over a findings set covering 1 of 6 queries.
     sage_coverage: queries.length ? Math.min(1, sageFindings.length / queries.length) : null,
@@ -331,6 +338,7 @@ const summary = {
   nodes_with_empty_tree_metrics: nodes.filter((n) => n.tree_metrics_empty).length,
   scored_nodes_not_attributed_to_a_tick: scored.filter((n) => n.tick === null).length,
   sage_proactive_total: perTick.reduce((a, t) => a + t.sage_proactive_findings, 0),
+  sage_proactive_measurable: perTick.some((t) => t.sage_proactive_measurable),
   selector_precision: selectorPrecision,
   technique_tag_vocabulary: seenTags.size,
   proposals_untagged: perTick.reduce((a, t) => a + (t.proposals - t.proposals_tagged), 0),
@@ -363,8 +371,14 @@ if (summary.selector_schema_drift) {
   console.log('  shape, so any consumer of it (including the orchestrator) is guessing.');
 }
 if (summary.sage_proactive_total === 0 && summary.ticks > 1) {
-  console.log('SAGE PROACTIVE FINDINGS 0 — every answer stayed inside the question set');
-  console.log('  Mutagen already had. Nothing new can enter the hypothesis space this way.');
+  if (!summary.sage_proactive_measurable) {
+    console.log('SAGE PROACTIVE CHANNEL NOT MEASURABLE — no finding carries `self_directed`.');
+    console.log('  This run predates the flag, or Sage is not emitting it. Do NOT read the 0');
+    console.log('  below as evidence about whether Sage widened the search.');
+  } else {
+    console.log('SAGE PROACTIVE FINDINGS 0 — every answer stayed inside the question set');
+    console.log('  Mutagen already had. Nothing new can enter the hypothesis space this way.');
+  }
 }
 if (summary.scored_nodes_not_attributed_to_a_tick) {
   console.log(`${summary.scored_nodes_not_attributed_to_a_tick} SCORED NODE(S) COULD NOT BE ATTRIBUTED TO A TICK —`);

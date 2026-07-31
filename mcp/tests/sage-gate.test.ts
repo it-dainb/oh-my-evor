@@ -70,7 +70,49 @@ describe("the loop and the agent agree about the self-directed angle", () => {
   });
 
   it("the agent's self-directed findings are identifiable, so the channel is measurable", () => {
-    expect(sage).toMatch(/investigation_query_ref/);
-    expect(sage).toMatch(/null/);
+    // Was asserting investigation_query_ref + null, which is the OLD contract and
+    // passed for the wrong reason: both strings appear in the file regardless.
+    expect(sage).toMatch(/self_directed/);
+  });
+});
+
+describe("fields an agent is told to set must exist in the schema it is shown", () => {
+  /**
+   * A4 instructed Sage to mark self-chosen findings by setting
+   * `investigation_query_ref: null` on each finding. That field is ARTIFACT-level —
+   * one per tick — and findings have no such key. So the instruction was
+   * unfollowable, and the analyzer that counted it measured a level where nothing
+   * could ever appear. Two full runs reported "0 proactive findings" as if it said
+   * something about Sage's behaviour. It only said the measurement was aimed at a
+   * field that does not exist there.
+   *
+   * Both halves read as correct in isolation, which is the whole difficulty. The
+   * check that catches it is cross-file: the instruction and the schema must agree.
+   */
+  const schemaBlock = (() => {
+    // The documented CitationBackedFinding shape: the JSON object containing
+    // "quorum_met", which is the finding-level marker field.
+    const i = sage.indexOf("quorum_met");
+    expect(i, "finding schema not found — this test is stale").toBeGreaterThan(-1);
+    return sage.slice(Math.max(0, i - 1200), i + 400);
+  })();
+
+  it("the self-directed marker is a per-finding field in the documented schema", () => {
+    expect(
+      schemaBlock,
+      "Step 1b tells Sage to mark individual findings, so the marker must live on a finding",
+    ).toMatch(/self_directed/);
+  });
+
+  it("the instruction names that same field", () => {
+    const step1b = sage.slice(sage.indexOf("Step 1b"), sage.indexOf("Step 1b") + 1800);
+    expect(step1b).toMatch(/self_directed/);
+  });
+
+  it("the instruction no longer names the artifact-level field it cannot set per finding", () => {
+    const step1b = sage.slice(sage.indexOf("Step 1b"), sage.indexOf("Step 1b") + 1800);
+    // It may mention investigation_query_ref to EXPLAIN why it is wrong, but must
+    // not instruct setting it as the marker.
+    expect(step1b).not.toMatch(/Set `investigation_query_ref/);
   });
 });

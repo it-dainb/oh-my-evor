@@ -142,8 +142,9 @@ disallowedTools: Write, Edit
 
     Up to one angle per tick (never more than 30% of the tick's angles) is yours to
     choose, and it must NOT be a restatement of anything in investigation_queries[].
-    Set `investigation_query_ref: null` on the findings it produces so the channel
-    can be measured.
+    Set `"self_directed": true` on each finding it produces. That flag is the whole
+    measurement: `investigation_query_ref` is an ARTIFACT-level field, one per tick,
+    so it cannot mark which individual findings were self-chosen.
 
     This exists because of a structural limit in your own position. Mutagen asks;
     you answer. Every answer therefore lands inside a hypothesis space Mutagen
@@ -225,6 +226,7 @@ disallowedTools: Write, Edit
           "trust_level": "authoritative | indicative",
           "sota_bar": null,
           "applicable_families": ["arch", "training", "data-augmentation"],
+          "self_directed": false,
           "quorum_met": true,
           "junior_sources": ["angle-slug-a", "angle-slug-b"],
           "implementation_spec": null,
