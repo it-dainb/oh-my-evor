@@ -85,10 +85,20 @@ code=$?
 # Transcripts live in the staged HOME, which the trap is about to delete — copy
 # the analysis input out first so a failed run can still be diagnosed.
 if [ -d "$BENCH_HOME/.claude/projects" ]; then
-  # Fresh each run. This directory is what every downstream analysis reads, and
-  # leaving the previous run's files in it silently blends two runs into one set
-  # of numbers — which already produced one wrong measurement.
-  rm -rf ci/out/bench-transcripts
+  # Fresh each run, because this directory is what every downstream analysis reads
+  # and leaving the previous run's files in it silently blends two runs into one
+  # set of numbers — which already produced one wrong measurement.
+  #
+  # ARCHIVED, not deleted. The first version of this deleted, and the very next
+  # A/B destroyed the transcripts of the arm it was supposed to be compared
+  # against. Keeping the current run's set unambiguous does not require throwing
+  # the previous one away.
+  if [ -d ci/out/bench-transcripts ] && [ -n "$(ls -A ci/out/bench-transcripts 2>/dev/null)" ]; then
+    prev="ci/out/bench-archive/$(date -u +%Y%m%dT%H%M%SZ)"
+    mkdir -p "$prev"
+    mv ci/out/bench-transcripts/* "$prev"/ 2>/dev/null
+    echo "▶ previous transcripts archived: $prev"
+  fi
   mkdir -p ci/out/bench-transcripts
   find "$BENCH_HOME/.claude/projects" -name "*.jsonl" -exec cp {} ci/out/bench-transcripts/ \; 2>/dev/null
   echo "▶ transcripts: ci/out/bench-transcripts/ ($(ls ci/out/bench-transcripts 2>/dev/null | wc -l) file(s))"

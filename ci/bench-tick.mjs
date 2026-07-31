@@ -131,8 +131,16 @@ try {
 } catch {
   fail(`unparseable CLI result envelope; raw output in ci/out/bench-tick-raw.json\n${rawOut.slice(0, 500)}`);
 }
+// A CLI error is fatal, not a note. This printed
+//   "! CLI reported an error: success — You've hit your session limit"
+// and then went on to report `success`, `modelled cost $1.02`, `0 tree nodes` —
+// numbers from a run that never started. Note `subtype` was "success" while
+// is_error was true, so subtype cannot be trusted as the verdict.
+//
+// The comment twenty lines above this one already says a benchmark that reports
+// success when it measured nothing is worse than no benchmark. It was right.
 if (result?.is_error) {
-  log(`  ! CLI reported an error: ${result.subtype} — ${String(result.result ?? '').slice(0, 300)}`);
+  fail(`CLI reported an error (subtype=${result.subtype}): ${String(result.result ?? '').slice(0, 300)}`);
 }
 
 log(`  wall-clock ${(wallMs / 1000).toFixed(1)}s · turns ${result?.num_turns ?? '?'} · ` +
