@@ -22125,6 +22125,13 @@ function recordEval(runId, nodeId, result, missionId) {
       if (integrityVerdict === "passed" || integrityVerdict === "failed") {
         updates.integrity_status = integrityVerdict;
       }
+      const r = result;
+      if (r && typeof r.metrics === "object" && r.metrics !== null) {
+        updates.metrics = r.metrics;
+      }
+      if (typeof r?.fitness_value === "number") {
+        updates.fitness_value = r.fitness_value;
+      }
       upsertNode(runId, { ...node, ...updates }, missionId);
     }
   } catch {
@@ -22293,13 +22300,15 @@ function dfsCollect(rootId, childrenMap, maxDepth) {
   return collected;
 }
 function toNamedNode(node, runId, missionId) {
+  const scored = node.integrity_status !== "failed";
   return {
     name: nameForId(runId, node.id, missionId),
     status: node.status,
     integrity_status: node.integrity_status,
     depth: node.depth,
     approach_family: node.approach_family,
-    score: node.ucb1_score,
+    metrics: scored ? node.metrics : void 0,
+    fitness_value: scored ? node.fitness_value : void 0,
     parent_names: namesForIds(runId, node.parent_ids, missionId)
   };
 }
@@ -22323,10 +22332,6 @@ function treeRead(runId, subtreeRoot, depth, missionId, filters) {
     }
     if (filters.integrity_status !== void 0) {
       raw = raw.filter((n) => n.integrity_status === filters.integrity_status);
-    }
-    if (filters.min_score !== void 0) {
-      const minScore = filters.min_score;
-      raw = raw.filter((n) => n.ucb1_score !== void 0 && n.ucb1_score >= minScore);
     }
     if (filters.approach_family !== void 0) {
       raw = raw.filter((n) => n.approach_family === filters.approach_family);
@@ -22370,7 +22375,7 @@ function treeSelect(runId, strategy, count, missionId) {
 function registerTreeTools(server) {
   server.tool(
     "evor_tree_read",
-    "Read the evolution tree for a run, optionally filtered to a subtree rooted at subtree_root up to depth levels. Optional filters: status, integrity_status, min_score, approach_family (all applied after depth/subtree filter). Each NamedTreeNode includes integrity_status for downstream gate checks.",
+    "Read the evolution tree for a run, optionally filtered to a subtree rooted at subtree_root up to depth levels. Optional filters: status, integrity_status, approach_family (all applied after depth/subtree filter). Each NamedTreeNode includes integrity_status for downstream gate checks and fitness_value/metrics for ranking.",
     {
       run_id: external_exports.string().describe("Active run identifier"),
       subtree_root: external_exports.string().optional().describe("Node ID to root the subtree at; omit for full tree"),
@@ -22380,9 +22385,6 @@ function registerTreeTools(server) {
       ),
       integrity_status: external_exports.enum(["passed", "failed", "pending"]).optional().describe(
         "Filter: only return nodes with this integrity_status; nodes lacking integrity_status are excluded"
-      ),
-      min_score: external_exports.number().optional().describe(
-        "Filter: only return nodes with ucb1_score >= min_score; nodes without a score are excluded"
       ),
       approach_family: external_exports.enum([
         "arch",
@@ -22396,12 +22398,11 @@ function registerTreeTools(server) {
         "Filter: only return nodes from this approach family"
       )
     },
-    async ({ run_id, subtree_root, depth, status, integrity_status, min_score, approach_family }) => {
+    async ({ run_id, subtree_root, depth, status, integrity_status, approach_family }) => {
       const missionId = process.env.EVOR_MISSION_ID;
       const filters = {};
       if (status !== void 0) filters.status = status;
       if (integrity_status !== void 0) filters.integrity_status = integrity_status;
-      if (min_score !== void 0) filters.min_score = min_score;
       if (approach_family !== void 0) filters.approach_family = approach_family;
       const nodes = treeRead(run_id, subtree_root, depth, missionId, filters);
       return {
@@ -23690,6 +23691,7 @@ var import_path13 = require("path");
 var import_os2 = require("os");
 var CONTRACT_VALIDATED_AGENTS = /* @__PURE__ */ new Set([
   "mutagen",
+  "selector",
   "sage",
   "sage-junior",
   "acquirer"
