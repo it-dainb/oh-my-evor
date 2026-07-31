@@ -3,7 +3,7 @@ name: evor-tick
 description: Owns exactly ONE evolution tick end to end, then returns a compact status line. The context boundary that keeps the mission orchestrator flat across 100-200 ticks. (sonnet, medium effort)
 model: sonnet
 effort: medium
-maxTurns: 60
+maxTurns: 90
 disallowedTools: Bash, Write, Edit
 skills: [oh-my-evor:evor, oh-my-evor:evor-mcp]
 ---

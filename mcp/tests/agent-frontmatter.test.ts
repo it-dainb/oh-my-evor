@@ -27,22 +27,37 @@ import { fileURLToPath } from "url";
 
 const AGENTS_DIR = resolve(dirname(fileURLToPath(import.meta.url)), "../../agents");
 
-/** Provisional per-role turn caps (plan §1.2). */
+/**
+ * Per-role turn caps (plan §S3).
+ *
+ * The first set of caps was chosen to bound cost. Measured against a real 3-tick
+ * run, they did the opposite: agents hit the cap MID-TASK and the orchestrator
+ * resumed them, so the run paid for the same orientation twice. Every over-cap
+ * agent was exactly `cap + a resume`:
+ *
+ *   forge 50 = 25+25   tick 87 = 60+27   forge-junior 28 = 20+8
+ *   sage  22 = 16+6    critic 17 = 10+7  sage-junior  16 =  8+8
+ *
+ * Transcript: "Forge stopped mid-review. Resuming it to finish and write its
+ * artifact." A resume re-primes the whole prefix as cache_creation, billed at
+ * 1.25x input — strictly worse than having let the agent finish.
+ *
+ * So these are set to the observed cap+resume totals: the work each role actually
+ * needs. A cap is a runaway backstop, not a budget. PM1 says raising a cap can let
+ * a runaway run longer; the near-cap warning in subagent-stop.mjs is the detector.
+ */
 const EXPECTED_MAX_TURNS: Record<string, number> = {
-  // Phase 3a boundary agent. 60, not the plan's original 30: main performed this exact
-  // passthrough workload in 47 measured turns, so a 30-cap would truncate every tick
-  // rather than bound cost, firing PM1 continuously.
-  "evor-tick": 60,
-  "evor-forge": 25,
-  "evor-forge-junior": 20,
-  "evor-sage": 16,
+  "evor-tick": 90,
+  "evor-forge": 45,
+  "evor-forge-junior": 28,
+  "evor-sage": 22,
   "evor-mutagen": 14,
   "evor-probe": 14,
   "evor-selector": 12,
-  "evor-forge-critic": 10,
+  "evor-forge-critic": 16,
   "evor-forge-architect": 10,
   "evor-forge-analyst": 10,
-  "evor-sage-junior": 8,
+  "evor-sage-junior": 16,
   "evor-acquirer": 15,
 };
 

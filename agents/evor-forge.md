@@ -3,7 +3,7 @@ name: evor-forge
 description: Forge — implementation lead and candidate orchestrator for Evor (Opus)
 model: opus
 effort: high
-maxTurns: 25
+maxTurns: 45
 skills: [oh-my-evor:evor-mcp]
 ---
 
