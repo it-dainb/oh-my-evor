@@ -23,7 +23,7 @@
  */
 
 import { spawnSync } from 'child_process';
-import { mkdirSync, writeFileSync, readFileSync, existsSync, readdirSync, statSync, copyFileSync } from 'fs';
+import { mkdirSync, writeFileSync, readFileSync, existsSync, readdirSync, statSync, copyFileSync, cpSync } from 'fs';
 import { join } from 'path';
 
 const PLUGIN = '/plugin';
@@ -189,6 +189,21 @@ collect(join(runDir, 'ticks'));
 const readJson = (p) => { try { return JSON.parse(readFileSync(p, 'utf8')); } catch { return null; } };
 const tree = readJson(join(runDir, 'tree.json'));
 const nodeCount = tree?.nodes ? Object.keys(tree.nodes).length : 0;
+
+// The run directory is the ONLY record of what the search actually decided —
+// mutagen's proposals, selector's verdicts, sage's findings, per-node results.
+// It lives in the container at /tmp/bench and the container runs with --rm, so
+// every completed run was destroying its own evidence; only ci/out is mounted
+// back. Cost telemetry survived, search-quality data did not, which is a fair
+// summary of what this benchmark has been able to measure so far.
+try {
+  const dest = join(OUT, 'bench-runs', activeRun.run_id);
+  mkdirSync(dest, { recursive: true });
+  cpSync(runDir, dest, { recursive: true });
+  log(`▶ run artifacts: ci/out/bench-runs/${activeRun.run_id}/`);
+} catch (e) {
+  log(`  ! could not export run artifacts (non-fatal): ${e.message}`);
+}
 
 const report = {
   run_id: activeRun.run_id,
