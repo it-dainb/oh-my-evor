@@ -17,6 +17,18 @@
  *
  * CPU-only by construction: synthetic tabular classification, sklearn-class models,
  * no GPU anywhere in the contract or the evaluator.
+ *
+ * Two selectable missions (BENCH_MISSION env var, default 'tabular'):
+ *   tabular — benchmarks/tabular-churn: fast smoke test. Its target saturates
+ *             a depth-4 tree on tick 1 (evidence: task B3), so it cannot
+ *             measure search quality across ticks — kept only as a quick
+ *             "does the loop run at all" check.
+ *   ladder  — benchmarks/tabular-ladder: a genuine improvement LADDER with
+ *             measured headroom (roc_auc ~0.81 -> ~0.85 -> ~0.89 -> ~0.91
+ *             across four reference candidates of increasing sophistication;
+ *             see benchmarks/tabular-ladder/evaluate.py for the full design
+ *             and harness/tests/test_tabular_ladder.py for the measurement).
+ *             Use this one to evaluate whether a search is actually climbing.
  */
 
 import { spawn, spawnSync } from 'child_process';
@@ -28,7 +40,12 @@ const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const BENCH_ROOT = resolve(process.argv[2] ?? join(REPO, '.evor-bench'));
 const EVOR_ROOT = join(BENCH_ROOT, '.evor');
 
-const MISSION_ID = 'bench-cpu-tabular';
+const MISSION = process.env.BENCH_MISSION ?? 'tabular';
+if (!['tabular', 'ladder'].includes(MISSION)) {
+  throw new Error(`BENCH_MISSION must be 'tabular' or 'ladder', got: ${MISSION}`);
+}
+const MISSION_ID = MISSION === 'ladder' ? 'bench-cpu-tabular-ladder' : 'bench-cpu-tabular';
+const EVALUATOR_SRC = join(REPO, 'benchmarks', MISSION === 'ladder' ? 'tabular-ladder' : 'tabular-churn', 'evaluate.py');
 // Phase 3a.2 measures whether main's per-tick context residue stays FLAT across
 // ticks. That is only observable across several ticks in ONE session, so the tick
 // count is a parameter rather than a hardcoded 1.
@@ -41,7 +58,7 @@ const EVAL_VERSION = 'v1';
 // generated from the evaluator's OWN generator (below) — regenerating it
 // independently could freeze samples the evaluator never scores, producing a
 // split that guards nothing.
-const DATASET_DIR = join(BENCH_ROOT, 'dataset');
+const DATASET_DIR = join(BENCH_ROOT, MISSION === 'ladder' ? 'dataset-ladder' : 'dataset');
 const DATASET_REF = DATASET_DIR;
 
 // ── MCP client over stdio ────────────────────────────────────────────────────
@@ -114,7 +131,62 @@ function makeClient() {
 
 // ── The mission ──────────────────────────────────────────────────────────────
 
-const goalContract = {
+const goalContract = MISSION === 'ladder' ? {
+  mission_id: MISSION_ID,
+  mode: 'from-scratch',
+  mission_type: 'fixed',
+  task_description:
+    'Binary tabular classification on a deterministic synthetic dataset (10,000 ' +
+    'samples x 84 features, seed=42; train 0-5999, val 6000-7999, test 8000-9999) ' +
+    'with a genuine improvement LADDER, not a cliff: features 0-1 carry a weak ' +
+    'linear main effect, features 2-3 carry a conjunction interaction (bonus only ' +
+    'when BOTH x2>0.3 AND x3>0.3), and features 4-83 (80 of them) are pure noise. ' +
+    'Four rungs of measured headroom (see benchmarks/tabular-ladder/evaluate.py): ' +
+    '(1) a basic linear model beats chance at roc_auc~0.81 by capturing the main ' +
+    'effects but not the interaction; (2) an unregularized tree that captures the ' +
+    'interaction reaches ~0.85 but pays an overfitting cost on the 80 noise ' +
+    'features; (3) a tree with train-set feature selection that filters the noise ' +
+    'reaches ~0.89; (4) a bagged ensemble of selected-feature trees reaches ~0.91, ' +
+    'approaching the ~0.918 Bayes-optimal ceiling. A search that is actually ' +
+    'improving should climb this ladder tick over tick; a search that is stuck ' +
+    'plateaus at whichever rung it already reached. CPU only: the evaluator ' +
+    'trains from the Python standard library alone — no GPU, no torch, no sklearn.',
+  dataset_ref: DATASET_REF,
+  metric_specs: [
+    {
+      metric_name: 'roc_auc',
+      direction: 'higher',
+      domain_applicability: 'all',
+      aggregation_rule: 'macro_avg',
+      role: 'primary_fitness',
+    },
+    {
+      metric_name: 'accuracy',
+      direction: 'higher',
+      domain_applicability: 'all',
+      aggregation_rule: 'macro_avg',
+      role: 'secondary_reported',
+    },
+  ],
+  fitness_mode: 'aggregate',
+  eval_version: EVAL_VERSION,
+  // Chance-level roc_auc is 0.5. The measured rung-1 reference (plain logistic
+  // regression) reaches ~0.81, so 0.55 keeps the bar real but low, letting the
+  // full ladder (up to the ~0.918 Bayes ceiling) be visible as headroom.
+  baseline_value: 0.55,
+  target_value: 0.9,
+  stop_condition: { type: 'evolve-n', n: TICKS },
+  wildness: 0.3,
+  budget: {
+    max_iterations: TICKS,
+    plateau_window: 3,
+    circuit_breaker: 5,
+    max_cost_usd: 25,
+    max_wall_clock_hours: 2,
+  },
+  framework: 'python-stdlib',
+  allowed_licenses: ['MIT', 'BSD-3-Clause', 'Apache-2.0'],
+} : {
   mission_id: MISSION_ID,
   mode: 'from-scratch',
   mission_type: 'fixed',
@@ -123,7 +195,9 @@ const goalContract = {
     '(800 samples x 10 features, seed=42; train 0-479, val 480-639, test 640-799). ' +
     'The target is deliberately non-linear (XOR-like), so a depth-limited tree can ' +
     'beat a linear model. CPU only: the evaluator trains from the Python standard ' +
-    'library alone — no GPU, no torch, no sklearn.',
+    'library alone — no GPU, no torch, no sklearn. NOTE: this mission saturates a ' +
+    'depth-4 tree on tick 1 (see task B3) — it is a fast smoke test only, not a ' +
+    'search-quality benchmark. Use BENCH_MISSION=ladder for that.',
   dataset_ref: DATASET_REF,
   // accuracy on a 160-sample test split only has 1/160 = 0.00625 granularity —
   // a real 3-tick run produced just two distinct values across all nodes and a
@@ -180,7 +254,7 @@ async function main() {
     const gen = spawnSync('python3', ['-c', `
 import importlib.util, json, sys
 from pathlib import Path
-spec = importlib.util.spec_from_file_location("ev", ${JSON.stringify(join(REPO, 'benchmarks', 'tabular-churn', 'evaluate.py'))})
+spec = importlib.util.spec_from_file_location("ev", ${JSON.stringify(EVALUATOR_SRC)})
 ev = importlib.util.module_from_spec(spec); spec.loader.exec_module(ev)
 X, y = ev._make_dataset()
 out = Path(${JSON.stringify(DATASET_DIR)})
@@ -235,7 +309,7 @@ print(len(X))
       const { runDir } = runPaths(runId);
       const dest = join(runDir, 'eval-suites', `${EVAL_VERSION}.py`);
       mkdirSync(dirname(dest), { recursive: true });
-      copyFileSync(join(REPO, 'benchmarks', 'tabular-churn', 'evaluate.py'), dest);
+      copyFileSync(EVALUATOR_SRC, dest);
       return { dest };
     });
 

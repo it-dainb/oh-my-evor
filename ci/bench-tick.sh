@@ -77,6 +77,12 @@ fi
 [ -n "${BENCH_TICKS:-}" ] && RUN_ARGS+=(-e "BENCH_TICKS=${BENCH_TICKS}")
 [ -n "${BENCH_MAX_TURNS:-}" ] && RUN_ARGS+=(-e "BENCH_MAX_TURNS=${BENCH_MAX_TURNS}")
 [ -n "${BENCH_TIMEOUT_MS:-}" ] && RUN_ARGS+=(-e "BENCH_TIMEOUT_MS=${BENCH_TIMEOUT_MS}")
+# Without these two the container silently runs the DEFAULT mission and effort no
+# matter what the caller set, so a new benchmark would be unreachable from the
+# harness that is supposed to run it — the same "exists but never reached" shape
+# this repo keeps producing.
+[ -n "${BENCH_MISSION:-}" ] && RUN_ARGS+=(-e "BENCH_MISSION=${BENCH_MISSION}")
+[ -n "${BENCH_EFFORT:-}" ] && RUN_ARGS+=(-e "BENCH_EFFORT=${BENCH_EFFORT}")
 
 echo "▶ running one tick in an isolated container ..."
 docker run "${RUN_ARGS[@]}" --entrypoint node "$IMG" ci/bench-tick.mjs
