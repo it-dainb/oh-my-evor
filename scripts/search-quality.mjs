@@ -116,6 +116,7 @@ function meanPairwise(sets) {
 
 const perTick = [];
 const priorShingles = [];
+const seenTags = new Set();
 const seenCombos = new Set();
 const seenLoci = new Set();
 
@@ -150,6 +151,23 @@ for (const t of ticks) {
   // 0% selector precision. That is the third time in this work that a parser miss
   // has been indistinguishable from a finding about the search, so unparseable is
   // now tracked separately from zero and surfaced in the output.
+  // C2 (real answer): novelty over DECLARED mechanisms. Both inferred proxies —
+  // file locus and text similarity — sat at ceiling on real data, so the proposal
+  // now declares its own technique_tags[] and novelty is measured over that space.
+  // A proposal reusing only seen tags is a variation; one introducing an unseen tag
+  // is exploration. This is the measure that makes the moonshot quota enforceable.
+  const tagsPerProposal = props.map((p) =>
+    (Array.isArray(p.technique_tags) ? p.technique_tags : []).map((t) => String(t).toLowerCase()));
+  const tagged = tagsPerProposal.filter((t) => t.length).length;
+  let newTags = 0, proposalsWithNewTag = 0;
+  for (const tags of tagsPerProposal) {
+    let introducedOne = false;
+    for (const t of tags) {
+      if (!seenTags.has(t)) { seenTags.add(t); newTags++; introducedOne = true; }
+    }
+    if (introducedOne) proposalsWithNewTag++;
+  }
+
   // C2: continuous diversity, replacing the ceiling-pinned locus count.
   const ideaSets = props.map((p) => shingles(p.idea ?? p.hypothesis ?? ''));
   const intraTickDiversity = meanPairwise(ideaSets);
@@ -206,6 +224,10 @@ for (const t of ticks) {
     tiers: [...tiers],
     wildness: proposals?.wildness_used ?? null,
     crossover: proposals?.crossover_triggered ?? null,
+    proposals_tagged: tagged,
+    new_technique_tags: newTags,
+    proposals_introducing_a_new_tag: proposalsWithNewTag,
+    exploration_rate: props.length ? proposalsWithNewTag / props.length : null,
     intra_tick_diversity: intraTickDiversity,
     distance_from_history: vsHistory,
     novel_family_tier_combos: novelCombos,
@@ -285,6 +307,8 @@ const summary = {
   nodes_with_empty_tree_metrics: nodes.filter((n) => n.tree_metrics_empty).length,
   sage_proactive_total: perTick.reduce((a, t) => a + t.sage_proactive_findings, 0),
   selector_precision: selectorPrecision,
+  technique_tag_vocabulary: seenTags.size,
+  proposals_untagged: perTick.reduce((a, t) => a + (t.proposals - t.proposals_tagged), 0),
   selector_ticks_scored: withApproval.length,
   wildness_vs_novelty: wildnessVsNovelty,
   distinct_fitness_values: [...new Set(scored.map((n) => n.fitness))].sort((a, b) => a - b),
@@ -338,6 +362,20 @@ if (summary.selector_precision === null) {
 } else {
   console.log(`  ${pct(summary.selector_precision)} of ticks where Selector approved something improved the running best` +
               `  (n=${summary.selector_ticks_scored})`);
+}
+
+console.log('\nMUTAGEN exploration over DECLARED mechanisms (technique_tags):');
+if (summary.proposals_untagged === summary.total_proposals) {
+  console.log('  no proposal declared technique_tags — this run predates the field.');
+  console.log('  Mechanism-level novelty is unmeasurable for it; the lexical numbers below');
+  console.log('  are the fallback and they saturate.');
+} else {
+  for (const t of perTick) {
+    console.log(`  tick ${t.tick}: ${t.proposals_tagged}/${t.proposals} tagged · ` +
+                `${t.new_technique_tags} new mechanism(s) · exploration rate ${t.exploration_rate === null ? 'n/a' : t.exploration_rate.toFixed(2)}`);
+  }
+  console.log(`  vocabulary after ${summary.ticks} tick(s): ${summary.technique_tag_vocabulary} distinct mechanisms`);
+  if (summary.proposals_untagged) console.log(`  ! ${summary.proposals_untagged} proposal(s) declared no tags and are invisible to this measure`);
 }
 
 console.log('\nMUTAGEN wildness vs realized diversity (Jaccard on proposal text):');

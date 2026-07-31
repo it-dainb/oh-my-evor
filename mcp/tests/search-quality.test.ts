@@ -188,6 +188,96 @@ describe("Sage's self-directed angle is stated where Sage will read it", () => {
   });
 });
 
+describe("C2 — novelty over declared mechanisms discriminates where inferred proxies do not", () => {
+  // Both inferred proxies sat at ceiling on real data: every proposal touches a
+  // fresh file locus (rate 1.00), and every proposal is worded differently
+  // (Jaccard 0.95-0.98) even when the idea is the same. So the proposal declares
+  // its own mechanisms and novelty is measured over that space instead.
+  //
+  // This fixture is the case both inferred proxies get WRONG: two ticks of
+  // proposals that are textually different and touch different files, where the
+  // second tick is pure re-tread at the mechanism level.
+  let dir: string;
+
+  beforeAll(() => {
+    dir = mkdtempSync(join(tmpdir(), "evor-sq-tags-"));
+    const w = (p: string, o: unknown) => {
+      mkdirSync(dirname(p), { recursive: true });
+      writeFileSync(p, JSON.stringify(o));
+    };
+    w(join(dir, "tree.json"), { nodes: {} });
+    w(join(dir, "run-state.json"), { run_id: "tags" });
+
+    // tick 1 — two genuinely distinct mechanisms.
+    w(join(dir, "ticks", "1", "mutagen", "proposals.json"), {
+      proposals: [
+        { idea: "grow a decision tree with gini splits over raw columns",
+          mutation_locus: { path: "model/tree.py" }, technique_tags: ["decision-tree", "gini-split"] },
+        { idea: "bootstrap resample and average many weak learners together",
+          mutation_locus: { path: "model/bag.py" }, technique_tags: ["bagging", "bootstrap-resampling"] },
+      ],
+    });
+    // tick 2 — different wording, different files, SAME mechanisms. A re-tread.
+    w(join(dir, "ticks", "2", "mutagen", "proposals.json"), {
+      proposals: [
+        { idea: "construct a hierarchical partition using impurity reduction criteria",
+          mutation_locus: { path: "model/partition.py" }, technique_tags: ["decision-tree", "gini-split"] },
+        { idea: "aggregate predictions from resampled sub-populations by voting",
+          mutation_locus: { path: "model/vote.py" }, technique_tags: ["bagging"] },
+      ],
+    });
+    // tick 3 — one genuinely new mechanism.
+    w(join(dir, "ticks", "3", "mutagen", "proposals.json"), {
+      proposals: [
+        { idea: "cross pairs of features before fitting",
+          mutation_locus: { path: "data/cross.py" }, technique_tags: ["feature-cross"] },
+      ],
+    });
+  });
+
+  afterAll(() => rmSync(dir, { recursive: true, force: true }));
+
+  const run = () => {
+    const r = spawnSync("node", [SCRIPT, dir, "--json"], { encoding: "utf8" });
+    if (r.status !== 0) throw new Error(r.stderr);
+    return JSON.parse(r.stdout);
+  };
+
+  it("counts a mechanism-level re-tread as zero exploration", () => {
+    const perTick = run().per_tick;
+    expect(perTick[0].new_technique_tags).toBe(4);
+    expect(perTick[1].new_technique_tags, "tick 2 reuses only mechanisms already seen").toBe(0);
+    expect(perTick[2].new_technique_tags).toBe(1);
+  });
+
+  it("the inferred proxies call that same re-tread maximally novel — which is the point", () => {
+    const perTick = run().per_tick;
+    // Different files and different wording, so both cheap measures score it high
+    // while the mechanism measure correctly scores it zero.
+    expect(perTick[1].novel_loci).toBe(2);
+    expect(perTick[1].intra_tick_diversity).toBeGreaterThan(0.9);
+  });
+
+  it("tracks the vocabulary of distinct mechanisms across the run", () => {
+    expect(run().summary.technique_tag_vocabulary).toBe(5);
+  });
+
+  it("reports proposals that declared no tags rather than scoring them as novel", () => {
+    const untagged = mkdtempSync(join(tmpdir(), "evor-sq-untagged-"));
+    mkdirSync(join(untagged, "ticks", "1", "mutagen"), { recursive: true });
+    writeFileSync(join(untagged, "tree.json"), JSON.stringify({ nodes: {} }));
+    writeFileSync(join(untagged, "run-state.json"), JSON.stringify({ run_id: "u" }));
+    writeFileSync(
+      join(untagged, "ticks", "1", "mutagen", "proposals.json"),
+      JSON.stringify({ proposals: [{ idea: "something", mutation_locus: { path: "a.py" } }] }),
+    );
+    const out = run.call(null) && JSON.parse(spawnSync("node", [SCRIPT, untagged, "--json"], { encoding: "utf8" }).stdout);
+    rmSync(untagged, { recursive: true, force: true });
+    expect(out.summary.proposals_untagged).toBe(1);
+    expect(out.summary.technique_tag_vocabulary).toBe(0);
+  });
+});
+
 describe("Selector's artifact has no enforced schema — the analyzer must survive that", () => {
   // Three consecutive ticks of ONE real run used three different shapes:
   //   tick 1  reviews[]              -> critic_review.verdict

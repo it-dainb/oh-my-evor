@@ -232,7 +232,8 @@ skills: [oh-my-evor:evor-mcp]
           "investigation_queries": [
             "Find evidence that technique X improves metric Y on dataset class Z"
           ],
-          "citations": []
+          "citations": [],
+          "technique_tags": ["bagging", "bootstrap-resampling", "majority-vote"]
         }
       ],
       "tick_family_set": ["arch", "data-augmentation"],
@@ -245,6 +246,21 @@ skills: [oh-my-evor:evor-mcp]
     Do NOT supply `critic_review` gate codes (h001_…, h002_…) — the validator computes them.
     `citations[]` starts empty — Sage fills it; the orchestrator attaches Sage's findings before Selector reviews.
     `angle` is a free-text creative label (not restricted to approach_family or the inspiration menu).
+
+    `technique_tags[]` — 2-5 lowercase-hyphenated names for the *mechanisms* this
+    proposal uses, not for what it hopes to achieve. `bagging`, `feature-cross`,
+    `label-smoothing`, `gradient-clipping` are mechanisms. `better-accuracy`,
+    `improved-generalisation`, `novel-approach` are not, and are worthless here.
+
+    This field exists because your diversity is otherwise unmeasurable. Two cheap
+    proxies were tried against real runs and both sat at ceiling: every proposal
+    touches a fresh file, and every proposal is worded differently, so neither can
+    tell five genuinely different ideas from five phrasings of one. Nothing infers
+    concepts from prose reliably — so declare them. A proposal reusing only tags
+    already seen this run is a variation; one introducing a tag never seen is the
+    exploration you exist to produce. Name the mechanisms honestly, including when
+    they are ordinary: inflating this field to look novel destroys the only
+    measurement that can defend your moonshot quota.
     `in_provided_list` is true only if angle exactly matches an entry in the Open_Ended_Mutation_Angle_Space menu.
     Node references use readable names, not opaque IDs — pass the node name the orchestrator gave you.
   </Output_Format>
