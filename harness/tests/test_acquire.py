@@ -133,9 +133,26 @@ class TestTextExactMatch:
 class TestTextNearDup:
     def test_near_dup_dropped_above_threshold(self, tmp_path: Path) -> None:
         """A text that is very similar (Jaccard > 0.8) to a forbidden item is dropped."""
-        # Construct two texts sharing ~90% of 5-char shingles
-        base = "the quick brown fox jumps over the lazy dog " * 10
-        variant = base.replace("quick", "swift")  # One word change — still very similar
+        # The previous fixture repeated one 44-char phrase ten times and swapped a
+        # word. Shingle sets are SETS, so repetition adds nothing: the distinct
+        # 5-shingle set was only 43 entries, and replacing "quick" removed the ~9
+        # shingles spanning it — a true Jaccard of 0.65, comfortably BELOW the 0.8
+        # threshold. The detector was right to pass it; the test premise
+        # ("sharing ~90% of 5-char shingles") was simply false, and it had never
+        # run here because datasketch was not installed.
+        #
+        # A long non-repeating body gives a large distinct-shingle set, so a small
+        # edit moves a small fraction of it — the shape a real near-duplicate has.
+        # Measured Jaccard for this pair: 0.995.
+        import random as _random
+        import string as _string
+
+        _rng = _random.Random(42)
+        base = " ".join(
+            "".join(_rng.choices(_string.ascii_lowercase, k=_rng.randint(3, 9)))
+            for _ in range(400)
+        )
+        variant = base + " tail"  # near-identical body, tiny append
         forbidden = [{"text": base}]
         split = _make_forbidden_split(tmp_path / "split.json", [forbidden[0]])
 
@@ -378,8 +395,16 @@ class TestImageNearDup:
         import numpy as _np
         from PIL import Image as _PILImage
 
-        arr_a = _np.zeros((64, 64, 3), dtype=_np.uint8)
-        arr_b = _np.full((64, 64, 3), 255, dtype=_np.uint8)  # all-white vs all-black
+        # Was all-black vs all-white. A perceptual hash is brightness-invariant by
+        # design and both images are featureless, so phash returns 0000…/8000…
+        # for a Hamming distance of 1 — it correctly reports "same structure".
+        # Flat fields cannot express visual dissimilarity to a phash.
+        #
+        # Two independent noise fields do: measured Hamming distance 34, well
+        # above the threshold of 8.
+        _rng = _np.random.default_rng(0)
+        arr_a = _rng.integers(0, 256, (64, 64, 3), dtype=_np.uint8)
+        arr_b = _rng.integers(0, 256, (64, 64, 3), dtype=_np.uint8)
 
         img_a = tmp_path / "a.png"
         img_b = tmp_path / "b.png"

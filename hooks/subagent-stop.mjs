@@ -35,7 +35,9 @@
 
 import { existsSync, statSync, readFileSync, appendFileSync, renameSync, writeFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
+import { tmpdir } from 'os';
 import { spawnSync } from 'child_process';
+import { resolveActiveRun } from './lib/active-run.mjs';
 
 // ── Kill switches ─────────────────────────────────────────────────────────────
 if (process.env.DISABLE_EVOR) process.exit(0);
@@ -43,13 +45,73 @@ if (process.env.DISABLE_EVOR) process.exit(0);
 const skipHooks = (process.env.EVOR_SKIP_HOOKS ?? '').split(',').map(s => s.trim());
 if (skipHooks.includes('subagent-stop')) process.exit(0);
 
+// ── STDIN payload (read once — stdin is not re-readable) ──────────────────────
+let payload = {};
+try { payload = JSON.parse(readFileSync(0, 'utf8') || '{}'); } catch { /* fail-open */ }
+
+// ── evor-tick return contract ─────────────────────────────────────────────────
+// evor-tick's return is the ONLY thing that crosses the context boundary into
+// the mission orchestrator, so its size and shape are the whole reason the agent
+// exists. Rewriting a return is impossible (PostToolUse.updatedToolOutput is
+// documented but inert in CLI 2.1.220); blocking the stop is not — the subagent
+// resumes and re-emits. So: reject and let it correct itself, at most twice.
+const TICK_OUTCOMES = ['scored', 'rejected', 'skipped', 'failed'];
+const MAX_RETURN_CHARS = 1500;   // ~400 tokens, per the agent's own budget
+const MAX_RETRIES = 2;
+
+if ((payload.agent_type ?? '').toLowerCase().endsWith('evor-tick')) {
+  const msg = String(payload.last_assistant_message ?? '');
+  const violation = checkTickReturn(msg);
+  // stop_hook_active is the platform's own loop guard; our counter bounds the
+  // case where it is not set. Either one alone must be able to end the loop.
+  if (violation && !payload.stop_hook_active && bumpRetries(payload.agent_id) <= MAX_RETRIES) {
+    process.stdout.write(JSON.stringify({
+      decision: 'block',
+      reason:
+        `Your return violates the tick contract: ${violation}\n` +
+        `Re-emit your entire response as ONE JSON object, nothing else:\n` +
+        `{"tick":<number>,"outcome":"${TICK_OUTCOMES.join('|')}",` +
+        `"node_id":"<id, if a node was produced>","score":<number, if evaluated>,` +
+        `"pointers":[{"run_id":"...","tick":<n>,"agent":"..."}],"error":"<only when outcome=failed>"}\n` +
+        `Under ${MAX_RETURN_CHARS} characters. Content that lives in an artifact goes in pointers, not here.`,
+    }) + '\n');
+    process.exit(0);
+  }
+}
+
+/** null if the return conforms, else a one-line description of the violation. */
+function checkTickReturn(raw) {
+  const text = raw.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
+  if (text.length > MAX_RETURN_CHARS) {
+    return `${text.length} characters, over the ${MAX_RETURN_CHARS}-character budget`;
+  }
+  let obj;
+  try { obj = JSON.parse(text); } catch { return 'not parseable as JSON'; }
+  if (obj === null || typeof obj !== 'object' || Array.isArray(obj)) return 'not a JSON object';
+  if (typeof obj.tick !== 'number') return '"tick" is missing or not a number';
+  if (!TICK_OUTCOMES.includes(obj.outcome)) return `"outcome" must be one of ${TICK_OUTCOMES.join(', ')}`;
+  if (obj.pointers !== undefined && !Array.isArray(obj.pointers)) return '"pointers" must be an array';
+  return null;
+}
+
+/** Attempt number for this agent. Keyed by agent_id so ticks stay independent. */
+function bumpRetries(agentId) {
+  const path = join(process.env.EVOR_STATE_DIR || tmpdir(), 'evor-tick-retries.json');
+  let counts = {};
+  try { counts = JSON.parse(readFileSync(path, 'utf8')); } catch { /* first attempt */ }
+  const n = (counts[agentId ?? 'unknown'] ?? 0) + 1;
+  counts[agentId ?? 'unknown'] = n;
+  try { writeFileSync(path, JSON.stringify(counts)); } catch { return MAX_RETRIES + 1; }
+  return n;
+}
+
 // ── Active run guard ──────────────────────────────────────────────────────────
-const activeRunId = process.env.EVOR_ACTIVE_RUN_ID ?? '';
+const { runId: activeRunId, missionId } = resolveActiveRun();
 if (!activeRunId) process.exit(0);
 
 const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT ?? process.cwd();
 const evorRoot = process.env.EVOR_ROOT ?? join(pluginRoot, '.evor');
-const missionId = process.env.EVOR_MISSION_ID ?? '';
+// missionId comes from resolveActiveRun() above.
 
 const runDir = missionId
   ? join(evorRoot, 'runs', missionId, activeRunId)
@@ -65,8 +127,6 @@ let agentRole = (process.env.EVOR_AGENT_ROLE ?? '').toLowerCase().trim();
 
 if (!agentRole) {
   try {
-    const raw = readFileSync(0, 'utf8');
-    const payload = JSON.parse(raw || '{}');
     const agentType = (payload?.agent_type ?? '').toLowerCase();
     // Strip "oh-my-evor:evor-" prefix → bare role name (e.g. "sage", "forge").
     const stripped = agentType.replace(/^oh-my-evor:evor-/, '').replace(/^evor-/, '');

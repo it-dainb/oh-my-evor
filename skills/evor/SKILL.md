@@ -2,7 +2,6 @@
 name: evor
 description: Main 9-step Evor tick loop with meta-evolution, doom-loop detection, and parallel candidate scheduling
 argument-hint: "[run-id]"
-level: 4
 skills: [oh-my-evor:evor-mcp]
 ---
 
@@ -119,17 +118,22 @@ guard/spec to contract intent (Step above) is NOT it.
 | Agent | Model | Role |
 |---|---|---|
 | Evor (orchestrator) | opus | Tick coordination, meta-evolution decisions, doom-loop intervention |
-| Sage | opus | Research LEAD: decompose intent, fan out to Sage-junior, aggregate + quorum |
-| Sage-junior | sonnet | Single-angle deep citation research (spawned only by Sage) |
-| Mutagen | opus | Mutation proposal generation (creative, unbounded ideation) |
-| Probe | opus | Telemetry EDA, hypothesis verdict, benchmark-upgrade proposals |
+| Sage | sonnet | Research LEAD: decompose intent, fan out to Sage-junior, aggregate + quorum |
+| Sage-junior | haiku | Single-angle deep citation research (spawned only by Sage) |
+| Mutagen | sonnet | Mutation proposal generation (creative, unbounded ideation) |
+| Probe | sonnet | Telemetry EDA, hypothesis verdict, benchmark-upgrade proposals |
 | Forge | opus | Implementation LEAD: orchestrates its dev team (does not write code itself) |
-| Forge-architect | opus | Designs the candidate implementation (spawned only by Forge) |
+| Forge-architect | sonnet | Designs the candidate implementation (spawned only by Forge) |
 | Forge-junior | sonnet | Writes the candidate training code (spawned only by Forge) |
-| Forge-critic | opus | Pre-run code review + integrity/structure check (spawned only by Forge) |
-| Forge-analyst | opus | Post-run telemetry analysis + failure diagnosis (spawned only by Forge) |
-| Selector | opus | 6-gate pre-execution critique (sharper borderline-gate judgment) |
+| Forge-critic | sonnet | Pre-run code review + integrity/structure check (spawned only by Forge) |
+| Forge-analyst | sonnet | Post-run telemetry analysis + failure diagnosis (spawned only by Forge) |
+| Selector | sonnet | 6-gate pre-execution critique (sharper borderline-gate judgment) |
+| Acquirer | haiku | Scoped data acquisition, validation, de-duplication (spawned by Forge/Sage) |
 | Quick lookups | haiku | Wiki queries, state reads, schema checks |
+
+Tiering rule: **opus** for the orchestrator and for Forge (it arbitrates the atomic-review
+loop); **sonnet** for leads and for any role that renders a verdict or handles escalation;
+**haiku** only for single-angle, well-scoped work with no verification duty.
 </Model_Routing>
 
 <Parallel_Execution>
@@ -142,6 +146,26 @@ If the env var is unavailable, fall back to sequential candidate execution (conc
 </Parallel_Execution>
 
 <Steps>
+
+## Step -1 — Who runs this loop (execution boundary)
+
+This skill is loaded by two different roles. Read this before Step 0 and act on your own role.
+
+**If you are the mission orchestrator** (invoked via `/evor-run`, no `agent_type`): you do NOT
+run Steps 0-9 yourself. For each tick, spawn the boundary and await its status:
+
+`Task(subagent_type="oh-my-evor:evor-tick", description="Tick <n>", prompt="Run dir: <run_dir>. Tick: <n>. Execute exactly one tick end to end, then return a compact status.")`
+
+Then record the returned status, decide continue / stop / meta-evolve, and spawn the next tick.
+Keep nothing else. Do not read artifacts, tree, or state that the boundary already read — if
+you need detail, it is behind an `evor_read_artifact` pointer the boundary returned.
+
+**If you ARE `evor-tick`**: Steps 0-9 below are yours. Run them, then return the status.
+
+**Why:** measured on a real tick, the orchestrator ran 47 turns and ended at 144,644 tokens,
+recurring ~75,261 per tick — reaching the 1M window near tick 12 against a 100-200 tick target.
+Delegation was already fully enforced (orchestrator leaf calls 152 -> 1); the growth is the
+loop's own bookkeeping. The boundary exists so that per-tick context dies with the tick.
 
 ## Step 0 — Run Startup (once, before the first tick)
 

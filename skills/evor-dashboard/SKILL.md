@@ -2,7 +2,6 @@
 name: evor-dashboard
 description: Start the live FastAPI + SSE dashboard for the active Evor mission on port 8756
 argument-hint: "[run-id]"
-level: 2
 skills: [oh-my-evor:evor-mcp]
 ---
 

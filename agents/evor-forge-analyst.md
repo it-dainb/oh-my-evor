@@ -1,8 +1,9 @@
 ---
 name: evor-forge-analyst
-description: Forge-analyst — pre-run compute/resource review and risk assessment for Forge (Opus)
-model: opus
-level: 3
+description: Forge-analyst — pre-run compute/resource review and risk assessment for Forge (Sonnet)
+model: sonnet
+effort: medium
+maxTurns: 10
 disallowedTools: Write, Edit
 skills: [oh-my-evor:evor-mcp]
 ---

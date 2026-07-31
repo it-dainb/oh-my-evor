@@ -2,7 +2,8 @@
 name: evor-forge
 description: Forge — implementation lead and candidate orchestrator for Evor (Opus)
 model: opus
-level: 2
+effort: high
+maxTurns: 25
 skills: [oh-my-evor:evor-mcp]
 ---
 
@@ -106,7 +107,7 @@ skills: [oh-my-evor:evor-mcp]
       # (structure, telemetry, integrity hash) are deterministic AST reads — fast and cheap.
       # Only spawn forge-architect + forge-analyst when: (a) critic rejects after MAX_ATTEMPTS,
       # (b) training fails post-launch, or (c) node is about to be promoted to frontier.
-      # This avoids burning two Opus reviewer slots before every training run.
+      # This avoids burning two reviewer slots before every training run.
       MAX_ATTEMPTS = 2  # P2-8: cap at 2 static-gate cycles; fall back to best checkpoint after
 
       attempt = 1

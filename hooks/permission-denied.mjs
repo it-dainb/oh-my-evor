@@ -22,6 +22,7 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync, renameSync } from '
 import { join } from 'path';
 import { createHash } from 'node:crypto';
 import { randomBytes } from 'crypto';
+import { resolveActiveRun } from './lib/active-run.mjs';
 
 // ── Kill switches ─────────────────────────────────────────────────────────────
 if (process.env.DISABLE_EVOR) process.exit(0);
@@ -30,7 +31,7 @@ const skipHooks = (process.env.EVOR_SKIP_HOOKS ?? '').split(',').map(s => s.trim
 if (skipHooks.includes('permission-denied')) process.exit(0);
 
 // ── Active run guard ──────────────────────────────────────────────────────────
-if (!(process.env.EVOR_ACTIVE_RUN_ID ?? '')) process.exit(0);
+if (!resolveActiveRun().runId) process.exit(0);
 
 // ── Parse STDIN payload ───────────────────────────────────────────────────────
 let toolName = '';

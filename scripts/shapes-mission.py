@@ -177,7 +177,7 @@ def _extract_and_write_telemetry(
 
 def _make_goal(locked_split_hash: str, eval_script_hash: str) -> object:
     from evor.contracts import (
-        Budget, GoalContract, LegacyMetric, MetricSpec, StopCondition,
+        Budget, GoalContract, MetricSpec, StopCondition,
     )
     return GoalContract(
         mission_id=_MISSION_ID,
@@ -188,7 +188,6 @@ def _make_goal(locked_split_hash: str, eval_script_hash: str) -> object:
             "16×16 grayscale (seed=42)"
         ),
         dataset_ref="synthetic-shapes-cv2-seed42-n600-16x16",
-        metrics=[LegacyMetric(name="accuracy", direction="higher", primary=True)],
         metric_specs=[MetricSpec(
             metric_name="accuracy",
             direction="higher",

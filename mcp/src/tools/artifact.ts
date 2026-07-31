@@ -26,6 +26,20 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { resolveRunPaths } from "../run-store.js";
 import { callBridge } from "../subprocess-bridge.js";
+import { resolveRunId } from "../active-run.js";
+import { err } from "../tool-result.js";
+
+/**
+ * Agent kinds whose artifacts are validated against a Pydantic contract at write
+ * time. Every other kind is persisted as unchecked JSON — see the module notes.
+ * Keep this in sync with the harness contracts; an entry here is a promise.
+ */
+const CONTRACT_VALIDATED_AGENTS = new Set<string>([
+  "mutagen",
+  "sage",
+  "sage-junior",
+  "acquirer",
+]);
 
 const VALID_AGENTS = [
   "mutagen",
@@ -163,7 +177,12 @@ export function registerArtifactTools(server: McpServer): void {
       "unknown/loose agents pass through as plain JSON.",
     ].join(" "),
     {
-      run_id: z.string().describe("Active run identifier"),
+      // Optional with an active-run fallback. Required-with-no-default is what
+      // produced three identical evor_cite failures in run 29d17abc: the schema
+      // gave the model no signal about what was wrong, so it repeated the same
+      // bad call. Format hints would only make that more diagnosable; resolving
+      // from the active run removes the failure mode entirely (rubric rule 1).
+      run_id: z.string().optional().describe("Active run identifier"),
       tick: z.number().int().min(0).describe("Current tick number"),
       agent: z
         .enum(VALID_AGENTS)
@@ -182,13 +201,15 @@ export function registerArtifactTools(server: McpServer): void {
         .optional()
         .describe("If true, write as an in-progress (partial) artifact"),
     },
-    async ({ run_id, tick, agent, kind, payload, partial }) => {
+    async ({ run_id: run_id_in, tick, agent, kind, payload, partial }) => {
+      const run_id = resolveRunId(run_id_in);
+      if (!run_id) return err("no run_id given and no active run found — start a run or pass run_id explicitly");
       const missionId = process.env.EVOR_MISSION_ID;
       const result = writeArtifact(run_id, tick, agent, payload, kind, partial, missionId);
       if (!result.ok) {
         return {
           content: [
-            { type: "text" as const, text: JSON.stringify({ error: result.error }) },
+            { type: "text" as const, text: JSON.stringify({ ok: false, error: result.error }) },
           ],
         };
       }
@@ -212,7 +233,7 @@ export function registerArtifactTools(server: McpServer): void {
     "evor_read_artifact",
     [
       "Read and validate a tick artifact written by an upstream agent.",
-      "Returns the parsed artifact payload, or {error:'not found'} when the upstream",
+      "Returns {ok:true,validated,payload}, or {ok:false,error:'not found'} when the upstream",
       "agent hasn't produced it yet — a strong signal to stop and surface the gap,",
       "not proceed on assumptions. Path mapping is identical to evor_write_artifact.",
     ].join(" "),
@@ -242,8 +263,22 @@ export function registerArtifactTools(server: McpServer): void {
             type: "text" as const,
             text: JSON.stringify(
               result.ok
-                ? { ok: true, run_id, tick, agent, payload: result.payload }
-                : { error: result.error }
+                ? {
+                    ok: true,
+                    run_id,
+                    tick,
+                    agent,
+                    // `ok:true` means "some JSON was read", never "this payload is
+                    // trustworthy" — that conflation is what let the stub artifact
+                    // `{finding:"test", quorum_met:true}` clear a review gate in run
+                    // 29d17abc. Pydantic contracts cover only the kinds below; the
+                    // rest pass through as plain JSON with no write-time validation
+                    // at all, so the caller is told which it got rather than left to
+                    // assume.
+                    validated: CONTRACT_VALIDATED_AGENTS.has(agent),
+                    payload: result.payload,
+                  }
+                : { ok: false, error: result.error }
             ),
           },
         ],

@@ -650,7 +650,10 @@ describe("evor_freeze_splits zero-item guard", () => {
       data: { test_item_count: 0, val_item_count: 0, locked_split_hash: "h", val_split_hash: "h" },
     });
     const out = await callTool("evor_freeze_splits", FREEZE_ARGS);
-    expect(out.ok).toBeUndefined();
+    // C5 Stage 1: failures now carry ok:false. This previously asserted `undefined`,
+    // which pinned the defect — a caller checking `ok === false` read the failure
+    // as success.
+    expect(out.ok).toBe(false);
     expect(typeof out.error).toBe("string");
     expect(out.error).toMatch(/no data items were found/i);
     // guidance must be name-only — no internal path/filename leak
@@ -720,7 +723,10 @@ describe("evor_seal_eval_script", () => {
       mission_id: "m1",
     });
 
-    expect(out.ok).toBeUndefined();
+    // C5 Stage 1: failures now carry ok:false. This previously asserted `undefined`,
+    // which pinned the defect — a caller checking `ok === false` read the failure
+    // as success.
+    expect(out.ok).toBe(false);
     expect(typeof out.error).toBe("string");
     // Error must be actionable and name-only — no absolute path, no .evor fragments
     expect(out.error).not.toContain("/");

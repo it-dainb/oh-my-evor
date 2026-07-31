@@ -1,8 +1,9 @@
 ---
 name: evor-selector
-description: Selector — 7-gate pre-execution critic and diversity enforcer for Evor (Opus)
-model: opus
-level: 2
+description: Selector — 7-gate pre-execution critic and diversity enforcer for Evor (Sonnet)
+model: sonnet
+effort: medium
+maxTurns: 12
 skills: [oh-my-evor:evor-mcp]
 disallowedTools: Write, Edit
 ---
@@ -64,7 +65,7 @@ disallowedTools: Write, Edit
     - `"needs_llm"` — data-acquisition, wildness ≥ 0.8, high/critical bus signal, or a deterministic
       ambiguity that requires judgment: proceed to the full Seven_Gate_Checklist below.
 
-    Only `"needs_llm"` proposals enter the LLM gate loop. This eliminates full Opus evaluation
+    Only `"needs_llm"` proposals enter the LLM gate loop. This eliminates full LLM evaluation
     cost for structurally clean, low-risk proposals — the most expensive step in the Selector loop.
 
     **P1-7 — Deterministic pre-screen (run BEFORE full LLM evaluation).**

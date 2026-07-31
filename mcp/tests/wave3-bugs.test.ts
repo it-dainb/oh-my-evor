@@ -47,7 +47,7 @@ import {
   utimesSync,
   writeFileSync,
 } from "fs";
-import { join } from "path";
+import { join, resolve } from "path";
 import { tmpdir } from "os";
 import { randomUUID } from "crypto";
 import { spawn } from "child_process";
@@ -64,7 +64,26 @@ import { stateWrite } from "../src/tools/state.js";
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const __dirname_test = fileURLToPath(new URL(".", import.meta.url));
-const viteNode = "/storages_local/research/oh-my-evor/node_modules/.bin/vite-node";
+
+/**
+ * Resolved, not hardcoded. This was an absolute path to one developer's checkout
+ * (`/storages_local/research/oh-my-evor/node_modules/.bin/vite-node`), so the
+ * cross-process lock test could only run on that machine — in the CI container it
+ * spawned ENOENT and took the whole vitest run down with an uncaught exception,
+ * failing 33 test files because of one unresolvable binary.
+ *
+ * Workspace installs put the binary under mcp/, hoisted installs under the repo
+ * root; both are checked.
+ */
+const viteNode = (() => {
+  for (const candidate of [
+    resolve(__dirname_test, "../node_modules/.bin/vite-node"),
+    resolve(__dirname_test, "../../node_modules/.bin/vite-node"),
+  ]) {
+    if (existsSync(candidate)) return candidate;
+  }
+  return ""; // absent — the tests that need it skip rather than crash the run
+})();
 
 // ── Shared fixture ────────────────────────────────────────────────────────────
 
@@ -158,7 +177,7 @@ describe("Lock mechanism: upsertNode cross-process lock", () => {
     expect(() => upsertNode(runId, makeNode())).toThrow(/timeout acquiring/);
   }, 5_000);
 
-  it("two concurrent upsertNode processes both persist (cross-process lock)", async () => {
+  it.skipIf(!viteNode)("two concurrent upsertNode processes both persist (cross-process lock)", async () => {
     const runId = "run-lock-concurrent-001";
     const missionId = "mission-concurrent";
     const nodeId1 = randomUUID();

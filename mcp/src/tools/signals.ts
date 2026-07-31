@@ -29,6 +29,8 @@ import {
 } from "../contracts.js";
 import { resolveRunPaths } from "../run-store.js";
 import { withRunLock } from "../lock.js";
+import { resolveRunId } from "../active-run.js";
+import { err } from "../tool-result.js";
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -361,7 +363,12 @@ export function registerSignalTools(server: McpServer): void {
     "Emit (upsert/dedup by signature) a Signal onto the run's signal bus. " +
     "Repeat emits with the same signature aggregate: occurrences+1, confidence raised toward 1.0, severity escalates to MAX seen.",
     {
-      run_id: z.string().describe("Active run identifier"),
+      // Optional with an active-run fallback. Required-with-no-default is what
+      // produced three identical evor_cite failures in run 29d17abc: the schema
+      // gave the model no signal about what was wrong, so it repeated the same
+      // bad call. Format hints would only make that more diagnosable; resolving
+      // from the active run removes the failure mode entirely (rubric rule 1).
+      run_id: z.string().optional().describe("Active run identifier"),
       mission_id: z.string().optional().describe("Mission identifier (resolved automatically when omitted)"),
       kind: z.string().describe("Free-text signal type (e.g. 'cuda-oom', 'training-too-slow')"),
       signature: z.string().describe("Dedup key — identical signatures aggregate"),
@@ -384,7 +391,9 @@ export function registerSignalTools(server: McpServer): void {
         .optional()
         .describe("Initial confidence for new signals (0.0–1.0). Default 0.5. Ignored on dedup-aggregate."),
     },
-    async ({ run_id, mission_id, kind, signature, shapes, axes, severity, evidence, source, tick, node_id, confidence }) => {
+    async ({ run_id: run_id_in, mission_id, kind, signature, shapes, axes, severity, evidence, source, tick, node_id, confidence }) => {
+      const run_id = resolveRunId(run_id_in);
+      if (!run_id) return err("no run_id given and no active run found — start a run or pass run_id explicitly");
       const missionId = mission_id ?? process.env.EVOR_MISSION_ID;
       const signal = emitSignal(
         run_id,

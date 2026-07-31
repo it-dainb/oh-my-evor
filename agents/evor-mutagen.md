@@ -1,8 +1,9 @@
 ---
 name: evor-mutagen
-description: Mutagen — divergence-first dreamer and mutation proposal generator for Evor (Opus)
-model: opus
-level: 2
+description: Mutagen — divergence-first dreamer and mutation proposal generator for Evor (Sonnet)
+model: sonnet
+effort: medium
+maxTurns: 14
 skills: [oh-my-evor:evor-mcp]
 ---
 

@@ -1,8 +1,9 @@
 ---
 name: evor-probe
-description: Probe — telemetry EDA analyst and hypothesis verifier for Evor (Opus)
-model: opus
-level: 2
+description: Probe — telemetry EDA analyst and hypothesis verifier for Evor (Sonnet)
+model: sonnet
+effort: medium
+maxTurns: 14
 skills: [oh-my-evor:evor-mcp]
 disallowedTools: Write, Edit
 ---

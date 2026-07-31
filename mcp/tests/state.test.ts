@@ -20,9 +20,18 @@ describe("RunStatePatchSchema.mission_status", () => {
   });
 
   it("passes valid mission-status values through unchanged", () => {
-    for (const s of ["draft", "locked", "running", "paused", "completed", "failed"] as const) {
+    for (const s of ["draft", "running", "paused", "completed", "failed"] as const) {
       expect(RunStatePatchSchema.parse({ mission_status: s }).mission_status).toBe(s);
     }
+  });
+
+  // C5 Stage 3: "locked" was removed from this enum. evor_lock_mission validates
+  // first and then flips mission-state directly, so locking never needs this
+  // path — while its presence made the tool description's "always call
+  // evor_lock_mission instead of writing mission_status='locked' directly" a
+  // request rather than a constraint. The enum is now the enforcement.
+  it("rejects 'locked' — locking is reachable only through evor_lock_mission", () => {
+    expect(() => RunStatePatchSchema.parse({ mission_status: "locked" })).toThrow();
   });
 
   it("still rejects a genuinely invalid mission-status", () => {

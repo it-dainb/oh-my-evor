@@ -1,8 +1,8 @@
 ---
 name: evor-acquirer
-description: Acquirer — data acquisition specialist that fetches, validates, de-duplicates, and integrates external data without license gating (Sonnet)
-model: sonnet
-level: 3
+description: Acquirer — data acquisition specialist that fetches, validates, de-duplicates, and integrates external data without license gating (Haiku)
+model: haiku
+maxTurns: 15
 skills: [oh-my-evor:evor-mcp]
 ---
 

@@ -19,6 +19,7 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync, renameSync } from 'fs';
 import { join } from 'path';
 import { randomBytes } from 'crypto';
+import { resolveActiveRun } from './lib/active-run.mjs';
 
 // ── Kill switches ─────────────────────────────────────────────────────────────
 if (process.env.DISABLE_EVOR) process.exit(0);
@@ -27,12 +28,12 @@ const skipHooks = (process.env.EVOR_SKIP_HOOKS ?? '').split(',').map(s => s.trim
 if (skipHooks.includes('session-end')) process.exit(0);
 
 // ── Active run guard ──────────────────────────────────────────────────────────
-const activeRunId = process.env.EVOR_ACTIVE_RUN_ID ?? '';
+const { runId: activeRunId, missionId } = resolveActiveRun();
 if (!activeRunId) process.exit(0);
 
 const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT ?? process.cwd();
 const evorRoot = process.env.EVOR_ROOT ?? join(pluginRoot, '.evor');
-const missionId = process.env.EVOR_MISSION_ID ?? '';
+// missionId comes from resolveActiveRun() above.
 
 const runDir = missionId
   ? join(evorRoot, 'runs', missionId, activeRunId)

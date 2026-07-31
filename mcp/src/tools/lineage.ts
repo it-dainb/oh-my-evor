@@ -206,7 +206,7 @@ export function registerLineageTools(server: McpServer): void {
       if (!result.ok) {
         return {
           content: [
-            { type: "text" as const, text: JSON.stringify({ error: result.error }) },
+            { type: "text" as const, text: JSON.stringify({ ok: false, error: result.error }) },
           ],
         };
       }
@@ -244,7 +244,7 @@ export function registerLineageTools(server: McpServer): void {
       if (!result.ok) {
         return {
           content: [
-            { type: "text" as const, text: JSON.stringify({ error: result.error }) },
+            { type: "text" as const, text: JSON.stringify({ ok: false, error: result.error }) },
           ],
         };
       }
@@ -272,7 +272,7 @@ export function registerLineageTools(server: McpServer): void {
       "from_agent+to_agent → within-tick JSON handoff (handoffs/<from>_to_<to>.json);",
       "tick → tick-N.md markdown handoff;",
       "neither → latest tick handoff (highest tick number found).",
-      "Returns {error:'not found'} when the handoff does not exist — surface the gap, do not fabricate.",
+      "Returns {ok:false,error:'not found'} when the handoff does not exist — surface the gap, do not fabricate.",
     ].join(" "),
     {
       run_id: z.string().describe("Active run identifier"),
@@ -296,7 +296,7 @@ export function registerLineageTools(server: McpServer): void {
             text: JSON.stringify(
               result.ok
                 ? { ok: true, run_id, handoff: result.handoff, ...(result.tick !== undefined ? { tick: result.tick } : {}) }
-                : { error: result.error }
+                : { ok: false, error: result.error }
             ),
           },
         ],
@@ -325,7 +325,7 @@ export function registerLineageTools(server: McpServer): void {
       if (!result.ok) {
         return {
           content: [
-            { type: "text" as const, text: JSON.stringify({ error: result.error }) },
+            { type: "text" as const, text: JSON.stringify({ ok: false, error: result.error }) },
           ],
         };
       }

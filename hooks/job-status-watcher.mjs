@@ -24,6 +24,7 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync, renameSync } from '
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { randomBytes } from 'crypto';
+import { resolveActiveRun } from './lib/active-run.mjs';
 
 // ── Kill switches ─────────────────────────────────────────────────────────────
 if (process.env.DISABLE_EVOR) process.exit(0);
@@ -32,7 +33,7 @@ const skipHooks = (process.env.EVOR_SKIP_HOOKS ?? '').split(',').map(s => s.trim
 if (skipHooks.includes('job-status-watcher')) process.exit(0);
 
 // ── Active run guard ──────────────────────────────────────────────────────────
-const activeRunId = process.env.EVOR_ACTIVE_RUN_ID ?? '';
+const activeRunId = resolveActiveRun().runId;
 if (!activeRunId) process.exit(0);
 
 // ── Parse STDIN payload ───────────────────────────────────────────────────────

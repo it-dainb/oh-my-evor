@@ -2,7 +2,6 @@
 name: evor-distill
 description: Scan an existing ML workspace to produce a starting-point report; pre-fills the evor-setup interview
 argument-hint: "[workspace-path]"
-level: 3
 skills: [oh-my-evor:evor-mcp]
 ---
 

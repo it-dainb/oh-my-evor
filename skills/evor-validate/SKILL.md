@@ -2,7 +2,6 @@
 name: evor-validate
 description: Run the Phase-2 contract/state validator against an active evor run directory and present the report
 argument-hint: "[run-dir or run-id]"
-level: 2
 skills: [oh-my-evor:evor-mcp]
 ---
 

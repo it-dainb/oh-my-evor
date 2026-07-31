@@ -53,7 +53,11 @@ export const RunStatePatchSchema = z.object({
       // The run lifecycle uses "initialized"; the mission lifecycle's equivalent
       // opening state is "draft". Coerce that common mix-up instead of rejecting it.
       (v) => (v === "initialized" ? "draft" : v),
-      z.enum(["draft", "locked", "running", "paused", "completed", "failed"]),
+      // "locked" is deliberately absent: it is reachable only through
+      // evor_lock_mission, which validates first and then flips mission-state
+      // directly. Leaving it here made the tool description's "always call
+      // evor_lock_mission instead" a request rather than a constraint.
+      z.enum(["draft", "running", "paused", "completed", "failed"]),
     )
     .optional()
     .describe(
@@ -568,7 +572,7 @@ export function registerStateTools(server: McpServer): void {
   server.tool(
     "evor_read_goal_contract",
     "Read the run's validated GoalContract. " +
-    "Returns the parsed GoalContract, or {error:'...'} when it is missing or invalid.",
+    "Returns {ok:true,...contract}, or {ok:false,error} when it is missing or invalid.",
     {
       run_id: z.string().describe("Active run identifier"),
     },
@@ -582,7 +586,7 @@ export function registerStateTools(server: McpServer): void {
             text: JSON.stringify(
               result.ok
                 ? { ok: true, run_id, contract: result.contract }
-                : { error: result.error }
+                : { ok: false, error: result.error }
             ),
           },
         ],

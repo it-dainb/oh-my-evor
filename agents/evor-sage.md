@@ -1,8 +1,9 @@
 ---
 name: evor-sage
-description: Sage — Research Lead that decomposes queries into angles, fans out to Sage-junior researchers, and aggregates citation-backed SOTA findings (Opus)
-model: opus
-level: 2
+description: Sage — Research Lead that decomposes queries into angles, fans out to Sage-junior researchers, and aggregates citation-backed SOTA findings (Sonnet)
+model: sonnet
+effort: medium
+maxTurns: 16
 skills: [oh-my-evor:evor-mcp]
 disallowedTools: Write, Edit
 ---

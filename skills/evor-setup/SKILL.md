@@ -2,7 +2,6 @@
 name: evor-setup
 description: Mission interview workflow that elicits all mission settings and launches a validated run via evor_init_run
 argument-hint: "[mission description]"
-level: 3
 skills: [oh-my-evor:evor-mcp]
 ---
 

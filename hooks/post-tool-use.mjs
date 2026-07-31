@@ -26,6 +26,7 @@
 import { existsSync, statSync, appendFileSync, mkdirSync, readFileSync, readdirSync } from 'fs';
 import { join } from 'path';
 import { createHash } from 'node:crypto';
+import { resolveActiveRun } from './lib/active-run.mjs';
 
 // ── Kill switches ─────────────────────────────────────────────────────────────
 if (process.env.DISABLE_EVOR) process.exit(0);
@@ -34,7 +35,7 @@ const skipHooks = (process.env.EVOR_SKIP_HOOKS ?? '').split(',').map(s => s.trim
 if (skipHooks.includes('post-tool-use')) process.exit(0);
 
 // ── Active run guard ──────────────────────────────────────────────────────────
-const activeRunId = process.env.EVOR_ACTIVE_RUN_ID ?? '';
+const { runId: activeRunId } = resolveActiveRun();
 if (!activeRunId) process.exit(0); // No active evor run — nothing to validate
 
 let input;
@@ -49,6 +50,14 @@ try {
 }
 
 const toolName = input?.tool_name ?? '';
+// Wire names are `mcp__plugin_oh-my-evor_evor__evor_<name>` — note BOTH `evor`
+// segments. Every rule below compares on the bare `<name>`, because comparing on
+// the full name is how this file's three rule layers came to be dead: they were
+// written against `..._evor__<name>` (one segment short) and against the bare
+// name, and neither ever equalled what the tool is actually called.
+const bareTool = String(toolName)
+  .replace(/^mcp__plugin_oh-my-evor_evor__/, '')
+  .replace(/^evor_/, '');
 const toolInput = input?.tool_input ?? {};
 
 const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT ?? process.cwd();
@@ -97,7 +106,7 @@ function signalSignature(kind, evidence) {
 const warnings = [];
 
 // ── evor_record_eval — verify results.json and telemetry.jsonl ───────────────
-if (toolName === 'evor_record_eval') {
+if (bareTool === 'record_eval') {
   const runId = toolInput.run_id ?? activeRunId;
   const nodeId = toolInput.node_id ?? '';
 
@@ -122,7 +131,7 @@ if (toolName === 'evor_record_eval') {
 }
 
 // ── evor_record_node — verify tree.json was recently written ─────────────────
-if (toolName === 'evor_record_node') {
+if (bareTool === 'record_node') {
   const runId = toolInput.run_id ?? activeRunId;
   const treePath = join(runDir(runId), 'tree.json');
   const RECENT_MS = 30_000; // 30 seconds
@@ -261,24 +270,11 @@ try {
 // FIRST: REFLEX_TOOLS early-exit — skip ~95% of tool calls with zero work.
 // Only tools in this set ever produce a nudge. (§15E perf note)
 const REFLEX_TOOLS = new Set([
-  // Canonical MCP tool names (full prefix)
-  'mcp__plugin_oh-my-evor_evor__run_start',
-  'mcp__plugin_oh-my-evor_evor__run_status',
-  'mcp__plugin_oh-my-evor_evor__record_node',
-  'mcp__plugin_oh-my-evor_evor__record_eval',
-  'mcp__plugin_oh-my-evor_evor__integrity_check',
-  'mcp__plugin_oh-my-evor_evor__init_run',
-  'mcp__plugin_oh-my-evor_evor__write_artifact',
-  'mcp__plugin_oh-my-evor_evor__read_artifact',
-  'mcp__plugin_oh-my-evor_evor__select',
-  'mcp__plugin_oh-my-evor_evor__cite',
-  // Short-form fallback (tool name without MCP prefix, used in tests + dev)
-  'evor_run_start', 'evor_run_status', 'evor_record_node', 'evor_record_eval',
-  'evor_integrity_check', 'evor_init_run', 'evor_write_artifact',
-  'evor_read_artifact', 'evor_select', 'evor_cite',
+  'run_start', 'run_status', 'record_node', 'record_eval', 'integrity_check',
+  'init_run', 'write_artifact', 'read_artifact', 'select', 'cite',
 ]);
 
-if (!REFLEX_TOOLS.has(toolName)) process.exit(0); // fast path — no nudge for this tool
+if (!REFLEX_TOOLS.has(bareTool)) process.exit(0); // fast path — no nudge for this tool
 
 try {
   // ── Throttle: per (agent_type, bare_tool, nudgeKey, tick) ──────────────────

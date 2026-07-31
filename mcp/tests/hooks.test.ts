@@ -1593,14 +1593,20 @@ describe("pre-tool-use hook — main Evor code-authoring restrictions", () => {
     expect(out.hookSpecificOutput.permissionDecisionReason).toMatch(/evor_wiki/i);
   });
 
-  it("allows main Evor to Write a non-.py file (e.g. run-state.json)", () => {
+  // CONTRACT CHANGE (plan §1.3, AC2): main's Write used to be allowed whenever
+  // the path was neither .py nor a per-role artifact. That exemption is why the
+  // orchestrator issued 18 Writes and 14 Edits in run 29d17abc. AC2 sets the
+  // target at zero, so a benign-looking path is no longer a reason to permit it.
+  it("denies main Evor's Write even for a non-.py file (orchestrator-only)", () => {
     const result = runHookWithStdin(
       PRE_TOOL_USE,
       ACTIVE_ENV,
       JSON.stringify({ tool_name: "Write", tool_input: { file_path: "/runs/r1/run-state.json" } }),
     );
     expect(result.status).toBe(0);
-    expect(result.stdout.trim()).toBe("");
+    const out = JSON.parse(result.stdout.trim());
+    expect(out.hookSpecificOutput.permissionDecision).toBe("deny");
+    expect(out.hookSpecificOutput.permissionDecisionReason).toMatch(/orchestrator-only/);
   });
 
   it("deny JSON has the required hookSpecificOutput shape", () => {
@@ -2816,8 +2822,11 @@ describe("pre-tool-use hook — .evor write-guard", () => {
       ACTIVE_ENV,
       JSON.stringify({
         tool_name: "Write",
-        // Use a non-.py file: GOVERNOR blocks .py writes by isMain; worktrees
-        // exemption is in the write-guard only. A JSON config file avoids GOVERNOR.
+        // Attributed to forge-junior, the role that actually owns the worktree.
+        // Under §1.3 main may not Write at all, so leaving this unattributed
+        // would test the orchestrator gate rather than the worktrees exemption
+        // this case exists to cover.
+        agent_type: "oh-my-evor:evor-forge-junior",
         tool_input: { file_path: "/workspace/.evor/worktrees/node-abc/run_config.json" },
       }),
     );

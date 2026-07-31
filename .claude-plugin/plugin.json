@@ -31,6 +31,7 @@
     "./skills/evor-schedule/"
   ],
   "agents": [
+    "./agents/evor-tick.md",
     "./agents/evor-sage.md",
     "./agents/evor-mutagen.md",
     "./agents/evor-probe.md",
