@@ -428,3 +428,58 @@ describe("S2 rev2 — the grant map follows the pipeline, not a list of exceptio
     }
   });
 });
+
+describe("A3 — the feedback edge: Mutagen reads Probe", () => {
+  // The pipeline rule (a stage reads upstream stages) puts probe DOWNSTREAM of
+  // mutagen, so the derived map denied this. Across ticks it is not backwards:
+  // Probe analyses tick N, Mutagen proposes tick N+1. It is the loop closing.
+  //
+  // It matters because Probe carries causal explanation and outcomes do not.
+  // Without it, Probe's analysis reaches Mutagen only when someone distils it into
+  // a gotcha — so only FAILURES survive the trip and the dreamer learns exclusively
+  // what not to do.
+  it("permits evor-mutagen to read probe's findings", () => {
+    const d = callGovernor(
+      as("evor-mutagen", "mcp__plugin_oh-my-evor_evor__evor_read_artifact", {
+        run_id: "r1",
+        tick: 1,
+        agent: "probe",
+      }),
+    );
+    expect(d.decision, `denied: ${d.reason ?? ""}`).not.toBe("deny");
+  });
+
+  it("still denies evor-mutagen WRITING into probe's slot", () => {
+    const d = callGovernor(
+      as("evor-mutagen", "mcp__plugin_oh-my-evor_evor__evor_write_artifact", {
+        run_id: "r1",
+        tick: 1,
+        agent: "probe",
+        payload: { findings: [] },
+      }),
+    );
+    expect(d.decision).toBe("deny");
+  });
+
+  it("does not open the feedback edge to everyone — selector still cannot read probe", () => {
+    const d = callGovernor(
+      as("evor-selector", "mcp__plugin_oh-my-evor_evor__evor_read_artifact", {
+        run_id: "r1",
+        tick: 1,
+        agent: "probe",
+      }),
+    );
+    expect(d.decision).toBe("deny");
+  });
+
+  it("keeps mutagen's upstream grant — the feedback edge adds, never replaces", () => {
+    const d = callGovernor(
+      as("evor-mutagen", "mcp__plugin_oh-my-evor_evor__evor_read_artifact", {
+        run_id: "r1",
+        tick: 1,
+        agent: "sage",
+      }),
+    );
+    expect(d.decision, `mutagen lost its sage grant: ${d.reason ?? ""}`).not.toBe("deny");
+  });
+});

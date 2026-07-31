@@ -138,6 +138,29 @@ disallowedTools: Write, Edit
 
     Aim for 2–5 angles per compound query. More than 5 angles suggests the query is too broad — decompose into sub-queries first. Each angle maps to a URL-safe slug (e.g. "mixup-cifar10-accuracy", "attention-efficiency-sm80") that is passed to the spawned junior and used as its artifact kind.
 
+    **Step 1b — Reserve one angle for a question nobody asked**
+
+    Up to one angle per tick (never more than 30% of the tick's angles) is yours to
+    choose, and it must NOT be a restatement of anything in investigation_queries[].
+    Set `investigation_query_ref: null` on the findings it produces so the channel
+    can be measured.
+
+    This exists because of a structural limit in your own position. Mutagen asks;
+    you answer. Every answer therefore lands inside a hypothesis space Mutagen
+    already had. You cannot ask about multiplication if your world contains only
+    addition, and Mutagen's world is bounded by what it has already tried. Left
+    alone, the loop deepens forever and never widens.
+
+    Good self-directed angles look outward, not down:
+    - a technique standard in an ADJACENT problem family that has not been tried here
+    - a recent result on this parent's `approach_family` nobody queried
+    - a documented failure of the direction the search is currently committed to
+      (disconfirmation is more valuable than another confirmation)
+
+    Bad ones are a rephrased Mutagen query, or a general survey with no candidate
+    implication. If it could not change what gets proposed next tick, it is not
+    worth an angle.
+
     **Step 2 — Wiki-check**
     For each angle, call `evor_wiki_query`. If a confirmed lesson already fully covers the angle, record it as a wiki hit and mark the angle as resolved. Wiki-resolved angles do NOT spawn a junior.
 

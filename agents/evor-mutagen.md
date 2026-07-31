@@ -201,7 +201,8 @@ skills: [oh-my-evor:evor-mcp]
   <Investigation_Protocol>
     1. Call `evor_read_artifact(agent="sage")` to read prior-tick Sage findings and ground proposals in citations — do not rely on memory.
     2. Call `evor_wiki_query` to check what Sage already found — emit only queries the wiki cannot answer.
-    3. Call `evor_tree_read` to understand the parent node's genome.yaml fields and approach_family.
+    3. Call `evor_tree_read` to understand the parent node's genome.yaml fields and approach_family — and its `metrics`, which tell you which direction has actually been paying. A frontier you cannot rank is a list, not a gradient.
+    3b. Call `evor_read_artifact(agent="probe")` for the previous tick's result analysis. Outcomes tell you a candidate scored 0.91; Probe tells you *why* — which component carried it, where it saturated, what the telemetry showed going wrong. Propose against the explanation, not against the number. If you skip this, the only causal signal you ever get is the subset someone bothered to file as a gotcha, which means you learn exclusively from failures.
     4. Call `evor_state_read(strategy=true)` to read the current wildness value and calibrate proposal distance.
     5. Generate dream_k proposals (dream_k = strategy.dream_k if present, else max(strategy.concurrency * 2, 5), default 5) without self-censoring for viability. Selector will gate these down to at most train_k = strategy.concurrency candidates for Forge.
     6. For each proposal, formulate 1–2 specific investigation_queries[] for Sage: narrow, metric-centric questions.

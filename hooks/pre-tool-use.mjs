@@ -508,6 +508,16 @@ try {
       grants.delete([...own][0]);
       if (grants.size) READ_EXTRA_GRANTS[role] = grants;
     }
+
+    // FEEDBACK EDGE — the one place the pipeline legitimately runs backwards.
+    //
+    // Probe analyses tick N's telemetry and explains WHY a candidate behaved as it
+    // did. Mutagen proposes tick N+1. Across ticks that is not backwards, it is the
+    // loop closing: it is the only channel carrying causal explanation rather than
+    // bare outcome. Without it Probe's analysis reaches Mutagen only if someone
+    // distils it into a gotcha, which means only FAILURES survive the trip and the
+    // dreamer is fed exclusively on what not to do.
+    READ_EXTRA_GRANTS['evor-mutagen'] = new Set([...(READ_EXTRA_GRANTS['evor-mutagen'] ?? []), 'probe']);
     // evor-tick is deliberately absent from AGENT_ROLE_MAP, so this guard skips it
     // entirely: the tick boundary reads every stage's artifact by design — that is
     // the context the orchestrator is denied and evor-tick absorbs on its behalf.

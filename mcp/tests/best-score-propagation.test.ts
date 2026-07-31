@@ -122,6 +122,37 @@ describe("best_score propagation", () => {
     expect(state().best_score).toBeCloseTo(0.5, 4);
   });
 
+  it("selects the roc_auc winner over the accuracy tie (A2: accuracy saturates on small test splits)", () => {
+    // Real 3-tick bench run: A and B tie on accuracy (0.91875) while C loses on
+    // accuracy but leads B on the tied metric's rival, roc_auc. With roc_auc
+    // declared primary_fitness (accuracy demoted to secondary_reported), B —
+    // not A — must end up best, since roc_auc breaks the accuracy tie in B's
+    // favor and outranks C.
+    runDir = join(root, "runs", MISSION, RUN);
+    mkdirSync(runDir, { recursive: true });
+    writeFileSync(
+      join(runDir, "goal-contract.json"),
+      JSON.stringify({
+        mission_id: MISSION,
+        metric_specs: [
+          { metric_name: "roc_auc", direction: "higher", role: "primary_fitness", domain_applicability: "all" },
+          { metric_name: "accuracy", direction: "higher", role: "secondary_reported", domain_applicability: "all" },
+        ],
+      }),
+    );
+    writeFileSync(
+      join(runDir, "run-state.json"),
+      JSON.stringify({ run_id: RUN, tick_count: 3, best_score: null, best_node_id: null }),
+    );
+
+    updateBestScore(RUN, "node-a", { metrics: { accuracy: 0.91875, roc_auc: 0.905145 } }, "passed", MISSION);
+    updateBestScore(RUN, "node-b", { metrics: { accuracy: 0.91875, roc_auc: 0.913431 } }, "passed", MISSION);
+    updateBestScore(RUN, "node-c", { metrics: { accuracy: 0.88750, roc_auc: 0.912011 } }, "passed", MISSION);
+
+    expect(state().best_node_id).toBe("node-b");
+    expect(state().best_score).toBeCloseTo(0.913431, 6);
+  });
+
   it("does not throw when the run has no goal contract", () => {
     runDir = join(root, "runs", MISSION, RUN);
     mkdirSync(runDir, { recursive: true });

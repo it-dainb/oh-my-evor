@@ -114,6 +114,12 @@ for (const t of ticks) {
   // Sage: absence is itself a finding. A tick that ran without grounding tells
   // you the gate is skippable in practice, whatever the prose says.
   const sageFindings = Array.isArray(sage) ? sage : (sage?.findings ?? []);
+  // A4: an angle Sage chose itself carries investigation_query_ref: null. This is
+  // the only channel by which a concept Mutagen did not already suspect can enter
+  // the system — Sage is otherwise purely reactive and can only ever deepen the
+  // hypothesis space Mutagen arrived with.
+  const proactive = sageFindings.filter((f) => f && 'investigation_query_ref' in f
+    ? f.investigation_query_ref === null : false).length;
   const queries = props.flatMap((p) => p.investigation_queries ?? []);
   const disconfirming = sageFindings.filter((f) => {
     const s = JSON.stringify(f).toLowerCase();
@@ -136,6 +142,7 @@ for (const t of ticks) {
     sage_findings: sageFindings.length,
     sage_queries_asked: queries.length,
     sage_disconfirming: disconfirming,
+    sage_proactive_findings: proactive,
     probe_present: Boolean(probe),
   });
 }
@@ -172,6 +179,7 @@ const summary = {
   })(),
   ticks_without_sage: perTick.filter((t) => !t.sage_present).length,
   nodes_with_empty_tree_metrics: nodes.filter((n) => n.tree_metrics_empty).length,
+  sage_proactive_total: perTick.reduce((a, t) => a + t.sage_proactive_findings, 0),
   distinct_fitness_values: [...new Set(scored.map((n) => n.fitness))].sort((a, b) => a - b),
 };
 
@@ -189,6 +197,10 @@ console.log(`ticks ${summary.ticks} · proposals ${summary.total_proposals} · n
 console.log(`best_score ${summary.best_score} · families explored ${summary.distinct_families_explored} · approval rate ${pct(summary.approval_rate)}`);
 console.log(`\nIMPROVING TICKS  ${summary.improving_ticks}/${summary.ticks}  (${pct(summary.improving_tick_ratio)})` +
             `${summary.improving_tick_ratio !== null && summary.improving_tick_ratio < 0.5 ? '   <-- the search is mostly not finding anything' : ''}`);
+if (summary.sage_proactive_total === 0 && summary.ticks > 1) {
+  console.log('SAGE PROACTIVE FINDINGS 0 — every answer stayed inside the question set');
+  console.log('  Mutagen already had. Nothing new can enter the hypothesis space this way.');
+}
 if (summary.ticks_without_sage) {
   console.log(`SAGE ABSENT in ${summary.ticks_without_sage} tick(s) — grounding gate was skipped, not enforced`);
 }
