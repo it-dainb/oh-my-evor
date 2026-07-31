@@ -579,11 +579,51 @@ class CriticReview(BaseEvorModel):
     h001_one_hypothesis: Literal["pass", "fail"]
     h002_family_streak: Literal["pass", "fail"]
     h003_intra_tick_diversity: Literal["pass", "fail"]
+    # Optional: not populated by evor_validate_proposals (H001-H003 only); the
+    # Selector agent's full 9-gate review (verdict.json) sets these.
+    h004_parent_diversity: Optional[Literal["pass", "fail"]] = None
     integrity_risk: Literal["pass", "fail"]
     instrumentation_check: Literal["pass", "fail"]
     schema_valid: Literal["pass", "fail"]
+    acquisition_contamination: Optional[Literal["pass", "fail"]] = None
+    gotcha_avoidance: Optional[Literal["pass", "fail"]] = None
     verdict: Literal["approved", "rejected"]
     rejection_reason: Optional[str] = None
+
+
+# ────────────────────────────────────────────────────────────────────────────
+# SelectorVerdict — canonical shape for ticks/<tick>/selector/verdict.json
+# ────────────────────────────────────────────────────────────────────────────
+
+
+class SelectorReview(BaseEvorModel):
+    """One proposal's gate review within a Selector verdict artifact.
+
+    Field names mirror agents/evor-selector.md's Output_Format exactly —
+    the agent's own instructions are the source of truth for this shape.
+    """
+
+    model_config = ConfigDict(strict=True, exclude_none=True, extra="forbid")
+
+    proposal_id: str
+    approach_family: ApproachFamily
+    critic_review: CriticReview
+    selected: bool
+    selection_note: Optional[str] = None
+
+
+class SelectorVerdict(BaseEvorModel):
+    """Canonical Selector verdict artifact (ticks/<tick>/selector/verdict.json).
+
+    One review per proposal in the tick, plus the winning proposal_id (or None
+    if no proposal was selected). This is the single accepted shape — see the
+    module docstring in evor/artifacts.py for the drift this replaces.
+    """
+
+    model_config = ConfigDict(strict=True, exclude_none=True, extra="forbid")
+
+    reviews: list[SelectorReview]
+    winner: Optional[str] = None
 
 
 class MutationProposal(BaseEvorModel):

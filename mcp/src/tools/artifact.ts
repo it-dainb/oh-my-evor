@@ -15,8 +15,8 @@
  *   acquirer        → ticks/<tick>/acquirer/<kind-slug>.json
  *
  * Payload validation is delegated to the Python harness (evor.artifacts) which
- * validates against Pydantic contracts where one exists (mutagen, sage,
- * sage-junior, acquirer); all other agents pass through as plain JSON.
+ * validates against Pydantic contracts where one exists (mutagen, selector,
+ * sage, sage-junior, acquirer); all other agents pass through as plain JSON.
  */
 
 import { mkdtempSync, rmdirSync, unlinkSync, writeFileSync } from "fs";
@@ -36,6 +36,7 @@ import { err } from "../tool-result.js";
  */
 const CONTRACT_VALIDATED_AGENTS = new Set<string>([
   "mutagen",
+  "selector",
   "sage",
   "sage-junior",
   "acquirer",

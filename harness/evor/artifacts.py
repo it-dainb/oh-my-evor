@@ -16,7 +16,8 @@ Path mapping (spec §1):
   acquirer        → ticks/<tick>/acquirer/<kind-slug>.json
 
 Validation: payload is validated against Pydantic contracts where a mapping
-exists; unknown agents and loose kinds pass through as plain JSON objects.
+exists (mutagen, selector, sage, sage-junior, acquirer); unknown agents pass
+through as plain JSON objects.
 """
 
 from __future__ import annotations
@@ -93,8 +94,8 @@ def _validate_payload(agent: str, payload: Any) -> str | None:
     """Validate payload against Pydantic contracts where one exists.
 
     Returns an error string on failure, None on success (or when no model exists).
-    selector, probe, forge, forge-architect, forge-critic, forge-analyst pass
-    through because their contracts are not in contracts.py (yet).
+    probe, forge, forge-architect, forge-critic, forge-analyst pass through
+    because their contracts are not in contracts.py (yet).
     """
     try:
         if agent == "mutagen":
@@ -102,6 +103,10 @@ def _validate_payload(agent: str, payload: Any) -> str | None:
             items = payload if isinstance(payload, list) else payload.get("proposals", [])
             for item in items:
                 MutationProposal.model_validate(item)
+
+        elif agent == "selector":
+            from evor.contracts import SelectorVerdict
+            SelectorVerdict.model_validate(payload)
 
         elif agent == "sage":
             from evor.contracts import CitationBackedFinding
@@ -120,7 +125,7 @@ def _validate_payload(agent: str, payload: Any) -> str | None:
             from evor.contracts import AcquisitionProvenance
             AcquisitionProvenance.model_validate(payload)
 
-        # selector, probe, forge*, and all other known agents pass through.
+        # probe, forge*, and all other unmapped agents pass through.
 
     except Exception as exc:
         return str(exc)
