@@ -434,13 +434,14 @@ try {
   // direct self-approval vector — the exact P3 failure the review gates exist to
   // stop. Same silent-inertness class as the un-propagated EVOR_ACTIVE_RUN_ID.
   // Matching on the suffix keeps this working if the namespace is ever renamed.
-  const isArtifactTool =
-    /(^|_)evor_write_artifact$/.test(toolNameS) || /(^|_)evor_read_artifact$/.test(toolNameS);
+  const isWriteToolS = /(^|_)evor_write_artifact$/.test(toolNameS);
+  const isReadToolS = /(^|_)evor_read_artifact$/.test(toolNameS);
+  const isArtifactTool = isWriteToolS || isReadToolS;
 
   if (isArtifactTool && tiS?.agent) {
     const claimedAgent = String(tiS.agent);
 
-    // Map caller role → allowed agent values for artifact writes/reads
+    // Map caller role → allowed agent values for artifact writes/reads (own slot only).
     const AGENT_ROLE_MAP = {
       'evor-sage':             new Set(['sage']),
       'evor-sage-junior':      new Set(['sage-junior']),
@@ -455,12 +456,38 @@ try {
       'evor-acquirer':         new Set(['acquirer']),
     };
 
+    // READ-only grants onto a specific upstream slot — never extends to writes.
+    // Each entry is backed by an explicit read call in that role's own agent
+    // prompt (agents/evor-*.md), not a blanket allow:
+    //   - forge-junior reads the proposal (evor-forge.md:89) and, on a
+    //     critic-rejected re-attempt, the critic's verdict (evor-forge.md:157).
+    //   - forge-critic reads the proposal to run Check 1 — correctness vs
+    //     proposal (evor-forge.md:123, evor-forge-critic.md Final_Checklist).
+    // Read-only grants for upstream slots a role is INSTRUCTED to read. Each one
+    // is justified by the spawn prompt the system itself issues in
+    // agents/evor-forge.md — denying them means the orchestration tells an agent
+    // to do something the governor then blocks, which is how 28 of one run's 44
+    // EVOR GUARD denials were generated. Agents responded by reading files off
+    // disk and relaying findings through SendMessage, putting artifact content
+    // back into context — the exact thing the boundary exists to prevent.
+    const READ_EXTRA_GRANTS = {
+      'evor-forge':           new Set(['selector', 'mutagen']),      // Phase 1, evor-forge.md:76
+      'evor-forge-junior':    new Set(['mutagen', 'forge-critic']),  // evor-forge.md:89,157
+      'evor-forge-critic':    new Set(['mutagen']),                  // evor-forge.md:123
+      'evor-forge-architect': new Set(['mutagen']),                  // evor-forge.md:139
+      'evor-forge-analyst':   new Set(['mutagen']),                  // evor-forge.md:146
+    };
+
     if (!callerIsMain) {
       const allowed = AGENT_ROLE_MAP[agentTypeS];
-      if (allowed && !allowed.has(claimedAgent)) {
-        deny(
-          `[EVOR GUARD] This artifact slot is not accessible from your role. Use the correct evor_* tool for your role.`
-        );
+      if (allowed) {
+        const extra = isReadToolS ? READ_EXTRA_GRANTS[agentTypeS] : undefined;
+        const permitted = allowed.has(claimedAgent) || (extra && extra.has(claimedAgent));
+        if (!permitted) {
+          deny(
+            `[EVOR GUARD] This artifact slot is not accessible from your role. Use the correct evor_* tool for your role.`
+          );
+        }
       }
     }
   }

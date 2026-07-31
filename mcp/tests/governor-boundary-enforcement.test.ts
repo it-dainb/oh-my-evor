@@ -90,6 +90,18 @@ describe("boundary enforcement — main may not absorb per-tick detail", () => {
   });
 });
 
+describe("boundary enforcement — S2 read-grant change does not touch main's boundary", () => {
+  // Pin: broadening sage-junior/forge-critic/forge-junior read grants (S2) must
+  // never loosen the orchestrator boundary. Main stays denied on all three
+  // boundary-absorbed tools regardless of which `agent` slot it names.
+  for (const tool of ["evor_read_artifact", "evor_tree_read", "evor_state_read"]) {
+    it(`main is still denied ${tool} even when claiming an in-grant agent slot`, () => {
+      const d = callGovernor(asMain(`${MCP}${tool}`, { run_id: "r1", tick: 1, agent: "mutagen" }));
+      expect(d.decision).toBe("deny");
+    });
+  }
+});
+
 describe("boundary enforcement — main keeps what it needs to run the mission", () => {
   const ALLOWED = [
     ["Agent", { subagent_type: "oh-my-evor:evor-tick" }, "spawning the boundary"],

@@ -21,7 +21,7 @@
 
 import { describe, it, expect } from "vitest";
 import { spawnSync } from "child_process";
-import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from "fs";
+import { mkdtempSync, rmSync, writeFileSync, mkdirSync, readFileSync } from "fs";
 import { join, dirname, resolve } from "path";
 import { fileURLToPath } from "url";
 import { tmpdir } from "os";
@@ -144,6 +144,143 @@ describe("enforcement inventory — a role may not write another role's artifact
   });
 });
 
+describe("enforcement inventory — S2 narrow READ grants for sub-sub-agents", () => {
+  // Stage S2: sage-junior, forge-critic, forge-junior are leaf/near-leaf roles
+  // that legitimately need to READ one specific upstream slot to do their job
+  // (see agents/evor-forge.md spawn prompts + agents/evor-forge-critic.md
+  // Check 1). The grant is READ-only, per (role -> specific slot); it must
+  // never extend to WRITE, and roles/slots outside the grant list stay denied.
+
+  it("allows forge-junior to READ mutagen's proposal", () => {
+    const d = callGovernor(
+      as("evor-forge-junior", "mcp__plugin_oh-my-evor_evor__evor_read_artifact", {
+        run_id: "r1",
+        tick: 1,
+        agent: "mutagen",
+      }),
+    );
+    expect(d.decision, `forge-junior read of mutagen denied: ${d.reason ?? ""}`).not.toBe("deny");
+  });
+
+  it("denies forge-junior WRITING into mutagen's slot (read grant is not a write grant)", () => {
+    const d = callGovernor(
+      as("evor-forge-junior", "mcp__plugin_oh-my-evor_evor__evor_write_artifact", {
+        run_id: "r1",
+        tick: 1,
+        agent: "mutagen",
+        payload: { proposals: [] },
+      }),
+    );
+    expect(d.decision).toBe("deny");
+  });
+
+  it("allows forge-junior to READ forge-critic's verdict (re-attempt feedback)", () => {
+    const d = callGovernor(
+      as("evor-forge-junior", "mcp__plugin_oh-my-evor_evor__evor_read_artifact", {
+        run_id: "r1",
+        tick: 1,
+        agent: "forge-critic",
+      }),
+    );
+    expect(d.decision, `forge-junior read of forge-critic denied: ${d.reason ?? ""}`).not.toBe("deny");
+  });
+
+  it("denies forge-junior WRITING into forge-critic's slot", () => {
+    const d = callGovernor(
+      as("evor-forge-junior", "mcp__plugin_oh-my-evor_evor__evor_write_artifact", {
+        run_id: "r1",
+        tick: 1,
+        agent: "forge-critic",
+        payload: { verdict: "approved" },
+      }),
+    );
+    expect(d.decision).toBe("deny");
+  });
+
+  it("allows forge-critic to READ mutagen's proposal", () => {
+    const d = callGovernor(
+      as("evor-forge-critic", "mcp__plugin_oh-my-evor_evor__evor_read_artifact", {
+        run_id: "r1",
+        tick: 1,
+        agent: "mutagen",
+      }),
+    );
+    expect(d.decision, `forge-critic read of mutagen denied: ${d.reason ?? ""}`).not.toBe("deny");
+  });
+
+  it("denies forge-critic WRITING into mutagen's slot", () => {
+    const d = callGovernor(
+      as("evor-forge-critic", "mcp__plugin_oh-my-evor_evor__evor_write_artifact", {
+        run_id: "r1",
+        tick: 1,
+        agent: "mutagen",
+        payload: { proposals: [] },
+      }),
+    );
+    expect(d.decision).toBe("deny");
+  });
+
+  it("does NOT grant forge-critic a read of forge-critic's sibling forge-analyst slot (no such need in its prompt)", () => {
+    const d = callGovernor(
+      as("evor-forge-critic", "mcp__plugin_oh-my-evor_evor__evor_read_artifact", {
+        run_id: "r1",
+        tick: 1,
+        agent: "forge-analyst",
+      }),
+    );
+    expect(d.decision).toBe("deny");
+  });
+
+  it("does NOT grant sage-junior any upstream READ — its own prompt has no read call", () => {
+    const d = callGovernor(
+      as("evor-sage-junior", "mcp__plugin_oh-my-evor_evor__evor_read_artifact", {
+        run_id: "r1",
+        tick: 1,
+        agent: "sage",
+      }),
+    );
+    expect(d.decision).toBe("deny");
+  });
+
+  it("sage-junior may still read/write its own slot", () => {
+    const d = callGovernor(
+      as("evor-sage-junior", "mcp__plugin_oh-my-evor_evor__evor_read_artifact", {
+        run_id: "r1",
+        tick: 1,
+        agent: "sage-junior",
+        kind: "angle-a",
+      }),
+    );
+    expect(d.decision).not.toBe("deny");
+  });
+
+  it("a role NOT in the grant list (sage-junior) is still denied reading forge-critic's slot", () => {
+    // This case originally used forge-analyst reading mutagen. That is exactly a
+    // read evor-forge.md's own spawn prompt instructs, so the assertion pinned the
+    // defect rather than the property — the harvest suite below now proves it.
+    // sage-junior is the right example: nothing anywhere tells it to read this.
+    const d = callGovernor(
+      as("evor-sage-junior", "mcp__plugin_oh-my-evor_evor__evor_read_artifact", {
+        run_id: "r1",
+        tick: 1,
+        agent: "forge-critic",
+      }),
+    );
+    expect(d.decision).toBe("deny");
+  });
+
+  it("mutagen (unrelated role) is still denied reading forge-critic's slot", () => {
+    const d = callGovernor(
+      as("evor-mutagen", "mcp__plugin_oh-my-evor_evor__evor_read_artifact", {
+        run_id: "r1",
+        tick: 1,
+        agent: "forge-critic",
+      }),
+    );
+    expect(d.decision).toBe("deny");
+  });
+});
+
 describe("enforcement inventory — .evor state is written through tools, not by hand", () => {
   it("denies a direct write to a run state file", () => {
     const d = callGovernor(
@@ -164,4 +301,48 @@ describe("enforcement inventory — .evor state is written through tools, not by
     );
     expect(d.decision).not.toBe("deny");
   });
+});
+
+describe("the governor permits every artifact read the system itself instructs", () => {
+  // The general form of the S2 defect, and the reason enumerating grants is not
+  // enough. agents/evor-forge.md spawns its sub-agents with prompts that name the
+  // artifact each one must read. When the governor denies one of those reads, the
+  // system has told an agent to do something it then blocks — 28 of one measured
+  // run's 44 EVOR GUARD denials came from exactly that, and the agents responded
+  // by reading files off disk and relaying findings through SendMessage, which
+  // puts artifact content back into the context the boundary exists to keep out.
+  //
+  // Same shape as session-start recommending evor_state_read to main. Both are
+  // "the instructions and the enforcement disagree", and only one of them is
+  // discoverable by reading either file alone.
+  const forge = readFileSync(
+    resolve(dirname(fileURLToPath(import.meta.url)), "../../agents/evor-forge.md"),
+    "utf8",
+  );
+
+  /** (spawned role, slot it is told to read) pairs, harvested from spawn prompts. */
+  const instructed: Array<[string, string]> = [];
+  const SPAWN =
+    /subagent_type="oh-my-evor:(evor-[a-z-]+)"[\s\S]{0,80}?prompt=\(([\s\S]*?)\n\s*\)\)/g;
+  for (const [, role, body] of forge.matchAll(SPAWN)) {
+    for (const [, slot] of body.matchAll(/evor_read_artifact\(agent=['"]([a-z-]+)['"]\)/g)) {
+      if (!instructed.some(([r, s]) => r === role && s === slot)) instructed.push([role, slot]);
+    }
+  }
+
+  it("harvests spawn prompts — a stale regex here would make every case below vacuous", () => {
+    expect(instructed.length, "no (role, slot) pairs harvested from evor-forge.md").toBeGreaterThan(2);
+  });
+
+  for (const [role, slot] of instructed) {
+    it(`${role} may read ${slot}, because its own spawn prompt says to`, () => {
+      const d = callGovernor(
+        as(role, "mcp__plugin_oh-my-evor_evor__evor_read_artifact", { run_id: "r1", tick: 1, agent: slot }),
+      );
+      expect(
+        d.decision,
+        `evor-forge.md tells ${role} to read '${slot}', but the governor denies it: ${d.reason ?? ""}`,
+      ).not.toBe("deny");
+    });
+  }
 });
