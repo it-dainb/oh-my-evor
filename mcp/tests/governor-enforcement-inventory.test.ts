@@ -346,3 +346,85 @@ describe("the governor permits every artifact read the system itself instructs",
     });
   }
 });
+
+describe("S2 rev2 — the grant map follows the pipeline, not a list of exceptions", () => {
+  // The first pass enumerated grants harvested from evor-forge.md alone. It
+  // shipped, and the next measured run still logged 46 denials — 26 of them
+  // evor-sage unable to read its own sage-junior findings, which is exactly the
+  // "Sage grounding skipped" failure the stage was meant to fix.
+  //
+  // Two structural rules replace the list: a lead reads its juniors, and a stage
+  // reads upstream stages (sage -> mutagen -> selector -> forge -> probe).
+  // Every case below is a (role, slot) pair observed being denied in that run.
+  const OBSERVED_DENIALS: Array<[string, string, number]> = [
+    ["evor-sage", "sage-junior", 26],
+    ["evor-selector", "mutagen", 6],
+    ["evor-mutagen", "sage", 2],
+    ["evor-forge", "forge-architect", 1],
+    ["evor-forge-junior", "forge-architect", 1],
+    ["evor-forge-architect", "selector", 1],
+    ["evor-selector", "sage", 1],
+    ["evor-probe", "forge", 1],
+  ];
+
+  for (const [role, slot, n] of OBSERVED_DENIALS) {
+    it(`${role} may now read ${slot} (denied ${n}x in the measured run)`, () => {
+      const d = callGovernor(
+        as(role, "mcp__plugin_oh-my-evor_evor__evor_read_artifact", { run_id: "r1", tick: 1, agent: slot }),
+      );
+      expect(d.decision, `still denied: ${d.reason ?? ""}`).not.toBe("deny");
+    });
+
+    it(`${role} still may NOT write ${slot}`, () => {
+      const d = callGovernor(
+        as(role, "mcp__plugin_oh-my-evor_evor__evor_write_artifact", {
+          run_id: "r1",
+          tick: 1,
+          agent: slot,
+          payload: { x: 1 },
+        }),
+      );
+      expect(d.decision, "a read grant must never become a write grant").toBe("deny");
+    });
+  }
+
+  it("reviewers cannot read each other — three anchored reviews are not three reviews", () => {
+    for (const [a, b] of [
+      ["evor-forge-critic", "forge-analyst"],
+      ["evor-forge-analyst", "forge-critic"],
+      ["evor-forge-architect", "forge-critic"],
+    ]) {
+      const d = callGovernor(
+        as(a, "mcp__plugin_oh-my-evor_evor__evor_read_artifact", { run_id: "r1", tick: 1, agent: b }),
+      );
+      expect(d.decision, `${a} must not see ${b}'s verdict`).toBe("deny");
+    }
+  });
+
+  it("but the implementer reads every reviewer verdict — it has to act on them", () => {
+    for (const slot of ["forge-critic", "forge-architect", "forge-analyst"]) {
+      const d = callGovernor(
+        as("evor-forge-junior", "mcp__plugin_oh-my-evor_evor__evor_read_artifact", {
+          run_id: "r1",
+          tick: 1,
+          agent: slot,
+        }),
+      );
+      expect(d.decision, `forge-junior cannot read ${slot}: ${d.reason ?? ""}`).not.toBe("deny");
+    }
+  });
+
+  it("grants do not run backwards down the pipeline", () => {
+    // sage is the first stage; nothing downstream of a role is readable by it.
+    for (const [role, slot] of [
+      ["evor-sage", "mutagen"],
+      ["evor-mutagen", "selector"],
+      ["evor-selector", "forge"],
+    ]) {
+      const d = callGovernor(
+        as(role, "mcp__plugin_oh-my-evor_evor__evor_read_artifact", { run_id: "r1", tick: 1, agent: slot }),
+      );
+      expect(d.decision, `${role} must not read downstream slot ${slot}`).toBe("deny");
+    }
+  });
+});

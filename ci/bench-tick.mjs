@@ -103,7 +103,7 @@ const tick = spawnSync('claude', [
 ], {
   cwd: BENCH,                       // agent writes land here, never in the checkout
   encoding: 'utf8',
-  timeout: Number(process.env.BENCH_TIMEOUT_MS ?? 3_600_000),
+  timeout: Number(process.env.BENCH_TIMEOUT_MS ?? 10_800_000),
   maxBuffer: 64 * 1024 * 1024,
   input: '',
   env: { ...process.env, EVOR_ROOT, EVOR_MISSION_ID: activeRun.mission_id },

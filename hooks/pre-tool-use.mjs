@@ -470,13 +470,47 @@ try {
     // EVOR GUARD denials were generated. Agents responded by reading files off
     // disk and relaying findings through SendMessage, putting artifact content
     // back into context — the exact thing the boundary exists to prevent.
-    const READ_EXTRA_GRANTS = {
-      'evor-forge':           new Set(['selector', 'mutagen']),      // Phase 1, evor-forge.md:76
-      'evor-forge-junior':    new Set(['mutagen', 'forge-critic']),  // evor-forge.md:89,157
-      'evor-forge-critic':    new Set(['mutagen']),                  // evor-forge.md:123
-      'evor-forge-architect': new Set(['mutagen']),                  // evor-forge.md:139
-      'evor-forge-analyst':   new Set(['mutagen']),                  // evor-forge.md:146
+    // Two structural rules, not a list of exceptions. Enumerating exceptions is
+    // what made the first pass of this too narrow: it was harvested from
+    // evor-forge.md alone, shipped, and a measured run still logged 46 denials —
+    // 26 of them evor-sage unable to read its OWN sage-junior findings, which is
+    // the "Sage grounding skipped" failure.
+    //
+    //   1. A LEAD READS ITS JUNIORS. An agent that spawns sub-agents has to
+    //      aggregate what they produce; that is the entire reason it spawned them.
+    //   2. A STAGE READS UPSTREAM STAGES. The 9-step loop is a pipeline —
+    //      sage -> mutagen -> selector -> forge -> probe. Each stage's input is the
+    //      previous stage's artifact.
+    //
+    // Still READ-only, still per (role -> specific slot), and still never a
+    // blanket allow: nothing here lets a role read a slot that is neither its own
+    // junior's nor upstream of it.
+    const JUNIORS = {
+      'evor-sage':   ['sage-junior'],
+      'evor-forge':  ['forge-junior', 'forge-critic', 'forge-architect', 'forge-analyst'],
     };
+    const PIPELINE = ['sage', 'mutagen', 'selector', 'forge', 'probe'];
+    const upstreamOf = (slot) => PIPELINE.slice(0, Math.max(0, PIPELINE.indexOf(slot)));
+
+    const READ_EXTRA_GRANTS = {};
+    for (const [role, own] of Object.entries(AGENT_ROLE_MAP)) {
+      const grants = new Set(JUNIORS[role] ?? []);
+      // A sub-agent inherits its lead's stage position: forge-critic reviews for
+      // forge, so it reads what forge reads.
+      const slot = [...own][0];
+      const stage = slot.replace(/-(junior|critic|architect|analyst)$/, '');
+      for (const s of upstreamOf(stage)) grants.add(s);
+      // Sibling verdicts go ONLY to the implementer, which has to act on them.
+      // Reviewers deliberately do not read each other: three independent reviews
+      // that can see each other's verdicts are one anchored review wearing three
+      // hats, and this system's whole job is evaluating candidates honestly.
+      if (slot.endsWith('-junior')) for (const sib of JUNIORS[`evor-${stage}`] ?? []) grants.add(sib);
+      grants.delete([...own][0]);
+      if (grants.size) READ_EXTRA_GRANTS[role] = grants;
+    }
+    // evor-tick is deliberately absent from AGENT_ROLE_MAP, so this guard skips it
+    // entirely: the tick boundary reads every stage's artifact by design — that is
+    // the context the orchestrator is denied and evor-tick absorbs on its behalf.
 
     if (!callerIsMain) {
       const allowed = AGENT_ROLE_MAP[agentTypeS];
