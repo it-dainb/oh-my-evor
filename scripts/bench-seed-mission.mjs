@@ -125,13 +125,27 @@ const goalContract = {
     'beat a linear model. CPU only: the evaluator trains from the Python standard ' +
     'library alone — no GPU, no torch, no sklearn.',
   dataset_ref: DATASET_REF,
+  // accuracy on a 160-sample test split only has 1/160 = 0.00625 granularity —
+  // a real 3-tick run produced just two distinct values across all nodes and a
+  // tie between two structurally different candidates. roc_auc is continuous
+  // (rank statistic over all pos/neg pairs) and does not saturate at this
+  // sample size, so it is the metric that can actually rank candidates.
+  // accuracy is kept as a reported secondary metric — still visible, no longer
+  // the selection criterion.
   metric_specs: [
+    {
+      metric_name: 'roc_auc',
+      direction: 'higher',
+      domain_applicability: 'all',
+      aggregation_rule: 'macro_avg',
+      role: 'primary_fitness',
+    },
     {
       metric_name: 'accuracy',
       direction: 'higher',
       domain_applicability: 'all',
       aggregation_rule: 'macro_avg',
-      role: 'primary_fitness',
+      role: 'secondary_reported',
     },
   ],
   fitness_mode: 'aggregate',

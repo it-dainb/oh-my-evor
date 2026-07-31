@@ -27,6 +27,7 @@ Coverage:
 
 from __future__ import annotations
 
+import importlib.util
 from pathlib import Path
 
 import pytest
@@ -38,6 +39,14 @@ from evor.integrity import IntegrityGate
 REPO_ROOT = Path(__file__).resolve().parents[2]
 EVAL_SCRIPT = REPO_ROOT / "benchmarks" / "tabular-churn" / "evaluate.py"
 FIXTURES = Path(__file__).resolve().parent / "fixtures" / "bench-cpu-tabular" / "candidates"
+
+
+def _load_eval_module():
+    """Import evaluate.py directly to unit-test its private metric helpers."""
+    spec = importlib.util.spec_from_file_location("bench_evaluate", EVAL_SCRIPT)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 def _goal() -> GoalContract:
@@ -167,3 +176,32 @@ class TestCandidateFailureIsRecorded:
         result = _run(tmp_path, "no_trainer", node_id="node-missing")
         assert result.status == "error"
         assert result.metrics == {}
+
+
+class TestDegenerateRocAuc:
+    """A2: roc_auc replaces accuracy as primary_fitness. When the test split
+    ever produced only one ground-truth class, roc_auc (a pos/neg rank
+    statistic) would have no pairs to rank and is undefined. Decision: fall
+    back to accuracy rather than emitting NaN/None and letting a downstream
+    consumer (updateBestScore, TreeEngine.compute_fitness) silently drop the
+    node or crash. This is already how _roc_auc is written — this test locks
+    that behavior in now that roc_auc is load-bearing as the primary metric.
+    """
+
+    def test_falls_back_to_accuracy_when_only_positive_class_present(self):
+        ev = _load_eval_module()
+        proba = [0.9, 0.4, 0.7, 0.6]
+        y = [1, 1, 1, 1]
+        assert ev._roc_auc(proba, y) == pytest.approx(ev._accuracy(proba, y))
+
+    def test_falls_back_to_accuracy_when_only_negative_class_present(self):
+        ev = _load_eval_module()
+        proba = [0.9, 0.4, 0.7, 0.6]
+        y = [0, 0, 0, 0]
+        assert ev._roc_auc(proba, y) == pytest.approx(ev._accuracy(proba, y))
+
+    def test_normal_case_is_a_real_rank_statistic(self):
+        ev = _load_eval_module()
+        proba = [0.9, 0.4, 0.7, 0.6]
+        y = [1, 0, 1, 0]
+        assert ev._roc_auc(proba, y) == pytest.approx(1.0)
