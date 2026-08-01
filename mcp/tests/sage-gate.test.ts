@@ -116,3 +116,56 @@ describe("fields an agent is told to set must exist in the schema it is shown", 
     expect(step1b).not.toMatch(/Set `investigation_query_ref/);
   });
 });
+
+describe("S1 — routing Mutagen's queries to Sage is unconditional, including tick 1", () => {
+  /**
+   * Traced from two full runs. Spawn sequences:
+   *   tick 1: wiki_query -> mutagen -> selector -> forge      <- Sage never considered
+   *   tick 2: read_handoff -> mutagen -> write_handoff -> wiki+gotcha -> SAGE -> selector
+   *   tick 3: read_handoff -> mutagen -> write_handoff -> SAGE -> selector
+   *
+   * Every tick that began by READING an inbound handoff spawned Sage; tick 1, which has
+   * none, did not. `evor_write_handoff` is overloaded — it does within-tick routing
+   * (Mutagen -> Sage) and between-tick continuity — so with nothing inbound to anchor on,
+   * tick 1's agent treated the handoff as an end-of-tick artifact and never entered the
+   * route-to-Sage sub-procedure.
+   *
+   * It compounded: Sage's POST-CONDITION was nested INSIDE the conditional gate, while
+   * Mutagen's sits at step level. An agent that never enters the gate never sees the
+   * check that would have caught the omission.
+   *
+   * Tick 1 is the worst possible tick to lose: the wiki is empty, so it is the tick where
+   * external grounding is the only grounding available.
+   */
+  const step2 = (() => {
+    const i = loop.indexOf("2. **Every tick routes");
+    expect(i, "step 2 not found — this test is stale").toBeGreaterThan(-1);
+    return loop.slice(i, loop.indexOf("3. Attach Sage's findings", i));
+  })();
+
+  it("states the step is unconditional and names tick 1", () => {
+    expect(step2).toMatch(/unconditional/i);
+    expect(step2).toMatch(/tick 1/i);
+  });
+
+  it("explains that the two uses of evor_write_handoff are different jobs", () => {
+    expect(step2).toMatch(/WITHIN this tick/i);
+    expect(step2).toMatch(/NEXT tick/i);
+  });
+
+  it("carries a post-condition that applies whatever the gate decided", () => {
+    const pc = step2.slice(step2.indexOf("POST-CONDITION"));
+    expect(pc).toMatch(/every tick/i);
+    expect(pc).toMatch(/whatever the gate/i);
+  });
+
+  it("forbids advancing to Selector with no Sage artifact", () => {
+    expect(step2).toMatch(/not proceed to step 3|before advancing to Selector/i);
+  });
+
+  it("Mutagen's post-condition is still step-level, so the two are symmetric", () => {
+    // The asymmetry is what hid this: one check always applied, the other did not.
+    const step1 = loop.slice(loop.indexOf('1. `Task(subagent_type="oh-my-evor:evor-mutagen"'), loop.indexOf("2. **Every tick routes"));
+    expect(step1).toMatch(/POST-CONDITION/);
+  });
+});

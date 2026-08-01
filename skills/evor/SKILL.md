@@ -195,7 +195,20 @@ Spawn Mutagen and Sage as REAL sub-agents. Do NOT write proposals or citations y
 
 1. `Task(subagent_type="oh-my-evor:evor-mutagen", description="Tick <n> proposals", prompt="Run dir: <run_dir>. Tick: <n>. Parent node(s): <ids>. Wildness: <w>. Generate N=<concurrency> proposals and write ticks/<n>/mutagen/proposals.json per your write-as-you-go contract.")`.
    - **POST-CONDITION:** call `evor_read_artifact({ run_id, tick: n, agent: "mutagen" })`. If it returns `{error:"not found"}`, re-spawn Mutagen with a corrective note. Never fabricate the artifact.
-2. Write Mutagen's `investigation_queries[]` to the tick handoff via `evor_write_handoff({ run_id, tick: n, data: { to: "sage", investigation_queries: [...] } })`.
+2. **Every tick routes Mutagen's queries to Sage. This step is unconditional — including
+   tick 1.** `evor_write_handoff` serves two different jobs: routing WITHIN this tick
+   (Mutagen → Sage, which is what you are doing here) and carrying state to the NEXT tick.
+   On tick 1 there is no inbound handoff to read, and that is not a reason to skip the
+   within-tick route. Measured: two runs spawned Sage in every tick that began by reading an
+   inbound handoff, and in no tick 1 — the loop went Mutagen → Selector with Sage never
+   considered, and tick 1 is precisely the tick where nothing is in the wiki yet.
+
+   Write Mutagen's `investigation_queries[]` to the tick handoff via `evor_write_handoff({ run_id, tick: n, data: { to: "sage", investigation_queries: [...] } })`.
+
+   - **POST-CONDITION (applies to every tick, whatever the gate below decided):** call
+     `evor_read_artifact({ run_id, tick: n, agent: "sage" })`. If it returns
+     `{error:"not found"}`, Sage did not run — spawn it before advancing to Selector.
+     Do not proceed to step 3 with no Sage artifact for this tick.
 
    **P1-8 — Conditional Sage gate (wiki+gotcha first; Sage only when needed):**
    Before spawning Sage, call `evor_wiki_query` and `evor_gotcha_query` for each angle in
