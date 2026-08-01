@@ -38,12 +38,25 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 EVAL_SCRIPT = REPO_ROOT / "benchmarks" / "tabular-ladder" / "evaluate.py"
 FIXTURES = Path(__file__).resolve().parent / "fixtures" / "tabular-ladder" / "candidates"
 
-RUNGS = ["logreg", "tree_basic", "tree_selected", "forest"]
+RUNGS = ["logreg", "tree_basic", "tree_selected", "forest", "boosting"]
+
+# "forest" (rung 4) is THE STRONG FIRST ATTEMPT (task S2): feature selection
+# + a bagged tree ensemble, exactly what an able agent writes on tick 1. It
+# must land well short of the ceiling, not saturate it.
+STRONG_FIRST_ATTEMPT_RUNG = "forest"
 
 # Bootstrap sd of roc_auc at n=2000 test samples for these candidates is
 # ~0.007-0.012 (measured during design). Require gaps well above that so a
 # single tick's ranking is never noise.
 MIN_GAP = 0.015
+
+# roc_auc = 0.5 is chance; CEILING is the Bayes-optimal roc_auc (see
+# TestDatasetContract.test_ceiling below for how it's computed). The strong
+# first attempt must land in [0.70, 0.90] of the way from chance to ceiling
+# -- comfortably inside the task's target 0.75-0.85 band with slack for
+# harmless dataset-regeneration drift, but nowhere near saturating (1.0).
+STRONG_FIRST_ATTEMPT_CEILING_FRACTION_MIN = 0.70
+STRONG_FIRST_ATTEMPT_CEILING_FRACTION_MAX = 0.90
 
 
 def _load_eval_module():
@@ -153,6 +166,45 @@ class TestLadderOrdering:
     def test_all_rungs_beat_chance(self, rung_results):
         for rung in RUNGS:
             assert rung_results[rung].metrics["roc_auc"] > 0.5 + MIN_GAP
+
+
+class TestStrongFirstAttemptLandsShortOfCeiling:
+    """Task S2's actual acceptance criterion: the STRONG first attempt (rung
+    4, "forest" = feature selection + a bagged tree ensemble -- exactly what
+    an able agent writes on tick 1) must land well short of the Bayes-optimal
+    ceiling, not saturate it. v1 of this dataset failed this exact check in
+    real agent runs even though its measured rungs looked fine."""
+
+    def test_ceiling_is_computable_and_not_1(self):
+        ev = _load_eval_module()
+        X, y = ev._make_dataset()
+        _, _, _, _, Xte, yte = ev._splits(X, y)
+        ceiling = ev._roc_auc(ev._bayes_predict(Xte), yte)
+        assert 0.85 < ceiling < 0.95, f"ceiling {ceiling:.4f} out of expected range"
+
+    def test_strong_first_attempt_does_not_saturate(self, rung_results):
+        ev = _load_eval_module()
+        X, y = ev._make_dataset()
+        _, _, _, _, Xte, yte = ev._splits(X, y)
+        ceiling = ev._roc_auc(ev._bayes_predict(Xte), yte)
+
+        strong = rung_results[STRONG_FIRST_ATTEMPT_RUNG].metrics["roc_auc"]
+        fraction = (strong - 0.5) / (ceiling - 0.5)
+
+        assert STRONG_FIRST_ATTEMPT_CEILING_FRACTION_MIN <= fraction <= STRONG_FIRST_ATTEMPT_CEILING_FRACTION_MAX, (
+            f"strong first attempt ({STRONG_FIRST_ATTEMPT_RUNG}) roc_auc={strong:.4f} is "
+            f"{fraction:.3f} of the way from chance to ceiling={ceiling:.4f}; expected "
+            f"[{STRONG_FIRST_ATTEMPT_CEILING_FRACTION_MIN}, {STRONG_FIRST_ATTEMPT_CEILING_FRACTION_MAX}] "
+            "-- outside this band means the task is saturating (or under-shooting) again"
+        )
+
+    def test_boosting_rung_beats_strong_first_attempt_above_noise_floor(self, rung_results):
+        strong = rung_results[STRONG_FIRST_ATTEMPT_RUNG].metrics["roc_auc"]
+        boosted = rung_results["boosting"].metrics["roc_auc"]
+        assert boosted - strong >= MIN_GAP, (
+            f"boosting ({boosted:.4f}) does not clear the strong first attempt "
+            f"({strong:.4f}) by the noise floor {MIN_GAP} -- there is nothing left to search for"
+        )
 
 
 class TestTelemetry:

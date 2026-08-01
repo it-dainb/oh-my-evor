@@ -2,10 +2,11 @@
 Reference candidate — LADDER RUNG 3: "handling irrelevant/noisy features".
 
 Ranks all raw features by the gini gain of their single best split on the
-TRAIN set only, keeps the top-K, and fits a CART tree restricted to that
-pool. This removes rung 2's spurious-noise-split risk (80 of
-benchmarks/tabular-ladder/evaluate.py's 84 features are pure noise) before
-the tree is even grown, at the cost of a shallower/more-regularized tree.
+TRAIN set only, keeps the top-K (14, generous enough to cover both main
+effects, all four conjunction pairs, and the rare-subgroup feature), and
+fits a CART tree restricted to that pool. Removing the 79 pure-noise columns
+before growing the tree, and affording it more depth than rung 2 could
+safely spend unfiltered, recovers more of the conjunction structure.
 
 Contract (benchmarks/tabular-ladder/evaluate.py):
     train(Xtr, ytr, Xva, yva, cfg) -> predict(X) -> list[float]
@@ -105,8 +106,8 @@ def _select_features(Xtr, ytr, top_k, min_leaf):
 
 
 def train(Xtr, ytr, Xva, yva, cfg):
-    top_k = int(cfg.get("top_k", 10))
-    max_depth = int(cfg.get("max_depth", 4))
+    top_k = int(cfg.get("top_k", 14))
+    max_depth = int(cfg.get("max_depth", 7))
     min_leaf = int(cfg.get("min_leaf", 15))
 
     tel_path = os.environ.get("EVOR_TELEMETRY_PATH")

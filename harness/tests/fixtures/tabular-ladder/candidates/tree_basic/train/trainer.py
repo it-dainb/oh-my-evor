@@ -2,12 +2,13 @@
 Reference candidate — LADDER RUNG 2: "handling feature interactions".
 
 A single unregularized CART decision tree (Gini impurity), built greedily
-over ALL raw features with a deep max_depth and a tiny min_leaf. It CAN
-split on x2 then x3 to isolate the conjunction region a linear model cannot
-reach (rung 1) — but with no regularization and 80 pure-noise columns in
-benchmarks/tabular-ladder/evaluate.py's dataset, it also spends some of its
-capacity on spurious noise splits. That overfitting risk is exactly what
-rung 3 (feature-selection) is supposed to remove.
+over ALL raw features with no feature-selection pre-filter. It CAN isolate
+one or two of the four independent pairwise conjunctions in
+benchmarks/tabular-ladder/evaluate.py's v2 dataset — but its depth budget
+runs out before it can reach the rest, and with 79 pure-noise columns and no
+filtering, it also spends some capacity on spurious noise splits. That
+"can't reach all the interactions, and wastes some depth on noise" combo is
+exactly what rung 3 (feature-selection) starts to remove.
 
 Contract (benchmarks/tabular-ladder/evaluate.py):
     train(Xtr, ytr, Xva, yva, cfg) -> predict(X) -> list[float]
@@ -96,8 +97,8 @@ def _tree_predict_one(tree, row):
 
 
 def train(Xtr, ytr, Xva, yva, cfg):
-    max_depth = int(cfg.get("max_depth", 8))
-    min_leaf = int(cfg.get("min_leaf", 3))
+    max_depth = int(cfg.get("max_depth", 5))
+    min_leaf = int(cfg.get("min_leaf", 5))
 
     tel_path = os.environ.get("EVOR_TELEMETRY_PATH")
     node_id = os.environ.get("EVOR_NODE_ID", "")

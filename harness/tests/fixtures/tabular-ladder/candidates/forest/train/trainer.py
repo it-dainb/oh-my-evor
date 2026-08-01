@@ -1,12 +1,20 @@
 """
-Reference candidate — LADDER RUNG 4: "regularization / ensembling".
+Reference candidate — LADDER RUNG 4: "regularization / ensembling" — THE
+STRONG "OBVIOUS FIRST ATTEMPT" (task S2). Same train-set feature-selection
+pre-filter as rung 3, but instead of a single tree, bags N bootstrap-
+resampled CART trees over the SAME fixed selected pool and averages their
+predictions (no per-split random feature subsampling, i.e. plain bagging,
+not a true random forest). This is exactly the ensemble an able agent
+reaches for immediately on tick 1.
 
-Same train-set feature-selection pre-filter as rung 3, but instead of a
-single tree, bags N bootstrap-resampled CART trees over the selected pool
-and averages their predictions. The bagging variance reduction squeezes out
-most of the remaining recoverable signal in
-benchmarks/tabular-ladder/evaluate.py's dataset, approaching (never
-reaching) the ~0.918 Bayes-optimal roc_auc ceiling.
+It is measurably NOT the ceiling on benchmarks/tabular-ladder/evaluate.py's
+v2 dataset: with four independent pairwise conjunctions, each bootstrap's
+greedy depth-4 tree tends to lock onto the same one or two of them (the
+ones with the largest sample gini gain), so averaging many similar trees
+mostly reduces variance, not the bias from the conjunctions it never
+represents. Measured: reaches roughly 85% of the way from chance to the
+Bayes ceiling — clear room remains for rung 5 (boosting), which fits what
+each round's residual still gets wrong.
 
 Contract (benchmarks/tabular-ladder/evaluate.py):
     train(Xtr, ytr, Xva, yva, cfg) -> predict(X) -> list[float]
@@ -107,7 +115,7 @@ def _select_features(Xtr, ytr, top_k, min_leaf):
 
 
 def train(Xtr, ytr, Xva, yva, cfg):
-    top_k = int(cfg.get("top_k", 10))
+    top_k = int(cfg.get("top_k", 14))
     max_depth = int(cfg.get("max_depth", 4))
     min_leaf = int(cfg.get("min_leaf", 15))
     n_trees = int(cfg.get("n_trees", 20))

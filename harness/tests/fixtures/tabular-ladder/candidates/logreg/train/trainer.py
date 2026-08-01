@@ -2,9 +2,9 @@
 Reference candidate — LADDER RUNG 1: "basic model beating chance".
 
 Plain logistic regression (batch gradient descent) over all raw features.
-Captures the two linear main effects but cannot fully separate the x2/x3
-conjunction interaction (benchmarks/tabular-ladder/evaluate.py) — that gap is
-exactly what rung 2 (a tree) is supposed to close.
+Captures the two linear main effects but cannot separate any of the four
+independent pairwise conjunctions in benchmarks/tabular-ladder/evaluate.py's
+v2 dataset — that gap is exactly what rung 2 (a tree) starts to close.
 
 Contract (benchmarks/tabular-ladder/evaluate.py):
     train(Xtr, ytr, Xva, yva, cfg) -> predict(X) -> list[float]
