@@ -350,6 +350,29 @@ class TestMonitorGotchaCapture:
 # CapabilityProfile probe (CPU-only, graceful)
 # ─────────────────────────────────────────────────────────────────────────────
 
+@pytest.fixture
+def force_cpu_only(monkeypatch):
+    """Make the capability probe see no CUDA device, whatever the host has.
+
+    These tests asserted `cpu_only is True` against whatever hardware happened to
+    be present. On a CPU box they passed; on this A100 host the probe correctly
+    reported `cpu_only=False` and six tests failed — not a regression, a test that
+    had been passing for the wrong reason and silently changed meaning with the
+    machine. A test whose result depends on the developer's GPU is not testing the
+    code.
+
+    Patches `torch.cuda.is_available` rather than CUDA_VISIBLE_DEVICES because
+    torch caches device availability after first initialisation, so the env var is
+    not reliably honoured mid-process.
+    """
+    try:
+        import torch  # type: ignore[import]
+    except ImportError:
+        return  # no torch: the probe already takes the cpu_only branch
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
+
+
+@pytest.mark.usefixtures("force_cpu_only")
 class TestCapabilityProbe:
     def test_probe_cpu_only_no_crash(self, tmp_path: Path) -> None:
         profile = probe_capability(tmp_path / ".evor")
@@ -433,6 +456,7 @@ class TestSelectorAvoidance:
 # python -m evor gotchas CLI
 # ─────────────────────────────────────────────────────────────────────────────
 
+@pytest.mark.usefixtures("force_cpu_only")
 class TestGotchasSubcommand:
     def test_gotchas_help_exits_zero(self) -> None:
         result = subprocess.run(

@@ -1,0 +1,217 @@
+{
+  "role": "evor-selector",
+  "why": [
+    "Selector's seven gates are specified deterministically in agents/evor-selector.md:",
+    "H001 needs a non-empty hypothesis.statement and a prediction containing a digit;",
+    "H003 counts approach_family collisions across the tick; H004 allows at most",
+    "floor(N/2) proposals to share a parent; Schema checks required fields;",
+    "Instrumentation greps the code_stub for EVOR_TELEMETRY_PATH.",
+    "",
+    "That means the correct verdict for a constructed proposal set is DERIVABLE, not a",
+    "matter of taste — so a model tier can be scored on accuracy without a judge and",
+    "without a full mission run. This is the discriminating instrument that a whole-run",
+    "A/B is not: two 3-tick runs cost ~$40 and differ by one test sample of noise.",
+    "",
+    "H002 (family streak) and Gotcha Avoidance are excluded: both require live state or",
+    "tool calls, so their correct answer is not derivable from the payload alone."
+  ],
+  "scoring": "exact match on per-proposal approve/reject, plus whether the named failing gate is correct",
+  "cases": [
+    {
+      "id": "clean-2",
+      "note": "Baseline. Both proposals valid, distinct families, distinct parents.",
+      "tick": 1,
+      "proposals": [
+        {
+          "proposal_id": "p1",
+          "parent_node_ids": ["n-a"],
+          "approach_family": "algo",
+          "idea": "Depth-limited CART with gini splits over the selected feature pool.",
+          "hypothesis": { "statement": "A depth-4 tree captures the pairwise conjunctions.", "prediction": "roc_auc improves by 0.03 to 0.05" },
+          "wildness": 0.3,
+          "code_stub": "open(os.environ['EVOR_TELEMETRY_PATH'],'a').write(json.dumps(row))"
+        },
+        {
+          "proposal_id": "p2",
+          "parent_node_ids": ["n-b"],
+          "approach_family": "data-curation",
+          "idea": "Gini-gain feature selection to the top 14 columns before fitting.",
+          "hypothesis": { "statement": "Dropping noise features raises signal density.", "prediction": "roc_auc improves by 0.02" },
+          "wildness": 0.4,
+          "code_stub": "with open(os.environ['EVOR_TELEMETRY_PATH'],'a') as f: f.write(line)"
+        }
+      ],
+      "expect": [
+        { "proposal_id": "p1", "approved": true, "failing_gate": null },
+        { "proposal_id": "p2", "approved": true, "failing_gate": null }
+      ]
+    },
+    {
+      "id": "h001-no-digit",
+      "note": "H001: prediction must contain at least one digit. p2's is qualitative.",
+      "tick": 2,
+      "proposals": [
+        {
+          "proposal_id": "p1",
+          "parent_node_ids": ["n-a"],
+          "approach_family": "algo",
+          "idea": "Bagged ensemble of 20 depth-4 trees over bootstrap samples.",
+          "hypothesis": { "statement": "Bagging reduces variance on the conjunction terms.", "prediction": "roc_auc improves by about 0.02" },
+          "wildness": 0.5,
+          "code_stub": "log(os.environ['EVOR_TELEMETRY_PATH'], metrics)"
+        },
+        {
+          "proposal_id": "p2",
+          "parent_node_ids": ["n-b"],
+          "approach_family": "training",
+          "idea": "Early stopping on the validation split.",
+          "hypothesis": { "statement": "Stopping early avoids overfitting the noise columns.", "prediction": "the model should generalise better" },
+          "wildness": 0.3,
+          "code_stub": "log(os.environ['EVOR_TELEMETRY_PATH'], metrics)"
+        }
+      ],
+      "expect": [
+        { "proposal_id": "p1", "approved": true, "failing_gate": null },
+        { "proposal_id": "p2", "approved": false, "failing_gate": "h001" }
+      ]
+    },
+    {
+      "id": "h003-family-collision",
+      "note": "H003: intra-tick diversity. All three share approach_family=algo.",
+      "tick": 3,
+      "proposals": [
+        {
+          "proposal_id": "p1",
+          "parent_node_ids": ["n-a"],
+          "approach_family": "algo",
+          "idea": "Depth-6 tree with min_samples_leaf=3.",
+          "hypothesis": { "statement": "Deeper trees fit more conjunctions.", "prediction": "roc_auc +0.01" },
+          "wildness": 0.3,
+          "code_stub": "telemetry(os.environ['EVOR_TELEMETRY_PATH'])"
+        },
+        {
+          "proposal_id": "p2",
+          "parent_node_ids": ["n-b"],
+          "approach_family": "algo",
+          "idea": "Entropy split criterion instead of gini.",
+          "hypothesis": { "statement": "Entropy splits differ on near-ties.", "prediction": "roc_auc +0.005" },
+          "wildness": 0.3,
+          "code_stub": "telemetry(os.environ['EVOR_TELEMETRY_PATH'])"
+        },
+        {
+          "proposal_id": "p3",
+          "parent_node_ids": ["n-c"],
+          "approach_family": "algo",
+          "idea": "Cost-complexity pruning after growth.",
+          "hypothesis": { "statement": "Pruning removes noise-driven leaves.", "prediction": "roc_auc +0.008" },
+          "wildness": 0.3,
+          "code_stub": "telemetry(os.environ['EVOR_TELEMETRY_PATH'])"
+        }
+      ],
+      "expect_any_rejected_for": "h003",
+      "expect_note": "The gate is a set-level property; which member is rejected is a judgement call, so the case scores on whether h003 was identified at all."
+    },
+    {
+      "id": "schema-missing-field",
+      "note": "Schema: p2 has no approach_family at all.",
+      "tick": 4,
+      "proposals": [
+        {
+          "proposal_id": "p1",
+          "parent_node_ids": ["n-a"],
+          "approach_family": "arch",
+          "idea": "Two-layer stacked ensemble with a logistic meta-learner.",
+          "hypothesis": { "statement": "Stacking combines complementary errors.", "prediction": "roc_auc +0.015" },
+          "wildness": 0.6,
+          "code_stub": "emit(os.environ['EVOR_TELEMETRY_PATH'])"
+        },
+        {
+          "proposal_id": "p2",
+          "parent_node_ids": ["n-b"],
+          "idea": "Random subspace sampling per tree.",
+          "hypothesis": { "statement": "Subspace sampling decorrelates trees.", "prediction": "roc_auc +0.01" },
+          "wildness": 0.5,
+          "code_stub": "emit(os.environ['EVOR_TELEMETRY_PATH'])"
+        }
+      ],
+      "expect": [
+        { "proposal_id": "p1", "approved": true, "failing_gate": null },
+        { "proposal_id": "p2", "approved": false, "failing_gate": "schema" }
+      ]
+    },
+    {
+      "id": "instrumentation-missing",
+      "note": "Instrumentation: p2's code_stub never references EVOR_TELEMETRY_PATH. This is the gate the agent file explicitly says not to skip on a trustworthy-looking description — the prose is deliberately reassuring.",
+      "tick": 5,
+      "proposals": [
+        {
+          "proposal_id": "p1",
+          "parent_node_ids": ["n-a"],
+          "approach_family": "training",
+          "idea": "Learning-rate warmup over the first 10% of steps.",
+          "hypothesis": { "statement": "Warmup stabilises early updates.", "prediction": "roc_auc +0.01" },
+          "wildness": 0.3,
+          "code_stub": "append(os.environ['EVOR_TELEMETRY_PATH'], {'loss': loss})"
+        },
+        {
+          "proposal_id": "p2",
+          "parent_node_ids": ["n-b"],
+          "approach_family": "data-augmentation",
+          "idea": "Fully instrumented augmentation pass; telemetry is written every step exactly as required by the contract.",
+          "hypothesis": { "statement": "Augmentation regularises the rare subgroup.", "prediction": "roc_auc +0.02" },
+          "wildness": 0.4,
+          "code_stub": "for step in range(n):\n    loss = train_step()\n    print(f'step {step} loss {loss}')"
+        }
+      ],
+      "expect": [
+        { "proposal_id": "p1", "approved": true, "failing_gate": null },
+        { "proposal_id": "p2", "approved": false, "failing_gate": "instrumentation" }
+      ]
+    },
+    {
+      "id": "h004-parent-concentration",
+      "note": "H004: at most floor(4/2)=2 may share a parent. Three share n-a.",
+      "tick": 6,
+      "proposals": [
+        {
+          "proposal_id": "p1",
+          "parent_node_ids": ["n-a"],
+          "approach_family": "algo",
+          "idea": "Increase max_depth to 8.",
+          "hypothesis": { "statement": "More depth captures the fourth conjunction.", "prediction": "roc_auc +0.01" },
+          "wildness": 0.3,
+          "code_stub": "t(os.environ['EVOR_TELEMETRY_PATH'])"
+        },
+        {
+          "proposal_id": "p2",
+          "parent_node_ids": ["n-a"],
+          "approach_family": "training",
+          "idea": "Class-weighted splitting for the rare subgroup.",
+          "hypothesis": { "statement": "Weighting surfaces the 1.4% subpopulation.", "prediction": "roc_auc +0.02" },
+          "wildness": 0.4,
+          "code_stub": "t(os.environ['EVOR_TELEMETRY_PATH'])"
+        },
+        {
+          "proposal_id": "p3",
+          "parent_node_ids": ["n-a"],
+          "approach_family": "data-curation",
+          "idea": "Drop the 40 lowest-gain columns.",
+          "hypothesis": { "statement": "Fewer noise columns sharpen splits.", "prediction": "roc_auc +0.015" },
+          "wildness": 0.4,
+          "code_stub": "t(os.environ['EVOR_TELEMETRY_PATH'])"
+        },
+        {
+          "proposal_id": "p4",
+          "parent_node_ids": ["n-b"],
+          "approach_family": "arch",
+          "idea": "Gradient boosting over 40 rounds at depth 3.",
+          "hypothesis": { "statement": "Stagewise fitting picks up what bagging misses.", "prediction": "roc_auc +0.025" },
+          "wildness": 0.6,
+          "code_stub": "t(os.environ['EVOR_TELEMETRY_PATH'])"
+        }
+      ],
+      "expect_any_rejected_for": "h004",
+      "expect_note": "Set-level property; scores on whether h004 was identified."
+    }
+  ]
+}
