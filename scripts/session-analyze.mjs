@@ -18,15 +18,32 @@
 
 import { readFileSync } from 'fs';
 
-/** $/Mtok, Anthropic first-party. Sonnet 5 intro pricing ends 2026-08-31. */
+/**
+ * $/Mtok, Anthropic first-party.
+ *
+ * Sonnet 5 is the only rate that moves: $2/$10 introductory through 2026-08-31,
+ * $3/$15 list after. The previous table listed BOTH but looked up the list entry,
+ * so every run measured while intro pricing was in effect was reported ~50% too
+ * expensive on its largest line item — Sonnet is most of the agent mix.
+ *
+ * Resolved by date rather than by picking one, because both are correct at
+ * different times and a long mission can straddle the boundary. Override with
+ * EVOR_PRICING_DATE to model a run on the other side of it.
+ */
+const SONNET_INTRO_ENDS = Date.parse('2026-09-01T00:00:00Z');
+const pricingAt = Date.parse(process.env.EVOR_PRICING_DATE ?? new Date().toISOString());
+const sonnetIntro = pricingAt < SONNET_INTRO_ENDS;
+
 const PRICING = {
   'claude-opus-5': { input: 5, output: 25 },
   'claude-opus-4-8': { input: 5, output: 25 },
-  'claude-sonnet-5': { input: 3, output: 15 },
-  'claude-sonnet-5-intro': { input: 2, output: 10 },
+  'claude-sonnet-5': sonnetIntro ? { input: 2, output: 10 } : { input: 3, output: 15 },
   'claude-sonnet-4-6': { input: 3, output: 15 },
   'claude-haiku-4-5': { input: 1, output: 5 },
 };
+const PRICING_NOTE = sonnetIntro
+  ? 'sonnet-5 $2/$10 introductory (ends 2026-08-31)'
+  : 'sonnet-5 $3/$15 list';
 const CACHE_READ_MULT = 0.1;
 const CACHE_WRITE_MULT = 1.25;
 
@@ -184,10 +201,22 @@ for (const file of files) {
 // ── Cost ─────────────────────────────────────────────────────────────────────
 const costByModel = {};
 let costTotal = 0;
+/**
+ * Transcripts carry DATED model ids (`claude-haiku-4-5-20251001`) while the table
+ * keys on the alias (`claude-haiku-4-5`). The exact-match lookup missed, cost was
+ * recorded as null, and null was skipped when summing — so every haiku agent in
+ * every run cost $0 in our accounting. Silent, and precisely backwards for a
+ * project evaluating whether to move work ONTO haiku.
+ */
+const priceFor = (model) =>
+  PRICING[model] ?? PRICING[String(model).replace(/-\d{8}$/, '')];
+
+let unpriced = 0;
 for (const [model, m] of Object.entries(byModel)) {
-  const p = PRICING[model];
+  const p = priceFor(model);
   if (!p) {
-    costByModel[model] = null; // unknown tier — report rather than guess
+    costByModel[model] = null; // genuinely unknown tier — report rather than guess
+    unpriced++;
     continue;
   }
   const c =
@@ -211,7 +240,15 @@ process.stdout.write(
       main,
       subagents,
       by_model: byModel,
-      cost: { by_model: costByModel, total: costTotal, note: 'cache_read=0.1x input, cache_write=1.25x input' },
+      cost: {
+        by_model: costByModel,
+        total: costTotal,
+        note: `cache_read=0.1x input, cache_write=1.25x input; ${PRICING_NOTE}`,
+        pricing_basis: PRICING_NOTE,
+        // Non-zero means the total UNDERSTATES real spend — a model ran that we
+        // could not price. Never read `total` without checking this.
+        unpriced_models: unpriced,
+      },
       wall_clock: { seconds, human: `${Math.floor(seconds / 3600)}h${String(Math.floor((seconds % 3600) / 60)).padStart(2, '0')}m` },
       hooks: { total_fires: hookFires, messages_with_hooks: messagesWithHooks },
       ac2: { orchestrator_leaf_tool_calls: orchestratorLeafCalls },
