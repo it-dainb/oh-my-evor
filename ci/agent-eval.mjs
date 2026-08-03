@@ -123,6 +123,24 @@ const ALIAS_MODEL_PREFIX = {
   opus: 'claude-opus-5',
 };
 
+/**
+ * Models on which `effort` has no effect. Haiku 4.5 has no effort dial — the API
+ * does not apply one, and agents/evor-selector.md's own frontmatter test says so
+ * ("haiku does not support effort — declaring it is inert").
+ *
+ * This exists because the first matrix ran "haiku-high" and "haiku-medium" as two
+ * tiers and reported them as two results. They were one configuration. Measured on
+ * a reasoning-heavy prompt, 3 reps each: low 1016/947/901, high 908/699/1021 —
+ * high LOWER than low, ranges overlapping. The tier guard checked the model and
+ * not the effort, so a dial that does nothing looked like a variable under test.
+ */
+export const EFFORT_INERT_MODELS = new Set(['haiku', 'claude-haiku-4-5']);
+
+/** True when this tier's effort setting cannot affect the result. */
+export function effortIsInert(model) {
+  return EFFORT_INERT_MODELS.has(String(model).replace(/-\d{8}$/, ''));
+}
+
 export function checkTierMatch(requestedModelAlias, modelUsage) {
   const expectedPrefix = ALIAS_MODEL_PREFIX[requestedModelAlias] ?? requestedModelAlias;
   const keys = Object.keys(modelUsage ?? {});
@@ -361,6 +379,14 @@ function compareTiers(a, b) {
 // ─────────────────────────────────────────────────────────────────────────────
 // Report assembly (pure — takes raw per-call records, no I/O)
 // ─────────────────────────────────────────────────────────────────────────────
+
+/** Tiers whose effort is inert collapse to one label, so the report cannot show
+ *  two rows for one configuration. */
+export function canonicalTierLabel(tier) {
+  const model = tier.model ?? tier;
+  const effort = tier.effort;
+  return effortIsInert(model) ? `${model} (effort inert)` : `${model}-${effort}`;
+}
 
 export function buildReport({ role, tiers, records }) {
   const tierReports = tiers.map((tier) => {

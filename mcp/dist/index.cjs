@@ -22606,6 +22606,7 @@ function pruneAndWrite(indexPath, newEntry) {
   const tmp = `${indexPath}.tmp.${process.pid}`;
   (0, import_fs6.writeFileSync)(tmp, entries.map((e) => JSON.stringify(e)).join("\n") + "\n", "utf8");
   (0, import_fs6.renameSync)(tmp, indexPath);
+  bumpWikiGeneration();
 }
 function tokenize(text) {
   return text.toLowerCase().split(/[^a-z]+/).filter((t) => t.length >= 2);
@@ -22633,16 +22634,20 @@ function cosineSim(a, b) {
   return dot / (Math.sqrt(normA) * Math.sqrt(normB));
 }
 var idfCache = /* @__PURE__ */ new Map();
+var wikiGeneration = 0;
+function bumpWikiGeneration() {
+  wikiGeneration++;
+}
 var _wikiCacheStats = { hits: 0, misses: 0 };
 function loadCorpus(indexPath) {
   let mtime = 0;
   try {
     mtime = (0, import_fs6.statSync)(indexPath).mtimeMs;
   } catch {
-    return { mtime: 0, entries: [], entryVecs: [], df: /* @__PURE__ */ new Map(), N: 0 };
+    return { mtime: 0, generation: wikiGeneration, entries: [], entryVecs: [], df: /* @__PURE__ */ new Map(), N: 0 };
   }
   const cached2 = idfCache.get(indexPath);
-  if (cached2 && cached2.mtime === mtime) {
+  if (cached2 && cached2.mtime === mtime && cached2.generation === wikiGeneration) {
     _wikiCacheStats.hits++;
     return cached2;
   }
@@ -22678,7 +22683,7 @@ function loadCorpus(indexPath) {
     }
     return vec;
   });
-  const result = { mtime, entries, entryVecs, df, N };
+  const result = { mtime, generation: wikiGeneration, entries, entryVecs, df, N };
   idfCache.set(indexPath, result);
   return result;
 }

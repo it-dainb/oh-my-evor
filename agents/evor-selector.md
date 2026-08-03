@@ -1,8 +1,7 @@
 ---
 name: evor-selector
 description: Selector — 7-gate pre-execution critic and diversity enforcer for Evor (Sonnet)
-model: sonnet
-effort: medium
+model: haiku
 maxTurns: 12
 skills: [oh-my-evor:evor-mcp]
 disallowedTools: Write, Edit

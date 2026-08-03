@@ -29,6 +29,8 @@ import {
   buildReport,
   renderTable,
   SHORT_TO_GATE_KEY,
+  effortIsInert,
+  canonicalTierLabel,
 } from "../../ci/agent-eval.mjs";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
@@ -412,5 +414,40 @@ describe("agent-eval — report assembly and insufficient-evidence verdict", () 
     expect(c1.counts.unparseable).toBe(1);
     // accuracy is computed over SCORED (correct+incorrect) calls only.
     expect(report.tiers[0].accuracy).toBe(1);
+  });
+});
+
+describe("a dial that does nothing must not look like a variable under test", () => {
+  /**
+   * The first tier matrix ran "haiku-high" and "haiku-medium" as separate tiers and
+   * reported two rows. They are one configuration: haiku has no effort dial. The
+   * repo's own frontmatter test already said so ("haiku does not support effort —
+   * declaring it is inert"), and a controlled check confirmed it — 3 reps each on a
+   * reasoning-heavy prompt gave low 1016/947/901 vs high 908/699/1021, high LOWER
+   * than low with overlapping ranges.
+   *
+   * The tier guard verified the MODEL came back as requested and never checked
+   * whether the effort could matter, so 60 samples of one arm were presented as a
+   * comparison between two.
+   */
+  it("knows effort is inert on haiku", () => {
+    expect(effortIsInert("haiku")).toBe(true);
+    expect(effortIsInert("claude-haiku-4-5")).toBe(true);
+    expect(effortIsInert("claude-haiku-4-5-20251001"), "dated ids too").toBe(true);
+  });
+
+  it("effort is a real variable on sonnet and opus", () => {
+    expect(effortIsInert("sonnet")).toBe(false);
+    expect(effortIsInert("opus")).toBe(false);
+  });
+
+  it("collapses inert-effort tiers to a single label", () => {
+    expect(canonicalTierLabel({ model: "haiku", effort: "high" }))
+      .toBe(canonicalTierLabel({ model: "haiku", effort: "medium" }));
+  });
+
+  it("keeps distinct labels where effort genuinely varies", () => {
+    expect(canonicalTierLabel({ model: "sonnet", effort: "low" }))
+      .not.toBe(canonicalTierLabel({ model: "sonnet", effort: "medium" }));
   });
 });

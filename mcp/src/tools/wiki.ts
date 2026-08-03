@@ -136,6 +136,9 @@ function pruneAndWrite(indexPath: string, newEntry: LessonEntry): void {
   const tmp = `${indexPath}.tmp.${process.pid}`;
   writeFileSync(tmp, entries.map((e) => JSON.stringify(e)).join("\n") + "\n", "utf8");
   renameSync(tmp, indexPath);
+  // Invalidate explicitly. mtime cannot be relied on: two writes inside the same
+  // millisecond share a timestamp, and the reader would serve the pre-write corpus.
+  bumpWikiGeneration();
 }
 
 // ── TF-IDF helpers ────────────────────────────────────────────────────────
@@ -183,11 +186,26 @@ function cosineSim(a: Map<string, number>, b: Map<string, number>): number {
  * These are IDF-dependent and do not change while the file is unchanged.
  * Query vectors are built per-call (cheap: just the query tokens × IDF lookup).
  *
- * Cache key: (indexPath → mtime).  A write via pruneAndWrite (tmp→rename) always
- * produces a fresh mtime so the next wikiGetRelevant call triggers a cold load.
+ * Cache key: (indexPath → mtime + generation).
+ *
+ * mtime ALONE IS NOT SUFFICIENT, which the original design assumed: "a write via
+ * pruneAndWrite (tmp→rename) always produces a fresh mtime". It does not. mtimeMs
+ * is millisecond-resolution and the kernel's timestamp source is coarser still —
+ * measured on this host, two immediate writes to the same file produced identical
+ * `mtime_ns`. So a wikiAdd followed by a wikiGetRelevant inside the same tick
+ * served the PREVIOUS corpus, silently missing the lesson just written.
+ *
+ * That is a data-loss path, not a performance detail: Sage writes a finding and
+ * Mutagen queries the wiki in the same tick, so the reader can miss exactly the
+ * lesson the writer just produced — with no error anywhere.
+ *
+ * The generation counter is bumped by every in-process write, so invalidation no
+ * longer depends on clock resolution. mtime is retained as the secondary key so
+ * writes from ANOTHER process still invalidate.
  */
 interface WikiCache {
   mtime: number;
+  generation: number;
   entries: LessonEntry[];
   entryVecs: Map<string, number>[];
   df: Map<string, number>;
@@ -195,6 +213,14 @@ interface WikiCache {
 }
 
 const idfCache = new Map<string, WikiCache>();
+
+/** Bumped on every in-process write; part of the cache key. See WikiCache. */
+let wikiGeneration = 0;
+
+/** Invalidate the corpus cache for a path after a write. */
+function bumpWikiGeneration(): void {
+  wikiGeneration++;
+}
 
 /** Hit/miss counters exposed for tests. */
 export const _wikiCacheStats = { hits: 0, misses: 0 };
@@ -207,6 +233,7 @@ export function _resetWikiCache(): void {
   idfCache.clear();
   _wikiCacheStats.hits = 0;
   _wikiCacheStats.misses = 0;
+  wikiGeneration = 0;
 }
 
 /**
@@ -220,11 +247,11 @@ function loadCorpus(indexPath: string): WikiCache {
   try {
     mtime = statSync(indexPath).mtimeMs;
   } catch {
-    return { mtime: 0, entries: [], entryVecs: [], df: new Map(), N: 0 };
+    return { mtime: 0, generation: wikiGeneration, entries: [], entryVecs: [], df: new Map(), N: 0 };
   }
 
   const cached = idfCache.get(indexPath);
-  if (cached && cached.mtime === mtime) {
+  if (cached && cached.mtime === mtime && cached.generation === wikiGeneration) {
     _wikiCacheStats.hits++;
     return cached;
   }
@@ -269,7 +296,7 @@ function loadCorpus(indexPath: string): WikiCache {
     return vec;
   });
 
-  const result: WikiCache = { mtime, entries, entryVecs, df, N };
+  const result: WikiCache = { mtime, generation: wikiGeneration, entries, entryVecs, df, N };
   idfCache.set(indexPath, result);
   return result;
 }

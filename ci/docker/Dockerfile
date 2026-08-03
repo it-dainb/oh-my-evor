@@ -26,6 +26,12 @@ ENV CLAUDE_CODE_MAX_SUBAGENTS_PER_SESSION=2000
 
 WORKDIR /plugin
 COPY . /plugin
+# The container runs as the HOST uid, not root, so every file it must read has to
+# be world-readable. A source file created with restrictive perms (0771) copies in
+# root-owned with others=--x, and node dies with EACCES on a file that is plainly
+# present — which reads as a missing file, not a permissions problem. Normalise
+# here rather than relying on whatever mode each file happened to be authored with.
+RUN chmod -R a+rX /plugin
 
 # Build the TypeScript MCP server -> mcp/dist/index.cjs
 RUN cd mcp && npm ci --no-audit --no-fund && npm run build
