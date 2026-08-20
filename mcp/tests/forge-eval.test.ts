@@ -39,6 +39,7 @@ import {
   CANDIDATE_CONTRACT,
   buildDiagnostics,
   interleaveByTier,
+  parseArms,
   calibrateHost,
   CALIBRATION_TRAINER,
 } from "../../ci/forge-eval.mjs";
@@ -908,5 +909,169 @@ describe("forge-eval-analyze: the report says whether it can be trusted", () => 
     }));
     expect(text).toMatch(/1 attempt\(s\) were KILLED at the scoring deadline/);
     expect(text).toMatch(/has not been shown to write worse code/);
+  });
+});
+
+describe("forge-eval-analyze: candidate EXECUTION cost is reported per tier", () => {
+  /**
+   * The discriminator between "the host was busy" and "this tier writes slower
+   * code". Pass rate alone cannot separate them: both show up as failures. A
+   * tier whose candidates score in 20s and one whose candidates score in 400s
+   * are making very different claims on the budget even when both pass.
+   */
+  const report = {
+    role: "evor-forge-junior",
+    tiers: [
+      { tier: "sonnet-high", model: "claude-sonnet-5", effort: "high" },
+      { tier: "haiku-high", model: "claude-haiku-4-5", effort: "high" },
+    ],
+    host_calibration: { ok: true, wall_ms: 13000, roc_auc: 0.814, budget_ms: 600_000, timed_out: false },
+    raw_records: [
+      { tier: "sonnet-high", case_id: "a", status: "correct", cost_usd: 0.2, eval_wall_ms: 10_000, result: { failed_gates: [] } },
+      { tier: "sonnet-high", case_id: "b", status: "correct", cost_usd: 0.2, eval_wall_ms: 20_000, result: { failed_gates: [] } },
+      { tier: "haiku-high", case_id: "a", status: "correct", cost_usd: 0.1, eval_wall_ms: 300_000, result: { failed_gates: [] } },
+      { tier: "haiku-high", case_id: "b", status: "correct", cost_usd: 0.1, eval_wall_ms: 500_000, result: { failed_gates: [] } },
+    ],
+  };
+
+  it("reports median and max candidate execution time per tier", () => {
+    const rows = analyze(report).rows;
+    const sonnet = rows.find((r: any) => r.tier === "sonnet-high");
+    const haiku = rows.find((r: any) => r.tier === "haiku-high");
+    expect(sonnet.median_eval_wall_ms).toBe(15_000);
+    expect(haiku.median_eval_wall_ms).toBe(400_000);
+    expect(haiku.max_eval_wall_ms).toBe(500_000);
+  });
+
+  it("expresses execution cost as a multiple of the calibrated reference", () => {
+    // 400s median against a 13s reference is not 'slightly slower' — it is a
+    // different algorithm. The multiple is what makes that legible.
+    const rows = analyze(report).rows;
+    const haiku = rows.find((r: any) => r.tier === "haiku-high");
+    expect(haiku.eval_vs_calibration).toBeCloseTo(400_000 / 13_000, 1);
+  });
+
+  it("renders the execution-cost column", () => {
+    const text = render(analyze(report));
+    expect(text).toMatch(/eval_s/);
+  });
+
+  it("ignores attempts that never produced an execution time", () => {
+    const rows = analyze({
+      ...report,
+      raw_records: [
+        { tier: "sonnet-high", case_id: "a", status: "cli_error", cost_usd: 0 },
+        { tier: "sonnet-high", case_id: "b", status: "correct", cost_usd: 0.2, eval_wall_ms: 10_000, result: { failed_gates: [] } },
+      ],
+    }).rows;
+    expect(rows[0].median_eval_wall_ms).toBe(10_000);
+    expect(rows[0].n_eval_timed).toBe(1);
+  });
+});
+
+describe("forge-eval: an ARM pairs a tier with a prompt, so prompt A/B is interleaved too", () => {
+  /**
+   * WHY THIS EXISTS: the natural next experiment after finding a prompt defect is
+   * "same model, old prompt vs new prompt". Running those as two separate matrices
+   * reintroduces exactly the confound interleaveByTier() was built to kill — the
+   * two arms would differ in wall-clock time and host conditions as well as in
+   * prompt. An arm carries its own agent file so both variants interleave inside
+   * ONE run.
+   */
+  it("parses label|model|effort|agentFile arms", () => {
+    const arms = parseArms(
+      "base|claude-haiku-4-5|high|agents/a.md,budgeted|claude-haiku-4-5|high|agents/b.md",
+      null,
+      "agents/default.md",
+    );
+    expect(arms).toHaveLength(2);
+    expect(arms[0]).toMatchObject({ label: "base", model: "claude-haiku-4-5", effort: "high", agentFile: "agents/a.md" });
+    expect(arms[1].agentFile).toBe("agents/b.md");
+  });
+
+  it("falls back to the tier list with the default agent file when no arms are given", () => {
+    // Backwards compatibility: every existing invocation must keep working.
+    const arms = parseArms(undefined, [{ model: "claude-sonnet-5", effort: "high" }], "agents/default.md");
+    expect(arms).toEqual([
+      { label: "claude-sonnet-5-high", model: "claude-sonnet-5", effort: "high", agentFile: "agents/default.md" },
+    ]);
+  });
+
+  it("two arms on the SAME model are distinguishable by label", () => {
+    // The whole point: model and effort are identical, only the prompt differs,
+    // so the label is the only thing that can tell the arms apart in the report.
+    const arms = parseArms(
+      "before|claude-haiku-4-5|high|agents/v1.md,after|claude-haiku-4-5|high|agents/v2.md",
+      null,
+      "agents/default.md",
+    );
+    expect(arms[0].model).toBe(arms[1].model);
+    expect(arms[0].label).not.toBe(arms[1].label);
+  });
+
+  it("rejects a malformed arm loudly rather than silently dropping it", () => {
+    // A silently-dropped arm means the matrix runs a comparison with one side
+    // missing and still prints a table — the failure mode this repo keeps hitting.
+    expect(() => parseArms("justalabel", null, "agents/default.md")).toThrow(/arm/i);
+  });
+
+  it("interleaves arms so neither prompt variant owns a block of wall-clock time", () => {
+    const arms = parseArms(
+      "before|claude-haiku-4-5|high|agents/v1.md,after|claude-haiku-4-5|high|agents/v2.md",
+      null,
+      "agents/default.md",
+    );
+    const jobs = interleaveByTier(arms, [{ id: "a" }, { id: "b" }], 2);
+    expect(jobs).toHaveLength(8);
+    const firstHalf = jobs.slice(0, 4).filter((j: any) => j.tier.label === "after").length;
+    expect(firstHalf).toBe(2);
+  });
+});
+
+describe("forge-eval-analyze: prompt arms on the same model stay distinguishable", () => {
+  /**
+   * canonicalTierLabel() collapses model+effort — correct for tier comparisons
+   * (haiku's effort dial is inert, so haiku:high and haiku:max ARE one config).
+   * But in a prompt A/B both arms have the SAME model and effort by construction,
+   * so collapsing renders two different experiments under one identical label and
+   * the reader cannot tell which row is which.
+   */
+  const abReport = {
+    role: "evor-forge-junior",
+    tiers: [
+      { tier: "before", model: "claude-haiku-4-5", effort: "high", agent_file: "agents/v1.md" },
+      { tier: "after", model: "claude-haiku-4-5", effort: "high", agent_file: "agents/v2.md" },
+    ],
+    host_calibration: { ok: true, wall_ms: 13000, roc_auc: 0.814, budget_ms: 600_000, timed_out: false },
+    raw_records: [
+      { tier: "before", case_id: "a", status: "incorrect", timed_out: true, cost_usd: 0.1, eval_wall_ms: 600_000, result: { failed_gates: ["runs"] } },
+      { tier: "after", case_id: "a", status: "correct", cost_usd: 0.1, eval_wall_ms: 5_000, result: { failed_gates: [] } },
+    ],
+  };
+
+  it("does not render both arms under one collapsed label", () => {
+    const labels = analyze(abReport).rows.map((r: any) => r.label);
+    expect(new Set(labels).size).toBe(2);
+  });
+
+  it("keeps the arm label visible in the rendered table", () => {
+    const text = render(analyze(abReport));
+    expect(text).toMatch(/before/);
+    expect(text).toMatch(/after/);
+  });
+
+  it("still collapses genuine effort-inert tiers that differ only by an inert dial", () => {
+    const rows = analyze({
+      role: "r",
+      tiers: [
+        { tier: "claude-haiku-4-5-high", model: "claude-haiku-4-5", effort: "high" },
+        { tier: "claude-haiku-4-5-max", model: "claude-haiku-4-5", effort: "max" },
+      ],
+      raw_records: [
+        { tier: "claude-haiku-4-5-high", case_id: "a", status: "correct", cost_usd: 0.1, result: { failed_gates: [] } },
+        { tier: "claude-haiku-4-5-max", case_id: "a", status: "correct", cost_usd: 0.1, result: { failed_gates: [] } },
+      ],
+    }).rows;
+    expect(rows.every((r: any) => r.effort_inert)).toBe(true);
   });
 });

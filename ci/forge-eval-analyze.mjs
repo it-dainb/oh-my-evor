@@ -111,6 +111,22 @@ export function analyze(report) {
     const totalCost = recs.reduce((a, r) => a + (r.cost_usd ?? 0), 0);
     const aucs = recs.map((r) => r.result?.roc_auc).filter((x) => typeof x === 'number');
 
+    // How expensive is the CODE this tier writes to actually run? Pass rate
+    // cannot answer that — a tier can pass every case with candidates that take
+    // 20x longer to score, and under a tighter budget those same candidates
+    // become "failures". Median, not mean: one pathological candidate should
+    // not be able to make a tier look uniformly slow, and it is the typical
+    // candidate that determines whether a budget is survivable.
+    const evalMs = recs.map((r) => r.eval_wall_ms).filter((x) => typeof x === 'number');
+    const median = (xs) => {
+      if (!xs.length) return null;
+      const s = [...xs].sort((a, b) => a - b);
+      const mid = s.length >> 1;
+      return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
+    };
+    const medianEval = median(evalMs);
+    const calMs = report.host_calibration?.wall_ms ?? null;
+
     return {
       tier,
       label: canonicalTierLabel({ model: meta.model, effort: meta.effort }),
@@ -127,8 +143,23 @@ export function analyze(report) {
       mean_roc_auc: aucs.length ? aucs.reduce((a, b) => a + b, 0) / aucs.length : null,
       // Only meaningful over attempts that actually produced a score.
       n_scored_auc: aucs.length,
+      median_eval_wall_ms: medianEval,
+      max_eval_wall_ms: evalMs.length ? Math.max(...evalMs) : null,
+      n_eval_timed: evalMs.length,
+      eval_vs_calibration: medianEval != null && calMs ? medianEval / calMs : null,
     };
   });
+
+  // canonicalTierLabel() collapses model+effort, which is RIGHT for tier
+  // comparisons (haiku's effort dial is inert, so haiku:high and haiku:max are
+  // genuinely one configuration and showing them as two invites a false
+  // difference). But in a prompt A/B both arms share model AND effort by
+  // construction, so collapsing would print two different experiments under one
+  // identical label. Where labels collide, fall back to the arm label — the only
+  // thing that distinguishes them.
+  const seen = {};
+  for (const r of rows) seen[r.label] = (seen[r.label] ?? 0) + 1;
+  for (const r of rows) if (seen[r.label] > 1) r.label = r.tier;
 
   return { role: report.role, rows, host_calibration: report.host_calibration ?? null };
 }
@@ -168,7 +199,9 @@ export function render(analysis) {
     );
   }
 
-  out.push(['tier', 'n', 'pass', '95% CI', '$/call', '$ total', 'wall_s', 'mean_auc'].join('\t'));
+  out.push(
+    ['tier', 'n', 'pass', '95% CI', '$/call', '$ total', 'wall_s', 'eval_s', 'vs_ref', 'mean_auc'].join('\t'),
+  );
   for (const r of analysis.rows) {
     out.push(
       [
@@ -179,10 +212,20 @@ export function render(analysis) {
         `$${r.mean_cost_usd.toFixed(4)}`,
         `$${r.total_cost_usd.toFixed(2)}`,
         r.mean_wall_s.toFixed(0),
+        r.median_eval_wall_ms === null
+          ? 'n/a'
+          : `${(r.median_eval_wall_ms / 1000).toFixed(1)}/${(r.max_eval_wall_ms / 1000).toFixed(0)}max`,
+        r.eval_vs_calibration === null ? 'n/a' : `${r.eval_vs_calibration.toFixed(1)}x`,
         r.mean_roc_auc === null ? 'n/a' : `${r.mean_roc_auc.toFixed(4)} (n=${r.n_scored_auc})`,
       ].join('\t'),
     );
   }
+  out.push(
+    '',
+    'eval_s = MEDIAN/max seconds to execute the candidate this tier wrote; vs_ref = median',
+    'against the calibrated reference. A tier that passes with candidates 20x the reference',
+    'is buying its pass rate with compute, and fails the moment the budget tightens.',
+  );
 
   out.push('', 'ROOT CAUSE of each failure (one per attempt, cascades collapsed):');
   for (const r of analysis.rows) {

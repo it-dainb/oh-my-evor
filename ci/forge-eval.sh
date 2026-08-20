@@ -56,7 +56,7 @@ fi
 # Forward every FORGE_EVAL_* / pricing override the caller set. Without this the
 # container silently runs the DEFAULT tiers/cases no matter what was asked for —
 # the same unreachable-config bug BENCH_MISSION/BENCH_EFFORT already hit.
-for var in FORGE_EVAL_CASES FORGE_EVAL_AGENT_FILE FORGE_EVAL_TIERS FORGE_EVAL_REPEATS \
+for var in FORGE_EVAL_CASES FORGE_EVAL_AGENT_FILE FORGE_EVAL_TIERS FORGE_EVAL_ARMS FORGE_EVAL_REPEATS \
            FORGE_EVAL_MAX_TURNS FORGE_EVAL_TIMEOUT_MS FORGE_EVAL_EVAL_TIMEOUT_MS \
            FORGE_EVAL_CONCURRENCY EVOR_PRICING_DATE; do
   if [ -n "${!var:-}" ]; then

@@ -42,6 +42,10 @@
  *   FORGE_EVAL_CASES        default "evals/forge-junior/cases.json"
  *   FORGE_EVAL_AGENT_FILE   default "agents/evor-forge-junior.md"
  *   FORGE_EVAL_TIERS        same syntax as AGENT_EVAL_TIERS
+ *   FORGE_EVAL_ARMS         "label|model|effort|agentFile,..." — overrides TIERS.
+ *                            An arm carries its own PROMPT, so a prompt A/B
+ *                            interleaves inside one run instead of being compared
+ *                            across two runs with different host conditions.
  *   FORGE_EVAL_REPEATS      default 3
  *   FORGE_EVAL_MAX_TURNS    default 28 (matches the agent's own maxTurns —
  *                            this role genuinely needs tool calls)
@@ -486,7 +490,9 @@ export function buildForgeCasePrompt(agentPromptBlock, caseObj, worktreeDir) {
 // Live run
 // ─────────────────────────────────────────────────────────────────────────────
 
-const tierName = (t) => `${t.model}-${t.effort}`;
+// An arm carries an explicit label so two arms on the SAME model/effort (a prompt
+// A/B) stay distinguishable in the report. Falls back to model-effort for plain tiers.
+const tierName = (t) => t.label ?? `${t.model}-${t.effort}`;
 
 function execFileAsync(cmd, args, opts) {
   return new Promise((res) => {
@@ -648,6 +654,42 @@ async function mapLimit(items, limit, fn) {
 }
 
 /**
+ * An ARM is a tier PLUS the prompt it was given: {label, model, effort, agentFile}.
+ *
+ * WHY THE PROMPT BELONGS ON THE ARM: the natural experiment after finding a prompt
+ * defect is "same model, old prompt vs new prompt". Run as two separate matrices,
+ * those two arms differ in wall-clock time and host conditions as well as in prompt
+ * — reintroducing the exact confound interleaveByTier() exists to kill, just on a
+ * different axis. Carrying the agent file on the arm lets both variants interleave
+ * inside ONE run, so the only systematic difference between them is the prompt.
+ *
+ * Format: "label|model|effort|agentFile,label|model|effort|agentFile"
+ * ('|' rather than ':' because agent files are paths.)
+ */
+export function parseArms(spec, fallbackTiers, defaultAgentFile) {
+  if (!spec) {
+    return (fallbackTiers ?? []).map((t) => ({
+      label: `${t.model}-${t.effort}`,
+      model: t.model,
+      effort: t.effort,
+      agentFile: defaultAgentFile,
+    }));
+  }
+  return spec.split(',').map((chunk) => {
+    const parts = chunk.split('|').map((s) => s.trim());
+    if (parts.length !== 4 || parts.some((p) => !p)) {
+      // LOUD, not skipped. A silently-dropped arm means the matrix runs a
+      // comparison with one side missing and still prints a confident table.
+      throw new Error(
+        `malformed arm "${chunk}" — expected "label|model|effort|agentFile" (4 non-empty fields)`,
+      );
+    }
+    const [label, model, effort, agentFile] = parts;
+    return { label, model, effort, agentFile };
+  });
+}
+
+/**
  * Job ordering. THE PREVIOUS ORDERING WAS `for tier { for case { for rep } }`,
  * which ran every sonnet job first and every haiku job afterwards. On a shared
  * host that makes tier perfectly collinear with wall-clock time: the later tier
@@ -778,24 +820,38 @@ async function runMatrix() {
   const concurrency = Number(process.env.FORGE_EVAL_CONCURRENCY ?? 4);
 
   const casesFile = JSON.parse(readFileSync(casesPath, 'utf8'));
-  const agentPromptBlock = extractAgentPromptBlock(readFileSync(agentFilePath, 'utf8'));
   const role = casesFile.role ?? 'evor-forge-junior';
+
+  // Arms, not tiers: each carries its own prompt, so a prompt A/B interleaves in
+  // one run instead of being compared across two.
+  const arms = parseArms(process.env.FORGE_EVAL_ARMS, tiers, agentFilePath);
+  const promptByArm = new Map();
+  for (const arm of arms) {
+    const file = resolve(REPO_ROOT, arm.agentFile);
+    if (!promptByArm.has(file)) {
+      promptByArm.set(file, extractAgentPromptBlock(readFileSync(file, 'utf8')));
+    }
+    arm.promptBlock = promptByArm.get(file);
+  }
 
   const workRoot = process.env.FORGE_EVAL_WORKROOT ?? join(tmpdir(), 'forge-eval');
   mkdirSync(workRoot, { recursive: true });
 
-  const jobs = interleaveByTier(tiers, casesFile.cases, repeats);
+  const jobs = interleaveByTier(arms, casesFile.cases, repeats);
 
   console.log(
-    `▶ forge-eval role=${role} tiers=${tiers.map(tierName).join(',')} cases=${casesFile.cases.length} ` +
+    `▶ forge-eval role=${role} arms=${arms.map(tierName).join(',')} cases=${casesFile.cases.length} ` +
       `repeats=${repeats} jobs=${jobs.length} concurrency=${concurrency}`,
   );
+  for (const arm of arms) {
+    console.log(`    arm ${tierName(arm)}: ${arm.model} effort=${arm.effort} prompt=${arm.agentFile}`);
+  }
   console.log('▶ phase 1/2: authoring (concurrent) — no candidate is executed yet');
 
   let done = 0;
   const authored = await mapLimit(jobs, concurrency, async ({ tier, caseObj, rep }, index) => {
     const a = await authorAttempt({
-      agentPromptBlock, caseObj, tier, maxTurns, timeoutMs, workRoot, index,
+      agentPromptBlock: tier.promptBlock, caseObj, tier, maxTurns, timeoutMs, workRoot, index,
     });
     done++;
     console.log(
@@ -838,7 +894,7 @@ async function runMatrix() {
     });
   }
 
-  const report = buildForgeReport({ role, tiers, records });
+  const report = buildForgeReport({ role, tiers: arms, records });
   report.raw_records = records;
   report.host_calibration = calibration;
 
@@ -876,6 +932,9 @@ export function buildForgeReport({ role, tiers, records }) {
       canonical: canonicalTierLabel(tier),
       model: tier.model,
       effort: tier.effort,
+      // Provenance. In a prompt A/B two arms share model AND effort, so the agent
+      // file is the only record of what actually differed between them.
+      agent_file: tier.agentFile ?? null,
       n_calls: rs.length,
       n_scored: scored.length,
       accuracy: scored.length ? correct / scored.length : null,
