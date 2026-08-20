@@ -1075,3 +1075,60 @@ describe("forge-eval-analyze: prompt arms on the same model stay distinguishable
     expect(rows.every((r: any) => r.effort_inert)).toBe(true);
   });
 });
+
+/**
+ * REGRESSION: the harness used to grade tidiness, not correctness.
+ *
+ * The agent prompt tells forge-junior to self-test by running evaluate.py.
+ * Doing so creates telemetry.jsonl in its own worktree. That file was then
+ * charged against the agent twice over:
+ *
+ *   1. no_stray_writes  — telemetry.jsonl matches none of ALLOWED_WRITE_RE, so
+ *      the diff (taken after authoring, before scoring) reported a stray write.
+ *   2. telemetry_steps  — scoring appended to the leftover file instead of
+ *      starting fresh, so the step counter restarted at the join and the gate
+ *      read "step values decrease".
+ *
+ * One cause, two gates, always together. It cost 4 of 105 attempts in the
+ * sonnet effort matrix, unevenly across the arms being compared (low 1,
+ * medium 3, high 0) — i.e. it was noise landing directly on the measured axis.
+ * __pycache__ was already excluded for exactly this reason; telemetry.jsonl is
+ * the same category of runtime artefact and was simply missed.
+ */
+describe("forge-eval: self-testing is not punished as a stray write", () => {
+  const staleSelfTest = Array.from({ length: 10 }, (_, i) =>
+    JSON.stringify({ step: i, loss: 1 - i / 20, node_id: "eval-node", run_id: "eval-run" }),
+  ).join("\n") + "\n";
+
+  it("a leftover telemetry.jsonl from the agent's own self-test does not fail no_stray_writes", () => {
+    const { scored } = gradeWithTrainer(caseById("telemetry-discipline"), TRAINER_TELEMETRY_OK_WEAK, {
+      "telemetry.jsonl": staleSelfTest,
+    });
+    expect(scored.gates.no_stray_writes.pass).toBe(true);
+    expect(scored.failed_gates).not.toContain("no_stray_writes");
+  }, 120_000);
+
+  it("scoring starts from a fresh telemetry file, so stale self-test records are not graded", () => {
+    const { scored, telemetry } = gradeWithTrainer(
+      caseById("telemetry-discipline"),
+      TRAINER_TELEMETRY_OK_WEAK,
+      { "telemetry.jsonl": staleSelfTest },
+    );
+    // 10 records from THIS run, not 20 from this run concatenated onto the last.
+    expect(telemetry.records.length).toBe(10);
+    const steps = telemetry.records.map((r: any) => r.step);
+    expect(steps.every((s: number, i: number) => i === 0 || s > steps[i - 1])).toBe(true);
+    expect(scored.gates.telemetry_steps.pass).toBe(true);
+  }, 120_000);
+
+  it("genuinely stray files are still caught", () => {
+    // The fix must not blanket-permit unknown writes.
+    const { scored } = gradeWithTrainer(caseById("telemetry-discipline"), TRAINER_TELEMETRY_OK_WEAK, {
+      "telemetry.jsonl": staleSelfTest,
+      "notes/scratch.txt": "stray",
+    });
+    expect(scored.gates.no_stray_writes.pass).toBe(false);
+    expect(scored.gates.no_stray_writes.detail).toContain("notes/scratch.txt");
+    expect(scored.gates.no_stray_writes.detail).not.toContain("telemetry.jsonl");
+  }, 120_000);
+});

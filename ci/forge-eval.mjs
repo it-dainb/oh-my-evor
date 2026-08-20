@@ -238,6 +238,14 @@ export function runCandidate(worktreeDir, { timeoutMs = 120_000, telemetryPath, 
   if (!existsSync(evaluator)) {
     return { ok: false, error: 'worktree has no evaluate.py — harness setup failed', stdout: '', stderr: '' };
   }
+  // Start from a clean slate. The agent is TOLD to self-test by running the
+  // evaluator, which leaves its own telemetry.jsonl behind; appending this run
+  // onto that one makes the step counter restart at the join, and the
+  // telemetry_steps gate reads the restart as "step values decrease". The
+  // function that produces the telemetry owns keeping it honest — callers
+  // should not each have to remember this.
+  if (telemetryPath) rmSync(telemetryPath, { force: true });
+
   const env = {
     ...process.env,
     EVOR_WORKTREE: worktreeDir,
@@ -304,13 +312,22 @@ export function runCandidate(worktreeDir, { timeoutMs = 120_000, telemetryPath, 
 // Scoring
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Paths the agent is allowed to create or modify, as regexes. */
+/**
+ * Paths the agent is allowed to create or modify, as regexes.
+ *
+ * telemetry.jsonl is here because the prompt instructs the agent to self-test
+ * by running the evaluator, and doing so writes this file into its own
+ * worktree. It is a runtime artefact of running the benchmark, not a source
+ * edit — the same reason snapshotTree already skips __pycache__. Charging it as
+ * a stray write graded tidiness after self-testing rather than correctness.
+ */
 const ALLOWED_WRITE_RE = [
   /^train\/.*\.py$/,
   /^model\/.*\.py$/,
   /^data\/.*\.py$/,
   /^genome\.yaml$/,
   /^config\.json$/,
+  /^telemetry\.jsonl$/,
 ];
 
 /**
@@ -998,7 +1015,6 @@ function runSubcommand(argv) {
     const caseObj = JSON.parse(readFileSync(getFlag('case'), 'utf8'));
     const worktree = resolve(getFlag('worktree'));
     const telemetryPath = join(worktree, 'telemetry.jsonl');
-    rmSync(telemetryPath, { force: true });
     const before = JSON.parse(readFileSync(getFlag('before'), 'utf8'));
     const run = runCandidate(worktree, { telemetryPath });
     const telemetry = parseTelemetryFile(telemetryPath);
