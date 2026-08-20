@@ -2,7 +2,7 @@
  * mcp/tests/forge-eval.test.ts — ci/forge-eval.mjs, the execution-graded
  * MODEL-TIER eval for evor-forge-junior.
  *
- * No API calls. The live path (runMatrix / runOneAttempt) is never invoked.
+ * No API calls. The live path (runMatrix / authorAttempt) is never invoked.
  *
  * WHAT MAKES THIS SUITE WORTH HAVING: the scorer's whole job is to separate
  * code that works from code that doesn't. A scorer that passes everything would
@@ -37,7 +37,12 @@ import {
   buildForgeReport,
   renderForgeTable,
   CANDIDATE_CONTRACT,
+  buildDiagnostics,
+  interleaveByTier,
+  calibrateHost,
+  CALIBRATION_TRAINER,
 } from "../../ci/forge-eval.mjs";
+import { rootCause, wilson, analyze, render } from "../../ci/forge-eval-analyze.mjs";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const CASES = JSON.parse(
@@ -189,12 +194,20 @@ def train(Xtr, ytr, Xva, yva, cfg):
 
 describe("forge-eval: telemetry gates read the FILE, not the evaluator's summary", () => {
   /**
-   * THE LOAD-BEARING TEST. benchmarks/tabular-ladder/evaluate.py:305 reports
-   * telemetry_summary.total_steps = len(Xtr) — a constant 6000 — regardless of
-   * whether the candidate wrote any telemetry at all. If the scorer trusted
-   * that field, this gate would pass the exact failure mode it exists to catch.
+   * THE LOAD-BEARING TEST. A candidate that reads EVOR_TELEMETRY_PATH and never
+   * appends — forge-junior's own #1 named failure mode — still exits 0 with
+   * status="success". Nothing about the evaluator's exit code or status
+   * distinguishes it from a correctly instrumented run, so the grade has to
+   * come from the telemetry file itself.
+   *
+   * benchmarks/tabular-ladder/evaluate.py used to compound this by reporting
+   * telemetry_summary.total_steps = len(Xtr), a constant 6000, for BOTH cases.
+   * That field is now honest (it counts records), but the scorer still parses
+   * the file independently rather than trusting it — the evaluator lives in the
+   * candidate's own worktree, so a tampering candidate could make it report
+   * anything. Two independent signals, one of which the candidate cannot reach.
    */
-  it("a candidate that writes ZERO telemetry fails, even though the evaluator reports success and a nonzero total_steps", () => {
+  it("a candidate that writes ZERO telemetry fails, even though the evaluator reports success", () => {
     const { scored, run, telemetry } = gradeWithTrainer(
       caseById("telemetry-discipline"),
       TRAINER_NO_TELEMETRY,
@@ -203,12 +216,24 @@ describe("forge-eval: telemetry gates read the FILE, not the evaluator's summary
     // The evaluator is perfectly happy — this is the trap being avoided.
     expect(run.ok).toBe(true);
     expect(run.result.status).toBe("success");
-    expect(run.result.telemetry_summary.total_steps).toBeGreaterThan(0);
 
-    // The file tells the truth.
+    // The file tells the truth, and so now does the summary.
     expect(telemetry.exists).toBe(false);
+    expect(run.result.telemetry_summary.total_steps).toBe(0);
     expect(scored.status).toBe("incorrect");
     expect(scored.failed_gates).toContain("telemetry_written");
+  }, 120_000);
+
+  it("the evaluator's own total_steps now tracks what the candidate wrote", () => {
+    // Regression guard for the len(Xtr) constant: if this ever goes back to
+    // reporting a fixed number, the field silently stops meaning anything.
+    const { run, telemetry } = gradeWithTrainer(
+      caseById("telemetry-discipline"),
+      TRAINER_TELEMETRY_OK_WEAK,
+    );
+    expect(telemetry.records.length).toBe(10);
+    expect(run.result.telemetry_summary.total_steps).toBe(10);
+    expect(run.result.telemetry_summary.total_steps).not.toBe(6000);
   }, 120_000);
 
   it("a candidate that writes telemetry once outside the loop fails the min-lines gate", () => {
@@ -571,6 +596,171 @@ describe("forge-eval: report assembly", () => {
   });
 });
 
+describe("forge-eval: failures carry a post-mortem", () => {
+  /**
+   * The candidate worktree lives in a container that is destroyed when the
+   * matrix ends. Anything not captured into the record at failure time is gone
+   * for good — so "did_not_run = 12" would be a number with no path to a cause.
+   */
+  const run = { ok: false, error: "evaluate.py exited abnormally", stdout: "", stderr: "Traceback...\nNameError: x" };
+  const diff = { created: ["train/trainer.py"], modified: [], deleted: [] };
+
+  it("captures stderr, the files written, and the trainer source on failure", () => {
+    const d = buildDiagnostics({
+      status: "incorrect",
+      run,
+      diff,
+      worktreeDir: "/nope",
+      agentReply: "wrote the trainer",
+      readFile: () => "def train(...): ...",
+    });
+    expect(d.evaluator_stderr).toContain("NameError");
+    expect(d.evaluator_error).toContain("exited abnormally");
+    expect(d.files_written).toEqual(["train/trainer.py"]);
+    expect(d.trainer_source).toContain("def train");
+    expect(d.agent_reply).toBe("wrote the trainer");
+  });
+
+  it("records a MISSING trainer.py as the finding rather than an empty string", () => {
+    // An empty trainer_source would read as "the agent wrote nothing useful";
+    // this distinguishes "wrote a bad file" from "never wrote the file".
+    const d = buildDiagnostics({
+      status: "incorrect",
+      run,
+      diff: { created: [], modified: [] },
+      worktreeDir: "/nope",
+      agentReply: "",
+      readFile: () => {
+        const e: any = new Error("ENOENT");
+        e.code = "ENOENT";
+        throw e;
+      },
+    });
+    expect(d.trainer_source).toContain("no train/trainer.py was written");
+    expect(d.trainer_source).toContain("ENOENT");
+  });
+
+  it("passing attempts carry no diagnostics", () => {
+    expect(
+      buildDiagnostics({ status: "correct", run, diff, worktreeDir: "/nope", agentReply: "ok" }),
+    ).toBeUndefined();
+  });
+});
+
+describe("forge-eval-analyze: cascading gate failures collapse to one root cause", () => {
+  /**
+   * A candidate whose code never ran fails `runs` AND every gate downstream of
+   * it. That is one defect, not five. If the tally counted all five, a report
+   * would say "haiku failed telemetry_written 12 times" about code that never
+   * executed — and the next fix would go to the telemetry prompt instead of to
+   * whatever stopped it running.
+   */
+  it("attributes a did-not-run attempt to did_not_run, not to its downstream gates", () => {
+    const rec = {
+      status: "incorrect",
+      result: {
+        failed_gates: ["runs", "auc_floor", "telemetry_written", "telemetry_fields", "telemetry_steps"],
+      },
+    };
+    expect(rootCause(rec)).toBe("did_not_run");
+  });
+
+  it("separates a scoring TIMEOUT from a candidate that genuinely did not run", () => {
+    // Same failed_gates as the test above — the only difference is timed_out.
+    // Conflating them is what turned a busy host into a model result.
+    const rec = {
+      status: "incorrect",
+      timed_out: true,
+      result: {
+        failed_gates: ["runs", "auc_floor", "telemetry_written", "telemetry_fields", "telemetry_steps"],
+      },
+    };
+    expect(rootCause(rec)).toBe("scoring_timeout");
+  });
+
+  it("ranks integrity above telemetry and score", () => {
+    expect(
+      rootCause({
+        status: "incorrect",
+        result: { failed_gates: ["evaluate_untouched", "auc_floor", "telemetry_written"] },
+      }),
+    ).toBe("integrity_violation");
+  });
+
+  it("a purely-below-floor attempt is attributed to the floor", () => {
+    expect(rootCause({ status: "incorrect", result: { failed_gates: ["auc_floor"] } })).toBe(
+      "below_score_floor",
+    );
+  });
+
+  it("a passing attempt has no root cause", () => {
+    expect(rootCause({ status: "correct", result: { failed_gates: [] } })).toBe("pass");
+  });
+
+  it("a cli_error outranks everything — it is not evidence about the model", () => {
+    expect(rootCause({ status: "cli_error", result: undefined })).toBe("cli_error");
+  });
+
+  it("an unknown gate name surfaces as harness_error rather than a model failure", () => {
+    expect(rootCause({ status: "unparseable", result: { failed_gates: [] } })).toBe("harness_error");
+  });
+
+  it("reports a Wilson interval, not a bare percentage", () => {
+    // 35/35 is not 'certainly 100%' — at n=35 the lower bound is near 90%.
+    const [lo, hi] = wilson(35, 35);
+    expect(hi).toBeCloseTo(1, 5);
+    expect(lo).toBeGreaterThan(0.87);
+    expect(lo).toBeLessThan(0.93);
+  });
+
+  it("cost per PASSING attempt is what the comparison reports", () => {
+    // A cheaper tier that fails more is not cheaper. Mean cost per CALL would
+    // flatter the failing tier; per PASS is the honest denominator.
+    const report = {
+      role: "evor-forge-junior",
+      tiers: [
+        { tier: "sonnet-high", model: "sonnet", effort: "high" },
+        { tier: "haiku-high", model: "haiku", effort: "high" },
+      ],
+      raw_records: [
+        { tier: "sonnet-high", case_id: "a", status: "correct", cost_usd: 0.2, wall_ms: 1000, result: { failed_gates: [], roc_auc: 0.85 } },
+        { tier: "sonnet-high", case_id: "a", status: "correct", cost_usd: 0.2, wall_ms: 1000, result: { failed_gates: [], roc_auc: 0.85 } },
+        { tier: "haiku-high", case_id: "a", status: "correct", cost_usd: 0.05, wall_ms: 1000, result: { failed_gates: [], roc_auc: 0.84 } },
+        { tier: "haiku-high", case_id: "a", status: "incorrect", cost_usd: 0.05, wall_ms: 1000, result: { failed_gates: ["runs"] } },
+        { tier: "haiku-high", case_id: "a", status: "incorrect", cost_usd: 0.05, wall_ms: 1000, result: { failed_gates: ["runs"] } },
+      ],
+    };
+    const analysis = analyze(report);
+    const sonnet = analysis.rows.find((r: any) => r.tier === "sonnet-high");
+    const haiku = analysis.rows.find((r: any) => r.tier === "haiku-high");
+
+    expect(sonnet.total_cost_usd / sonnet.correct).toBeCloseTo(0.2, 6);
+    // haiku is 4x cheaper per call but only 1 of 3 passed: $0.15 per pass.
+    expect(haiku.total_cost_usd / haiku.correct).toBeCloseTo(0.15, 6);
+    expect(haiku.root_causes.did_not_run).toBe(2);
+
+    const text = render(analysis);
+    expect(text).toContain("cost per PASSING attempt");
+    expect(text).toContain("haiku (effort inert)");
+  });
+
+  it("mean_roc_auc is averaged only over attempts that produced a score", () => {
+    // Treating a crashed run as roc_auc 0 would drag the mean down and make a
+    // failing tier look uniformly weak rather than intermittently broken.
+    const report = {
+      role: "r",
+      tiers: [{ tier: "haiku-high", model: "haiku", effort: "high" }],
+      raw_records: [
+        { tier: "haiku-high", case_id: "a", status: "correct", cost_usd: 0.05, wall_ms: 1, result: { failed_gates: [], roc_auc: 0.86 } },
+        { tier: "haiku-high", case_id: "a", status: "incorrect", cost_usd: 0.05, wall_ms: 1, result: { failed_gates: ["runs"], roc_auc: null } },
+      ],
+    };
+    const row = analyze(report).rows[0];
+    expect(row.n_scored_auc).toBe(1);
+    expect(row.mean_roc_auc).toBeCloseTo(0.86, 6);
+  });
+});
+
 describe("forge-eval: snapshot diffing", () => {
   it("separates created, modified, and deleted paths", () => {
     const dir = mkdtempSync(join(ROOT, "snap-"));
@@ -597,5 +787,126 @@ describe("forge-eval: snapshot diffing", () => {
     const before = snapshotTree(dir);
     writeFileSync(join(dir, "a.py"), "same");
     expect(diffSnapshots(before, snapshotTree(dir)).modified).toEqual([]);
+  });
+});
+
+describe("forge-eval: job ordering is not confounded with wall-clock time", () => {
+  const TIERS = [
+    { model: "claude-sonnet-5", effort: "medium" },
+    { model: "claude-haiku-4-5", effort: "high" },
+  ];
+  const CASE_SET = [{ id: "a" }, { id: "b" }, { id: "c" }];
+
+  it("emits every (tier, case, repeat) combination exactly once", () => {
+    const jobs = interleaveByTier(TIERS, CASE_SET, 3);
+    expect(jobs).toHaveLength(2 * 3 * 3);
+    const keys = jobs.map((j: any) => `${j.tier.model}|${j.caseObj.id}|${j.rep}`);
+    expect(new Set(keys).size).toBe(keys.length);
+  });
+
+  it("spreads each tier evenly over the run instead of running one tier first", () => {
+    // THE REGRESSION THIS PINS: the original ordering was
+    // `for tier { for case { for rep } }`, so all of tier A ran, then all of
+    // tier B. Tier then equals position-in-time, and any difference between
+    // the arms is indistinguishable from the host getting busier. Measured on
+    // the run that motivated this: load reached 27.5/32 cores and the
+    // last-scheduled tier absorbed all of it.
+    const jobs = interleaveByTier(TIERS, CASE_SET, 2); // 12 jobs — an even split
+    const half = jobs.length / 2;
+    const firstHalf = jobs.slice(0, half).filter((j: any) => j.tier.model === "claude-haiku-4-5").length;
+    // A tier-sequential ordering would put 0 haiku jobs in the first half.
+    expect(firstHalf).toBe(half / 2);
+  });
+
+  it("handles a single tier without interleaving anything away", () => {
+    const jobs = interleaveByTier([TIERS[0]], CASE_SET, 2);
+    expect(jobs).toHaveLength(6);
+    expect(jobs.every((j: any) => j.tier.model === "claude-sonnet-5")).toBe(true);
+  });
+});
+
+describe("forge-eval: host calibration", () => {
+  // Real execution, ~13s on an idle 32-core host. Slow on purpose: a
+  // calibration that does not run the actual evaluator path calibrates nothing.
+  it("scores the reference candidate above rung 3 and reports its wall time", () => {
+    const dir = mkdtempSync(join(ROOT, "calib-"));
+    const c = calibrateHost(dir, 600_000);
+
+    expect(c.error).toBeNull();
+    expect(c.ok).toBe(true);
+    expect(c.timed_out).toBe(false);
+    // Between rung 3 (0.810) and rung 4 (0.844) — a REPRESENTATIVE candidate.
+    // If this drifts below rung 1 (0.767) the reference has silently become a
+    // bad model and its timing no longer stands in for real candidate cost.
+    expect(c.roc_auc).toBeGreaterThan(0.78);
+    expect(c.wall_ms).toBeGreaterThan(0);
+  }, 700_000);
+
+  it("is deterministic, so two runs differ only in wall time", () => {
+    const dir = mkdtempSync(join(ROOT, "calib2-"));
+    const a = calibrateHost(dir, 600_000);
+    const b = calibrateHost(dir, 600_000);
+    expect(b.roc_auc).toBe(a.roc_auc);
+  }, 700_000);
+
+  it("reports timed_out rather than a crash when the budget is impossibly small", () => {
+    // The distinction the fused-phase run got wrong: over-budget is a statement
+    // about the MACHINE, a traceback is a statement about the CODE.
+    const dir = mkdtempSync(join(ROOT, "calib3-"));
+    const c = calibrateHost(dir, 300);
+    expect(c.ok).toBe(false);
+    expect(c.timed_out).toBe(true);
+    expect(c.error).toMatch(/NOT a crash/);
+  }, 60_000);
+
+  it("the reference trainer honours the stdlib-only contract", () => {
+    expect(CALIBRATION_TRAINER).not.toMatch(/import (numpy|sklearn|pandas|torch|scipy)/);
+    expect(CALIBRATION_TRAINER).toMatch(/def train\(Xtr, ytr, Xva, yva, cfg\)/);
+  });
+});
+
+describe("forge-eval-analyze: the report says whether it can be trusted", () => {
+  const baseReport = (extra: any) => ({
+    role: "evor-forge-junior",
+    tiers: [{ tier: "haiku-high", model: "claude-haiku-4-5", effort: "high" }],
+    raw_records: [
+      { tier: "haiku-high", case_id: "a", status: "correct", cost_usd: 0.1, result: { failed_gates: [] } },
+    ],
+    ...extra,
+  });
+
+  it("leads with the calibration line when the host was timed", () => {
+    const text = render(analyze(baseReport({
+      host_calibration: { ok: true, wall_ms: 13000, roc_auc: 0.814097, budget_ms: 600_000, timed_out: false },
+    })));
+    expect(text.split("\n").slice(0, 4).join("\n")).toMatch(/host calibration: reference candidate scored/);
+    expect(text).toMatch(/13000ms/);
+  });
+
+  it("refuses to let a failed calibration read as a model comparison", () => {
+    const text = render(analyze(baseReport({
+      host_calibration: { ok: false, wall_ms: 600_000, roc_auc: null, budget_ms: 600_000, timed_out: true },
+    })));
+    expect(text).toMatch(/host calibration: FAILED/);
+    expect(text).toMatch(/DO NOT read the tier/);
+  });
+
+  it("says so when a report has no calibration at all", () => {
+    const text = render(analyze(baseReport({})));
+    expect(text).toMatch(/host calibration: ABSENT/);
+  });
+
+  it("warns when failures are actually scoring deadlines", () => {
+    const text = render(analyze({
+      role: "evor-forge-junior",
+      tiers: [{ tier: "haiku-high", model: "claude-haiku-4-5", effort: "high" }],
+      host_calibration: { ok: true, wall_ms: 13000, roc_auc: 0.814, budget_ms: 600_000, timed_out: false },
+      raw_records: [
+        { tier: "haiku-high", case_id: "a", status: "incorrect", timed_out: true, cost_usd: 0.1, result: { failed_gates: ["runs"] } },
+        { tier: "haiku-high", case_id: "b", status: "correct", cost_usd: 0.1, result: { failed_gates: [] } },
+      ],
+    }));
+    expect(text).toMatch(/1 attempt\(s\) were KILLED at the scoring deadline/);
+    expect(text).toMatch(/has not been shown to write worse code/);
   });
 });

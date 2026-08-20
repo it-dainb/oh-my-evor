@@ -242,6 +242,48 @@ def _roc_auc(proba, y):
 
 # ─── Candidate execution ─────────────────────────────────────────────────────
 
+def _summarise_telemetry() -> dict:
+    """Summarise what the candidate ACTUALLY wrote to $EVOR_TELEMETRY_PATH.
+
+    This used to be `{"total_steps": len(Xtr)}` — the training-row count, a
+    constant 6000, which is not a count of anything the candidate did. Measured:
+    a candidate that reads EVOR_TELEMETRY_PATH and never appends (the single
+    most common instrumentation failure, named as such in
+    agents/evor-forge-junior.md) writes NO telemetry file and still reported
+    total_steps=6000 — byte-identical accounting to a candidate that wrote 20
+    real records.
+
+    Nothing in the harness read the field, so this misreported rather than
+    misbehaved: the real emptiness checks are IntegrityGate._check_telemetry_sane
+    and scheduler._preflight_micro_train, which both parse telemetry.jsonl
+    directly. But a summary field that cannot distinguish "wrote nothing" from
+    "wrote every step" is a trap for the next reader, so it now counts.
+
+    Mirrors benchmarks/shapes/evaluate.py, which has always used len(tele).
+    """
+    path = os.environ.get("EVOR_TELEMETRY_PATH")
+    records = []
+    if path and os.path.exists(path):
+        with open(path) as fh:
+            for line in fh:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    rec = json.loads(line)
+                except ValueError:
+                    continue  # a malformed line is not a step
+                if isinstance(rec, dict):
+                    records.append(rec)
+
+    summary = {"total_steps": len(records)}
+    losses = [r["train_loss"] for r in records
+              if isinstance(r.get("train_loss"), (int, float))]
+    if losses:
+        summary["final_train_loss"] = round(float(losses[-1]), 6)
+    return summary
+
+
 def _load_candidate_train(worktree: Path):
     """Import worktree/train/trainer.py and return its train() callable.
 
@@ -302,7 +344,7 @@ def main() -> None:
             "val_accuracy": round(val_acc, 6),
         },
         "per_domain": {"default": {"accuracy": round(test_acc, 6), "roc_auc": round(test_auc, 6)}},
-        "telemetry_summary": {"total_steps": len(Xtr)},
+        "telemetry_summary": _summarise_telemetry(),
         "status": "success",
         "benchmark_raw": f"test_acc={test_acc:.4f} roc_auc={test_auc:.4f}",
     }

@@ -19,18 +19,24 @@
  * solution, not that the bar was invented.
  *
  * ── THE GATE THAT ALMOST DIDN'T WORK ────────────────────────────────────────
- * `telemetry_written` counts lines in the telemetry FILE. It deliberately does
- * NOT read the evaluator's `telemetry_summary.total_steps`, because that field
- * is a constant: benchmarks/tabular-ladder/evaluate.py:305 emits
- * `{"total_steps": len(Xtr)}` — the training-row count (6000), not a count of
- * anything the candidate wrote. Measured: a candidate that reads
- * EVOR_TELEMETRY_PATH and never appends (forge-junior's OWN #1 named failure
- * mode, agents/evor-forge-junior.md <Failure_Modes_To_Avoid>) produces NO
- * telemetry file at all and still reports total_steps=6000, status="success",
- * exit 0 — byte-identical accounting to a candidate that wrote 20 real lines.
+ * `telemetry_written` counts lines in the telemetry FILE, not the evaluator's
+ * `telemetry_summary.total_steps`.
  *
- * Had this gate trusted the summary field, it would have passed the exact
- * failure mode it exists to detect. Count the file.
+ * When this harness was written that field was a CONSTANT —
+ * benchmarks/tabular-ladder/evaluate.py emitted `{"total_steps": len(Xtr)}`,
+ * the training-row count (6000). Measured: a candidate that reads
+ * EVOR_TELEMETRY_PATH and never appends (forge-junior's OWN #1 named failure
+ * mode, agents/evor-forge-junior.md <Failure_Modes_To_Avoid>) produced NO
+ * telemetry file at all and still reported total_steps=6000, status="success",
+ * exit 0 — byte-identical accounting to a candidate that wrote 20 real lines.
+ * Had this gate trusted the field, it would have passed the exact failure mode
+ * it exists to detect.
+ *
+ * That field is now honest (it counts records). This gate still parses the file
+ * itself anyway, because the evaluator lives in the CANDIDATE'S OWN worktree:
+ * a candidate that tampers with it can make it report whatever it likes. The
+ * file count and the integrity hash are two signals the candidate cannot
+ * satisfy simultaneously by lying about one of them.
  *
  * Config (env, all optional):
  *   FORGE_EVAL_CASES        default "evals/forge-junior/cases.json"
@@ -40,9 +46,30 @@
  *   FORGE_EVAL_MAX_TURNS    default 28 (matches the agent's own maxTurns —
  *                            this role genuinely needs tool calls)
  *   FORGE_EVAL_TIMEOUT_MS   default 900000 per call
- *   FORGE_EVAL_EVAL_TIMEOUT_MS  default 120000 per candidate execution
+ *   FORGE_EVAL_EVAL_TIMEOUT_MS  default 600000 per candidate execution
  *   FORGE_EVAL_CONCURRENCY  default 4 parallel calls
  *   EVOR_PRICING_DATE       forwarded to the shared pricing table
+ *
+ * ── WHY THE RUN IS SPLIT INTO TWO PHASES ────────────────────────────────────
+ * Phase 1 authors every candidate concurrently; phase 2 executes and grades
+ * them one at a time. They were fused once, and the fusion silently corrupted
+ * a 105-call matrix: candidate execution is CPU-bound, the AUTHORING agents run
+ * this same evaluator to self-test (measured: 10 concurrent `python3
+ * evaluate.py` from agents alone), so scoring competed with authoring for
+ * cores. Correct candidates hit the deadline and were recorded as "did not
+ * run" — a MODEL result manufactured out of a SCHEDULING artefact.
+ *
+ * That is not a hypothesis. The 105-call run this replaces produced 18 haiku
+ * failures, and ALL 18 carried the same `runs` detail:
+ *     "evaluate.py exited abnormally: spawnSync python3 ETIMEDOUT"
+ * Not one was a crash, a wrong answer, or a missing file. The report would have
+ * read "haiku 45.7% vs sonnet 100%"; the underlying measurement was the
+ * scheduler. Sonnet, which ran FIRST under the old tier-sequential ordering,
+ * had zero failures of any kind.
+ *
+ * Jobs are also round-robined across tiers rather than run tier-by-tier, and
+ * the host is timed against a reference candidate before phase 2. See
+ * interleaveByTier() and calibrateHost() for why each is load-bearing.
  */
 
 import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync, statSync, cpSync, rmSync } from 'fs';
@@ -231,6 +258,7 @@ export function runCandidate(worktreeDir, { timeoutMs = 120_000, telemetryPath, 
 
   let stdout = '';
   let stderr = '';
+  const evalT0 = Date.now();
   try {
     stdout = execFileSync('python3', ['-c', bootstrap], {
       cwd: worktreeDir,
@@ -240,20 +268,32 @@ export function runCandidate(worktreeDir, { timeoutMs = 120_000, telemetryPath, 
       maxBuffer: 32 * 1024 * 1024,
     });
   } catch (e) {
+    // A TIMEOUT IS NOT A CRASH, and conflating them cost a whole matrix run.
+    // Under load — this benchmark's candidates are CPU-bound, the agents run
+    // the evaluator themselves to self-test, and the host may be shared — a
+    // perfectly correct candidate gets SIGTERM'd at the deadline and looks
+    // byte-identical to code that threw on line 1. One is evidence about the
+    // model; the other is evidence about the machine.
+    const timedOut = e.killed === true || e.signal === 'SIGTERM';
     return {
       ok: false,
-      error: `evaluate.py exited abnormally: ${e.message}`,
+      eval_wall_ms: Date.now() - evalT0,
+      timed_out: timedOut,
+      error: timedOut
+        ? `evaluate.py exceeded the ${timeoutMs}ms budget and was killed (NOT a crash — see wall time and host load)`
+        : `evaluate.py exited abnormally: ${e.message}`,
       stdout: e.stdout ?? '',
       stderr: (e.stderr ?? '').slice(0, 2000),
     };
   }
+  const evalWallMs = Date.now() - evalT0;
   let parsed;
   try {
     parsed = JSON.parse(stdout.slice(stdout.indexOf('{')));
   } catch {
-    return { ok: false, error: `evaluator stdout was not JSON: ${stdout.slice(0, 300)}`, stdout, stderr };
+    return { ok: false, eval_wall_ms: evalWallMs, error: `evaluator stdout was not JSON: ${stdout.slice(0, 300)}`, stdout, stderr };
   }
-  return { ok: true, result: parsed, stdout, stderr };
+  return { ok: true, eval_wall_ms: evalWallMs, result: parsed, stdout, stderr };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -288,7 +328,7 @@ export function scoreAttempt(caseObj, evidence) {
     ? run.result?.status === 'success'
       ? { pass: true, detail: 'evaluate.py exited 0 with status=success' }
       : { pass: false, detail: `evaluator reported status=${run.result?.status}` }
-    : { pass: false, detail: run.error };
+    : { pass: false, detail: run.error, timed_out: run.timed_out === true };
 
   // ── Score floor ───────────────────────────────────────────────────────────
   const auc = run.ok ? run.result?.metrics?.roc_auc : undefined;
@@ -454,7 +494,15 @@ function execFileAsync(cmd, args, opts) {
   });
 }
 
-async function runOneAttempt({ agentPromptBlock, caseObj, tier, maxTurns, timeoutMs, evalTimeoutMs, workRoot, index }) {
+/**
+ * PHASE 1 — authoring. Runs the agent and captures what it left on disk.
+ * Deliberately does NOT execute the candidate: scoring happens later, serially,
+ * so that a CPU-bound scoring run is never competing with N concurrent agents
+ * (which themselves run this benchmark's evaluator to self-test — measured: 10
+ * concurrent `python3 evaluate.py` processes from agents alone). Scoring under
+ * that contention timed out on correct code and recorded it as "did not run".
+ */
+async function authorAttempt({ agentPromptBlock, caseObj, tier, maxTurns, timeoutMs, workRoot, index }) {
   const worktreeDir = join(workRoot, `${tierName(tier)}__${caseObj.id}__${index}`);
   rmSync(worktreeDir, { recursive: true, force: true });
   stageWorktree(caseObj, worktreeDir);
@@ -502,21 +550,84 @@ async function runOneAttempt({ agentPromptBlock, caseObj, tier, maxTurns, timeou
 
   // Snapshot BEFORE running the evaluator: the evaluator import can create
   // files, and those are not the agent's writes.
-  const afterAgent = snapshotTree(worktreeDir);
-  const diff = diffSnapshots(before, afterAgent);
-
-  const run = runCandidate(worktreeDir, { timeoutMs: evalTimeoutMs, telemetryPath });
-  const telemetry = parseTelemetryFile(telemetryPath);
-  const scored = scoreAttempt(caseObj, { run, telemetry, diff });
+  const diff = diffSnapshots(before, snapshotTree(worktreeDir));
 
   return {
-    status: scored.status,
+    authored: true,
     wall_ms,
     cost_usd: cost.total,
     model: tierCheck.model,
     num_turns: envelope.num_turns,
-    result: scored,
     worktree: worktreeDir,
+    telemetryPath,
+    diff,
+    agentReply: envelope.result,
+  };
+}
+
+/**
+ * PHASE 2 — scoring. Executes the candidate and grades it. Called SERIALLY so
+ * the wall-clock of one candidate is not an artefact of how many others were
+ * running at the same moment.
+ */
+function scoreAuthoredAttempt(caseObj, authored, { evalTimeoutMs }) {
+  if (!authored.authored) return authored; // a cli_error record passes straight through
+
+  const run = runCandidate(authored.worktree, {
+    timeoutMs: evalTimeoutMs,
+    telemetryPath: authored.telemetryPath,
+  });
+  const telemetry = parseTelemetryFile(authored.telemetryPath);
+  const scored = scoreAttempt(caseObj, { run, telemetry, diff: authored.diff });
+
+  return {
+    status: scored.status,
+    wall_ms: authored.wall_ms,
+    eval_wall_ms: run.eval_wall_ms ?? null,
+    timed_out: run.timed_out === true,
+    cost_usd: authored.cost_usd,
+    model: authored.model,
+    num_turns: authored.num_turns,
+    result: scored,
+    worktree: authored.worktree,
+    // Diagnostics. WITHOUT THESE the report can say a tier's code "did not run"
+    // N times and offer nothing about WHY — which is not an actionable finding,
+    // it is a number. The worktree lives in a container that is discarded when
+    // the matrix ends, so anything not captured here is gone.
+    diagnostics: buildDiagnostics({
+      status: scored.status,
+      run,
+      diff: authored.diff,
+      worktreeDir: authored.worktree,
+      agentReply: authored.agentReply,
+    }),
+  };
+}
+
+/**
+ * Assemble the post-mortem for a failed attempt. Exported so the shape is
+ * tested rather than assumed — a diagnostics blob that silently comes back
+ * empty is worse than none, because the report then reads as "no further
+ * information exists" when it was simply never collected.
+ */
+export function buildDiagnostics({ status, run, diff, worktreeDir, agentReply, readFile = readFileSync }) {
+  if (status === 'correct') return undefined;
+
+  let trainerSource;
+  try {
+    trainerSource = String(readFile(join(worktreeDir, 'train', 'trainer.py'), 'utf8')).slice(0, 8000);
+  } catch (e) {
+    // A MISSING trainer.py is itself the finding — the agent never wrote the
+    // one file the contract requires. Say so explicitly.
+    trainerSource = `<no train/trainer.py was written: ${e.code ?? e.message}>`;
+  }
+
+  return {
+    evaluator_stderr: (run?.stderr ?? '').slice(-4000),
+    evaluator_error: run?.error ?? null,
+    files_written: [...(diff?.created ?? []), ...(diff?.modified ?? [])],
+    trainer_source: trainerSource,
+    agent_reply: String(agentReply ?? '').slice(0, 2000),
   };
 }
 
@@ -536,6 +647,126 @@ async function mapLimit(items, limit, fn) {
   return out;
 }
 
+/**
+ * Job ordering. THE PREVIOUS ORDERING WAS `for tier { for case { for rep } }`,
+ * which ran every sonnet job first and every haiku job afterwards. On a shared
+ * host that makes tier perfectly collinear with wall-clock time: the later tier
+ * inherits whatever the machine was doing an hour in. Measured on the run this
+ * replaces — load climbed to 27.5 on 32 cores, a foreign `python3` sat at 1326%
+ * CPU, and haiku (which went last) absorbed all of it. Any difference that came
+ * out of that comparison is a difference between two POINTS IN TIME, and no
+ * amount of repeats fixes it, because the repeats are inside the same block.
+ *
+ * Round-robining over tiers spreads each tier evenly across the whole run, so a
+ * load spike hits every arm roughly equally instead of one of them entirely.
+ */
+export function interleaveByTier(tiers, cases, repeats) {
+  const perTier = tiers.map((tier) => {
+    const jobs = [];
+    for (let rep = 0; rep < repeats; rep++) {
+      for (const caseObj of cases) jobs.push({ tier, caseObj, rep });
+    }
+    return jobs;
+  });
+  const out = [];
+  const longest = Math.max(0, ...perTier.map((j) => j.length));
+  for (let i = 0; i < longest; i++) {
+    for (const jobs of perTier) if (i < jobs.length) out.push(jobs[i]);
+  }
+  return out;
+}
+
+/**
+ * A KNOWN-GOOD candidate, used only to time the host. Bagged depth-limited
+ * trees over binned thresholds: pure stdlib, seeded, and representative of what
+ * a real candidate for the upper rungs actually costs to run.
+ */
+export const CALIBRATION_TRAINER = `import os, json, math, random
+
+TREES, DEPTH, BINS = 4, 6, 8
+
+def _bins(col, k=BINS):
+    s = sorted(col)
+    return [s[int(len(s) * (i + 1) / (k + 1))] for i in range(k)]
+
+def _grow(rows, X, y, feats, cuts, depth):
+    pos = sum(y[i] for i in rows)
+    rate = pos / len(rows) if rows else 0.5
+    if depth == 0 or len(rows) < 40 or pos == 0 or pos == len(rows):
+        return ('leaf', rate)
+    best = None
+    for f in feats:
+        for t in cuts[f]:
+            lp = ln = rp = rn = 0
+            for i in rows:
+                if X[i][f] <= t:
+                    ln += 1; lp += y[i]
+                else:
+                    rn += 1; rp += y[i]
+            if ln < 20 or rn < 20:
+                continue
+            g = (ln * (lp / ln) * (1 - lp / ln) + rn * (rp / rn) * (1 - rp / rn)) / len(rows)
+            if best is None or g < best[0]:
+                best = (g, f, t)
+    if best is None:
+        return ('leaf', rate)
+    _, f, t = best
+    left = [i for i in rows if X[i][f] <= t]
+    right = [i for i in rows if X[i][f] > t]
+    return ('node', f, t, _grow(left, X, y, feats, cuts, depth - 1), _grow(right, X, y, feats, cuts, depth - 1))
+
+def _pred(tree, row):
+    while tree[0] == 'node':
+        tree = tree[3] if row[tree[1]] <= tree[2] else tree[4]
+    return tree[1]
+
+def train(Xtr, ytr, Xva, yva, cfg):
+    rng = random.Random(42)
+    nfeat = len(Xtr[0])
+    cuts = {f: _bins([r[f] for r in Xtr]) for f in range(nfeat)}
+    # Split over ALL features, not a sqrt-sized random subset: only a handful of
+    # this benchmark's 90 columns carry signal, so subsampling mostly draws noise
+    # and the reference candidate lands BELOW rung 1 — useless as a reference.
+    k = nfeat
+    tel = os.environ.get('EVOR_TELEMETRY_PATH')
+    trees = []
+    for step in range(TREES):
+        rows = [rng.randrange(len(Xtr)) for _ in range(len(Xtr))]
+        feats = rng.sample(range(nfeat), k)
+        trees.append(_grow(rows, Xtr, ytr, feats, cuts, DEPTH))
+        if tel:
+            with open(tel, 'a') as fh:
+                fh.write(json.dumps({'step': step, 'epoch': 0, 'lr': 0.0, 'train_loss': 1.0 / (step + 1)}) + '\\n')
+
+    def predict(X):
+        return [sum(_pred(t, r) for t in trees) / len(trees) for r in X]
+
+    return predict
+`;
+
+/**
+ * Time the reference candidate on THIS machine, right now, under the same
+ * serial conditions phase 2 uses. A timeout is uninterpretable on its own: it
+ * says "over budget" without saying whether the candidate was slow or the host
+ * was. This number is what separates those, and it is recorded in the report so
+ * a future reader can tell whether two runs are even comparable.
+ */
+export function calibrateHost(workRoot, evalTimeoutMs) {
+  const dir = join(workRoot, '__calibration__');
+  rmSync(dir, { recursive: true, force: true });
+  stageWorktree({ worktree_files: { 'train/trainer.py': CALIBRATION_TRAINER } }, dir);
+  const telemetryPath = join(dir, 'telemetry.jsonl');
+  const run = runCandidate(dir, { timeoutMs: evalTimeoutMs, telemetryPath });
+  return {
+    ok: run.ok === true,
+    wall_ms: run.eval_wall_ms ?? null,
+    timed_out: run.timed_out === true,
+    roc_auc: run.result?.metrics?.roc_auc ?? run.result?.roc_auc ?? null,
+    error: run.error ?? null,
+    budget_ms: evalTimeoutMs,
+  };
+}
+
 async function runMatrix() {
   const casesPath = resolve(REPO_ROOT, process.env.FORGE_EVAL_CASES ?? 'evals/forge-junior/cases.json');
   const agentFilePath = resolve(REPO_ROOT, process.env.FORGE_EVAL_AGENT_FILE ?? 'agents/evor-forge-junior.md');
@@ -543,7 +774,7 @@ async function runMatrix() {
   const repeats = Number(process.env.FORGE_EVAL_REPEATS ?? 3);
   const maxTurns = Number(process.env.FORGE_EVAL_MAX_TURNS ?? 28);
   const timeoutMs = Number(process.env.FORGE_EVAL_TIMEOUT_MS ?? 900_000);
-  const evalTimeoutMs = Number(process.env.FORGE_EVAL_EVAL_TIMEOUT_MS ?? 120_000);
+  const evalTimeoutMs = Number(process.env.FORGE_EVAL_EVAL_TIMEOUT_MS ?? 600_000);
   const concurrency = Number(process.env.FORGE_EVAL_CONCURRENCY ?? 4);
 
   const casesFile = JSON.parse(readFileSync(casesPath, 'utf8'));
@@ -553,40 +784,63 @@ async function runMatrix() {
   const workRoot = process.env.FORGE_EVAL_WORKROOT ?? join(tmpdir(), 'forge-eval');
   mkdirSync(workRoot, { recursive: true });
 
-  const jobs = [];
-  for (const tier of tiers) {
-    for (const caseObj of casesFile.cases) {
-      for (let rep = 0; rep < repeats; rep++) jobs.push({ tier, caseObj, rep });
-    }
-  }
+  const jobs = interleaveByTier(tiers, casesFile.cases, repeats);
 
   console.log(
     `▶ forge-eval role=${role} tiers=${tiers.map(tierName).join(',')} cases=${casesFile.cases.length} ` +
       `repeats=${repeats} jobs=${jobs.length} concurrency=${concurrency}`,
   );
+  console.log('▶ phase 1/2: authoring (concurrent) — no candidate is executed yet');
 
   let done = 0;
-  const records = await mapLimit(jobs, concurrency, async ({ tier, caseObj, rep }, index) => {
-    const r = await runOneAttempt({
-      agentPromptBlock, caseObj, tier, maxTurns, timeoutMs, evalTimeoutMs, workRoot, index,
+  const authored = await mapLimit(jobs, concurrency, async ({ tier, caseObj, rep }, index) => {
+    const a = await authorAttempt({
+      agentPromptBlock, caseObj, tier, maxTurns, timeoutMs, workRoot, index,
     });
     done++;
     console.log(
-      `  [${done}/${jobs.length}] ${tierName(tier)} / ${caseObj.id} / rep ${rep + 1} → ${r.status}` +
+      `  [${done}/${jobs.length}] authored ${tierName(tier)} / ${caseObj.id} / rep ${rep + 1}` +
+        (a.authored ? ` (${a.num_turns} turns, $${(a.cost_usd ?? 0).toFixed(4)})` : ` → ${a.status}`),
+    );
+    return { tier, caseObj, rep, authored: a };
+  });
+
+  // ── Calibration ────────────────────────────────────────────────────────────
+  // Time a KNOWN-GOOD reference candidate on this machine, right now, in the
+  // same serial conditions the real scoring uses. A timeout means nothing in
+  // isolation: without this number there is no way to tell "the candidate is
+  // slow" from "the host was busy", and the second was misread as the first for
+  // an entire matrix run.
+  const calibration = calibrateHost(workRoot, evalTimeoutMs);
+  console.log(
+    `▶ host calibration: reference candidate (~rung 3.5) scored in ${calibration.wall_ms}ms ` +
+      `(roc_auc ${calibration.roc_auc ?? 'n/a'})${calibration.ok ? '' : ' — CALIBRATION FAILED'}`,
+  );
+
+  console.log(`▶ phase 2/2: scoring (serial, ${evalTimeoutMs}ms budget per candidate)`);
+  const records = [];
+  for (let i = 0; i < authored.length; i++) {
+    const { tier, caseObj, rep, authored: a } = authored[i];
+    const r = scoreAuthoredAttempt(caseObj, a, { evalTimeoutMs });
+    console.log(
+      `  [${i + 1}/${authored.length}] ${tierName(tier)} / ${caseObj.id} / rep ${rep + 1} → ${r.status}` +
+        (r.timed_out ? ' [TIMED OUT — not necessarily a code defect]' : '') +
+        (r.eval_wall_ms != null ? ` (eval ${r.eval_wall_ms}ms)` : '') +
         (r.result?.failed_gates?.length ? ` (failed: ${r.result.failed_gates.join(', ')})` : '') +
         (r.error ? ` (${r.error.slice(0, 120)})` : ''),
     );
-    return {
+    records.push({
       tier: tierName(tier),
       case_id: caseObj.id,
       primary_gate: caseObj.primary_gate ?? 'baseline',
       repeat: rep,
       ...r,
-    };
-  });
+    });
+  }
 
   const report = buildForgeReport({ role, tiers, records });
   report.raw_records = records;
+  report.host_calibration = calibration;
 
   const outDir = resolve(REPO_ROOT, 'ci', 'out');
   mkdirSync(outDir, { recursive: true });

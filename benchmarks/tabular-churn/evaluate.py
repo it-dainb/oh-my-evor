@@ -103,6 +103,38 @@ def _roc_auc(proba, y):
 
 # ─── Candidate execution ─────────────────────────────────────────────────────
 
+def _summarise_telemetry() -> dict:
+    """Summarise what the candidate ACTUALLY wrote to $EVOR_TELEMETRY_PATH.
+
+    Was `{"total_steps": len(Xtr)}` — the training-row count, a constant, not a
+    count of anything the candidate did. A candidate that reads
+    EVOR_TELEMETRY_PATH and never appends produced the same number as one that
+    instrumented every step. See the companion note in
+    benchmarks/tabular-ladder/evaluate.py; mirrors benchmarks/shapes/evaluate.py.
+    """
+    path = os.environ.get("EVOR_TELEMETRY_PATH")
+    records = []
+    if path and os.path.exists(path):
+        with open(path) as fh:
+            for line in fh:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    rec = json.loads(line)
+                except ValueError:
+                    continue  # a malformed line is not a step
+                if isinstance(rec, dict):
+                    records.append(rec)
+
+    summary = {"total_steps": len(records)}
+    losses = [r["train_loss"] for r in records
+              if isinstance(r.get("train_loss"), (int, float))]
+    if losses:
+        summary["final_train_loss"] = round(float(losses[-1]), 6)
+    return summary
+
+
 def _load_candidate_train(worktree: Path):
     """Import worktree/train/trainer.py and return its train() callable.
 
@@ -163,7 +195,7 @@ def main() -> None:
             "val_accuracy": round(val_acc, 6),
         },
         "per_domain": {"default": {"accuracy": round(test_acc, 6), "roc_auc": round(test_auc, 6)}},
-        "telemetry_summary": {"total_steps": len(Xtr)},
+        "telemetry_summary": _summarise_telemetry(),
         "status": "success",
         "benchmark_raw": f"test_acc={test_acc:.4f} roc_auc={test_auc:.4f}",
     }
