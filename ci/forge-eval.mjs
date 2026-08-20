@@ -593,7 +593,7 @@ async function authorAttempt({ agentPromptBlock, caseObj, tier, maxTurns, timeou
  * the wall-clock of one candidate is not an artefact of how many others were
  * running at the same moment.
  */
-function scoreAuthoredAttempt(caseObj, authored, { evalTimeoutMs }) {
+export function scoreAuthoredAttempt(caseObj, authored, { evalTimeoutMs }) {
   if (!authored.authored) return authored; // a cli_error record passes straight through
 
   const run = runCandidate(authored.worktree, {
@@ -605,6 +605,12 @@ function scoreAuthoredAttempt(caseObj, authored, { evalTimeoutMs }) {
 
   return {
     status: scored.status,
+    // Recorded on PASSING attempts too, not just in diagnostics. Whether the
+    // agent left a telemetry.jsonl behind is how often it self-tested, and that
+    // rate is the exposure rate for the artefact this file used to mis-grade.
+    // Kept out of diagnostics on purpose: diagnostics is a post-mortem and is
+    // undefined when nothing died.
+    files_written: [...(authored.diff?.created ?? []), ...(authored.diff?.modified ?? [])].sort(),
     wall_ms: authored.wall_ms,
     eval_wall_ms: run.eval_wall_ms ?? null,
     timed_out: run.timed_out === true,

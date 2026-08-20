@@ -27,6 +27,7 @@ import { spawnSync } from "child_process";
 
 import {
   snapshotTree,
+  scoreAuthoredAttempt,
   diffSnapshots,
   parseTelemetryFile,
   scoreTelemetry,
@@ -1130,5 +1131,51 @@ describe("forge-eval: self-testing is not punished as a stray write", () => {
     expect(scored.gates.no_stray_writes.pass).toBe(false);
     expect(scored.gates.no_stray_writes.detail).toContain("notes/scratch.txt");
     expect(scored.gates.no_stray_writes.detail).not.toContain("telemetry.jsonl");
+  }, 120_000);
+});
+
+/**
+ * Self-testing is stochastic: only some attempts leave a telemetry.jsonl
+ * behind. That frequency is now a quantity worth knowing — it is the exposure
+ * rate for the artefact fixed above, and it was invisible because the report
+ * only retained files_written inside diagnostics, which buildDiagnostics
+ * returns undefined for on a passing attempt. A run could therefore come back
+ * 30/30 without revealing whether the fix was ever exercised.
+ */
+describe("forge-eval: what the agent wrote is recorded on success too", () => {
+  it("buildDiagnostics still returns nothing for a passing attempt", () => {
+    expect(buildDiagnostics({ status: "correct", run: {}, diff: {}, worktreeDir: "/x" })).toBeUndefined();
+  });
+
+  it("a PASSING record still carries the file list, so self-test rate is measurable", () => {
+    const c = caseById("telemetry-discipline");
+    const dir = mkdtempSync(join(ROOT, "wrote-"));
+    stageWorktree(c, dir);
+    const before = snapshotTree(dir);
+
+    // Stand in for the agent: write the trainer, and leave behind the
+    // telemetry.jsonl a self-test would have produced.
+    mkdirSync(join(dir, "train"), { recursive: true });
+    writeFileSync(join(dir, "train", "trainer.py"), TRAINER_TELEMETRY_OK_WEAK);
+    writeFileSync(join(dir, "telemetry.jsonl"), '{"step": 0}\n');
+
+    const rec = scoreAuthoredAttempt(
+      c,
+      {
+        authored: true,
+        worktree: dir,
+        telemetryPath: join(dir, "telemetry.jsonl"),
+        diff: diffSnapshots(before, snapshotTree(dir)),
+        wall_ms: 1,
+        cost_usd: 0.1,
+        num_turns: 3,
+      },
+      { evalTimeoutMs: 120_000 },
+    );
+
+    expect(rec.status).toBe("correct");
+    expect(rec.diagnostics).toBeUndefined();
+    expect(rec.files_written).toContain("telemetry.jsonl");
+    expect(rec.files_written).toContain("train/trainer.py");
   }, 120_000);
 });
