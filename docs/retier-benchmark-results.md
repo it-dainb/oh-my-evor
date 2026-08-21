@@ -86,3 +86,51 @@ gap.
 - Every fixture defect found during this work (~8) was mine, and the model was
   right every time. Fixtures are now verified against the strictest arm before a
   matrix is launched.
+
+---
+
+# Ladder extension: sonnet -> haiku on the three ceiling roles
+
+The three roles closest to ceiling on sonnet were re-run on haiku. The sonnet
+arms were reused rather than re-measured, so only the haiku arm was paid for.
+
+| role | haiku | sonnet | delta | Fisher p | $/call | $/pass | verdict |
+|---|---|---|---|---|---|---|---|
+| probe | 22/30 = 73.3% [56–86] | 30/30 = 100.0% [89–100] | -26.7pp | **0.0046** | +48.8% | +30.2% | **REGRESSION — do not adopt** |
+| forge-analyst | 31/36 = 86.1% [71–94] | 35/36 = 97.2% [86–100] | -11.1pp | 0.199 | +19.9% | **+9.6%** | not adopted — see below |
+| forge-architect | 24/30 = 80.0% [63–91] | 28/30 = 93.3% [79–98] | -13.3pp | 0.254 | +31.9% | **+20.5%** | not adopted — see below |
+
+**Recommendation: keep all three on sonnet.**
+
+probe is a clear regression and the decision is easy. The other two are the
+interesting case, because a naive reading says they passed — p > 0.05, "no
+detectable difference." That reading is wrong twice.
+
+**1. Failure to detect is not evidence of equivalence.** At n=30–36 the Wilson
+intervals span 20+ points. A true 10-point drop is exactly what this design
+cannot distinguish from noise. Both roles point *down* by 11–13pp; the test
+says we cannot rule out zero, not that zero is likely.
+
+**2. The saving mostly evaporates when you price the retry.** Haiku is 20–49%
+cheaper per call but only **9.6%** cheaper per passing attempt for forge-analyst
+and 20.5% for forge-architect, because it fails more often. Trading an 11-point
+accuracy drop for 9.6% is a bad trade at any level of significance — and these
+roles gate downstream work, so a wrong analysis costs a whole implementation
+cycle, not one retry.
+
+Both also have a systematic blind spot rather than diffuse noise:
+forge-architect misses `structural-missing-new-knob` 0/3 (approving a structural
+mutation that introduces no new knob), and probe misses `grad-vanishing` 0/3
+(calling small-amplitude noise around a flat line "oscillating").
+
+Unlike mutagen's regression, these are **not** buried-instruction defects. There
+is no stated rule the model failed to find; fixing them would mean inventing new
+decision thresholds, which changes what the agent means rather than clarifying
+it. That is the honest boundary between a prompt fix and a capability limit.
+
+**Where the ladder stops.** sonnet holds for six roles and haiku holds for
+sage-junior, whose 48%-per-pass saving is real because its accuracy barely moved
+(77.8% vs 81.5%). The pattern across both rungs: judge the rung by cost per
+*passing* attempt, not per call. Per-call savings of 20–49% shrank to 10–30%
+once failures were priced in, and that is what turned two apparent passes into
+declines.
