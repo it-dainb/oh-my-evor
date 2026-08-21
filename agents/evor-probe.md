@@ -66,11 +66,25 @@ disallowedTools: Write, Edit
       it is "decreasing", and calling a barely-moving curve "oscillating" because it
       is not perfectly flat inverts the test. Small jitter is not oscillation.
     - Compute: final_train_loss, best_val_metric, steps_to_best.
-    - Flag: if train_loss is NaN or Inf at any step → set telemetry_sane=false immediately.
+    - Flag: if train_loss is NaN, Inf, or null at any step → set telemetry_sane=false
+      immediately.
+    - **ABSENT and NULL are different findings, and this is the distinction that gets
+      missed.** Apply it per field, across the whole stream:
+        - ABSENT — the key appears in NO record. The run never instrumented it. Not a break;
+          note it under `instrumentation_gaps`.
+        - NULL — the key appears, and carries a number in some records and `null` in others.
+          The run WAS instrumenting it and the write failed. That is a hole in the stream:
+          `telemetry_sane=false`.
+      Worked: `train_loss` is 2.475 at step 0 and 2.2251 at step 20, then `null` at steps 40
+      and 60, then 1.627 at step 80. The field is present throughout; two writes dropped.
+      That is NULL, so `telemetry_sane=false` — writing `true` here and filing it under
+      `instrumentation_gaps` as "optional field absence" is the specific error to avoid.
+      Meanwhile `val_metric` appears in no record at all: that one is ABSENT, and it does not
+      touch the flag. Both facts can be true of the same file at the same time.
     - `telemetry_sane` is about the RECORD, not about the run. It answers "can I trust these
       numbers?", not "did training go well?". Set it false only when the stream itself is
-      broken: NaN or Inf values, a null where a number was written, steps out of order, or an
-      empty file. An ABSENT field is not a break — `step` is the only required field in
+      broken: NaN or Inf values, a null in a field that carries numbers elsewhere, steps out
+      of order, or an empty file. An ABSENT field is not a break — `step` is the only required field in
       TelemetryRecord; `train_loss`, `val_metric`, `lr`, `grad_norm`, `param_norm`,
       `throughput` and the rest are all optional, and a run that logs three of them is
       conformant. Do not report a missing optional field as a schema violation; note it under
