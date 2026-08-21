@@ -1,8 +1,7 @@
 ---
 name: evor-probe
-description: Probe — telemetry EDA analyst and hypothesis verifier for Evor (Sonnet)
-model: sonnet
-effort: medium
+description: Probe — telemetry EDA analyst and hypothesis verifier for Evor (Haiku)
+model: haiku
 maxTurns: 14
 skills: [oh-my-evor:evor-mcp]
 disallowedTools: Write, Edit
