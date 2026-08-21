@@ -119,18 +119,36 @@ def self_test():
 
 
 def load_reports():
-    out = []
-    for path in sorted(glob(str(REPO / "ci/out/*-report.json"))):
-        if "bench-tick" in path:
+    """
+    Collect the matrix reports, whichever naming convention they landed under.
+
+    Two things this must not do. It must not pick up a diagnostic or smoke run
+    -- those are single-tier and single-case by construction, and averaging one
+    into a role's numbers would quietly corrupt the verdict. And when a role has
+    more than one report on disk it must not silently choose; it keeps the one
+    with the most records and says so.
+    """
+    best = {}
+    paths = set(glob(str(REPO / "ci/out/*-report.json"))) | set(glob(str(REPO / "ci/out/role-*.json")))
+    for path in sorted(paths):
+        name = Path(path).name
+        if any(s in name for s in ("diag", "smoke", "bench-tick")):
             continue
         try:
             r = json.load(open(path))
         except json.JSONDecodeError:
-            print(f"  ! {Path(path).name} is not valid JSON (run still writing?)", file=sys.stderr)
+            print(f"  ! {name} is not valid JSON (run still writing?)", file=sys.stderr)
             continue
-        if "records" in r and r.get("role"):
-            out.append((Path(path).name, r))
-    return out
+        if not (r.get("role") and r.get("records")):
+            continue
+        role = r["role"]
+        if role in best and len(best[role][1]["records"]) >= len(r["records"]):
+            print(f"  ! ignoring {name}: {best[role][0]} has more records for {role}", file=sys.stderr)
+            continue
+        if role in best:
+            print(f"  ! ignoring {best[role][0]}: {name} has more records for {role}", file=sys.stderr)
+        best[role] = (name, r)
+    return [best[k] for k in sorted(best)]
 
 
 def summarise(records):
@@ -150,7 +168,18 @@ def summarise(records):
     return tiers
 
 
+def load_spec_arms():
+    """role -> [current_tier, pre_retier_tier], taken from the spec's arm order."""
+    arms = {}
+    for path in sorted(glob(str(REPO / "evals/*/spec.json"))):
+        s = json.load(open(path))
+        if s.get("role") and s.get("arms"):
+            arms[s["role"]] = [f"{a['model']}-{a['effort']}" for a in s["arms"]]
+    return arms
+
+
 def main():
+    spec_arms = load_spec_arms()
     reports = load_reports()
     if not reports:
         print("no role reports found in ci/out/ -- nothing to analyse")
@@ -167,8 +196,17 @@ def main():
         tiers = summarise(recs)
         # The spec's first arm is the current (cheaper) tier; the second is the
         # main-branch tier it replaced.
-        order = [f"{a['model']}-{a['effort']}" for a in rep.get("arms", [])] or sorted(tiers)
-        order = [t for t in order if t in tiers]
+        # Which arm is "current" comes from the spec, never from the report.
+        # buildReport does not carry the arms through, and falling back to
+        # sorted() orders them alphabetically -- which put opus before sonnet
+        # and labelled the pre-retier arm as the current one. A cost saving
+        # printed with the arms swapped reads as a cost increase.
+        arms = spec_arms.get(role)
+        if not arms:
+            print(f"\n### {role}  -- SKIPPED: no evals/*/spec.json declares this role, "
+                  f"so which arm is current cannot be established")
+            continue
+        order = [t for t in arms if t in tiers]
         if len(order) < 2:
             print(f"\n### {role}  -- INCOMPLETE: only {order or list(tiers)} present, cannot compare")
             continue
