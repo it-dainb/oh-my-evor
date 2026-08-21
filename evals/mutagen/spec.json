@@ -30,18 +30,11 @@
         "kind": "count"
       },
       {
-        "path": "proposals[].mutation_tier",
-        "kind": "every",
-        "values": [
-          "parametric",
-          "structural"
-        ]
-      },
-      {
         "path": "proposals[].approach_family",
         "kind": "unique"
       }
-    ]
+    ],
+    "note": "proposals[].mutation_tier is deliberately NOT graded. evor-mutagen.md:156 says wildness < 0.5 -> parametric, but evor-mutagen.md:125 says a data-acquisition proposal is always structural. For a data-acquisition proposal at low wildness the two rules give opposite answers, so any grading of that field scores which contradiction the model happened to resolve, not whether it followed the spec."
   },
   "cases": [
     {
@@ -92,7 +85,6 @@
         "proposals": {
           "min": 6
         },
-        "proposals[].mutation_tier": "parametric",
         "proposals[].approach_family": true,
         "crossover_triggered": false
       }
@@ -145,7 +137,6 @@
         "proposals": {
           "min": 6
         },
-        "proposals[].mutation_tier": "structural",
         "proposals[].approach_family": true,
         "crossover_triggered": false
       }
@@ -198,7 +189,6 @@
         "proposals": {
           "min": 6
         },
-        "proposals[].mutation_tier": "structural",
         "proposals[].approach_family": true,
         "crossover_triggered": false
       }
@@ -251,7 +241,6 @@
         "proposals": {
           "min": 6
         },
-        "proposals[].mutation_tier": "parametric",
         "proposals[].approach_family": true,
         "crossover_triggered": false
       }
@@ -304,7 +293,6 @@
         "proposals": {
           "min": 10
         },
-        "proposals[].mutation_tier": "structural",
         "proposals[].approach_family": true,
         "crossover_triggered": false
       }
@@ -357,7 +345,6 @@
         "proposals": {
           "min": 4
         },
-        "proposals[].mutation_tier": "parametric",
         "proposals[].approach_family": true,
         "crossover_triggered": false
       }
@@ -415,7 +402,6 @@
         "proposals": {
           "min": 6
         },
-        "proposals[].mutation_tier": "structural",
         "proposals[].approach_family": true,
         "crossover_triggered": true
       }
@@ -468,7 +454,6 @@
         "proposals": {
           "min": 6
         },
-        "proposals[].mutation_tier": "parametric",
         "proposals[].approach_family": true,
         "crossover_triggered": false
       }
@@ -521,7 +506,6 @@
         "proposals": {
           "min": 8
         },
-        "proposals[].mutation_tier": "structural",
         "proposals[].approach_family": true,
         "crossover_triggered": false
       }
@@ -584,7 +568,6 @@
         "proposals": {
           "min": 6
         },
-        "proposals[].mutation_tier": "structural",
         "proposals[].approach_family": true,
         "crossover_triggered": false
       }
