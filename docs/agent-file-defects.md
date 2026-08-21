@@ -114,14 +114,50 @@ low-confidence-reportable branch is still tested.
 
 ---
 
+## 4. `evor-mutagen.md` — dream_k asks for more proposals than families exist
+
+- **Success_Criteria** `dream_k >= train_k * 2`
+- **H003** no two proposals in one call may share an `approach_family`
+- **Output_Format** the `approach_family` enum holds exactly seven values:
+  `arch`, `training`, `data-curation`, `data-augmentation`, `data-acquisition`,
+  `algo`, `other`
+
+Seven distinct families is the most proposals a single call can contain. At
+`train_k >= 4` the doubling rule asks for eight or more, and the two rules become
+mutually unsatisfiable. Nothing in the file said which one yields.
+
+Found by the S30 re-baseline, not by reading: `dream-k-scales-with-train-k`
+(train_k=5, so the fixture demanded 10) and `crossover-lineages-far-apart`
+(demanded 8) each scored **0/3 in both arms**. Both models emitted exactly seven,
+one per family, and both were right; the fixtures were impossible. Two arms at
+zero is the fixture-bug signature -- a capability difference does not show up
+identically in both.
+
+**Fixed.** Step 5a now computes
+`dream_k = min(max(strategy.dream_k or 0, train_k * 2, 5), 7)` under a FAMILY
+CEILING paragraph that names the seven families, says the two rules collide, and
+says which wins: H003 is a hard Selector gate, so it wins, and padding by
+repeating a family costs a slot and buys nothing. Both fixtures now expect 7.
+
+---
+
 ## Cross-cutting note
 
-All three are the same defect class this session has been chasing: **a rule that
+All four are the same defect class this session has been chasing: **a rule that
 is graded but not stated, or stated twice with different answers.** The harness
 catches the first shape structurally — `scoreByContract` throws on an
 expectation outside the contract. It cannot catch the second, because both
 rules really are in the file. That needs a human read, or a lint pass that
 looks for two rules writing the same output field.
+
+Defect 4 suggests a cheaper detector than either. Three of the four were found
+by *grading the field* -- and the signature is specific: **a case that fails in
+every arm is a fixture or file bug, not a capability difference.** A model that
+is merely weaker fails some of the time; a rule that cannot be satisfied fails
+all of the time, identically, at every tier. `ci/compare-arms.py` already splits
+its per-case output on exactly this, and it is worth reading that section first
+whenever an arm regresses. The corollary is uncomfortable but held every time
+this session: when the models disagree with the fixture, check the fixture.
 
 ---
 

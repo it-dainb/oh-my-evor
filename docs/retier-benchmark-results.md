@@ -28,9 +28,15 @@ of the price.
 | forge-analyst | opus->sonnet | 35/36 = 97.2% [86–100] | 31/36 = 86.1% [71–94] | +11.1pp | 0.199 | no difference | $0.0502 vs $0.1095 (+54%) |
 | forge-architect | opus->sonnet | 28/30 = 93.3% [79–98] | 26/30 = 86.7% [70–95] | +6.7pp | 0.671 | no difference | $0.0508 vs $0.0846 (+40%) |
 | forge-critic | opus->sonnet | 27/30 = 90.0% [74–97] | 29/30 = 96.7% [83–99] | -6.7pp | 0.612 | no difference | $0.0537 vs $0.0882 (+39%) |
-| sage | opus->sonnet | 25/30 = 83.3% [66–93] | 24/30 = 80.0% [63–90] | +3.3pp | 1.000 | no difference | $0.0774 vs $0.1367 (+43%) |
-| sage-junior | sonnet->haiku | 21/27 = 77.8% [59–89] | 22/27 = 81.5% [63–92] | -3.7pp | 1.000 | no difference | $0.0378 vs $0.0721 (+48%) |
-| mutagen † | opus->sonnet | 23/30 = 76.7% [59–88] | 22/30 = 73.3% [56–86] | +3.3pp | 1.000 | no difference | $0.1994 vs $0.2888 (+31%) |
+| sage ‡ | opus->sonnet | 25/30 = 83.3% [66–93] | 24/30 = 80.0% [63–90] | +3.3pp | 1.000 | no difference | $0.0774 vs $0.1367 (+43%) |
+| sage-junior ‡ | sonnet->haiku | 21/27 = 77.8% [59–89] | 22/27 = 81.5% [63–92] | -3.7pp | 1.000 | no difference | $0.0378 vs $0.0721 (+48%) |
+| mutagen †‡ | opus->sonnet | 23/30 = 76.7% [59–88] | 22/30 = 73.3% [56–86] | +3.3pp | 1.000 | no difference | $0.1994 vs $0.2888 (+31%) |
+
+‡ **These three rows are superseded.** They were measured against agent files
+that contradicted themselves (see `docs/agent-file-defects.md`). S30 fixed the
+contradictions, which changed both the prompts and several expectations, so
+these numbers no longer describe the shipped files. The re-baseline below
+replaces them; the four unmarked rows are unaffected and stand as measured.
 
 Sum of mean per-call cost across the seven roles: **$0.4766** current vs **$0.7521** pre-retier (**37% cheaper**).
 
