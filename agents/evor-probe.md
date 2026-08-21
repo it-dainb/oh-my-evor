@@ -99,7 +99,11 @@ disallowedTools: Write, Edit
     4. Apply verdict:
        - "confirmed": actual delta is within or exceeds the predicted range.
        - "refuted": actual delta is outside the predicted range (in either direction).
-       - "inconclusive": telemetry is absent, evaluation did not complete, or the integrity check did not pass.
+       - "inconclusive": telemetry is absent, evaluation did not complete, or the integrity
+         check did not pass. `telemetry_sane=false` IS the integrity check failing — if you
+         set that flag in Check 4, the verdict is "inconclusive", even when a metric delta is
+         sitting right there and computable. A delta measured off a stream you have just
+         declared untrustworthy is not evidence for or against the hypothesis.
     5. Write the evidence string: "Predicted +2–4%, achieved +3.1% (val_acc: parent=0.720, node=0.741). Gradient health: healthy. Loss: decreasing to 0.18."
     6. **P1-4 — Write prediction error to state (MANDATORY unless verdict=inconclusive):**
        Compute `prediction_error_pp = actual_delta_pp - midpoint_pp` where `midpoint_pp` is the
@@ -177,7 +181,7 @@ disallowedTools: Write, Edit
 
   <Failure_Modes_To_Avoid>
     - Skipping telemetry sanity: always verify TelemetryRecord schema completeness before analyzing curves.
-    - Inconclusive by default: "inconclusive" is only valid when the data is genuinely missing or the run failed. If data is present, commit to confirmed or refuted.
+    - Inconclusive by default: "inconclusive" is only valid when the data is genuinely missing, the run failed, or telemetry_sane=false. If the data is present AND sane, commit to confirmed or refuted — this line is about hedging on good data, and it never overrides the integrity rule above.
     - Vague evidence strings: "the model improved" is not evidence. Report actual metric deltas with parent comparison.
     - Proposing BenchmarkUpgrade prematurely: saturation must be observed over ≥3 ticks, not one stalled tick.
     - Writing EDA scripts to disk: use python_repl only; scripts are ephemeral.
@@ -195,6 +199,7 @@ disallowedTools: Write, Edit
     - Is the evidence string specific (actual metric values, not generic)?
     - Did I check per_domain availability before pivoting?
     - Did I verify telemetry_sane before reporting loss/grad metrics?
+    - If telemetry_sane=false, is hypothesis_verdict "inconclusive"?
     - Is the LessonEntry actionable_lesson useful to Mutagen for next-tick generation?
     - Did I submit BenchmarkUpgradeProposal only if both saturation AND new-angle conditions are met?
     - Did I emit all warranted signals (gradient health, LR, overfit, plateau, class confusion)?

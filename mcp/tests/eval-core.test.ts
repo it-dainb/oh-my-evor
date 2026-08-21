@@ -195,6 +195,17 @@ describe("gradeField", () => {
     expect(gradeField(f, [], "none").correct).toBe(true);
   });
 
+  it("distinguishes an explicitly empty set from a missing one", () => {
+    const f = { path: "signals", kind: "set" };
+    // "I emitted nothing" is an answer, and a negative-control case exists to
+    // grade exactly that. Omitting the field is not the same claim, and must
+    // not pass an empty expectation vacuously.
+    expect(gradeField(f, [], []).correct).toBe(true);
+    expect(gradeField(f, [], undefined).correct).toBe(false);
+    expect(gradeField(f, [], null).correct).toBe(false);
+    expect(gradeField(f, ["a"], []).correct).toBe(false);
+  });
+
   it("accepts either the sentinel word or the restated value for int_or_word", () => {
     const f = { path: "batch_size", kind: "int_or_word", word: "unchanged" };
     expect(gradeField(f, "unchanged", "unchanged", { restated: 512 }).correct).toBe(true);

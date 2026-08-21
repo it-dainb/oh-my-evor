@@ -257,6 +257,13 @@ export function parseContractOutput(text, contract) {
 
 const strip = (v) => String(v ?? '').replace(/[*`_]/g, '').trim();
 
+const normSet = (v) =>
+  new Set(
+    (Array.isArray(v) ? v : String(v ?? '').split(','))
+      .map((x) => strip(x).toLowerCase())
+      .filter((x) => x && x !== 'none'),
+  );
+
 function normEnum(f, raw) {
   const s = strip(raw).toLowerCase();
   // `values` is precedence-ordered. It matters only when an answer mentions
@@ -340,6 +347,13 @@ export function gradeField(f, expected, actual, opts = {}) {
     return mk(ok);
   }
 
+  // A `set` answered as an empty array is a claim — "nothing fired" — and the
+  // negative-control cases exist to grade it. An absent field is not that claim,
+  // so it still falls through to the missing-answer guard below.
+  if (f.kind === 'set' && Array.isArray(actual) && actual.length === 0) {
+    return mk(normSet(expected).size === 0);
+  }
+
   if (actual === undefined || actual === null || strip(actual) === '') return mk(false);
 
   switch (f.kind) {
@@ -365,16 +379,8 @@ export function gradeField(f, expected, actual, opts = {}) {
     }
 
     case 'set': {
-      const norm = (v) => {
-        const items = Array.isArray(v) ? v : String(v ?? '').split(',');
-        return new Set(
-          items
-            .map((x) => strip(x).toLowerCase())
-            .filter((x) => x && x !== 'none'),
-        );
-      };
-      const a = norm(expected);
-      const b = norm(actual);
+      const a = normSet(expected);
+      const b = normSet(actual);
       return mk(a.size === b.size && [...a].every((x) => b.has(x)));
     }
 

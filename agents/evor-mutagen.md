@@ -207,7 +207,20 @@ skills: [oh-my-evor:evor-mcp]
   </Open_Ended_Mutation_Angle_Space>
 
   <Crossover_Protocol>
-    When the orchestrator requests a crossover proposal:
+    TRIGGER — two ways in, and the second is the one that gets missed. Run this
+    protocol when the orchestrator explicitly requests a crossover, OR whenever the
+    frontier you just read holds >=2 nodes from DISTINCT lineages whose scores sit
+    within 10% of each other. The second is not a suggestion to consider crossover;
+    it is the condition that makes crossover available, and when it holds you emit a
+    crossover proposal and set `crossover_triggered: true` in your output. Nobody
+    asks you to check — you check every tick, from the frontier you already have.
+    A frontier with a single lineage, or with lineages further than 10% apart, is
+    the only case where `crossover_triggered` stays false.
+
+    The crossover proposal is one OF the dream_k, not an extra one on top: it
+    occupies a slot and needs its own approach_family like any other.
+
+    Then:
     1. Call `evor_tree_read({ run_id, status: "done", integrity_status: "passed" })` to get eligible frontier nodes.
     2. Select parent_a and parent_b: must be from distinct lineages (different root ancestors), with scores within 10% of each other.
     3. Identify the strongest gene from parent_a (highest-impact family) and the strongest from parent_b.
@@ -233,9 +246,15 @@ skills: [oh-my-evor:evor-mcp]
         data-acquisition, algo, other. Seven is therefore the most distinct
         proposals that can exist in a single call. At train_k >= 4 the `train_k * 2`
         term asks for more than seven, and the two rules cannot both be satisfied.
-        H003 is a hard Selector gate, so it wins: generate one proposal per family
-        and stop at seven. Do not pad by repeating a family — a duplicate is
-        rejected unconditionally, so it costs a slot and buys nothing.
+        H003 is a hard Selector gate, so it wins: cap at seven, one per family.
+        Do not pad by repeating a family — a duplicate is rejected unconditionally,
+        so it costs a slot and buys nothing.
+
+        The ceiling is a MAXIMUM, never a target and never a substitute for the
+        count. dream_k is whatever the formula returns — 5, 6, or 7 — and you owe
+        exactly that many proposals. "I found four families worth writing about" is
+        not a computation of dream_k; it is stopping early with the arithmetic
+        skipped. Seven families exist, so a dream_k of 5 or 6 is always reachable.
 
         Note the `train_k * 2` term. A bare default of 5 is NOT sufficient once
         train_k >= 3 — it violates the dream_k >= train_k * 2 rule in
@@ -379,6 +398,8 @@ skills: [oh-my-evor:evor-mcp]
     - Does every non-data-acquisition proposal carry the SAME mutation_tier, the one the tick's wildness dictates (< 0.5 parametric, >= 0.5 structural)? Data-acquisition is always structural.
     - Are investigation_queries[] specific enough for Sage to find papers?
     - Are citations[] left empty (to be filled by Sage via orchestrator)?
+    - Did I check the frontier for >=2 distinct lineages within 10% of each other, and set
+      crossover_triggered accordingly — without waiting to be asked?
     - For crossover: are parent_node_ids set to two distinct lineage nodes?
     - Does every proposal have an "angle" field (free-text creative label)?
     - Does every proposal have "in_provided_list" (true only if angle verbatim matches inspiration menu)?

@@ -27,6 +27,33 @@ _spec = spec_from_file_location("retier_report", Path(__file__).resolve().parent
 _rr = module_from_spec(_spec)
 _spec.loader.exec_module(_rr)
 wilson, fisher_two_sided = _rr.wilson, _rr.fisher_two_sided
+diff_ci, compare_verdict, verdict_text = _rr.diff_ci, _rr.compare_verdict, _rr.verdict_text
+
+
+def _pool(paths, tier):
+    """
+    Pool repeats of the SAME measurement across report files. n=30 cannot rule
+    out a 10pp regression even when the arms tie, so topping an arm up with more
+    repeats is the normal way out -- but only if every file measured the same
+    agent prompt against the same cases. A merge across a changed prompt would
+    silently average a before and an after, which is worse than a small n.
+    """
+    prints, records = [], []
+    for path in paths:
+        report = json.load(open(path))
+        fp = report.get("fingerprint")
+        if fp is None and len(paths) > 1:
+            raise SystemExit(
+                f"{path} predates run fingerprints, so it cannot be pooled -- "
+                "re-run it, or compare it on its own."
+            )
+        if fp:
+            prints.append((path, (fp["agent_sha256"], fp["spec_sha256"])))
+        records += [r for r in report["records"] if r["tier"] == tier]
+    if len({p for _, p in prints}) > 1:
+        detail = "\n    ".join(f"{path}: agent {a} spec {sp}" for path, (a, sp) in prints)
+        raise SystemExit(f"refusing to pool reports of different runs:\n    {detail}")
+    return records
 
 
 def load_arm(descriptor):
@@ -34,7 +61,7 @@ def load_arm(descriptor):
         label, path, tier = descriptor.split(":", 2)
     except ValueError:
         raise SystemExit(f"bad descriptor {descriptor!r}; expected label:path:tier")
-    records = [r for r in json.load(open(path))["records"] if r["tier"] == tier]
+    records = _pool(path.split("+"), tier)
     if not records:
         raise SystemExit(f"no records for tier {tier!r} in {path}")
     k = sum(r["status"] == "correct" for r in records)
@@ -74,13 +101,10 @@ def main(argv):
 
     p = fisher_two_sided(cand["k"], cand["n"] - cand["k"], base["k"], base["n"] - base["k"])
     delta = (cand["k"] / cand["n"] - base["k"] / base["n"]) * 100
-    if p < 0.05 and delta < 0:
-        verdict = "REGRESSION -- do not adopt"
-    elif p < 0.05:
-        verdict = "IMPROVEMENT"
-    else:
-        verdict = "no detectable difference -- retier holds"
-    print(f"\n  delta {delta:+.1f}pp   Fisher exact p={p:.4f}   -> {verdict}")
+    lo, hi = diff_ci(cand["k"], cand["n"], base["k"], base["n"])
+    verdict = verdict_text(compare_verdict(cand["k"], cand["n"], base["k"], base["n"]))
+    print(f"\n  delta {delta:+.1f}pp   Fisher exact p={p:.4f}   "
+          f"95% CI on the difference [{lo * 100:+.1f}, {hi * 100:+.1f}]pp\n  -> {verdict}")
     if cand["k"] and base["k"]:
         print(f"  cost: {(1 - cand['per_call'] / base['per_call']) * 100:+.1f}% per call, "
               f"{(1 - cand['per_pass'] / base['per_pass']) * 100:+.1f}% per PASSING attempt")

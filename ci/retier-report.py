@@ -38,6 +38,65 @@ def wilson(k, n, z=1.96):
     return (max(0.0, centre - half), min(1.0, centre + half))
 
 
+# How far below the baseline a candidate may sit and still count as "no
+# regression". Anything the interval cannot rule out beyond this is not a held
+# retier -- it is a measurement too small to decide, which is a different thing
+# and must be reported as one.
+#
+# 10pp is set by what n can reach, not by what would be nice. At n=30 a perfect
+# tie still leaves a 15pp drop inside the interval; ruling out 5pp needs n near
+# 200. So a role that lands "underpowered" needs more repeats, not a softer
+# margin -- lowering this number to make a verdict appear would be assuming the
+# answer the run was supposed to produce.
+NONINFERIORITY_MARGIN = 0.10
+
+
+def diff_ci(k1, n1, k2, n2, z=1.96):
+    """
+    Newcombe's method-10 interval for p1 - p2, built from the two Wilson
+    intervals. The normal approximation to a difference of proportions is what
+    Wilson exists to avoid on a single arm; using it on the difference would
+    reintroduce the same failure at exactly the small n these runs have.
+    """
+    if n1 == 0 or n2 == 0:
+        return (-1.0, 1.0)
+    p1, p2 = k1 / n1, k2 / n2
+    l1, u1 = wilson(k1, n1, z)
+    l2, u2 = wilson(k2, n2, z)
+    d = p1 - p2
+    lo = d - math.sqrt((p1 - l1) ** 2 + (u2 - p2) ** 2)
+    hi = d + math.sqrt((u1 - p1) ** 2 + (p2 - l2) ** 2)
+    return (max(-1.0, lo), min(1.0, hi))
+
+
+def compare_verdict(k1, n1, k2, n2, margin=NONINFERIORITY_MARGIN):
+    """
+    Four outcomes, not three. The one this exists to add is "underpowered":
+    a p above 0.05 says only that the run could not tell the arms apart, and
+    reading that as "the retier holds" adopts every regression too small for
+    n=30 to catch. A retier holds when the difference interval rules OUT a drop
+    worse than the margin -- that is a claim the data can actually support.
+    """
+    lo, hi = diff_ci(k1, n1, k2, n2)
+    p = fisher_two_sided(k1, n1 - k1, k2, n2 - k2)
+    if p < 0.05 and (k1 / n1 if n1 else 0) < (k2 / n2 if n2 else 0):
+        return "regression"
+    if p < 0.05:
+        return "improvement"
+    if lo > -margin:
+        return "non-inferior"
+    return "underpowered"
+
+
+def verdict_text(v):
+    return {
+        "regression": "REGRESSION -- do not adopt",
+        "improvement": "IMPROVEMENT",
+        "non-inferior": "non-inferior within 10pp -- retier holds",
+        "underpowered": "UNDERPOWERED -- a drop worse than 10pp is not ruled out; add repeats before adopting",
+    }[v]
+
+
 def fisher_two_sided(a, b, c, d):
     """
     Exact two-sided Fisher test on [[a, b], [c, d]].
@@ -113,6 +172,28 @@ def self_test():
     print(f"27/30 [{lo27:.3f},{hi27:.3f}] vs 29/30 [{lo29:.3f},{hi29:.3f}] -> p={p:.3f}")
     if p < 0.05:
         failures.append("27/30 vs 29/30 was called significant; the test is too permissive")
+
+    # A non-significant p is not evidence of equivalence, and treating it as one
+    # is how a real regression gets adopted. 31/39 vs 37/39 is a 15pp drop at
+    # p=0.087: not significant, and nowhere near close enough to call a tie.
+    lo, hi = diff_ci(31, 39, 37, 39)
+    v = compare_verdict(31, 39, 37, 39)
+    print(f"31/39 vs 37/39 -> diff CI [{lo * 100:+.1f}, {hi * 100:+.1f}]pp -> {v}")
+    if v != "underpowered":
+        failures.append(f"31/39 vs 37/39 was called {v!r}; a 15pp drop is not a held retier")
+    if compare_verdict(36, 36, 36, 36) != "non-inferior":
+        failures.append("36/36 vs 36/36 was not called non-inferior")
+    # Two arms that tie perfectly at n=33 STILL cannot rule out a 10pp drop.
+    # This is the run's precision, not a defect, and the report must say so
+    # rather than pass a tie off as a demonstration.
+    if compare_verdict(32, 33, 33, 33) != "underpowered":
+        failures.append("32/33 vs 33/33 does not have the precision to hold a 10pp margin")
+    if compare_verdict(27, 30, 29, 30) != "underpowered":
+        failures.append("27/30 vs 29/30 needs more evidence, not a verdict")
+    if compare_verdict(10, 30, 29, 30) != "regression":
+        failures.append("10/30 vs 29/30 was not called a regression")
+    if compare_verdict(120, 120, 100, 120) != "improvement":
+        failures.append("120/120 vs 100/120 was not called an improvement")
 
     print("SELF-TEST FAILED: " + "; ".join(failures) if failures else "SELF-TEST OK")
     return 1 if failures else 0

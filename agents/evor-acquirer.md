@@ -93,6 +93,13 @@ skills: [oh-my-evor:evor-mcp]
       `contract["harden_test_unlabeled"]=true` allows "unlabeled" items.
     - Drop invalid items; log count as `validation_dropped`.
 
+    The provenance record has ONE drop field for both steps, so the two counts merge:
+    `dropped_for_format = format_errors + validation_dropped`, and
+    `item_count_valid = item_count_fetched - dropped_for_format`. Do not report a
+    separate validation count and do not leave validation drops out of
+    `dropped_for_format` — an item dropped for a label outside `label_space` is
+    counted there just like an unparseable one.
+
     **Step 3 — De-duplicate (inviolable no-leakage step)**
     See `<Deduplication_Protocol>` — execute in full before any integration.
 
@@ -170,6 +177,8 @@ skills: [oh-my-evor:evor-mcp]
         "license_noted": "apache-2.0",
         "target": "enrich-train | harden-test",
         "caller": "forge | evor",
+        "namespace_used": "train | eval",
+        "forbidden_split": "train | test",
         "item_count_fetched": 3200,
         "item_count_valid": 3100,
         "dropped_for_format": 100,
@@ -185,11 +194,33 @@ skills: [oh-my-evor:evor-mcp]
         "near_dup_collisions": 17,
         "intra_batch_duplicates": 0,
         "method": "<reported by evor_check_leakage>"
-      }
+      },
+      "signals_emitted": ["data-acquired", "leakage-blocked"]
     }
     ```
     `eval_version_after` is returned by `evor_store_blob` for harden-test items; otherwise
     equals `eval_version_before`. `method` and collision counts are returned by `evor_check_leakage`.
+
+    `item_count_integrated` is the size of the clean set `evor_check_leakage` returned —
+    which is `item_count_valid - dropped_for_collision - intra_batch_duplicates`. The
+    within-batch duplicates are removed too, and `dropped_for_collision` counts only
+    forbidden-split hits, so subtracting it alone over-reports what you stored.
+
+    `namespace_used` and `forbidden_split` are both fixed by `target`, and they point in
+    OPPOSITE directions: enrich-train stores into `train` and is de-duped against `test`;
+    harden-test stores into `eval` and is de-duped against `train`. Write both down —
+    a record that names only one leaves the reader unable to check the leakage direction.
+
+    On a halt — an unrecognised caller, or `evor_read_goal_contract` returning an error —
+    still write the provenance record, with every count zero, `signals_emitted` empty, and
+    the reason in `halt_reason`. A rejected spawn is part of the audit trail.
+
+    `signals_emitted` lists the `kind` of every signal you actually emitted, so the
+    provenance record is a complete audit trail on its own. It is a record of what you
+    did, not a plan — the emit conditions live in `<Signal_Lens>` and nowhere else, and
+    the four kinds are independent: emitting one never excuses another whose condition
+    also fired. `collision_rate = dropped_for_collision / item_count_fetched` — the
+    denominator is what you FETCHED, not what survived validation.
   </Output_Format>
 
   <Failure_Modes_To_Avoid>
@@ -220,6 +251,7 @@ skills: [oh-my-evor:evor-mcp]
     - Emitted "leakage-blocked" if dropped_for_collision > 0?
     - Emitted "license-gate" if license_noted is unknown or restricted?
     - Emitted "data-contamination-detected" if collision_rate > 0.50?
+    - Listed every emitted kind in `signals_emitted`, and nothing you did not emit?
   </Final_Checklist>
 
   <Write_As_You_Go>
@@ -263,8 +295,12 @@ skills: [oh-my-evor:evor-mcp]
       source="evor-acquirer", tick=tick, node_id=None)`.
 
     **Emit 3 — License gate (flag, not block):**
-    When `license_noted` is "unknown", null, or a known-restricted license (e.g. "cc-by-nc",
-    "gpl-3.0", "proprietary"). Emit BEFORE proceeding — do not halt acquisition.
+    Decide by exclusion, so an unfamiliar license string is never silently treated as clean:
+    emit UNLESS `license_noted` is one of the permissive set — `apache-2.0`, `mit`, `bsd-2-clause`,
+    `bsd-3-clause`, `cc0-1.0`, `cc-by-4.0`. Everything else fires, including "unknown", null,
+    a copyleft or non-commercial license (`gpl-3.0`, `cc-by-nc-4.0`), and any string you do not
+    recognise. Emit BEFORE proceeding — do not halt acquisition; the license is recorded, never
+    gated, and this signal is a flag for review only.
     Call `evor_signal_emit(run_id=run_id, kind="license-gate",
       signature=f"license-gate-{source_slug}",
       shapes=["failure"], axes=["data"], severity="high",

@@ -16,6 +16,7 @@
  */
 
 import { execFileSync } from 'child_process';
+import { createHash } from 'crypto';
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'fs';
 import { dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
@@ -120,7 +121,17 @@ async function main() {
     }
   }
 
+  // Two reports may be pooled only if they measured the same thing. Recording
+  // what was measured is the cheap half of that check; ci/compare-arms.py does
+  // the other half and refuses a merge across a changed prompt or case set.
+  const sha = (text) => createHash('sha256').update(text).digest('hex').slice(0, 16);
   const report = buildReport({ role: spec.role, tiers, records });
+  report.fingerprint = {
+    agent_file: spec.agent_file,
+    agent_sha256: sha(readFileSync(agentFile, 'utf8')),
+    spec_sha256: sha(readFileSync(specPath, 'utf8')),
+    repeats,
+  };
   mkdirSync(dirname(outPath), { recursive: true });
   writeFileSync(outPath, JSON.stringify({ ...report, records }, null, 2));
   console.log(renderTable(report));
