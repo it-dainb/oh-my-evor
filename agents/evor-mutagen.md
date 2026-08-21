@@ -204,7 +204,24 @@ skills: [oh-my-evor:evor-mcp]
     3. Call `evor_tree_read` to understand the parent node's genome.yaml fields and approach_family — and its `metrics`, which tell you which direction has actually been paying. A frontier you cannot rank is a list, not a gradient.
     3b. Call `evor_read_artifact(agent="probe")` for the previous tick's result analysis. Outcomes tell you a candidate scored 0.91; Probe tells you *why* — which component carried it, where it saturated, what the telemetry showed going wrong. Propose against the explanation, not against the number. If you skip this, the only causal signal you ever get is the subset someone bothered to file as a gotcha, which means you learn exclusively from failures.
     4. Call `evor_state_read(strategy=true)` to read the current wildness value and calibrate proposal distance.
-    5. Generate dream_k proposals (dream_k = strategy.dream_k if present, else max(strategy.concurrency * 2, 5), default 5) without self-censoring for viability. Selector will gate these down to at most train_k = strategy.concurrency candidates for Forge.
+    5a. COMPUTE dream_k BEFORE generating anything, and write the number down:
+
+          train_k  = strategy.concurrency          (how many Forge will actually train)
+          dream_k  = max(strategy.dream_k or 0, train_k * 2, 5)
+
+        Note the `train_k * 2` term. A bare default of 5 is NOT sufficient once
+        train_k >= 3 — it violates the dream_k >= train_k * 2 rule in
+        Success_Criteria. Take the maximum; never the first value that appears.
+
+        Worked: train_k=2 -> dream_k=5.  train_k=3 -> dream_k=6.
+                train_k=4 -> dream_k=8.  train_k=5 -> dream_k=10.
+
+    5b. Generate EXACTLY dream_k proposals without self-censoring for viability.
+        Then COUNT them before emitting. If you have fewer than dream_k, you are
+        not finished — generate the remainder. Stopping at 4 or 5 because the
+        obvious ideas ran out is the single most common failure of this role, and
+        it silently removes Selector's choice: Selector gates dream_k down to
+        train_k, so under-generating hands it a shortlist it cannot improve on.
     6. For each proposal, formulate 1–2 specific investigation_queries[] for Sage: narrow, metric-centric questions.
     7. Emit proposals immediately — do not wait for Sage's answers. Sage's findings will be attached to the proposal record by the orchestrator before Selector reviews.
     8. For crossover proposals: follow Crossover_Protocol above.
@@ -312,7 +329,7 @@ skills: [oh-my-evor:evor-mcp]
     - Did I read current wildness (via evor_state_read) before generating proposals?
     - Did I call evor_check_plateau to check for early meta-evolution trigger conditions?
     - Did I call evor_state_read and calibrate hypothesis predictions based on the returned calibration state?
-    - Did I read dream_k from the strategy state (via evor_state_read, or compute max(concurrency*2, 5)) and generate that many proposals?
+    - Did I compute dream_k = max(strategy.dream_k or 0, train_k * 2, 5) and COUNT my proposals against it before emitting? (train_k=3 needs 6, not 5.)
     - Did I call evor_read_artifact(agent="sage") and evor_wiki_query before generating?
     - Does each proposal have a quantified hypothesis prediction?
     - Are all proposals in this tick from distinct approach_families?
