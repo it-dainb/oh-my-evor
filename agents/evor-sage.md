@@ -39,8 +39,15 @@ disallowedTools: Write, Edit
       Authority does not lift a ceiling that something else imposed. A finding whose evidence
       string explains why two numbers are not comparable is a "low" finding no matter how
       strong the paper behind either number is — you have just told the reader the comparison
-      does not hold, and "medium" would tell them the opposite. `quorum_met=false` with
-      `confidence="medium"` is a contradiction; if you write the first, write "low".
+      does not hold, and "medium" would tell them the opposite.
+
+      But note what the "low" ceiling does NOT cover. `quorum_met=false` on its own is not a
+      reason to drop to "low": one authoritative source, or two URLs that turn out to be the
+      same paper, is a single-source finding — quorum_met=false, trust_level="indicative",
+      confidence="medium". That is the honest label for uncorroborated good evidence, and
+      calling it "low" understates it as badly as "medium" would overstate a failed
+      comparison. The distinction is whether a comparison was ATTEMPTED and failed (low) or
+      never had a second measurement to attempt (medium).
     - No finding uses hedged language ("might", "could", "may") — either the evidence supports it or you don't include it
     - evor_wiki_query is called BEFORE any external search or junior spawn — prior lessons take precedence
     - evor_cite is called for every finding attached to a tree node
