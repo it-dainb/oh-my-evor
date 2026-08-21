@@ -802,7 +802,7 @@
     {
       "id": "grad-vanishing",
       "gate": "grad",
-      "note": "last-10 grad mean well under 0.001 while param_norm stays above 0.01",
+      "note": "last-10 grad mean well under 0.001 while param_norm stays above 0.01. The loss tail is flat to 0.05% so the incidental loss_curve answer is derivable from Check 1's stated threshold; it previously drifted 0.69%, outside the <0.5% rule.",
       "run": {
         "expected_steps": 500,
         "completed_steps": 500,
@@ -1006,7 +1006,7 @@
         },
         {
           "step": 400,
-          "train_loss": 1.0537,
+          "train_loss": 1.0505,
           "grad_norm": 0.0003,
           "param_norm": 12.52,
           "node_id": "grad_vanishing_node",
@@ -1015,7 +1015,7 @@
         },
         {
           "step": 420,
-          "train_loss": 1.0533,
+          "train_loss": 1.0504,
           "grad_norm": 0.0003,
           "param_norm": 12.521,
           "node_id": "grad_vanishing_node",
@@ -1024,7 +1024,7 @@
         },
         {
           "step": 440,
-          "train_loss": 1.05,
+          "train_loss": 1.0502,
           "grad_norm": 0.0003,
           "param_norm": 12.522,
           "node_id": "grad_vanishing_node",
@@ -1033,7 +1033,7 @@
         },
         {
           "step": 460,
-          "train_loss": 1.0466,
+          "train_loss": 1.0501,
           "grad_norm": 0.0003,
           "param_norm": 12.523,
           "node_id": "grad_vanishing_node",
@@ -1042,7 +1042,7 @@
         },
         {
           "step": 480,
-          "train_loss": 1.0464,
+          "train_loss": 1.05,
           "grad_norm": 0.0003,
           "param_norm": 12.524,
           "node_id": "grad_vanishing_node",
@@ -1283,6 +1283,237 @@
       ],
       "expect": {
         "eda_summary.loss_curve": "plateaued",
+        "hypothesis_verdict": "refuted"
+      }
+    },
+    {
+      "id": "oscillating-curve",
+      "gate": "curve",
+      "note": "loss swings +-20% around a flat mean across the last 20% of steps: coefficient of variation well over 0.10 with no consistent direction, and it ends on a down-swing so the diverging check does not fire first. Tests the one enum value no case reached.",
+      "run": {
+        "expected_steps": 500,
+        "completed_steps": 500,
+        "lr_schedule": "constant",
+        "lr_values": [
+          0.003,
+          0.003,
+          0.003,
+          0.003,
+          0.003
+        ]
+      },
+      "hypothesis": {
+        "predicted_delta_pp": "+3 to +6",
+        "primary_metric": "val_acc",
+        "parent_value": 0.7
+      },
+      "result": {
+        "node_value": 0.704
+      },
+      "telemetry": [
+        {
+          "step": 0,
+          "train_loss": 1.52,
+          "grad_norm": 2.0,
+          "node_id": "oscillating_curve_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:00:00Z"
+        },
+        {
+          "step": 20,
+          "train_loss": 1.21,
+          "grad_norm": 2.2104,
+          "node_id": "oscillating_curve_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:01:00Z"
+        },
+        {
+          "step": 40,
+          "train_loss": 0.98,
+          "grad_norm": 2.2273,
+          "node_id": "oscillating_curve_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:02:00Z"
+        },
+        {
+          "step": 60,
+          "train_loss": 1.28,
+          "grad_norm": 2.0353,
+          "node_id": "oscillating_curve_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:03:00Z"
+        },
+        {
+          "step": 80,
+          "train_loss": 0.86,
+          "grad_norm": 1.8108,
+          "node_id": "oscillating_curve_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:04:00Z"
+        },
+        {
+          "step": 100,
+          "train_loss": 1.31,
+          "grad_norm": 1.7603,
+          "node_id": "oscillating_curve_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:05:00Z"
+        },
+        {
+          "step": 120,
+          "train_loss": 0.84,
+          "grad_norm": 1.9301,
+          "node_id": "oscillating_curve_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:06:00Z"
+        },
+        {
+          "step": 140,
+          "train_loss": 1.27,
+          "grad_norm": 2.1642,
+          "node_id": "oscillating_curve_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:07:00Z"
+        },
+        {
+          "step": 160,
+          "train_loss": 0.88,
+          "grad_norm": 2.2473,
+          "node_id": "oscillating_curve_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:08:00Z"
+        },
+        {
+          "step": 180,
+          "train_loss": 1.33,
+          "grad_norm": 2.103,
+          "node_id": "oscillating_curve_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:09:00Z"
+        },
+        {
+          "step": 200,
+          "train_loss": 0.83,
+          "grad_norm": 1.864,
+          "node_id": "oscillating_curve_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:10:00Z"
+        },
+        {
+          "step": 220,
+          "train_loss": 1.29,
+          "grad_norm": 1.75,
+          "node_id": "oscillating_curve_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:11:00Z"
+        },
+        {
+          "step": 240,
+          "train_loss": 0.87,
+          "grad_norm": 1.8659,
+          "node_id": "oscillating_curve_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:12:00Z"
+        },
+        {
+          "step": 260,
+          "train_loss": 1.26,
+          "grad_norm": 2.105,
+          "node_id": "oscillating_curve_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:13:00Z"
+        },
+        {
+          "step": 280,
+          "train_loss": 0.85,
+          "grad_norm": 2.2477,
+          "node_id": "oscillating_curve_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:14:00Z"
+        },
+        {
+          "step": 300,
+          "train_loss": 1.32,
+          "grad_norm": 2.1626,
+          "node_id": "oscillating_curve_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:15:00Z"
+        },
+        {
+          "step": 320,
+          "train_loss": 0.86,
+          "grad_norm": 1.928,
+          "node_id": "oscillating_curve_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:16:00Z"
+        },
+        {
+          "step": 340,
+          "train_loss": 1.28,
+          "grad_norm": 1.7597,
+          "node_id": "oscillating_curve_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:17:00Z"
+        },
+        {
+          "step": 360,
+          "train_loss": 0.84,
+          "grad_norm": 1.8123,
+          "node_id": "oscillating_curve_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:18:00Z"
+        },
+        {
+          "step": 380,
+          "train_loss": 1.3,
+          "grad_norm": 2.0375,
+          "node_id": "oscillating_curve_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:19:00Z"
+        },
+        {
+          "step": 400,
+          "train_loss": 0.88,
+          "grad_norm": 2.2282,
+          "node_id": "oscillating_curve_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:20:00Z"
+        },
+        {
+          "step": 420,
+          "train_loss": 1.28,
+          "grad_norm": 2.2092,
+          "node_id": "oscillating_curve_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:21:00Z"
+        },
+        {
+          "step": 440,
+          "train_loss": 1.31,
+          "grad_norm": 1.9978,
+          "node_id": "oscillating_curve_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:22:00Z"
+        },
+        {
+          "step": 460,
+          "train_loss": 0.89,
+          "grad_norm": 1.7884,
+          "node_id": "oscillating_curve_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:23:00Z"
+        },
+        {
+          "step": 480,
+          "train_loss": 0.83,
+          "grad_norm": 1.7736,
+          "node_id": "oscillating_curve_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:24:00Z"
+        }
+      ],
+      "expect": {
+        "eda_summary.loss_curve": "oscillating",
         "hypothesis_verdict": "refuted"
       }
     },

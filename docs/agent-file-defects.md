@@ -166,6 +166,41 @@ for it directly. sage-junior went 84.8% -> 93.9% on haiku.
 
 ---
 
+## 6. `evor-probe.md` — the loss_curve checks were unordered, and one was dimensionally wrong
+
+Found by re-opening the S29 probe->haiku rejection with the lens the five
+defects above taught. Three separate problems, all in Check 1:
+
+1. **No precedence.** The four classes were listed as independent tests, and
+   real curves satisfy more than one. A curve that is flat *and* jittery
+   matches both `plateaued` and `oscillating`; nothing said which wins.
+2. **`oscillating` was dimensionally wrong.** The threshold read `variance >
+   10% of mean`. Variance scales as loss-squared, so the test's outcome moves
+   when you rescale the loss — a curve is "oscillating" or not depending on
+   whether the loss is reported in nats or bits. The coefficient of variation
+   (std/mean) is the scale-free quantity that was meant.
+3. **The enum value was never graded.** No case in `evals/probe/spec.json`
+   expected `oscillating`. It was the untested fourth branch — and it was
+   exactly what haiku answered when the stated rules did not decide.
+
+The fixture had a matching defect: `grad-vanishing` expected `plateaued` while
+its last-20% window drifted **0.693%**, outside the file's own `<0.5%`
+threshold. The expectation was never derivable from the stated rule. Sonnet
+passed it by reading intent; haiku applied the rule as written and said
+`oscillating`. That is not a capability gap — the cheaper model was following
+the file more literally than the file deserved.
+
+**Fixed.** Check 1 is now an ordered precedence (diverging -> oscillating ->
+plateaued -> decreasing, first match wins), states std-not-variance and why,
+and says outright that small jitter is not oscillation. `grad-vanishing`'s loss
+tail is flat to 0.05% so its incidental answer is derivable (its `grad_norm`
+series, which is that case's actual purpose, is untouched). A new
+`oscillating-curve` case grades the fourth enum value: CV 0.203 across the last
+20%, ending on a descending run so the `diverging` check cannot pre-empt it,
+under a constant too-high LR so the schedule does not argue against the answer.
+
+---
+
 ## Cross-cutting note
 
 All five are the same defect class this session has been chasing: **a rule that

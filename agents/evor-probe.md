@@ -44,7 +44,24 @@ disallowedTools: Write, Edit
 
     **Check 1 — Loss Curve Shape:**
     - Load all TelemetryRecord entries; extract step, train_loss, val_metric.
-    - Classify: "decreasing" (monotonic or near-monotonic descent), "plateaued" (< 0.5% change over last 20% of steps), "diverging" (loss increasing over last 10% of steps), "oscillating" (variance > 10% of mean in last 20% of steps).
+    - Classify, in this order — the FIRST match wins, so read the precedence before applying:
+        1. "diverging"   — loss increasing over the last 10% of steps.
+        2. "oscillating" — the loss in the last 20% of steps has a standard deviation
+                           above 10% of its mean (a coefficient of variation > 0.10),
+                           with no consistent direction. Use the standard deviation,
+                           NOT the variance: variance scales as loss squared, so a
+                           variance-based bar means something different at loss 0.1
+                           than at loss 10, which is not what this test is for.
+        3. "plateaued"   — less than 0.5% change between the first and last loss in
+                           the last 20% of steps.
+        4. "decreasing"  — monotonic or near-monotonic descent.
+      Precedence matters because these overlap. A curve that swings hard but returns
+      to where it started has a near-zero first-to-last change AND a large spread:
+      it is "oscillating", not "plateaued", because the instability is the finding.
+      A curve that drifts down by a hair — 0.6% over the window, with a spread of a
+      fraction of a percent — is not oscillating and not really plateaued either;
+      it is "decreasing", and calling a barely-moving curve "oscillating" because it
+      is not perfectly flat inverts the test. Small jitter is not oscillation.
     - Compute: final_train_loss, best_val_metric, steps_to_best.
     - Flag: if train_loss is NaN or Inf at any step → set telemetry_sane=false immediately.
     - Overfit detection: if train_loss is decreasing while val_metric plateaus or degrades over the last 20% of steps → emit `overfit` signal (see Signal_Lens).
