@@ -5,12 +5,14 @@ models. They were found by benchmarking, which is the point: a contract that
 contradicts itself cannot be graded, and until you try to grade it nobody
 notices.
 
-**Status: all three are fixed.** They were deliberately left alone while the
+**Status: all seven are fixed.** They were deliberately left alone while the
 retier matrices ran -- editing an agent file mid-benchmark changes what the
 matrices are measuring, and the exercise is worthless if the two arms do not see
-the same prompt. The fixes landed after the last matrix completed; the three
-affected roles were re-baselined against the amended files, and those
-re-baselines are the numbers to cite for mutagen, sage and sage-junior.
+the same prompt. Each fix landed after the matrix it would have disturbed, and
+every affected role was re-measured against the amended file -- a defect fixed
+without a re-measurement invalidates the arms that ran before it, so the two
+always travel together. Defects 6 and 7 (probe, sage) were found later, in the
+sonnet->haiku ladder, by the same reading habit rather than by a new tool.
 
 ---
 
