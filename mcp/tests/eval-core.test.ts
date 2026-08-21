@@ -64,6 +64,29 @@ describe("buildContractText", () => {
     }
   });
 
+  it("nests dotted paths in the JSON skeleton instead of asking for flat keys", () => {
+    // Caught by the first live call: rendering "eda_summary.telemetry_sane" as a
+    // literal key made the agent emit exactly that, flat. The scorer then read
+    // the nested path, found nothing, and scored a correct answer as wrong. The
+    // agent was obeying the prompt; the prompt was wrong.
+    const text = buildContractText({
+      heading: "Probe Report",
+      mode: "json",
+      fields: [
+        { path: "eda_summary.telemetry_sane", kind: "bool" },
+        { path: "eda_summary.loss_curve", kind: "enum", values: ["decreasing", "plateaued"] },
+        { path: "hypothesis_verdict", kind: "enum", values: ["confirmed", "refuted"] },
+      ],
+    });
+    expect(text).not.toContain('"eda_summary.telemetry_sane"');
+    expect(text).toContain('"eda_summary"');
+    expect(text).toContain('"telemetry_sane"');
+    expect(text).toContain('"hypothesis_verdict"');
+    // and it must still be parseable back out as the shape it describes
+    const skeleton = /```json\n([\s\S]*?)```/.exec(text)![1];
+    expect(skeleton).toMatch(/"eda_summary":\s*\{/);
+  });
+
   it("emits a fenced JSON skeleton in json mode and bullets in section mode", () => {
     expect(buildContractText(JSON_CONTRACT)).toMatch(/```json/);
     const section = buildContractText(SECTION_CONTRACT);

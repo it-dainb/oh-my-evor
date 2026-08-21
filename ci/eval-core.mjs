@@ -86,13 +86,33 @@ export function buildContractText(contract) {
   );
 
   if (contract.mode === 'json') {
-    const body = keyed.map((f) => `  "${f.path}": ${jsonSkeletonValue(f)}`).join(',\n');
+    // A dotted path describes NESTING, not a key with a dot in it. Rendering it
+    // flat made the first live agent emit "eda_summary.telemetry_sane" as a
+    // literal key — obeying the prompt exactly — while the scorer read the
+    // nested path and saw nothing.
+    const tree = {};
+    for (const f of keyed) {
+      const parts = f.path.split('.');
+      let node = tree;
+      for (const p of parts.slice(0, -1)) node = node[p] ??= {};
+      node[parts[parts.length - 1]] = jsonSkeletonValue(f);
+    }
+    const render = (node, indent) => {
+      const pad = ' '.repeat(indent);
+      const lines = Object.entries(node).map(([k, v]) =>
+        typeof v === 'object' && v !== null
+          ? `${pad}"${k}": {\n${render(v, indent + 2)}\n${pad}}`
+          : `${pad}"${k}": ${v}`,
+      );
+      return lines.join(',\n');
+    };
     return [
-      'Emit your answer as a single fenced JSON block with exactly these keys:',
+      'Emit your answer as a single fenced JSON block shaped exactly like this',
+      '(nested objects are nested, not dotted keys):',
       '',
       '```json',
       '{',
-      body,
+      render(tree, 2),
       '}',
       '```',
       ...(constraints.length ? ['', 'Constraints on the list entries:', ...constraints] : []),

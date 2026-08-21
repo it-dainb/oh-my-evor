@@ -96,151 +96,226 @@
           "step": 0,
           "train_loss": 2.475,
           "grad_norm": 2.0,
-          "param_norm": 11.8
+          "param_norm": 11.8,
+          "node_id": "healthy_confirmed_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:00:00Z"
         },
         {
           "step": 20,
           "train_loss": 2.2251,
           "grad_norm": 2.2104,
-          "param_norm": 11.82
+          "param_norm": 11.82,
+          "node_id": "healthy_confirmed_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:01:00Z"
         },
         {
           "step": 40,
           "train_loss": 2.0024,
           "grad_norm": 2.2273,
-          "param_norm": 11.84
+          "param_norm": 11.84,
+          "node_id": "healthy_confirmed_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:02:00Z"
         },
         {
           "step": 60,
           "train_loss": 1.8039,
           "grad_norm": 2.0353,
-          "param_norm": 11.86
+          "param_norm": 11.86,
+          "node_id": "healthy_confirmed_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:03:00Z"
         },
         {
           "step": 80,
           "train_loss": 1.627,
           "grad_norm": 1.8108,
-          "param_norm": 11.88
+          "param_norm": 11.88,
+          "node_id": "healthy_confirmed_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:04:00Z"
         },
         {
           "step": 100,
           "train_loss": 1.4692,
           "grad_norm": 1.7603,
-          "param_norm": 11.9
+          "param_norm": 11.9,
+          "node_id": "healthy_confirmed_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:05:00Z"
         },
         {
           "step": 120,
           "train_loss": 1.3286,
           "grad_norm": 1.9301,
-          "param_norm": 11.92
+          "param_norm": 11.92,
+          "node_id": "healthy_confirmed_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:06:00Z"
         },
         {
           "step": 140,
           "train_loss": 1.2033,
           "grad_norm": 2.1642,
-          "param_norm": 11.94
+          "param_norm": 11.94,
+          "node_id": "healthy_confirmed_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:07:00Z"
         },
         {
           "step": 160,
           "train_loss": 1.0916,
           "grad_norm": 2.2473,
-          "param_norm": 11.96
+          "param_norm": 11.96,
+          "node_id": "healthy_confirmed_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:08:00Z"
         },
         {
           "step": 180,
           "train_loss": 0.992,
           "grad_norm": 2.103,
-          "param_norm": 11.98
+          "param_norm": 11.98,
+          "node_id": "healthy_confirmed_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:09:00Z"
         },
         {
           "step": 200,
           "train_loss": 0.9033,
           "grad_norm": 1.864,
-          "param_norm": 12.0
+          "param_norm": 12.0,
+          "node_id": "healthy_confirmed_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:10:00Z"
         },
         {
           "step": 220,
           "train_loss": 0.8242,
           "grad_norm": 1.75,
-          "param_norm": 12.02
+          "param_norm": 12.02,
+          "node_id": "healthy_confirmed_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:11:00Z"
         },
         {
           "step": 240,
           "train_loss": 0.7536,
           "grad_norm": 1.8659,
-          "param_norm": 12.04
+          "param_norm": 12.04,
+          "node_id": "healthy_confirmed_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:12:00Z"
         },
         {
           "step": 260,
           "train_loss": 0.6908,
           "grad_norm": 2.105,
-          "param_norm": 12.06
+          "param_norm": 12.06,
+          "node_id": "healthy_confirmed_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:13:00Z"
         },
         {
           "step": 280,
           "train_loss": 0.6347,
           "grad_norm": 2.2477,
-          "param_norm": 12.08
+          "param_norm": 12.08,
+          "node_id": "healthy_confirmed_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:14:00Z"
         },
         {
           "step": 300,
           "train_loss": 0.5848,
           "grad_norm": 2.1626,
-          "param_norm": 12.1
+          "param_norm": 12.1,
+          "node_id": "healthy_confirmed_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:15:00Z"
         },
         {
           "step": 320,
           "train_loss": 0.5403,
           "grad_norm": 1.928,
-          "param_norm": 12.12
+          "param_norm": 12.12,
+          "node_id": "healthy_confirmed_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:16:00Z"
         },
         {
           "step": 340,
           "train_loss": 0.5006,
           "grad_norm": 1.7597,
-          "param_norm": 12.14
+          "param_norm": 12.14,
+          "node_id": "healthy_confirmed_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:17:00Z"
         },
         {
           "step": 360,
           "train_loss": 0.4652,
           "grad_norm": 1.8123,
-          "param_norm": 12.16
+          "param_norm": 12.16,
+          "node_id": "healthy_confirmed_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:18:00Z"
         },
         {
           "step": 380,
           "train_loss": 0.4337,
           "grad_norm": 2.0375,
-          "param_norm": 12.18
+          "param_norm": 12.18,
+          "node_id": "healthy_confirmed_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:19:00Z"
         },
         {
           "step": 400,
           "train_loss": 0.4056,
           "grad_norm": 2.2282,
-          "param_norm": 12.2
+          "param_norm": 12.2,
+          "node_id": "healthy_confirmed_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:20:00Z"
         },
         {
           "step": 420,
           "train_loss": 0.3805,
           "grad_norm": 2.2092,
-          "param_norm": 12.22
+          "param_norm": 12.22,
+          "node_id": "healthy_confirmed_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:21:00Z"
         },
         {
           "step": 440,
           "train_loss": 0.3582,
           "grad_norm": 1.9978,
-          "param_norm": 12.24
+          "param_norm": 12.24,
+          "node_id": "healthy_confirmed_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:22:00Z"
         },
         {
           "step": 460,
           "train_loss": 0.3383,
           "grad_norm": 1.7884,
-          "param_norm": 12.26
+          "param_norm": 12.26,
+          "node_id": "healthy_confirmed_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:23:00Z"
         },
         {
           "step": 480,
           "train_loss": 0.3206,
           "grad_norm": 1.7736,
-          "param_norm": 12.28
+          "param_norm": 12.28,
+          "node_id": "healthy_confirmed_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:24:00Z"
         }
       ],
       "tick_history": [
@@ -290,127 +365,202 @@
         {
           "step": 0,
           "train_loss": 2.475,
-          "grad_norm": 2.0
+          "grad_norm": 2.0,
+          "node_id": "nan_telemetry_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:00:00Z"
         },
         {
           "step": 20,
           "train_loss": 2.2251,
-          "grad_norm": 2.2104
+          "grad_norm": 2.2104,
+          "node_id": "nan_telemetry_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:01:00Z"
         },
         {
           "step": 40,
           "train_loss": null,
-          "grad_norm": 2.2273
+          "grad_norm": 2.2273,
+          "node_id": "nan_telemetry_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:02:00Z"
         },
         {
           "step": 60,
           "train_loss": null,
-          "grad_norm": 2.0353
+          "grad_norm": 2.0353,
+          "node_id": "nan_telemetry_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:03:00Z"
         },
         {
           "step": 80,
           "train_loss": 1.627,
-          "grad_norm": 1.8108
+          "grad_norm": 1.8108,
+          "node_id": "nan_telemetry_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:04:00Z"
         },
         {
           "step": 100,
           "train_loss": 1.4692,
-          "grad_norm": 1.7603
+          "grad_norm": 1.7603,
+          "node_id": "nan_telemetry_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:05:00Z"
         },
         {
           "step": 120,
           "train_loss": 1.3286,
-          "grad_norm": 1.9301
+          "grad_norm": 1.9301,
+          "node_id": "nan_telemetry_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:06:00Z"
         },
         {
           "step": 140,
           "train_loss": 1.2033,
-          "grad_norm": 2.1642
+          "grad_norm": 2.1642,
+          "node_id": "nan_telemetry_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:07:00Z"
         },
         {
           "step": 160,
           "train_loss": 1.0916,
-          "grad_norm": 2.2473
+          "grad_norm": 2.2473,
+          "node_id": "nan_telemetry_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:08:00Z"
         },
         {
           "step": 180,
           "train_loss": 0.992,
-          "grad_norm": 2.103
+          "grad_norm": 2.103,
+          "node_id": "nan_telemetry_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:09:00Z"
         },
         {
           "step": 200,
           "train_loss": 0.9033,
-          "grad_norm": 1.864
+          "grad_norm": 1.864,
+          "node_id": "nan_telemetry_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:10:00Z"
         },
         {
           "step": 220,
           "train_loss": 0.8242,
-          "grad_norm": 1.75
+          "grad_norm": 1.75,
+          "node_id": "nan_telemetry_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:11:00Z"
         },
         {
           "step": 240,
           "train_loss": 0.7536,
-          "grad_norm": 1.8659
+          "grad_norm": 1.8659,
+          "node_id": "nan_telemetry_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:12:00Z"
         },
         {
           "step": 260,
           "train_loss": 0.6908,
-          "grad_norm": 2.105
+          "grad_norm": 2.105,
+          "node_id": "nan_telemetry_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:13:00Z"
         },
         {
           "step": 280,
           "train_loss": 0.6347,
-          "grad_norm": 2.2477
+          "grad_norm": 2.2477,
+          "node_id": "nan_telemetry_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:14:00Z"
         },
         {
           "step": 300,
           "train_loss": 0.5848,
-          "grad_norm": 2.1626
+          "grad_norm": 2.1626,
+          "node_id": "nan_telemetry_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:15:00Z"
         },
         {
           "step": 320,
           "train_loss": 0.5403,
-          "grad_norm": 1.928
+          "grad_norm": 1.928,
+          "node_id": "nan_telemetry_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:16:00Z"
         },
         {
           "step": 340,
           "train_loss": 0.5006,
-          "grad_norm": 1.7597
+          "grad_norm": 1.7597,
+          "node_id": "nan_telemetry_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:17:00Z"
         },
         {
           "step": 360,
           "train_loss": 0.4652,
-          "grad_norm": 1.8123
+          "grad_norm": 1.8123,
+          "node_id": "nan_telemetry_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:18:00Z"
         },
         {
           "step": 380,
           "train_loss": 0.4337,
-          "grad_norm": 2.0375
+          "grad_norm": 2.0375,
+          "node_id": "nan_telemetry_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:19:00Z"
         },
         {
           "step": 400,
           "train_loss": 0.4056,
-          "grad_norm": 2.2282
+          "grad_norm": 2.2282,
+          "node_id": "nan_telemetry_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:20:00Z"
         },
         {
           "step": 420,
           "train_loss": 0.3805,
-          "grad_norm": 2.2092
+          "grad_norm": 2.2092,
+          "node_id": "nan_telemetry_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:21:00Z"
         },
         {
           "step": 440,
           "train_loss": 0.3582,
-          "grad_norm": 1.9978
+          "grad_norm": 1.9978,
+          "node_id": "nan_telemetry_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:22:00Z"
         },
         {
           "step": 460,
           "train_loss": 0.3383,
-          "grad_norm": 1.7884
+          "grad_norm": 1.7884,
+          "node_id": "nan_telemetry_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:23:00Z"
         },
         {
           "step": 480,
           "train_loss": 0.3206,
-          "grad_norm": 1.7736
+          "grad_norm": 1.7736,
+          "node_id": "nan_telemetry_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:24:00Z"
         }
       ],
       "expect": {
@@ -446,127 +596,202 @@
         {
           "step": 0,
           "train_loss": 2.5,
-          "grad_norm": 2.0
+          "grad_norm": 2.0,
+          "node_id": "grad_explosion_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:00:00Z"
         },
         {
           "step": 20,
           "train_loss": 2.7048,
-          "grad_norm": 2.1683
+          "grad_norm": 2.1683,
+          "node_id": "grad_explosion_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:01:00Z"
         },
         {
           "step": 40,
           "train_loss": 2.2425,
-          "grad_norm": 2.1819
+          "grad_norm": 2.1819,
+          "node_id": "grad_explosion_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:02:00Z"
         },
         {
           "step": 60,
           "train_loss": 1.9576,
-          "grad_norm": 2.0282
+          "grad_norm": 2.0282,
+          "node_id": "grad_explosion_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:03:00Z"
         },
         {
           "step": 80,
           "train_loss": 2.3038,
-          "grad_norm": 1.8486
+          "grad_norm": 1.8486,
+          "node_id": "grad_explosion_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:04:00Z"
         },
         {
           "step": 100,
           "train_loss": 2.3193,
-          "grad_norm": 1.8082
+          "grad_norm": 1.8082,
+          "node_id": "grad_explosion_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:05:00Z"
         },
         {
           "step": 120,
           "train_loss": 1.7976,
-          "grad_norm": 1.9441
+          "grad_norm": 1.9441,
+          "node_id": "grad_explosion_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:06:00Z"
         },
         {
           "step": 140,
           "train_loss": 1.7535,
-          "grad_norm": 2.1314
+          "grad_norm": 2.1314,
+          "node_id": "grad_explosion_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:07:00Z"
         },
         {
           "step": 160,
           "train_loss": 2.1314,
-          "grad_norm": 2.1979
+          "grad_norm": 2.1979,
+          "node_id": "grad_explosion_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:08:00Z"
         },
         {
           "step": 180,
           "train_loss": 1.9305,
-          "grad_norm": 2.0824
+          "grad_norm": 2.0824,
+          "node_id": "grad_explosion_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:09:00Z"
         },
         {
           "step": 200,
           "train_loss": 1.464,
-          "grad_norm": 1.8912
+          "grad_norm": 1.8912,
+          "node_id": "grad_explosion_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:10:00Z"
         },
         {
           "step": 220,
           "train_loss": 1.6515,
-          "grad_norm": 1.8
+          "grad_norm": 1.8,
+          "node_id": "grad_explosion_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:11:00Z"
         },
         {
           "step": 240,
           "train_loss": 1.9427,
-          "grad_norm": 1.8927
+          "grad_norm": 1.8927,
+          "node_id": "grad_explosion_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:12:00Z"
         },
         {
           "step": 260,
           "train_loss": 1.5593,
-          "grad_norm": 2.084
+          "grad_norm": 2.084,
+          "node_id": "grad_explosion_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:13:00Z"
         },
         {
           "step": 280,
           "train_loss": 1.252,
-          "grad_norm": 88.0
+          "grad_norm": 88.0,
+          "node_id": "grad_explosion_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:14:00Z"
         },
         {
           "step": 300,
           "train_loss": 1.6052,
-          "grad_norm": 341.7
+          "grad_norm": 341.7,
+          "node_id": "grad_explosion_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:15:00Z"
         },
         {
           "step": 320,
           "train_loss": 1.7175,
-          "grad_norm": 126.4
+          "grad_norm": 126.4,
+          "node_id": "grad_explosion_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:16:00Z"
         },
         {
           "step": 340,
           "train_loss": 1.2364,
-          "grad_norm": 1.8077
+          "grad_norm": 1.8077,
+          "node_id": "grad_explosion_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:17:00Z"
         },
         {
           "step": 360,
           "train_loss": 1.154,
-          "grad_norm": 1.8498
+          "grad_norm": 1.8498,
+          "node_id": "grad_explosion_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:18:00Z"
         },
         {
           "step": 380,
           "train_loss": 1.5668,
-          "grad_norm": 2.03
+          "grad_norm": 2.03,
+          "node_id": "grad_explosion_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:19:00Z"
         },
         {
           "step": 400,
           "train_loss": 1.4577,
-          "grad_norm": 2.1826
+          "grad_norm": 2.1826,
+          "node_id": "grad_explosion_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:20:00Z"
         },
         {
           "step": 420,
           "train_loss": 0.992,
-          "grad_norm": 2.1673
+          "grad_norm": 2.1673,
+          "node_id": "grad_explosion_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:21:00Z"
         },
         {
           "step": 440,
           "train_loss": 1.1441,
-          "grad_norm": 1.9982
+          "grad_norm": 1.9982,
+          "node_id": "grad_explosion_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:22:00Z"
         },
         {
           "step": 460,
           "train_loss": 1.4973,
-          "grad_norm": 1.8308
+          "grad_norm": 1.8308,
+          "node_id": "grad_explosion_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:23:00Z"
         },
         {
           "step": 480,
           "train_loss": 1.1845,
-          "grad_norm": 1.8189
+          "grad_norm": 1.8189,
+          "node_id": "grad_explosion_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:24:00Z"
         }
       ],
       "expect": {
@@ -603,151 +828,226 @@
           "step": 0,
           "train_loss": 1.05,
           "grad_norm": 1.4,
-          "param_norm": 12.5
+          "param_norm": 12.5,
+          "node_id": "grad_vanishing_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:00:00Z"
         },
         {
           "step": 20,
           "train_loss": 1.0534,
           "grad_norm": 0.9199,
-          "param_norm": 12.501
+          "param_norm": 12.501,
+          "node_id": "grad_vanishing_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:01:00Z"
         },
         {
           "step": 40,
           "train_loss": 1.0536,
           "grad_norm": 0.6044,
-          "param_norm": 12.502
+          "param_norm": 12.502,
+          "node_id": "grad_vanishing_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:02:00Z"
         },
         {
           "step": 60,
           "train_loss": 1.0506,
           "grad_norm": 0.3971,
-          "param_norm": 12.503
+          "param_norm": 12.503,
+          "node_id": "grad_vanishing_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:03:00Z"
         },
         {
           "step": 80,
           "train_loss": 1.047,
           "grad_norm": 0.2609,
-          "param_norm": 12.504
+          "param_norm": 12.504,
+          "node_id": "grad_vanishing_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:04:00Z"
         },
         {
           "step": 100,
           "train_loss": 1.0462,
           "grad_norm": 0.1714,
-          "param_norm": 12.505
+          "param_norm": 12.505,
+          "node_id": "grad_vanishing_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:05:00Z"
         },
         {
           "step": 120,
           "train_loss": 1.0489,
           "grad_norm": 0.1126,
-          "param_norm": 12.506
+          "param_norm": 12.506,
+          "node_id": "grad_vanishing_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:06:00Z"
         },
         {
           "step": 140,
           "train_loss": 1.0526,
           "grad_norm": 0.074,
-          "param_norm": 12.507
+          "param_norm": 12.507,
+          "node_id": "grad_vanishing_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:07:00Z"
         },
         {
           "step": 160,
           "train_loss": 1.054,
           "grad_norm": 0.0486,
-          "param_norm": 12.508
+          "param_norm": 12.508,
+          "node_id": "grad_vanishing_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:08:00Z"
         },
         {
           "step": 180,
           "train_loss": 1.0516,
           "grad_norm": 0.032,
-          "param_norm": 12.509
+          "param_norm": 12.509,
+          "node_id": "grad_vanishing_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:09:00Z"
         },
         {
           "step": 200,
           "train_loss": 1.0478,
           "grad_norm": 0.021,
-          "param_norm": 12.51
+          "param_norm": 12.51,
+          "node_id": "grad_vanishing_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:10:00Z"
         },
         {
           "step": 220,
           "train_loss": 1.046,
           "grad_norm": 0.0138,
-          "param_norm": 12.511
+          "param_norm": 12.511,
+          "node_id": "grad_vanishing_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:11:00Z"
         },
         {
           "step": 240,
           "train_loss": 1.0479,
           "grad_norm": 0.0091,
-          "param_norm": 12.512
+          "param_norm": 12.512,
+          "node_id": "grad_vanishing_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:12:00Z"
         },
         {
           "step": 260,
           "train_loss": 1.0517,
           "grad_norm": 0.006,
-          "param_norm": 12.513
+          "param_norm": 12.513,
+          "node_id": "grad_vanishing_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:13:00Z"
         },
         {
           "step": 280,
           "train_loss": 1.054,
           "grad_norm": 0.0039,
-          "param_norm": 12.514
+          "param_norm": 12.514,
+          "node_id": "grad_vanishing_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:14:00Z"
         },
         {
           "step": 300,
           "train_loss": 1.0526,
           "grad_norm": 0.0026,
-          "param_norm": 12.515
+          "param_norm": 12.515,
+          "node_id": "grad_vanishing_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:15:00Z"
         },
         {
           "step": 320,
           "train_loss": 1.0488,
           "grad_norm": 0.0017,
-          "param_norm": 12.516
+          "param_norm": 12.516,
+          "node_id": "grad_vanishing_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:16:00Z"
         },
         {
           "step": 340,
           "train_loss": 1.0462,
           "grad_norm": 0.0011,
-          "param_norm": 12.517
+          "param_norm": 12.517,
+          "node_id": "grad_vanishing_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:17:00Z"
         },
         {
           "step": 360,
           "train_loss": 1.047,
           "grad_norm": 0.0007,
-          "param_norm": 12.518
+          "param_norm": 12.518,
+          "node_id": "grad_vanishing_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:18:00Z"
         },
         {
           "step": 380,
           "train_loss": 1.0506,
           "grad_norm": 0.0005,
-          "param_norm": 12.519
+          "param_norm": 12.519,
+          "node_id": "grad_vanishing_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:19:00Z"
         },
         {
           "step": 400,
           "train_loss": 1.0537,
           "grad_norm": 0.0003,
-          "param_norm": 12.52
+          "param_norm": 12.52,
+          "node_id": "grad_vanishing_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:20:00Z"
         },
         {
           "step": 420,
           "train_loss": 1.0533,
           "grad_norm": 0.0003,
-          "param_norm": 12.521
+          "param_norm": 12.521,
+          "node_id": "grad_vanishing_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:21:00Z"
         },
         {
           "step": 440,
           "train_loss": 1.05,
           "grad_norm": 0.0003,
-          "param_norm": 12.522
+          "param_norm": 12.522,
+          "node_id": "grad_vanishing_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:22:00Z"
         },
         {
           "step": 460,
           "train_loss": 1.0466,
           "grad_norm": 0.0003,
-          "param_norm": 12.523
+          "param_norm": 12.523,
+          "node_id": "grad_vanishing_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:23:00Z"
         },
         {
           "step": 480,
           "train_loss": 1.0464,
           "grad_norm": 0.0003,
-          "param_norm": 12.524
+          "param_norm": 12.524,
+          "node_id": "grad_vanishing_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:24:00Z"
         }
       ],
       "expect": {
@@ -783,127 +1083,202 @@
         {
           "step": 0,
           "train_loss": 1.52,
-          "grad_norm": 2.0
+          "grad_norm": 2.0,
+          "node_id": "plateaued_curve_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:00:00Z"
         },
         {
           "step": 20,
           "train_loss": 0.9859,
-          "grad_norm": 2.2104
+          "grad_norm": 2.2104,
+          "node_id": "plateaued_curve_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:01:00Z"
         },
         {
           "step": 40,
           "train_loss": 0.7688,
-          "grad_norm": 2.2273
+          "grad_norm": 2.2273,
+          "node_id": "plateaued_curve_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:02:00Z"
         },
         {
           "step": 60,
           "train_loss": 0.6805,
-          "grad_norm": 2.0353
+          "grad_norm": 2.0353,
+          "node_id": "plateaued_curve_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:03:00Z"
         },
         {
           "step": 80,
           "train_loss": 0.6446,
-          "grad_norm": 1.8108
+          "grad_norm": 1.8108,
+          "node_id": "plateaued_curve_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:04:00Z"
         },
         {
           "step": 100,
           "train_loss": 0.63,
-          "grad_norm": 1.7603
+          "grad_norm": 1.7603,
+          "node_id": "plateaued_curve_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:05:00Z"
         },
         {
           "step": 120,
           "train_loss": 0.6241,
-          "grad_norm": 1.9301
+          "grad_norm": 1.9301,
+          "node_id": "plateaued_curve_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:06:00Z"
         },
         {
           "step": 140,
           "train_loss": 0.6217,
-          "grad_norm": 2.1642
+          "grad_norm": 2.1642,
+          "node_id": "plateaued_curve_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:07:00Z"
         },
         {
           "step": 160,
           "train_loss": 0.6207,
-          "grad_norm": 2.2473
+          "grad_norm": 2.2473,
+          "node_id": "plateaued_curve_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:08:00Z"
         },
         {
           "step": 180,
           "train_loss": 0.6203,
-          "grad_norm": 2.103
+          "grad_norm": 2.103,
+          "node_id": "plateaued_curve_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:09:00Z"
         },
         {
           "step": 200,
           "train_loss": 0.6201,
-          "grad_norm": 1.864
+          "grad_norm": 1.864,
+          "node_id": "plateaued_curve_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:10:00Z"
         },
         {
           "step": 220,
           "train_loss": 0.62,
-          "grad_norm": 1.75
+          "grad_norm": 1.75,
+          "node_id": "plateaued_curve_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:11:00Z"
         },
         {
           "step": 240,
           "train_loss": 0.62,
-          "grad_norm": 1.8659
+          "grad_norm": 1.8659,
+          "node_id": "plateaued_curve_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:12:00Z"
         },
         {
           "step": 260,
           "train_loss": 0.62,
-          "grad_norm": 2.105
+          "grad_norm": 2.105,
+          "node_id": "plateaued_curve_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:13:00Z"
         },
         {
           "step": 280,
           "train_loss": 0.62,
-          "grad_norm": 2.2477
+          "grad_norm": 2.2477,
+          "node_id": "plateaued_curve_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:14:00Z"
         },
         {
           "step": 300,
           "train_loss": 0.62,
-          "grad_norm": 2.1626
+          "grad_norm": 2.1626,
+          "node_id": "plateaued_curve_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:15:00Z"
         },
         {
           "step": 320,
           "train_loss": 0.62,
-          "grad_norm": 1.928
+          "grad_norm": 1.928,
+          "node_id": "plateaued_curve_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:16:00Z"
         },
         {
           "step": 340,
           "train_loss": 0.62,
-          "grad_norm": 1.7597
+          "grad_norm": 1.7597,
+          "node_id": "plateaued_curve_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:17:00Z"
         },
         {
           "step": 360,
           "train_loss": 0.62,
-          "grad_norm": 1.8123
+          "grad_norm": 1.8123,
+          "node_id": "plateaued_curve_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:18:00Z"
         },
         {
           "step": 380,
           "train_loss": 0.62,
-          "grad_norm": 2.0375
+          "grad_norm": 2.0375,
+          "node_id": "plateaued_curve_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:19:00Z"
         },
         {
           "step": 400,
           "train_loss": 0.62,
-          "grad_norm": 2.2282
+          "grad_norm": 2.2282,
+          "node_id": "plateaued_curve_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:20:00Z"
         },
         {
           "step": 420,
           "train_loss": 0.62,
-          "grad_norm": 2.2092
+          "grad_norm": 2.2092,
+          "node_id": "plateaued_curve_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:21:00Z"
         },
         {
           "step": 440,
           "train_loss": 0.62,
-          "grad_norm": 1.9978
+          "grad_norm": 1.9978,
+          "node_id": "plateaued_curve_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:22:00Z"
         },
         {
           "step": 460,
           "train_loss": 0.62,
-          "grad_norm": 1.7884
+          "grad_norm": 1.7884,
+          "node_id": "plateaued_curve_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:23:00Z"
         },
         {
           "step": 480,
           "train_loss": 0.62,
-          "grad_norm": 1.7736
+          "grad_norm": 1.7736,
+          "node_id": "plateaued_curve_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:24:00Z"
         }
       ],
       "expect": {
@@ -939,127 +1314,202 @@
         {
           "step": 0,
           "train_loss": 2.32,
-          "grad_norm": 2.0
+          "grad_norm": 2.0,
+          "node_id": "diverging_curve_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:00:00Z"
         },
         {
           "step": 20,
           "train_loss": 1.9448,
-          "grad_norm": 2.2104
+          "grad_norm": 2.2104,
+          "node_id": "diverging_curve_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:01:00Z"
         },
         {
           "step": 40,
           "train_loss": 1.6437,
-          "grad_norm": 2.2273
+          "grad_norm": 2.2273,
+          "node_id": "diverging_curve_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:02:00Z"
         },
         {
           "step": 60,
           "train_loss": 1.402,
-          "grad_norm": 2.0353
+          "grad_norm": 2.0353,
+          "node_id": "diverging_curve_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:03:00Z"
         },
         {
           "step": 80,
           "train_loss": 1.2081,
-          "grad_norm": 1.8108
+          "grad_norm": 1.8108,
+          "node_id": "diverging_curve_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:04:00Z"
         },
         {
           "step": 100,
           "train_loss": 1.0525,
-          "grad_norm": 1.7603
+          "grad_norm": 1.7603,
+          "node_id": "diverging_curve_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:05:00Z"
         },
         {
           "step": 120,
           "train_loss": 0.9276,
-          "grad_norm": 1.9301
+          "grad_norm": 1.9301,
+          "node_id": "diverging_curve_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:06:00Z"
         },
         {
           "step": 140,
           "train_loss": 0.8273,
-          "grad_norm": 2.1642
+          "grad_norm": 2.1642,
+          "node_id": "diverging_curve_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:07:00Z"
         },
         {
           "step": 160,
           "train_loss": 0.7469,
-          "grad_norm": 2.2473
+          "grad_norm": 2.2473,
+          "node_id": "diverging_curve_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:08:00Z"
         },
         {
           "step": 180,
           "train_loss": 0.6823,
-          "grad_norm": 2.103
+          "grad_norm": 2.103,
+          "node_id": "diverging_curve_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:09:00Z"
         },
         {
           "step": 200,
           "train_loss": 0.6305,
-          "grad_norm": 1.864
+          "grad_norm": 1.864,
+          "node_id": "diverging_curve_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:10:00Z"
         },
         {
           "step": 220,
           "train_loss": 0.589,
-          "grad_norm": 1.75
+          "grad_norm": 1.75,
+          "node_id": "diverging_curve_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:11:00Z"
         },
         {
           "step": 240,
           "train_loss": 0.5556,
-          "grad_norm": 1.8659
+          "grad_norm": 1.8659,
+          "node_id": "diverging_curve_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:12:00Z"
         },
         {
           "step": 260,
           "train_loss": 0.5288,
-          "grad_norm": 2.105
+          "grad_norm": 2.105,
+          "node_id": "diverging_curve_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:13:00Z"
         },
         {
           "step": 280,
           "train_loss": 0.5073,
-          "grad_norm": 2.2477
+          "grad_norm": 2.2477,
+          "node_id": "diverging_curve_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:14:00Z"
         },
         {
           "step": 300,
           "train_loss": 0.4901,
-          "grad_norm": 2.1626
+          "grad_norm": 2.1626,
+          "node_id": "diverging_curve_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:15:00Z"
         },
         {
           "step": 320,
           "train_loss": 0.4762,
-          "grad_norm": 1.928
+          "grad_norm": 1.928,
+          "node_id": "diverging_curve_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:16:00Z"
         },
         {
           "step": 340,
           "train_loss": 0.4651,
-          "grad_norm": 1.7597
+          "grad_norm": 1.7597,
+          "node_id": "diverging_curve_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:17:00Z"
         },
         {
           "step": 360,
           "train_loss": 0.99,
-          "grad_norm": 1.8123
+          "grad_norm": 1.8123,
+          "node_id": "diverging_curve_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:18:00Z"
         },
         {
           "step": 380,
           "train_loss": 1.02,
-          "grad_norm": 2.0375
+          "grad_norm": 2.0375,
+          "node_id": "diverging_curve_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:19:00Z"
         },
         {
           "step": 400,
           "train_loss": 1.05,
-          "grad_norm": 2.2282
+          "grad_norm": 2.2282,
+          "node_id": "diverging_curve_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:20:00Z"
         },
         {
           "step": 420,
           "train_loss": 1.08,
-          "grad_norm": 2.2092
+          "grad_norm": 2.2092,
+          "node_id": "diverging_curve_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:21:00Z"
         },
         {
           "step": 440,
           "train_loss": 1.11,
-          "grad_norm": 1.9978
+          "grad_norm": 1.9978,
+          "node_id": "diverging_curve_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:22:00Z"
         },
         {
           "step": 460,
           "train_loss": 1.14,
-          "grad_norm": 1.7884
+          "grad_norm": 1.7884,
+          "node_id": "diverging_curve_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:23:00Z"
         },
         {
           "step": 480,
           "train_loss": 1.17,
-          "grad_norm": 1.7736
+          "grad_norm": 1.7736,
+          "node_id": "diverging_curve_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:24:00Z"
         }
       ],
       "expect": {
@@ -1092,27 +1542,42 @@
         {
           "step": 0,
           "train_loss": 2.475,
-          "grad_norm": 2.0
+          "grad_norm": 2.0,
+          "node_id": "truncated_run_trap_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:00:00Z"
         },
         {
           "step": 20,
           "train_loss": 2.2251,
-          "grad_norm": 2.2104
+          "grad_norm": 2.2104,
+          "node_id": "truncated_run_trap_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:01:00Z"
         },
         {
           "step": 40,
           "train_loss": 2.0024,
-          "grad_norm": 2.2273
+          "grad_norm": 2.2273,
+          "node_id": "truncated_run_trap_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:02:00Z"
         },
         {
           "step": 60,
           "train_loss": 1.8039,
-          "grad_norm": 2.0353
+          "grad_norm": 2.0353,
+          "node_id": "truncated_run_trap_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:03:00Z"
         },
         {
           "step": 80,
           "train_loss": 1.627,
-          "grad_norm": 1.8108
+          "grad_norm": 1.8108,
+          "node_id": "truncated_run_trap_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:04:00Z"
         }
       ],
       "expect": {
@@ -1154,151 +1619,226 @@
           "step": 0,
           "train_loss": 2.475,
           "grad_norm": 2.0,
-          "param_norm": 11.8
+          "param_norm": 11.8,
+          "node_id": "upgrade_negative_control_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:00:00Z"
         },
         {
           "step": 20,
           "train_loss": 2.2251,
           "grad_norm": 2.2104,
-          "param_norm": 11.82
+          "param_norm": 11.82,
+          "node_id": "upgrade_negative_control_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:01:00Z"
         },
         {
           "step": 40,
           "train_loss": 2.0024,
           "grad_norm": 2.2273,
-          "param_norm": 11.84
+          "param_norm": 11.84,
+          "node_id": "upgrade_negative_control_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:02:00Z"
         },
         {
           "step": 60,
           "train_loss": 1.8039,
           "grad_norm": 2.0353,
-          "param_norm": 11.86
+          "param_norm": 11.86,
+          "node_id": "upgrade_negative_control_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:03:00Z"
         },
         {
           "step": 80,
           "train_loss": 1.627,
           "grad_norm": 1.8108,
-          "param_norm": 11.88
+          "param_norm": 11.88,
+          "node_id": "upgrade_negative_control_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:04:00Z"
         },
         {
           "step": 100,
           "train_loss": 1.4692,
           "grad_norm": 1.7603,
-          "param_norm": 11.9
+          "param_norm": 11.9,
+          "node_id": "upgrade_negative_control_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:05:00Z"
         },
         {
           "step": 120,
           "train_loss": 1.3286,
           "grad_norm": 1.9301,
-          "param_norm": 11.92
+          "param_norm": 11.92,
+          "node_id": "upgrade_negative_control_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:06:00Z"
         },
         {
           "step": 140,
           "train_loss": 1.2033,
           "grad_norm": 2.1642,
-          "param_norm": 11.94
+          "param_norm": 11.94,
+          "node_id": "upgrade_negative_control_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:07:00Z"
         },
         {
           "step": 160,
           "train_loss": 1.0916,
           "grad_norm": 2.2473,
-          "param_norm": 11.96
+          "param_norm": 11.96,
+          "node_id": "upgrade_negative_control_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:08:00Z"
         },
         {
           "step": 180,
           "train_loss": 0.992,
           "grad_norm": 2.103,
-          "param_norm": 11.98
+          "param_norm": 11.98,
+          "node_id": "upgrade_negative_control_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:09:00Z"
         },
         {
           "step": 200,
           "train_loss": 0.9033,
           "grad_norm": 1.864,
-          "param_norm": 12.0
+          "param_norm": 12.0,
+          "node_id": "upgrade_negative_control_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:10:00Z"
         },
         {
           "step": 220,
           "train_loss": 0.8242,
           "grad_norm": 1.75,
-          "param_norm": 12.02
+          "param_norm": 12.02,
+          "node_id": "upgrade_negative_control_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:11:00Z"
         },
         {
           "step": 240,
           "train_loss": 0.7536,
           "grad_norm": 1.8659,
-          "param_norm": 12.04
+          "param_norm": 12.04,
+          "node_id": "upgrade_negative_control_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:12:00Z"
         },
         {
           "step": 260,
           "train_loss": 0.6908,
           "grad_norm": 2.105,
-          "param_norm": 12.06
+          "param_norm": 12.06,
+          "node_id": "upgrade_negative_control_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:13:00Z"
         },
         {
           "step": 280,
           "train_loss": 0.6347,
           "grad_norm": 2.2477,
-          "param_norm": 12.08
+          "param_norm": 12.08,
+          "node_id": "upgrade_negative_control_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:14:00Z"
         },
         {
           "step": 300,
           "train_loss": 0.5848,
           "grad_norm": 2.1626,
-          "param_norm": 12.1
+          "param_norm": 12.1,
+          "node_id": "upgrade_negative_control_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:15:00Z"
         },
         {
           "step": 320,
           "train_loss": 0.5403,
           "grad_norm": 1.928,
-          "param_norm": 12.12
+          "param_norm": 12.12,
+          "node_id": "upgrade_negative_control_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:16:00Z"
         },
         {
           "step": 340,
           "train_loss": 0.5006,
           "grad_norm": 1.7597,
-          "param_norm": 12.14
+          "param_norm": 12.14,
+          "node_id": "upgrade_negative_control_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:17:00Z"
         },
         {
           "step": 360,
           "train_loss": 0.4652,
           "grad_norm": 1.8123,
-          "param_norm": 12.16
+          "param_norm": 12.16,
+          "node_id": "upgrade_negative_control_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:18:00Z"
         },
         {
           "step": 380,
           "train_loss": 0.4337,
           "grad_norm": 2.0375,
-          "param_norm": 12.18
+          "param_norm": 12.18,
+          "node_id": "upgrade_negative_control_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:19:00Z"
         },
         {
           "step": 400,
           "train_loss": 0.4056,
           "grad_norm": 2.2282,
-          "param_norm": 12.2
+          "param_norm": 12.2,
+          "node_id": "upgrade_negative_control_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:20:00Z"
         },
         {
           "step": 420,
           "train_loss": 0.3805,
           "grad_norm": 2.2092,
-          "param_norm": 12.22
+          "param_norm": 12.22,
+          "node_id": "upgrade_negative_control_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:21:00Z"
         },
         {
           "step": 440,
           "train_loss": 0.3582,
           "grad_norm": 1.9978,
-          "param_norm": 12.24
+          "param_norm": 12.24,
+          "node_id": "upgrade_negative_control_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:22:00Z"
         },
         {
           "step": 460,
           "train_loss": 0.3383,
           "grad_norm": 1.7884,
-          "param_norm": 12.26
+          "param_norm": 12.26,
+          "node_id": "upgrade_negative_control_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:23:00Z"
         },
         {
           "step": 480,
           "train_loss": 0.3206,
           "grad_norm": 1.7736,
-          "param_norm": 12.28
+          "param_norm": 12.28,
+          "node_id": "upgrade_negative_control_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:24:00Z"
         }
       ],
       "tick_history": [
@@ -1349,127 +1889,202 @@
         {
           "step": 0,
           "train_loss": 1.52,
-          "grad_norm": 2.0
+          "grad_norm": 2.0,
+          "node_id": "upgrade_positive_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:00:00Z"
         },
         {
           "step": 20,
           "train_loss": 0.9859,
-          "grad_norm": 2.2104
+          "grad_norm": 2.2104,
+          "node_id": "upgrade_positive_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:01:00Z"
         },
         {
           "step": 40,
           "train_loss": 0.7688,
-          "grad_norm": 2.2273
+          "grad_norm": 2.2273,
+          "node_id": "upgrade_positive_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:02:00Z"
         },
         {
           "step": 60,
           "train_loss": 0.6805,
-          "grad_norm": 2.0353
+          "grad_norm": 2.0353,
+          "node_id": "upgrade_positive_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:03:00Z"
         },
         {
           "step": 80,
           "train_loss": 0.6446,
-          "grad_norm": 1.8108
+          "grad_norm": 1.8108,
+          "node_id": "upgrade_positive_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:04:00Z"
         },
         {
           "step": 100,
           "train_loss": 0.63,
-          "grad_norm": 1.7603
+          "grad_norm": 1.7603,
+          "node_id": "upgrade_positive_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:05:00Z"
         },
         {
           "step": 120,
           "train_loss": 0.6241,
-          "grad_norm": 1.9301
+          "grad_norm": 1.9301,
+          "node_id": "upgrade_positive_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:06:00Z"
         },
         {
           "step": 140,
           "train_loss": 0.6217,
-          "grad_norm": 2.1642
+          "grad_norm": 2.1642,
+          "node_id": "upgrade_positive_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:07:00Z"
         },
         {
           "step": 160,
           "train_loss": 0.6207,
-          "grad_norm": 2.2473
+          "grad_norm": 2.2473,
+          "node_id": "upgrade_positive_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:08:00Z"
         },
         {
           "step": 180,
           "train_loss": 0.6203,
-          "grad_norm": 2.103
+          "grad_norm": 2.103,
+          "node_id": "upgrade_positive_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:09:00Z"
         },
         {
           "step": 200,
           "train_loss": 0.6201,
-          "grad_norm": 1.864
+          "grad_norm": 1.864,
+          "node_id": "upgrade_positive_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:10:00Z"
         },
         {
           "step": 220,
           "train_loss": 0.62,
-          "grad_norm": 1.75
+          "grad_norm": 1.75,
+          "node_id": "upgrade_positive_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:11:00Z"
         },
         {
           "step": 240,
           "train_loss": 0.62,
-          "grad_norm": 1.8659
+          "grad_norm": 1.8659,
+          "node_id": "upgrade_positive_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:12:00Z"
         },
         {
           "step": 260,
           "train_loss": 0.62,
-          "grad_norm": 2.105
+          "grad_norm": 2.105,
+          "node_id": "upgrade_positive_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:13:00Z"
         },
         {
           "step": 280,
           "train_loss": 0.62,
-          "grad_norm": 2.2477
+          "grad_norm": 2.2477,
+          "node_id": "upgrade_positive_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:14:00Z"
         },
         {
           "step": 300,
           "train_loss": 0.62,
-          "grad_norm": 2.1626
+          "grad_norm": 2.1626,
+          "node_id": "upgrade_positive_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:15:00Z"
         },
         {
           "step": 320,
           "train_loss": 0.62,
-          "grad_norm": 1.928
+          "grad_norm": 1.928,
+          "node_id": "upgrade_positive_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:16:00Z"
         },
         {
           "step": 340,
           "train_loss": 0.62,
-          "grad_norm": 1.7597
+          "grad_norm": 1.7597,
+          "node_id": "upgrade_positive_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:17:00Z"
         },
         {
           "step": 360,
           "train_loss": 0.62,
-          "grad_norm": 1.8123
+          "grad_norm": 1.8123,
+          "node_id": "upgrade_positive_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:18:00Z"
         },
         {
           "step": 380,
           "train_loss": 0.62,
-          "grad_norm": 2.0375
+          "grad_norm": 2.0375,
+          "node_id": "upgrade_positive_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:19:00Z"
         },
         {
           "step": 400,
           "train_loss": 0.62,
-          "grad_norm": 2.2282
+          "grad_norm": 2.2282,
+          "node_id": "upgrade_positive_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:20:00Z"
         },
         {
           "step": 420,
           "train_loss": 0.62,
-          "grad_norm": 2.2092
+          "grad_norm": 2.2092,
+          "node_id": "upgrade_positive_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:21:00Z"
         },
         {
           "step": 440,
           "train_loss": 0.62,
-          "grad_norm": 1.9978
+          "grad_norm": 1.9978,
+          "node_id": "upgrade_positive_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:22:00Z"
         },
         {
           "step": 460,
           "train_loss": 0.62,
-          "grad_norm": 1.7884
+          "grad_norm": 1.7884,
+          "node_id": "upgrade_positive_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:23:00Z"
         },
         {
           "step": 480,
           "train_loss": 0.62,
-          "grad_norm": 1.7736
+          "grad_norm": 1.7736,
+          "node_id": "upgrade_positive_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:24:00Z"
         }
       ],
       "tick_history": [
@@ -1524,151 +2139,226 @@
           "step": 0,
           "train_loss": 2.475,
           "grad_norm": 2.0,
-          "param_norm": 11.8
+          "param_norm": 11.8,
+          "node_id": "refuted_verdict_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:00:00Z"
         },
         {
           "step": 20,
           "train_loss": 2.2251,
           "grad_norm": 2.2104,
-          "param_norm": 11.82
+          "param_norm": 11.82,
+          "node_id": "refuted_verdict_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:01:00Z"
         },
         {
           "step": 40,
           "train_loss": 2.0024,
           "grad_norm": 2.2273,
-          "param_norm": 11.84
+          "param_norm": 11.84,
+          "node_id": "refuted_verdict_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:02:00Z"
         },
         {
           "step": 60,
           "train_loss": 1.8039,
           "grad_norm": 2.0353,
-          "param_norm": 11.86
+          "param_norm": 11.86,
+          "node_id": "refuted_verdict_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:03:00Z"
         },
         {
           "step": 80,
           "train_loss": 1.627,
           "grad_norm": 1.8108,
-          "param_norm": 11.88
+          "param_norm": 11.88,
+          "node_id": "refuted_verdict_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:04:00Z"
         },
         {
           "step": 100,
           "train_loss": 1.4692,
           "grad_norm": 1.7603,
-          "param_norm": 11.9
+          "param_norm": 11.9,
+          "node_id": "refuted_verdict_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:05:00Z"
         },
         {
           "step": 120,
           "train_loss": 1.3286,
           "grad_norm": 1.9301,
-          "param_norm": 11.92
+          "param_norm": 11.92,
+          "node_id": "refuted_verdict_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:06:00Z"
         },
         {
           "step": 140,
           "train_loss": 1.2033,
           "grad_norm": 2.1642,
-          "param_norm": 11.94
+          "param_norm": 11.94,
+          "node_id": "refuted_verdict_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:07:00Z"
         },
         {
           "step": 160,
           "train_loss": 1.0916,
           "grad_norm": 2.2473,
-          "param_norm": 11.96
+          "param_norm": 11.96,
+          "node_id": "refuted_verdict_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:08:00Z"
         },
         {
           "step": 180,
           "train_loss": 0.992,
           "grad_norm": 2.103,
-          "param_norm": 11.98
+          "param_norm": 11.98,
+          "node_id": "refuted_verdict_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:09:00Z"
         },
         {
           "step": 200,
           "train_loss": 0.9033,
           "grad_norm": 1.864,
-          "param_norm": 12.0
+          "param_norm": 12.0,
+          "node_id": "refuted_verdict_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:10:00Z"
         },
         {
           "step": 220,
           "train_loss": 0.8242,
           "grad_norm": 1.75,
-          "param_norm": 12.02
+          "param_norm": 12.02,
+          "node_id": "refuted_verdict_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:11:00Z"
         },
         {
           "step": 240,
           "train_loss": 0.7536,
           "grad_norm": 1.8659,
-          "param_norm": 12.04
+          "param_norm": 12.04,
+          "node_id": "refuted_verdict_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:12:00Z"
         },
         {
           "step": 260,
           "train_loss": 0.6908,
           "grad_norm": 2.105,
-          "param_norm": 12.06
+          "param_norm": 12.06,
+          "node_id": "refuted_verdict_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:13:00Z"
         },
         {
           "step": 280,
           "train_loss": 0.6347,
           "grad_norm": 2.2477,
-          "param_norm": 12.08
+          "param_norm": 12.08,
+          "node_id": "refuted_verdict_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:14:00Z"
         },
         {
           "step": 300,
           "train_loss": 0.5848,
           "grad_norm": 2.1626,
-          "param_norm": 12.1
+          "param_norm": 12.1,
+          "node_id": "refuted_verdict_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:15:00Z"
         },
         {
           "step": 320,
           "train_loss": 0.5403,
           "grad_norm": 1.928,
-          "param_norm": 12.12
+          "param_norm": 12.12,
+          "node_id": "refuted_verdict_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:16:00Z"
         },
         {
           "step": 340,
           "train_loss": 0.5006,
           "grad_norm": 1.7597,
-          "param_norm": 12.14
+          "param_norm": 12.14,
+          "node_id": "refuted_verdict_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:17:00Z"
         },
         {
           "step": 360,
           "train_loss": 0.4652,
           "grad_norm": 1.8123,
-          "param_norm": 12.16
+          "param_norm": 12.16,
+          "node_id": "refuted_verdict_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:18:00Z"
         },
         {
           "step": 380,
           "train_loss": 0.4337,
           "grad_norm": 2.0375,
-          "param_norm": 12.18
+          "param_norm": 12.18,
+          "node_id": "refuted_verdict_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:19:00Z"
         },
         {
           "step": 400,
           "train_loss": 0.4056,
           "grad_norm": 2.2282,
-          "param_norm": 12.2
+          "param_norm": 12.2,
+          "node_id": "refuted_verdict_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:20:00Z"
         },
         {
           "step": 420,
           "train_loss": 0.3805,
           "grad_norm": 2.2092,
-          "param_norm": 12.22
+          "param_norm": 12.22,
+          "node_id": "refuted_verdict_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:21:00Z"
         },
         {
           "step": 440,
           "train_loss": 0.3582,
           "grad_norm": 1.9978,
-          "param_norm": 12.24
+          "param_norm": 12.24,
+          "node_id": "refuted_verdict_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:22:00Z"
         },
         {
           "step": 460,
           "train_loss": 0.3383,
           "grad_norm": 1.7884,
-          "param_norm": 12.26
+          "param_norm": 12.26,
+          "node_id": "refuted_verdict_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:23:00Z"
         },
         {
           "step": 480,
           "train_loss": 0.3206,
           "grad_norm": 1.7736,
-          "param_norm": 12.28
+          "param_norm": 12.28,
+          "node_id": "refuted_verdict_node",
+          "run_id": "run-2026-08-20-a",
+          "timestamp": "2026-08-20T14:24:00Z"
         }
       ],
       "expect": {

@@ -40,8 +40,18 @@ for a in "${SCRIPT_ARGS[@]}"; do
 done
 
 IMG="evor-plugin-test"
-echo "▶ building $IMG (CPU image, pinned CLI) ..."
-docker build -f ci/docker/Dockerfile -t "$IMG" . || { echo "✗ build failed"; exit 2; }
+# The Dockerfile does `COPY . /plugin` BEFORE npm ci, the venv and three pip
+# installs, so any repo edit invalidates ~20 minutes of layers. The harness
+# scripts and case files are plain JS/JSON that need no build step, so they are
+# bind-mounted below instead — which means an existing image can be reused while
+# iterating on a case file. Set AGENT_EVAL_REBUILD=1 to force a rebuild after
+# changing anything the image actually builds (mcp/, harness/, the Dockerfile).
+if [ "${AGENT_EVAL_REBUILD:-0}" = "1" ] || ! docker image inspect "$IMG" >/dev/null 2>&1; then
+  echo "▶ building $IMG (CPU image, pinned CLI) ..."
+  docker build -f ci/docker/Dockerfile -t "$IMG" . || { echo "✗ build failed"; exit 2; }
+else
+  echo "▶ reusing existing $IMG (set AGENT_EVAL_REBUILD=1 to rebuild)"
+fi
 
 mkdir -p ci/out
 
@@ -62,6 +72,12 @@ RUN_ARGS=(--rm
   -e "CLAUDE_PLUGIN_ROOT=/plugin"
   -e "EVOR_PLUGIN_ROOT=/plugin"
   -v "$BENCH_HOME:$CONTAINER_HOME"
+  # Harness scripts, case files and agent definitions come from the working
+  # checkout read-only, so editing a case file does not mean rebuilding the
+  # image. ci/out is mounted rw *after* ci so the nested mount wins.
+  -v "$PWD/ci:/plugin/ci:ro"
+  -v "$PWD/evals:/plugin/evals:ro"
+  -v "$PWD/agents:/plugin/agents:ro"
   -v "$PWD/ci/out:/plugin/ci/out")
 
 if [ -n "${CLAUDE_CODE_OAUTH_TOKEN:-}" ]; then
