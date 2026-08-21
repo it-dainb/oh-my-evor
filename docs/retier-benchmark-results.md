@@ -38,7 +38,15 @@ contradictions, which changed both the prompts and several expectations, so
 these numbers no longer describe the shipped files. The re-baseline below
 replaces them; the four unmarked rows are unaffected and stand as measured.
 
-Sum of mean per-call cost across the seven roles: **$0.4766** current vs **$0.7521** pre-retier (**37% cheaper**).
+Sum of mean per-call cost across the seven roles, using the re-baselined runs
+for the three ‡ rows: **$0.5163** current vs **$0.8266** pre-retier
+(**38% cheaper**). Per-role: probe +28.5%, forge-analyst +48.2%,
+forge-architect +35.3%, forge-critic +43.3%, sage +32.0%, sage-junior +64.9%,
+mutagen +29.4%.
+
+All seven retiers hold. Not one was defeated by a model that could not do the
+work; the only regression that survived scrutiny turned out to be an instruction
+the model could not find.
 
 † mutagen's current arm is sonnet:medium **with the S26 prompt fix**. As
 shipped before that fix it was 7/30 (23.3%) against opus's 22/30 — a genuine
@@ -46,6 +54,75 @@ regression at p=0.0002. See below.
 
 **Verdict: 7 of 7 retiers hold.** No role regresses at p<0.05. Four of the seven
 point cheaper-arm-ahead, though none significantly.
+
+## Re-baseline after the agent-file fixes (S30-S32)
+
+The three ‡ rows above were measured against agent files that answered the same
+question twice, differently (`docs/agent-file-defects.md`). Fixing those files
+changed the prompts, and fixing the fixtures that had encoded the contradictions
+changed the case sets, so these runs replace them outright:
+
+| role | retier | current | pre-retier | delta | Fisher p | verdict | $/pass |
+|---|---|---|---|---|---|---|---|
+| mutagen | opus->sonnet | 24/30 = 80.0% [63–91] | 24/30 = 80.0% [63–91] | +0.0pp | 1.0000 | no difference | $0.2124 vs $0.3008 (+29%) |
+| sage | opus->sonnet | 37/39 = 94.9% [83–99] | 33/39 = 84.6% [70–93] | +10.3pp | 0.2626 | no difference | $0.0903 vs $0.1489 (+39%) |
+| sage-junior | sonnet->haiku | 31/33 = 93.9% [80–98] | 29/33 = 87.9% [73–95] | +6.1pp | 0.6724 | no difference | $0.0328 vs $0.0998 (+67%) |
+
+**These accuracies are not comparable to the ‡ rows.** The case sets changed:
+sage went from 10 cases to 13 and sage-junior from 9 to 11, and several
+expectations flipped because the models had been right and the fixtures wrong.
+What *is* comparable is the arm-vs-arm verdict within each run, which is the only
+thing the retier decision rests on.
+
+All three retiers hold, and none of the three has a case failing in every arm
+any more — the state the fixes were aiming for. sage-junior's saving is the
+largest in the whole exercise at **67% per passing attempt**, and it is now the
+*better* arm as well as the cheaper one; haiku still runs ~2x slower per call
+(40.7s vs 20.8s), which matters only if latency ever outranks cost.
+
+### sage-junior: the merge rule was worth 9 points
+
+`wide-disagreement` had been failing in both arms — 0/3 sonnet, 1/3 haiku — and
+both models had the same defensible reason. They emitted **one finding per
+source**, so two papers reporting the same metric became two single-source
+findings, each legitimately "medium". The comparability gate never ran at all,
+because step 2b only fires when A and B sit inside one finding. The 24-point
+disagreement between the two papers — the whole question the angle was asked to
+resolve — appeared nowhere in the output, and nothing in the file forbade it.
+
+Stating the merge rule in `Output_Format` took the case to 3/3 haiku and 2/3
+sonnet, and lifted both arms overall (haiku 84.8% -> 93.9%, sonnet 90.9% ->
+87.9% within noise). Note the shape: this was invisible to every check that
+looked at *values*. It only surfaced because a case failed in both arms, which
+is the signature worth trusting.
+
+### mutagen: the same lesson as S26, found a second time
+
+The first re-baseline came back a genuine regression — sonnet 14/30 against
+opus's 24/30 — driven almost entirely by the newly-graded `mutation_tier`, which
+scored 30/30 for opus and 20/30 for sonnet. Sonnet was labelling proposals
+`"structural"` at wildness 0.45, apparently reasoning that switching approach
+family is inherently a structural change.
+
+The rule was stated, correctly and unambiguously, in `Wildness_Interpretation` —
+and nowhere near `Output_Format`, where the model actually writes the field.
+Restating it there as a two-number lookup, and naming the specific wrong
+inference, took sonnet to **30/30 on that field with no tier change**:
+
+| mutagen arm | mutation_tier | overall | note |
+|---|---|---|---|
+| sonnet, rule stated only in Wildness_Interpretation | 20/30 | 14/30 | regression, z=2.68 |
+| sonnet, rule restated at the point of use | 30/30 | 24/30 | ties opus |
+| opus | 30/30 | 24/30 | baseline |
+
+This is the second independent instance of the pattern S26 found for `dream_k`.
+Two data points is not a law, but it is enough to change the default move:
+**when the cheaper tier regresses on one specific field, check whether the rule
+is stated where that field is written before concluding the model cannot do it.**
+Both times the answer was prompt placement, and both times raising the tier back
+would have paid for a defect that cost nothing to fix.
+
+---
 
 ## The one real regression, and why effort was the wrong lever
 

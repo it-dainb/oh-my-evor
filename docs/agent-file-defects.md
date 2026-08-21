@@ -141,9 +141,34 @@ repeating a family costs a slot and buys nothing. Both fixtures now expect 7.
 
 ---
 
+## 5. `evor-sage-junior.md` — one finding per source, or one per claim?
+
+The file never said. Both arms split two search results reporting the same
+metric into two single-source findings, each correctly reported at `"medium"` as
+a single authoritative source. The comparability gate never ran, because step 2b
+only fires when A and B sit inside one finding — so a 24-point disagreement
+between two papers, the entire question the angle was asked to resolve, appeared
+nowhere in the output.
+
+This is the same shape as the sage `ambiguous-low-confidence` fixture defect:
+treating ambiguity as a property of a *pair* rather than of a *finding*. There
+the fixture was wrong; here the file was silent, so the expectation was grading a
+merge no rule required.
+
+Found the same way as defect 4 — `wide-disagreement` at 0/3 and 1/3, near enough
+to the both-arms signature to be worth checking rather than reading as a haiku
+weakness.
+
+**Fixed.** `Output_Format` now opens with ONE FINDING PER CLAIM, not one per
+source, explains that splitting skips the gate, and says when separate findings
+*are* right (a different technique, or a different metric). The checklist asks
+for it directly. sage-junior went 84.8% -> 93.9% on haiku.
+
+---
+
 ## Cross-cutting note
 
-All four are the same defect class this session has been chasing: **a rule that
+All five are the same defect class this session has been chasing: **a rule that
 is graded but not stated, or stated twice with different answers.** The harness
 catches the first shape structurally — `scoreByContract` throws on an
 expectation outside the contract. It cannot catch the second, because both
