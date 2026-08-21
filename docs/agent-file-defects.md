@@ -5,7 +5,7 @@ models. They were found by benchmarking, which is the point: a contract that
 contradicts itself cannot be graded, and until you try to grade it nobody
 notices.
 
-**Status: all seven are fixed.** They were deliberately left alone while the
+**Status: all nine are fixed.** They were deliberately left alone while the
 retier matrices ran -- editing an agent file mid-benchmark changes what the
 matrices are measuring, and the exercise is worthless if the two arms do not see
 the same prompt. Each fix landed after the matrix it would have disturbed, and
@@ -233,6 +233,52 @@ The lesson repeats: **when the cheaper tier misses one specific field, read what
 it actually wrote before concluding it cannot do the task.** Three times now the
 answer has been a rule the file states twice, or states far from the point of
 use, and zero times has it been the model failing to reason.
+
+---
+
+## 8. `evor-probe.md` — `telemetry_sane` conflated a broken stream with a bad run
+
+At n=99 the probe sonnet->haiku ladder is a regression, and two of its three
+failing cases fail the same way: `truncated-run-trap` and `grad-explosion` were
+marked `telemetry_sane=false`. Neither has anything wrong with its telemetry.
+One ran 96 of 500 steps; the other has gradients that exploded. Both recorded
+that faithfully.
+
+The file never defined the field. It said only "if train_loss is NaN or Inf ->
+false" and, elsewhere, "verify TelemetryRecord schema completeness" — leaving
+"is this run sane?" as an available reading, which is a different question.
+Defect 6's fix raised the stakes: `telemetry_sane=false` now forces the verdict
+to "inconclusive", so a false positive here throws away a finding the data
+fully supports.
+
+**Fixed.** `telemetry_sane` is now explicitly about the RECORD, not the run:
+false for NaN/Inf, missing fields, schema mismatch, out-of-order steps, an empty
+file. A run that diverged, exploded, truncated or plateaued is a run that
+FAILED, reported through `loss_curve`, `gradient_health` and `hypothesis_verdict`
+with `telemetry_sane=true` — the telemetry did its job by recording the failure.
+
+## 9. `evor-probe.md` — saturation: per-tick or cumulative? relative or points?
+
+`upgrade-positive` supplies 0.828 -> 0.833 -> 0.836 -> 0.838 and expects a
+BenchmarkUpgradeProposal. The rule read "primary metric improved < 1% over the
+last 3 consecutive ticks", which supports both readings and they disagree:
+
+  - per-tick relative: +0.60%, +0.36%, +0.24% — all three under 1%, saturated.
+  - cumulative: +1.2% over the stretch — over 1%, NOT saturated.
+
+haiku returned `null` in 3 of 9 attempts, which is correct under the second
+reading. Sonnet took the first. Neither was wrong about anything except which
+sentence the file meant.
+
+A second collision sat next to it: Success_Criteria said saturation "or a
+genuinely new angle", while BenchmarkUpgrade_Protocol said "only when BOTH
+conditions hold".
+
+**Fixed.** Saturation is now stated as three consecutive tick-over-tick
+improvements each under 1% relative, with the arithmetic worked through on the
+fixture's own numbers and a note that summing the crawl and comparing the sum to
+a per-tick threshold is a units error. Success_Criteria now says AND, and points
+at the protocol as authoritative.
 
 ---
 

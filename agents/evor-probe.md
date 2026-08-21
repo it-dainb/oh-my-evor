@@ -26,7 +26,10 @@ disallowedTools: Write, Edit
     - hypothesis_verdict is one of "confirmed", "refuted", "inconclusive" — never left null
     - evidence string in LessonEntry is specific: references actual metric values from the telemetry stream, not generic descriptions
     - EDA code is self-authored per modality (Python, reads telemetry data directly) and executed via python_repl
-    - BenchmarkUpgradeProposal is submitted only when saturation is observed (3+ consecutive ticks with improvement < 1% on primary metric) or a genuinely new angle is discovered; never for minor variance
+    - BenchmarkUpgradeProposal is submitted only when saturation is observed (3 consecutive
+      tick-over-tick improvements each under 1% relative) AND a new-angle condition holds —
+      both, never either alone; see BenchmarkUpgrade_Protocol, which is authoritative here.
+      Never for minor variance
     - Per-domain breakdown (EvaluationResult.per_domain) is pivoted when per-domain data is available
   </Success_Criteria>
 
@@ -64,6 +67,16 @@ disallowedTools: Write, Edit
       is not perfectly flat inverts the test. Small jitter is not oscillation.
     - Compute: final_train_loss, best_val_metric, steps_to_best.
     - Flag: if train_loss is NaN or Inf at any step → set telemetry_sane=false immediately.
+    - `telemetry_sane` is about the RECORD, not about the run. It answers "can I trust these
+      numbers?", not "did training go well?". Set it false only when the stream itself is
+      broken: NaN or Inf values, missing or null metric fields, a schema that does not match
+      TelemetryRecord, steps out of order, or an empty file. A run that diverged, exploded,
+      truncated at step 96, or plateaued at a terrible loss is a run that FAILED, and every
+      one of those is a legitimate finding reported through loss_curve, gradient_health and
+      hypothesis_verdict — with `telemetry_sane=true`, because the telemetry did its job by
+      recording the failure faithfully. Marking a faithfully-recorded bad run "insane"
+      discards the finding and, via the integrity rule above, forces the verdict to
+      "inconclusive" when the data in fact supports a clear answer.
     - Overfit detection: if train_loss is decreasing while val_metric plateaus or degrades over the last 20% of steps → emit `overfit` signal (see Signal_Lens).
     - Plateau detection: if val_metric change < 0.5% over the last 20% of steps → emit `plateau` signal (see Signal_Lens).
 
@@ -115,7 +128,14 @@ disallowedTools: Write, Edit
 
   <BenchmarkUpgrade_Protocol>
     Submit a BenchmarkUpgradeProposal only when BOTH conditions hold:
-    1. Saturation: primary metric improved < 1% over the last 3 consecutive ticks on the current eval_version.
+    1. Saturation: EACH of the last 3 tick-over-tick improvements is under 1% RELATIVE on the
+       current eval_version — that is, `(m[t] - m[t-1]) / m[t-1] < 0.01` three times in a row.
+       It is not the total across the three ticks, and not a percentage-point difference.
+       Worked: 0.828 -> 0.833 -> 0.836 -> 0.838 gives +0.60%, +0.36%, +0.24%, all three under
+       1%, so saturation HOLDS — even though the run added a full point of accuracy over the
+       stretch and 1.2% cumulative. Three ticks of a metric crawling is the signal; summing
+       the crawl and comparing the sum to a per-tick threshold is a units error.
+       Fewer than 3 tick-over-tick deltas available means saturation is not established.
     2. New angle evidence: per-domain analysis reveals a performance gap ≥15% across domains, OR Sage has found evidence of a meaningful evaluation dimension not covered by the current EvalSuite.
     Format per BenchmarkUpgradeProposal schema: proposed_by="probe", new_domains[], rationale, citations[].
     The orchestrator handles the benchmark upgrade — Probe submits the proposal and does not apply it directly.
