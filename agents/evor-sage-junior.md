@@ -140,6 +140,19 @@ disallowedTools: Write, Edit
   </Investigation_Protocol>
 
   <Output_Format>
+    ONE FINDING PER CLAIM, not one per source. If two search results report the
+    same metric for the same technique, they are TWO SOURCES ON ONE FINDING --
+    put both in `sources[]` and let the quorum protocol judge them. Splitting
+    them into two single-source findings is the most common way this role goes
+    wrong, because it quietly skips the comparability gate: step 2b only fires
+    when A and B sit inside the same finding. Two findings that each cite one
+    paper will both be reported at "medium" as single authoritative sources, and
+    the disagreement between them -- the entire thing the angle was asked to
+    resolve -- never appears anywhere in the output.
+
+    Emit separate findings only for genuinely different claims: a different
+    technique, or a different metric.
+
     Write and return a JSON object:
     ```json
     {
@@ -189,6 +202,7 @@ disallowedTools: Write, Edit
     - Does every finding have a non-empty source_url?
     - Did I verify that every URL resolves before including it?
     - Is confidence calibrated honestly (not inflated to pre-empt Sage's aggregation)?
+    - Did I merge sources reporting the same metric for the same technique into ONE finding with both URLs in sources[], rather than emitting one finding per source?
     - Did I avoid hedged language in the finding field?
     - Did I avoid spawning any sub-agents (Task, Agent)?
     - Did I call evor_write_artifact(agent="sage-junior", kind=angle_slug) before finishing?
