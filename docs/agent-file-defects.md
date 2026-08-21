@@ -87,3 +87,33 @@ catches the first shape structurally — `scoreByContract` throws on an
 expectation outside the contract. It cannot catch the second, because both
 rules really are in the file. That needs a human read, or a lint pass that
 looks for two rules writing the same output field.
+
+---
+
+# Known fixture limitations (mine, not the agent files')
+
+These depress both arms equally, so they do not affect any retier verdict. They
+do depress the absolute accuracy numbers, so they are stated rather than
+quietly excluded.
+
+## `evals/sage/spec.json` — `ambiguous-low-confidence` is mis-specified
+
+The case supplies two juniors reporting two *different* techniques (multi-scale
+TTA on Cityscapes, flip-only TTA on ADE20K). Each finding is individually
+single-sourced and clean, which the rules put at `"medium"`. The ambiguity is
+in the *comparison between* them, not in either one.
+
+The contract grades `findings[].confidence` with `every`, so it demands both
+findings be `"low"`. Both arms returned `"medium"` and both were right.
+
+Effect: 0/3 per arm, so roughly -10pp on both sage arms. sonnet 86.7% / opus
+83.3% as measured; ~96.3% / ~92.6% excluding this case.
+
+Fix: make the ambiguity intrinsic to a single finding -- one technique, two
+sources whose protocols are not comparable -- rather than a property of a pair.
+
+## `evals/sage-junior/spec.json` — two cases sit on agent-file contradictions
+
+See defects 2 and 3 above. `divergence-just-inside` and
+`indirect-evidence-forum` are unwinnable as specified because the agent file
+answers them twice, differently. Both arms are affected.
