@@ -122,6 +122,26 @@ def fisher_two_sided(a, b, c, d):
     return min(1.0, sum(prob(x) for x in range(lo, hi + 1) if prob(x) <= observed * (1 + 1e-9)))
 
 
+def arm_cost(records):
+    """
+    Total spend for an arm, and which basis it is on.
+
+    `cost_usd` is what our own price table models; `cli_cost_usd` is what the CLI
+    reported being billed. Across every report in ci/out they disagree, and --
+    this is the part that matters -- they disagree by DIFFERENT factors per tier:
+    billed/modeled runs ~1.14 on haiku and ~1.26 on sonnet and opus. So the
+    modeled numbers do not merely shift both arms of a retier equally; they
+    understate the sonnet arm by more, which understates the saving. Prefer
+    billed wherever the CLI gave it, and say so when it did not.
+    """
+    billed = [r for r in records if r.get("cli_cost_usd")]
+    if len(billed) == len(records) and records:
+        return sum(r["cli_cost_usd"] for r in records), "billed"
+    if not billed:
+        return sum(r.get("cost_usd") or 0 for r in records), "modeled"
+    return sum(r.get("cli_cost_usd") or r.get("cost_usd") or 0 for r in records), "mixed"
+
+
 def self_test():
     """
     `python3 ci/retier-report.py --self-test`
@@ -197,6 +217,20 @@ def self_test():
 
     print("SELF-TEST FAILED: " + "; ".join(failures) if failures else "SELF-TEST OK")
     return 1 if failures else 0
+
+
+
+def _arm_cost_self_test():
+    full = [{"cost_usd": 1.0, "cli_cost_usd": 1.26}, {"cost_usd": 2.0, "cli_cost_usd": 2.52}]
+    c, basis = arm_cost(full); assert basis == "billed" and abs(c - 3.78) < 1e-9, (c, basis)
+    none = [{"cost_usd": 1.0}, {"cost_usd": 2.0}]
+    assert arm_cost(none) == (3.0, "modeled"), arm_cost(none)
+    mixed = [{"cost_usd": 1.0, "cli_cost_usd": 1.26}, {"cost_usd": 2.0}]
+    c, basis = arm_cost(mixed); assert basis == "mixed" and abs(c - 3.26) < 1e-9, (c, basis)
+    # a zero billed figure is not a billed figure -- it is the CLI declining to say
+    assert arm_cost([{"cost_usd": 1.0, "cli_cost_usd": 0}]) == (1.0, "modeled")
+    assert arm_cost([]) == (0, "modeled")
+    print("arm_cost: billed preferred, modeled fallback, mixed flagged   OK")
 
 
 def load_reports():
@@ -353,4 +387,4 @@ def main():
 
 
 if __name__ == "__main__":
-    sys.exit(self_test() if "--self-test" in sys.argv else main())
+    sys.exit((_arm_cost_self_test() or self_test()) if "--self-test" in sys.argv else main())

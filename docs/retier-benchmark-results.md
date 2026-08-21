@@ -362,11 +362,11 @@ invisibly. Recorded as [[prompt-fix-can-regress-strong-arm]].
 
 Applied to agent frontmatter on this branch:
 
-| agent | was | now | evidence |
-|---|---|---|---|
-| `evor-acquirer` | sonnet | haiku | 36/36 vs 36/36, CI [-9.6, +9.6] |
-| `evor-forge-critic` | sonnet | haiku | 29/30 vs 27/30, CI [-8.2, +22.5] |
-| `evor-sage` | sonnet | haiku | 75/78 vs 77/78, CI [-9.5, +3.6] |
+| agent | was | now | evidence | $/pass, billed |
+|---|---|---|---|---|
+| `evor-acquirer` | sonnet | haiku | 36/36 vs 36/36, CI [-9.6, +9.6] | **-59.2%** |
+| `evor-forge-critic` | sonnet | haiku | 29/30 vs 27/30, CI [-8.2, +22.5] | **-44.6%** |
+| `evor-sage` | sonnet | haiku | 75/78 vs 77/78, CI [-9.5, +3.6] | **-58.6%** |
 
 `effort:` was dropped from the two retiered files — haiku does not support it,
 and `tests/agent-frontmatter.test.ts` fails if an inert tag is left behind.
@@ -374,3 +374,32 @@ and `tests/agent-frontmatter.test.ts` fails if an inert tag is left behind.
 Everything else stays where it is. Roles whose haiku arm is merely
 *underpowered* are not adopted: "we could not demonstrate a regression" is not
 "there is no regression", and at n=30 the interval still admits a 15pp drop.
+
+# The cost numbers above are billed, and that changed them
+
+Every $/pass figure in this document before this section was on *modeled*
+dollars — our own price table applied to the token counts. `cli_cost_usd` is
+what the CLI reported being billed, and across all 1988 records in `ci/out` the
+two disagree by a factor that is **not constant across tiers**:
+
+| tier | records | billed / modeled |
+|---|---|---|
+| haiku-medium | 738 | 1.142 |
+| sonnet-medium | 882 | 1.261 |
+| sonnet-high | 30 | 1.130 |
+| opus-medium | 338 | 1.261 |
+
+A uniform bias would cancel in an arm-vs-arm ratio. This one does not: modeled
+dollars understate the sonnet arm by about 12pp more than the haiku arm, so
+every modeled sonnet→haiku saving quoted here is a **floor**. Recomputed on
+billed cost the three adopted retiers all move up — sage 55.3% → 58.6%,
+acquirer 57% → 59.2%, forge-critic 41% → 44.6% per passing attempt.
+
+`arm_cost()` in `ci/retier-report.py` now prefers billed, falls back to modeled,
+flags `mixed`, and treats a *zero* `cli_cost_usd` as the CLI declining to answer
+rather than as a free call. `ci/compare-arms.py` prints the basis on the cost
+line and warns when either arm is on modeled dollars. Accuracy verdicts are
+untouched by any of this.
+
+What is still unexplained is *why* the bill exceeds the model at all; knowing
+the direction is not knowing the cause. No accuracy conclusion depends on it.

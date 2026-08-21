@@ -28,6 +28,7 @@ _rr = module_from_spec(_spec)
 _spec.loader.exec_module(_rr)
 wilson, fisher_two_sided = _rr.wilson, _rr.fisher_two_sided
 diff_ci, compare_verdict, verdict_text = _rr.diff_ci, _rr.compare_verdict, _rr.verdict_text
+arm_cost = _rr.arm_cost
 
 
 def _pool(paths, tier):
@@ -65,12 +66,13 @@ def load_arm(descriptor):
     if not records:
         raise SystemExit(f"no records for tier {tier!r} in {path}")
     k = sum(r["status"] == "correct" for r in records)
-    cost = sum(r.get("cost_usd") or 0 for r in records)
+    cost, basis = arm_cost(records)
     wall = sum((r.get("wall_ms") or 0) / 1000 for r in records)
     bad = sum(r["status"] in ("unparseable", "cli_error") for r in records)
     return {
         "label": label, "tier": tier, "k": k, "n": len(records), "bad": bad,
         "per_call": cost / len(records), "per_pass": cost / k if k else float("inf"),
+        "basis": basis,
         "sec": wall / len(records),
         # Per-case detail: a gate that fails in BOTH arms is a fixture bug, and
         # the whole point of pairing is to see that rather than read it as a
@@ -107,7 +109,11 @@ def main(argv):
           f"95% CI on the difference [{lo * 100:+.1f}, {hi * 100:+.1f}]pp\n  -> {verdict}")
     if cand["k"] and base["k"]:
         print(f"  cost: {(1 - cand['per_call'] / base['per_call']) * 100:+.1f}% per call, "
-              f"{(1 - cand['per_pass'] / base['per_pass']) * 100:+.1f}% per PASSING attempt")
+              f"{(1 - cand['per_pass'] / base['per_pass']) * 100:+.1f}% per PASSING attempt"
+              f"   ({cand['basis']} / {base['basis']})")
+        if "modeled" in (cand["basis"], base["basis"]) or "mixed" in (cand["basis"], base["basis"]):
+            print("  ! modeled cost understates sonnet/opus more than haiku, so a "
+                  "sonnet->haiku saving read off it is a FLOOR, not the figure.")
     for a in (cand, base):
         if a["bad"]:
             print(f"  ! {a['label']}: {a['bad']} unparseable/cli_error")
