@@ -52,7 +52,7 @@
     {
       "id": "two-sources-agree",
       "gate": "quorum",
-      "note": "94.2 vs 94.0 is a 0.21% divergence, comfortably inside the 5% quorum band",
+      "note": "94.2 vs 94.0 is 0.21% divergence AND both sources state the same dataset, split and preprocessing, so the comparability gate passes and the arithmetic decides",
       "angle_slug": "trocr-handwriting-sota",
       "angle_query": "What is the current SOTA accuracy for transformer OCR on handwritten text?",
       "metric_name": "top-1 accuracy on IAM-handwriting",
@@ -63,7 +63,7 @@
           "venue": "arXiv preprint",
           "type": "paper",
           "reported_metric": 94.2,
-          "excerpt": "On IAM handwriting, TrOCR-Large reaches 94.2% character accuracy."
+          "excerpt": "On the standard IAM handwriting test split, under the official preprocessing at 384x384 input, TrOCR-Large reaches 94.2% character accuracy."
         },
         {
           "url": "https://aclanthology.org/2023.emnlp-main.417",
@@ -71,7 +71,7 @@
           "venue": "EMNLP 2023",
           "type": "paper",
           "reported_metric": 94.0,
-          "excerpt": "Our reproduction of TrOCR-Large obtains 94.0% on the IAM test split."
+          "excerpt": "Our reproduction of TrOCR-Large obtains 94.0% on the same IAM test split, using the authors' released preprocessing and 384x384 input."
         }
       ],
       "expect": {
@@ -136,9 +136,9 @@
       }
     },
     {
-      "id": "divergence-just-inside",
+      "id": "divergence-inside-band-incomparable",
       "gate": "threshold",
-      "note": "94.2 vs 90.0 is 4.46% divergence: inside the band, but only just",
+      "note": "94.2 vs 90.0 is 4.46% divergence -- INSIDE the 5% band -- but source A reports on an unnamed 'evaluated split' while B reports under matched preprocessing in a fair-comparison study. The comparability gate runs before the arithmetic, so quorum does not apply. Answering from the 5% test alone gives 'high'.",
       "angle_slug": "crnn-vs-transformer",
       "angle_query": "What accuracy do CTC-based recognisers reach on IAM?",
       "metric_name": "top-1 accuracy on IAM-handwriting",
@@ -164,15 +164,49 @@
         "findings": {
           "min": 1
         },
+        "findings[].trust_level": "indicative",
+        "findings[].confidence": "low",
+        "findings[].quorum_met": "false"
+      }
+    },
+    {
+      "id": "divergence-just-inside-comparable",
+      "gate": "quorum",
+      "note": "94.2 vs 90.0 is 4.46% divergence and both sources state the SAME dataset, split, preprocessing and input size, so the gate passes and the number decides: just inside the band, quorum met",
+      "angle_slug": "ctc-recogniser-matched-protocol",
+      "angle_query": "What accuracy do CTC-based recognisers reach on IAM under a matched protocol?",
+      "metric_name": "top-1 accuracy on IAM-handwriting",
+      "search_results": [
+        {
+          "url": "https://arxiv.org/abs/1507.05717v2",
+          "title": "An End-to-End Trainable Neural Network for Image-based Sequence Recognition",
+          "venue": "TPAMI 2017",
+          "type": "paper",
+          "reported_metric": 94.2,
+          "excerpt": "On the standard IAM test split, with the official preprocessing and 32px input height, the CRNN obtains 94.2%."
+        },
+        {
+          "url": "https://openaccess.thecvf.com/content/WACV2022/html/crnn-rerun",
+          "title": "Re-running CRNN under the standard protocol",
+          "venue": "WACV 2022",
+          "type": "paper",
+          "reported_metric": 90.0,
+          "excerpt": "Re-running the same CRNN on the standard IAM test split, official preprocessing, 32px input height, we measure 90.0%."
+        }
+      ],
+      "expect": {
+        "findings": {
+          "min": 1
+        },
         "findings[].trust_level": "authoritative",
         "findings[].confidence": "high",
-        "findings[].quorum_met": true
+        "findings[].quorum_met": "true"
       }
     },
     {
       "id": "divergence-just-outside",
       "gate": "threshold",
-      "note": "94.2 vs 89.0 is 5.52% divergence: outside the band, so quorum is not met",
+      "note": "94.2 vs 89.0 is 5.52% divergence: outside the band. The two also disagree on protocol -- an 'internal split' against the standard IAM protocol -- so the gate fires as well.",
       "angle_slug": "attention-ocr-gap",
       "angle_query": "What accuracy do attention-based recognisers reach on IAM?",
       "metric_name": "top-1 accuracy on IAM-handwriting",
@@ -198,13 +232,15 @@
         "findings": {
           "min": 1
         },
-        "findings[].quorum_met": false
+        "findings[].trust_level": "indicative",
+        "findings[].confidence": "low",
+        "findings[].quorum_met": "false"
       }
     },
     {
       "id": "wide-disagreement",
       "gate": "threshold",
-      "note": "94.2 vs 71.5 is a 24% divergence; nothing here supports a quorum",
+      "note": "94.2 vs 71.5 is a 24% divergence, and the first source names neither split nor protocol while the second reports under the official one; nothing here supports a quorum",
       "angle_slug": "scene-text-claims",
       "angle_query": "What accuracy is reported for scene-text recognition on ICDAR2015?",
       "metric_name": "top-1 accuracy on IAM-handwriting",
@@ -230,13 +266,15 @@
         "findings": {
           "min": 1
         },
-        "findings[].quorum_met": false
+        "findings[].trust_level": "indicative",
+        "findings[].confidence": "low",
+        "findings[].quorum_met": "false"
       }
     },
     {
-      "id": "indirect-evidence-only",
+      "id": "inadmissible-marketing-copy",
       "gate": "confidence",
-      "note": "a vendor blog post with no numbers and no methodology",
+      "note": "a vendor page whose only evidence is customer testimonials: marketing copy with no method, which Source_Admissibility bars from being reported at all. Reporting it at 'low' is the failure under test.",
       "angle_slug": "ocr-vendor-claims",
       "angle_query": "Do commercial OCR engines outperform open models on receipts?",
       "metric_name": "top-1 accuracy on IAM-handwriting",
@@ -250,16 +288,11 @@
         }
       ],
       "expect": {
-        "findings": {
-          "min": 1
-        },
-        "findings[].confidence": "low",
-        "findings[].trust_level": "indicative",
-        "findings[].quorum_met": false
+        "findings": 0
       }
     },
     {
-      "id": "indirect-evidence-forum",
+      "id": "inadmissible-forum-anecdote",
       "gate": "confidence",
       "note": "a forum thread of anecdotes, again with no measurement",
       "angle_slug": "augmentation-anecdote",
@@ -275,12 +308,7 @@
         }
       ],
       "expect": {
-        "findings": {
-          "min": 1
-        },
-        "findings[].confidence": "low",
-        "findings[].trust_level": "indicative",
-        "findings[].quorum_met": false
+        "findings": 0
       }
     },
     {
@@ -293,6 +321,32 @@
       "search_results": [],
       "expect": {
         "findings": 0
+      }
+    },
+    {
+      "id": "indirect-evidence-admissible",
+      "gate": "confidence",
+      "note": "an engineering blog post from the model authors that states a method and a number: INDIRECT, so capped at \"low\", but reportable. Returning nothing here discards real signal.",
+      "angle_slug": "distillation-throughput",
+      "angle_query": "Does distilling the recogniser cost accuracy on IAM?",
+      "metric_name": "top-1 accuracy on IAM-handwriting",
+      "search_results": [
+        {
+          "url": "https://engineering.example-lab.org/blog/distilling-our-recogniser",
+          "title": "Distilling our handwriting recogniser",
+          "venue": "authors' engineering blog",
+          "type": "blog",
+          "reported_metric": 93.1,
+          "excerpt": "We distilled the 300M recogniser into a 60M student and measured 93.1% on our IAM test split, against 94.2% for the teacher. Training and eval scripts are linked, but this has not been peer reviewed and we did not run the standard preprocessing."
+        }
+      ],
+      "expect": {
+        "findings": {
+          "min": 1
+        },
+        "findings[].trust_level": "indicative",
+        "findings[].confidence": "low",
+        "findings[].quorum_met": "false"
       }
     }
   ]

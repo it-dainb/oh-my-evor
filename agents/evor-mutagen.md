@@ -122,7 +122,9 @@ skills: [oh-my-evor:evor-mcp]
     distribution).
 
     **How to propose a data-acquisition mutation:**
-    - Set approach_family="data-acquisition" and mutation_tier="structural".
+    - Set approach_family="data-acquisition" and mutation_tier="structural". This holds at
+      EVERY wildness, including wildness < 0.5, and overrides the wildness ranges in
+      Wildness_Interpretation.
     - State the target split in the idea field: "enrich-train" (more training coverage) or
       leave open for Sage to recommend. Probe's BenchmarkUpgrade covers "harden-test".
     - Emit investigation_queries[] for Sage to SOURCE the data — e.g. "find a HuggingFace
@@ -146,15 +148,30 @@ skills: [oh-my-evor:evor-mcp]
 
     | wildness range | Behavior |
     |---|---|
-    | 0.0 – 0.2 | Parametric mutation within parent's family: change one gene in genome.yaml (e.g., lr, batch_size, aug_set entry) |
-    | 0.2 – 0.5 | Structural mutation within parent's family: new module expressible via genome.yaml schema_extensions |
+    | 0.0 – 0.2 | Change one gene in genome.yaml (e.g., lr, batch_size, aug_set entry) |
+    | 0.2 – 0.5 | Add a new module within the parent's family, expressible via genome.yaml schema_extensions |
     | 0.5 – 0.7 | Family switch: propose a different approach_family entirely (e.g., switch from arch to data-curation) |
     | 0.7 – 0.9 | Cross-domain transfer: borrow a technique from an adjacent ML domain (NLP augmentation for vision, etc.) |
     | 0.9 – 1.0 | Paradigm shift: propose a fundamentally different training or data strategy (e.g., self-supervised pre-train + fine-tune instead of supervised-from-scratch) |
 
+    The table above describes HOW FAR a proposal strays. It does not name the
+    mutation_tier field; only the two rules below do. In particular the 0.2–0.5
+    row still yields mutation_tier="parametric" — adding a module inside the
+    parent's family is a small step on the dial, whatever the prose calls it.
+
     The mutation_tier is determined by the wildness range:
     - wildness < 0.5 → mutation_tier = "parametric"
     - wildness ≥ 0.5 → mutation_tier = "structural"
+
+    PRECEDENCE — read this before applying the two rules above. A
+    data-acquisition proposal is ALWAYS mutation_tier="structural", at every
+    wildness, including wildness < 0.5. See Data_Acquisition_Mutations. That
+    rule is specific and wins; the wildness ranges above are the general case
+    and apply to every other approach_family.
+
+    Rationale: acquiring new data changes the training distribution itself,
+    which is a structural change no matter how conservative the dial is. There
+    is no such thing as a parametric data acquisition.
   </Wildness_Interpretation>
 
   <Open_Ended_Mutation_Angle_Space>

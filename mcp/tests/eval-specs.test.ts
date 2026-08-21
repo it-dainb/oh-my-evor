@@ -42,11 +42,23 @@ const specs = readdirSync(EVALS, { withFileTypes: true })
  * the value, not the value itself, so `false` has to become `null`. Writing the
  * literal `false` would be a non-null value and would read back as present.
  */
+type OracleField = {
+  path: string;
+  kind: string;
+  key?: string;
+  where?: { field: string; equals?: string; not_equals?: string };
+};
+
 function oracleAnswer(
-  contract: { fields: { path: string; kind: string }[] },
+  contract: { fields: OracleField[] },
   caseObj: { expect: Record<string, unknown> },
 ) {
-  const kindOf = new Map(contract.fields.map((f) => [f.path, f.kind]));
+  // Two rules may share one path when each states its own subset, so the
+  // expectation key -- not the path -- identifies a field here, exactly as it
+  // does in scoreByContract.
+  const byKey = new Map(contract.fields.map((f) => [f.key ?? f.path, f]));
+  const kindOf = new Map([...byKey].map(([k, f]) => [k, f.kind]));
+  const pathOf = (key: string) => byKey.get(key)!.path;
   const out: Record<string, unknown> = {};
 
   const put = (path: string, value: unknown) => {
@@ -75,17 +87,25 @@ function oracleAnswer(
   const roots = new Set<string>(
     Object.keys(caseObj.expect)
       .filter((p) => kindOf.get(p) === "count" || kindOf.get(p) === "every")
-      .map((p) => p.split("[]")[0]),
+      .map((p) => pathOf(p).split("[]")[0]),
   );
   for (const root of roots) {
     const n = lengths.has(root) ? lengths.get(root)! : 1;
     const elements = Array.from({ length: n }, () => ({}) as Record<string, unknown>);
-    for (const [path, value] of Object.entries(caseObj.expect)) {
+    for (const [key, value] of Object.entries(caseObj.expect)) {
+      const path = pathOf(key);
       if (path.split("[]")[0] !== root) continue;
       const inner = path.split("[].")[1];
-      if (kindOf.get(path) === "every") {
+      const where = byKey.get(key)!.where;
+      if (where?.equals !== undefined) {
+        // An oracle for a positive filter would have to plant elements that
+        // match it, which collides with `unique`'s distinct values. Fail loudly
+        // rather than emit an oracle that quietly does not satisfy the rule.
+        throw new Error(`oracleAnswer cannot build a positive \`where\` yet (field ${key})`);
+      }
+      if (kindOf.get(key) === "every") {
         for (const el of elements) el[inner] = value;
-      } else if (kindOf.get(path) === "unique") {
+      } else if (kindOf.get(key) === "unique") {
         // The oracle for a distinctness rule is distinct values, not the
         // literal `true` the expectation carries.
         elements.forEach((el, i) => {
@@ -96,10 +116,10 @@ function oracleAnswer(
     put(root, elements);
   }
 
-  for (const [path, value] of Object.entries(caseObj.expect)) {
-    const kind = kindOf.get(path);
+  for (const [key, value] of Object.entries(caseObj.expect)) {
+    const kind = kindOf.get(key);
     if (kind === "count" || kind === "every") continue;
-    put(path, kind === "present" ? (value ? { present: true } : null) : value);
+    put(pathOf(key), kind === "present" ? (value ? { present: true } : null) : value);
   }
   return out;
 }
@@ -109,7 +129,7 @@ it("there is at least one role spec to validate", () => {
 });
 
 describe.each(specs)("$dir", ({ spec }) => {
-  const paths = new Set<string>(spec.contract.fields.map((f: { path: string }) => f.path));
+  const paths = new Set<string>(spec.contract.fields.map((f: OracleField) => f.key ?? f.path));
 
   it("declares two arms that differ, so the matrix measures a retier", () => {
     expect(spec.arms).toHaveLength(2);
@@ -155,17 +175,39 @@ describe.each(specs)("$dir", ({ spec }) => {
     // Every enum's declared values, plus both booleans, plus presence/absence:
     // enumerate the fixed replies an agent could give without reading anything.
     const constants: Record<string, unknown>[] = [];
-    const build = (choice: (f: { path: string; kind: string; values?: string[] }) => unknown) => {
+    const perElement = (f: OracleField) => f.kind === "every" || f.kind === "unique";
+    const build = (choice: (f: OracleField) => unknown, listLen: number) => {
       const out: Record<string, unknown> = {};
-      for (const f of spec.contract.fields) {
-        if (f.kind === "every" || f.kind === "unique") continue;
-        const parts = f.path.split(".");
+      const put = (path: string, value: unknown) => {
+        const parts = path.split(".");
         let node = out;
         for (const p of parts.slice(0, -1)) {
           node[p] = node[p] ?? {};
           node = node[p] as Record<string, unknown>;
         }
-        node[parts[parts.length - 1]] = choice(f);
+        node[parts[parts.length - 1]] = value;
+      };
+      // A fixed reply can pin a field on every element of a list just as easily
+      // as it can pin a scalar -- "report every finding as low/indicative" is a
+      // constant answer too. Skipping per-element fields here left that whole
+      // family of degenerate strategies unmeasured.
+      const roots = new Set<string>(
+        spec.contract.fields.filter(perElement).map((f: OracleField) => f.path.split("[]")[0]),
+      );
+      for (const root of roots) {
+        const elements = Array.from({ length: listLen }, () => ({}) as Record<string, unknown>);
+        for (const f of spec.contract.fields.filter(perElement)) {
+          if (f.path.split("[]")[0] !== root) continue;
+          const inner = f.path.split("[].")[1];
+          elements.forEach((el, i) => {
+            el[inner] = f.kind === "unique" ? `family-${i}` : choice(f);
+          });
+        }
+        put(root, elements);
+      }
+      for (const f of spec.contract.fields) {
+        if (perElement(f) || roots.has(f.path)) continue;
+        put(f.path, choice(f));
       }
       return out;
     };
@@ -174,15 +216,20 @@ describe.each(specs)("$dir", ({ spec }) => {
     );
     for (let i = 0; i < maxValues; i++) {
       for (const flag of [true, false]) {
-        constants.push(
-          build((f) => {
-            if (f.kind === "enum") return f.values![i % f.values!.length];
-            if (f.kind === "bool") return flag;
-            if (f.kind === "present") return flag ? {} : null;
-            if (f.kind === "count") return [];
-            return 0;
-          }),
-        );
+        // Both an empty list and one long enough to satisfy any `min` in the
+        // specs: "return nothing" and "return twelve identical entries" are
+        // different degenerate strategies and both have to be priced.
+        for (const listLen of [0, 12]) {
+          constants.push(
+            build((f) => {
+              if (f.kind === "enum" || f.kind === "every") return f.values![i % f.values!.length];
+              if (f.kind === "bool") return flag;
+              if (f.kind === "present") return flag ? {} : null;
+              if (f.kind === "count") return [];
+              return 0;
+            }, listLen),
+          );
+        }
       }
     }
 

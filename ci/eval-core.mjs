@@ -83,11 +83,12 @@ export function buildContractText(contract) {
   const isPerElement = (f) => f.kind === 'every' || f.kind === 'unique';
   const keyed = contract.fields.filter((f) => !isPerElement(f));
 
-  const constraints = contract.fields.filter(isPerElement).map((f) =>
-    f.kind === 'unique'
-      ? `- no two entries of \`${arrayRoot(f.path)}\` may share the same \`${arrayInner(f.path)}\``
-      : `- every entry of \`${arrayRoot(f.path)}\` must set \`${arrayInner(f.path)}\` to one of: ${(f.values ?? []).join(' | ')}`,
-  );
+  const constraints = contract.fields.filter(isPerElement).map((f) => {
+    const scope = `\`${arrayRoot(f.path)}\`${whereText(f.where)}`;
+    return f.kind === 'unique'
+      ? `- no two entries of ${scope} may share the same \`${arrayInner(f.path)}\``
+      : `- every entry of ${scope} must set \`${arrayInner(f.path)}\` to one of: ${(f.values ?? []).join(' | ')}`;
+  });
 
   if (contract.mode === 'json') {
     // A dotted path describes NESTING, not a key with a dot in it. Rendering it
@@ -267,8 +268,33 @@ function normEnum(f, raw) {
   return s;
 }
 
+/**
+ * A per-element rule sometimes governs only PART of a list. Mutagen's wildness
+ * ranges set mutation_tier for most approach families, but a data-acquisition
+ * proposal is structural at every wildness — one `every` over the whole list
+ * cannot say that, and grading it anyway penalised the agent for obeying the
+ * more specific rule. `where` names the subset; whereText puts that subset in
+ * the prompt, so the restriction is stated wherever it is graded.
+ */
+function whereText(where) {
+  if (!where) return '';
+  const rel = 'not_equals' in where ? 'is not' : 'is';
+  return ` whose \`${where.field}\` ${rel} \`${where.equals ?? where.not_equals}\``;
+}
+
+function applyWhere(elements, where) {
+  if (!where) return elements;
+  const want = String(where.equals ?? where.not_equals).toLowerCase();
+  const negated = 'not_equals' in where;
+  return elements.filter((el) => (String(strip(getPath(el, where.field))).toLowerCase() === want) !== negated);
+}
+
+/** Fields may share a path when each states its own subset, so the expectation
+ *  key — not the path — is what identifies a rule. */
+export const fieldKey = (f) => f.key ?? f.path;
+
 export function gradeField(f, expected, actual, opts = {}) {
-  const mk = (correct) => ({ name: f.path, expected, actual: actual ?? null, correct });
+  const mk = (correct) => ({ name: fieldKey(f), expected, actual: actual ?? null, correct });
 
   // `present` asks whether the field was filled in at all, so it must be graded
   // before the missing-answer guard that every other kind depends on.
@@ -287,19 +313,25 @@ export function gradeField(f, expected, actual, opts = {}) {
   }
 
   if (f.kind === 'unique') {
-    if (!Array.isArray(actual) || actual.length === 0) return mk(false);
+    if (!Array.isArray(actual)) return mk(false);
+    const rows = applyWhere(actual, f.where);
+    if (rows.length === 0) return mk(false);
     const inner = arrayInner(f.path);
-    const seen = actual.map((el) => strip(getPath(el, inner)).toLowerCase());
+    const seen = rows.map((el) => strip(getPath(el, inner)).toLowerCase());
     return mk(new Set(seen).size === seen.length);
   }
 
   if (f.kind === 'every') {
     // An empty list must not pass vacuously: an agent that returned nothing has
-    // not demonstrated obedience to a rule, it has declined to answer.
-    if (!Array.isArray(actual) || actual.length === 0) return mk(false);
+    // not demonstrated obedience to a rule, it has declined to answer. The same
+    // holds after `where` — a list with no element subject to the rule is no
+    // evidence the rule was followed.
+    if (!Array.isArray(actual)) return mk(false);
+    const rows = applyWhere(actual, f.where);
+    if (rows.length === 0) return mk(false);
     const innerPath = arrayInner(f.path);
     const inner = { ...f, kind: f.innerKind ?? 'enum', path: innerPath };
-    const ok = actual.every((el) => {
+    const ok = rows.every((el) => {
       const v = getPath(el, innerPath);
       return f.innerKind
         ? gradeField(inner, expected, v).correct
@@ -371,15 +403,15 @@ export function gradeField(f, expected, actual, opts = {}) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export function scoreByContract(contract, caseObj, parsed) {
-  const byPath = new Map(contract.fields.map((f) => [f.path, f]));
+  const byKey = new Map(contract.fields.map((f) => [fieldKey(f), f]));
 
   // A typo in a case file must fail loudly. Silently skipping an unknown path
   // would mean a case that appears to test a rule and tests nothing.
   for (const path of Object.keys(caseObj.expect ?? {})) {
-    if (!byPath.has(path)) {
+    if (!byKey.has(path)) {
       throw new Error(
         `case "${caseObj.id}" expects field "${path}", which the contract does not state. ` +
-          `Gradable fields: ${[...byPath.keys()].join(', ')}`,
+          `Gradable fields: ${[...byKey.keys()].join(', ')}`,
       );
     }
   }
@@ -389,8 +421,8 @@ export function scoreByContract(contract, caseObj, parsed) {
   }
 
   const checks = [];
-  for (const [path, expected] of Object.entries(caseObj.expect ?? {})) {
-    const f = byPath.get(path);
+  for (const [key, expected] of Object.entries(caseObj.expect ?? {})) {
+    const f = byKey.get(key);
     if (f.gradeWhen) {
       // e.g. batch_size is only meaningful when the decision was `proceed`;
       // on an abort it describes a spawn that will never happen.
@@ -399,7 +431,7 @@ export function scoreByContract(contract, caseObj, parsed) {
     }
     const opts = f.restatedFrom ? { restated: getPath(caseObj, f.restatedFrom) } : {};
     const actual =
-      f.kind === 'every' || f.kind === 'unique' ? getPath(parsed, arrayRoot(path)) : getPath(parsed, path);
+      f.kind === 'every' || f.kind === 'unique' ? getPath(parsed, arrayRoot(f.path)) : getPath(parsed, f.path);
     checks.push(gradeField(f, expected, actual, opts));
   }
 

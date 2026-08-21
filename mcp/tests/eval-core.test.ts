@@ -282,6 +282,131 @@ describe("array-shaped contracts", () => {
   });
 });
 
+describe("per-element rules that apply to only part of a list", () => {
+  // Mutagen's wildness ranges govern mutation_tier for most approach families,
+  // but a data-acquisition proposal is structural at EVERY wildness. A bare
+  // `every` cannot express that, so the field was dropped from the contract
+  // rather than grade a rule the agent was never given. `where` restores it.
+  const DA = { field: "approach_family", not_equals: "data-acquisition" };
+
+  it("grades only the elements the `where` filter selects", () => {
+    const f = {
+      path: "proposals[].mutation_tier",
+      kind: "every",
+      where: DA,
+      values: ["parametric", "structural"],
+    };
+    const mixed = [
+      { approach_family: "training", mutation_tier: "parametric" },
+      { approach_family: "data-acquisition", mutation_tier: "structural" },
+    ];
+    // The data-acquisition entry is structural, which would sink a bare
+    // `every` — the filter is the whole point.
+    expect(gradeField(f, "parametric", mixed).correct).toBe(true);
+    const bad = [...mixed, { approach_family: "arch", mutation_tier: "structural" }];
+    expect(gradeField(f, "parametric", bad).correct).toBe(false);
+  });
+
+  it("supports the positive form so the exempt subset can be graded too", () => {
+    const f = {
+      path: "proposals[].mutation_tier",
+      kind: "every",
+      where: { field: "approach_family", equals: "data-acquisition" },
+      values: ["parametric", "structural"],
+    };
+    const rows = [
+      { approach_family: "training", mutation_tier: "parametric" },
+      { approach_family: "data-acquisition", mutation_tier: "structural" },
+    ];
+    expect(gradeField(f, "structural", rows).correct).toBe(true);
+    rows[1].mutation_tier = "parametric";
+    expect(gradeField(f, "structural", rows).correct).toBe(false);
+  });
+
+  it("does not pass vacuously when the filter selects nothing", () => {
+    // Same reasoning as the empty-array case: an agent whose output contains no
+    // element subject to the rule has not demonstrated it obeys the rule.
+    const f = {
+      path: "proposals[].mutation_tier",
+      kind: "every",
+      where: DA,
+      values: ["parametric", "structural"],
+    };
+    expect(
+      gradeField(f, "parametric", [{ approach_family: "data-acquisition", mutation_tier: "structural" }]).correct,
+    ).toBe(false);
+  });
+
+  it("states the filter in the prompt, so the restriction is never graded unstated", () => {
+    const text = buildContractText({
+      heading: "Proposals",
+      mode: "json",
+      fields: [
+        { path: "proposals", kind: "count" },
+        { path: "proposals[].mutation_tier", kind: "every", where: DA, values: ["parametric", "structural"] },
+      ],
+    });
+    expect(text).toContain("approach_family");
+    expect(text).toContain("data-acquisition");
+    expect(text).toMatch(/not|except/i);
+  });
+
+  it("lets two rules share one path when each carries its own key", () => {
+    const contract = {
+      heading: "Proposals",
+      mode: "json",
+      fields: [
+        {
+          key: "proposals[].mutation_tier@other",
+          path: "proposals[].mutation_tier",
+          kind: "every",
+          where: DA,
+          values: ["parametric", "structural"],
+        },
+        {
+          key: "proposals[].mutation_tier@data-acquisition",
+          path: "proposals[].mutation_tier",
+          kind: "every",
+          where: { field: "approach_family", equals: "data-acquisition" },
+          values: ["parametric", "structural"],
+        },
+      ],
+    };
+    const caseObj = {
+      id: "split",
+      expect: {
+        "proposals[].mutation_tier@other": "parametric",
+        "proposals[].mutation_tier@data-acquisition": "structural",
+      },
+    };
+    const parsed = {
+      proposals: [
+        { approach_family: "training", mutation_tier: "parametric" },
+        { approach_family: "data-acquisition", mutation_tier: "structural" },
+      ],
+    };
+    const r = scoreByContract(contract, caseObj, parsed);
+    expect(r.status).toBe("correct");
+    expect(r.checks.map((c: { name: string }) => c.name).sort()).toEqual([
+      "proposals[].mutation_tier@data-acquisition",
+      "proposals[].mutation_tier@other",
+    ]);
+  });
+
+  it("still rejects an expectation for a key the contract does not state", () => {
+    const contract = {
+      heading: "Proposals",
+      mode: "json",
+      fields: [
+        { key: "tier@other", path: "proposals[].mutation_tier", kind: "every", where: DA, values: ["parametric"] },
+      ],
+    };
+    expect(() =>
+      scoreByContract(contract, { id: "x", expect: { "proposals[].mutation_tier": "parametric" } }, { proposals: [] }),
+    ).toThrow(/does not state/);
+  });
+});
+
 describe("scoreByContract", () => {
   const caseObj = {
     id: "nan-run",

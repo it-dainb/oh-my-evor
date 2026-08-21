@@ -91,8 +91,11 @@ describe("fields an agent is told to set must exist in the schema it is shown", 
    */
   const schemaBlock = (() => {
     // The documented CitationBackedFinding shape: the JSON object containing
-    // "quorum_met", which is the finding-level marker field.
-    const i = sage.indexOf("quorum_met");
+    // "quorum_met", which is the finding-level marker field. Match the quoted
+    // JSON key, not the bare word — prose above the schema names the field too
+    // ("report quorum_met=false"), and anchoring on the first mention pointed
+    // this block at the SotaVerifier prose instead of the schema.
+    const i = sage.indexOf('"quorum_met"');
     expect(i, "finding schema not found — this test is stale").toBeGreaterThan(-1);
     return sage.slice(Math.max(0, i - 1200), i + 400);
   })();

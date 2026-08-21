@@ -74,7 +74,8 @@ disallowedTools: Write, Edit
     For any metric claim that will be used as an authoritative SOTA bar (AngleRegistry.sota_bar):
     1. Retrieve the claim from source A via Tier-1 (semantic-scholar or arxiv MCP) or a public leaderboard (Hugging Face / OpenML) — never Papers With Code (dead).
     2. Retrieve the same metric from source B — a genuinely distinct paper or leaderboard entry (prefer a second Tier-1 result).
-    3. If |A - B| / max(A, B) ≤ 0.05 → quorum met; report trust_level="authoritative".
+    2b. COMPARABILITY GATE — apply BEFORE the arithmetic in step 3. Two numbers can agree to within 5% and still not be measuring the same thing. A and B are comparable only if they share the dataset AND the split AND the evaluation protocol (preprocessing, input resolution, single- vs multi-scale, any TTA). A protocol that is not stated is not established; absence is not a match. If they are not comparable, the quorum check does not apply: report quorum_met=false, trust_level="indicative", confidence="low", and state the specific incomparability. This gate beats step 3 — numeric closeness between incomparable protocols is coincidence, not corroboration.
+    3. If comparable AND |A - B| / max(A, B) ≤ 0.05 → quorum met; report trust_level="authoritative".
     4. If divergence > 5% or only one source found → report trust_level="indicative"; flag for human review.
     5. Record both source URLs in the CitationBackedFinding.sources[] array.
     This quorum protocol satisfies spec R1 (≥2 distinct sources required for authoritative SOTA bars used as stop conditions).

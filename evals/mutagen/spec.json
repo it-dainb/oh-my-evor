@@ -32,9 +32,22 @@
       {
         "path": "proposals[].approach_family",
         "kind": "unique"
+      },
+      {
+        "key": "proposals[].mutation_tier@non-acquisition",
+        "path": "proposals[].mutation_tier",
+        "kind": "every",
+        "where": {
+          "field": "approach_family",
+          "not_equals": "data-acquisition"
+        },
+        "values": [
+          "parametric",
+          "structural"
+        ]
       }
     ],
-    "note": "proposals[].mutation_tier is deliberately NOT graded. evor-mutagen.md:156 says wildness < 0.5 -> parametric, but evor-mutagen.md:125 says a data-acquisition proposal is always structural. For a data-acquisition proposal at low wildness the two rules give opposite answers, so any grading of that field scores which contradiction the model happened to resolve, not whether it followed the spec."
+    "note": "proposals[].mutation_tier is graded only OUTSIDE data-acquisition. evor-mutagen.md now states the precedence explicitly -- a data-acquisition proposal is structural at every wildness -- so the wildness ranges are gradable for every other approach_family. The data-acquisition subset itself is left ungraded because no case in this spec forces such a proposal to exist, and a `where` that selects nothing fails rather than passing vacuously."
   },
   "cases": [
     {
@@ -86,7 +99,8 @@
           "min": 6
         },
         "proposals[].approach_family": true,
-        "crossover_triggered": false
+        "crossover_triggered": false,
+        "proposals[].mutation_tier@non-acquisition": "parametric"
       }
     },
     {
@@ -138,7 +152,8 @@
           "min": 6
         },
         "proposals[].approach_family": true,
-        "crossover_triggered": false
+        "crossover_triggered": false,
+        "proposals[].mutation_tier@non-acquisition": "structural"
       }
     },
     {
@@ -190,7 +205,8 @@
           "min": 6
         },
         "proposals[].approach_family": true,
-        "crossover_triggered": false
+        "crossover_triggered": false,
+        "proposals[].mutation_tier@non-acquisition": "structural"
       }
     },
     {
@@ -242,7 +258,8 @@
           "min": 6
         },
         "proposals[].approach_family": true,
-        "crossover_triggered": false
+        "crossover_triggered": false,
+        "proposals[].mutation_tier@non-acquisition": "parametric"
       }
     },
     {
@@ -294,7 +311,8 @@
           "min": 10
         },
         "proposals[].approach_family": true,
-        "crossover_triggered": false
+        "crossover_triggered": false,
+        "proposals[].mutation_tier@non-acquisition": "structural"
       }
     },
     {
@@ -346,7 +364,8 @@
           "min": 4
         },
         "proposals[].approach_family": true,
-        "crossover_triggered": false
+        "crossover_triggered": false,
+        "proposals[].mutation_tier@non-acquisition": "parametric"
       }
     },
     {
@@ -403,7 +422,8 @@
           "min": 6
         },
         "proposals[].approach_family": true,
-        "crossover_triggered": true
+        "crossover_triggered": true,
+        "proposals[].mutation_tier@non-acquisition": "structural"
       }
     },
     {
@@ -455,7 +475,8 @@
           "min": 6
         },
         "proposals[].approach_family": true,
-        "crossover_triggered": false
+        "crossover_triggered": false,
+        "proposals[].mutation_tier@non-acquisition": "parametric"
       }
     },
     {
@@ -507,7 +528,8 @@
           "min": 8
         },
         "proposals[].approach_family": true,
-        "crossover_triggered": false
+        "crossover_triggered": false,
+        "proposals[].mutation_tier@non-acquisition": "structural"
       }
     },
     {
@@ -569,7 +591,8 @@
           "min": 6
         },
         "proposals[].approach_family": true,
-        "crossover_triggered": false
+        "crossover_triggered": false,
+        "proposals[].mutation_tier@non-acquisition": "structural"
       }
     }
   ]

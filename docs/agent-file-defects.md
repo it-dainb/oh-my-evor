@@ -5,10 +5,12 @@ models. They were found by benchmarking, which is the point: a contract that
 contradicts itself cannot be graded, and until you try to grade it nobody
 notices.
 
-None of them are fixed here. Editing an agent file mid-benchmark would change
-what the retier matrices are measuring, and the whole exercise is worthless if
-the two arms are not run against the same prompt. Fix them after the merge
-decision, then re-baseline.
+**Status: all three are fixed.** They were deliberately left alone while the
+retier matrices ran -- editing an agent file mid-benchmark changes what the
+matrices are measuring, and the exercise is worthless if the two arms do not see
+the same prompt. The fixes landed after the last matrix completed; the three
+affected roles were re-baselined against the amended files, and those
+re-baselines are the numbers to cite for mutagen, sage and sage-junior.
 
 ---
 
@@ -26,9 +28,20 @@ data-acquisition ones, which is the standard specific-beats-general reading.
 mutagen contract in S19. Grading it would score which horn a model happened to
 pick, not whether it followed the spec.
 
-**Suggested fix:** state the precedence explicitly at :156 — either
-"…except data-acquisition proposals, which are always structural (see :125)",
-or drop the blanket rule at :125 and let wildness govern.
+**Fixed.** `Wildness_Interpretation` now carries an explicit PRECEDENCE
+paragraph: a data-acquisition proposal is `"structural"` at every wildness, that
+specific rule wins, and the wildness ranges are the general case for every other
+family. `Data_Acquisition_Mutations` carries the reciprocal cross-reference.
+
+A second collision surfaced while fixing this one, one line up: the wildness
+*table* labelled the 0.2–0.5 row "Structural mutation within parent's family"
+while the rule below it assigns `mutation_tier="parametric"` to that same range.
+The table now describes the step size without reusing the field's vocabulary,
+and a sentence says outright that only the two rules name `mutation_tier`.
+
+`proposals[].mutation_tier` is graded again as a result -- restricted to
+non-data-acquisition proposals, which required a new `where` filter in the
+harness (see below).
 
 ---
 
@@ -53,11 +66,20 @@ The mechanical rule (:30, :62) says authoritative/high. The judgement rule
 either tier. It is left graded and flagged rather than removed, because unlike
 the mutagen case the model's failure mode here is legible.
 
-**Suggested fix:** say which rule wins when they collide. The defensible answer
-is that :42 wins — numeric agreement between incomparable protocols is not
-evidence of agreement — but then :30 and :62 need "…and the measurements are
-methodologically comparable" added, and the quorum check needs a comparability
-step before the arithmetic.
+**Fixed**, the way the models argued for. Both `evor-sage-junior.md` and
+`evor-sage.md` gained a step **2b COMPARABILITY GATE** that runs *before* the 5%
+arithmetic: two numbers are comparable only if they share dataset AND split AND
+evaluation protocol, an unstated protocol is not an established one, and a
+failed gate yields `quorum_met=false` / `trust_level="indicative"` /
+`confidence="low"`. The confidence bullets in `Success_Criteria` now point at
+the gate rather than at numeric closeness alone.
+
+Both arms were right and the fixture was wrong, so `divergence-just-inside`
+flipped: it is now `divergence-inside-band-incomparable` and expects
+indicative/low. Because that case had been the only positive test of the 5%
+arithmetic, a comparable twin was added alongside it in both specs -- same
+divergence, protocols explicitly shared -- so the arithmetic keeps a case that
+can only be passed by doing it.
 
 ---
 
@@ -73,9 +95,22 @@ should not be reported at all. The file never says which.
 
 **Effect on the benchmark:** depresses both arms roughly equally (2/3 each).
 
-**Suggested fix:** state the floor. Either name the source classes that are
-citable at low confidence, or say explicitly that a non-peer-reviewed source is
-never a finding and the angle is reported unresolved.
+**Fixed** by naming the classes. `evor-sage-junior.md` gained a
+`<Source_Admissibility>` block that separates "report it, at this ceiling"
+(peer-reviewed → up to high; leaderboard or model card → medium; indirect
+technical evidence such as an authors' engineering blog, framework docs, a
+maintainer's issue comment → low, never higher) from "do not report at all"
+(anonymous forum and social-media posts, marketing copy with no method,
+unestablished provenance, and any number not actually fetched this tick). An
+angle with nothing admissible returns an empty list *plus a stated reason*, so
+Sage can tell "found only inadmissible sources" from "search failed".
+
+Both arms were right here too: `indirect-evidence-forum` is now
+`inadmissible-forum-anecdote` and expects zero findings. The vendor page in
+`indirect-evidence-only` turned out to be marketing copy with no method rather
+than indirect technical evidence, so it became `inadmissible-marketing-copy`
+(zero findings), and a genuinely indirect-but-admissible case was added so the
+low-confidence-reportable branch is still tested.
 
 ---
 
@@ -109,11 +144,41 @@ findings be `"low"`. Both arms returned `"medium"` and both were right.
 Effect: 0/3 per arm, so roughly -10pp on both sage arms. sonnet 86.7% / opus
 83.3% as measured; ~96.3% / ~92.6% excluding this case.
 
-Fix: make the ambiguity intrinsic to a single finding -- one technique, two
-sources whose protocols are not comparable -- rather than a property of a pair.
+**Fixed.** Both juniors now report the same technique and the same metric
+(multi-scale TTA, mIoU gain), which `evor-sage.md:83` makes a cross-junior
+quorum, but on different datasets at different resolutions with different
+backbones. The two values are 2.4 and 2.3 -- 4.2% apart, *inside* the 5% band --
+so the arithmetic alone answers "authoritative/high" and only the comparability
+gate answers "low". The case is a discriminator now rather than a trap.
 
 ## `evals/sage-junior/spec.json` — two cases sit on agent-file contradictions
 
-See defects 2 and 3 above. `divergence-just-inside` and
-`indirect-evidence-forum` are unwinnable as specified because the agent file
-answers them twice, differently. Both arms are affected.
+See defects 2 and 3 above. Both are fixed: the agent file now answers each
+question once, and both cases were re-specified to the answer it gives.
+
+---
+
+# Harness changes these fixes required
+
+**`where` on per-element fields.** A per-element rule sometimes governs only
+part of a list. Mutagen's wildness ranges set `mutation_tier` for most approach
+families but not for data-acquisition, and a bare `every` cannot say that --
+which is why the field was dropped rather than grade a rule the agent was never
+given. `every`/`unique` now accept `where: {field, equals | not_equals}`, and
+`buildContractText` renders the filter into the prompt ("every entry of
+`proposals` whose `approach_family` is not `data-acquisition` ..."), so the
+restriction is stated wherever it is graded. A filter that selects nothing fails
+rather than passing vacuously, for the same reason an empty list does.
+
+Fields may now also carry a `key`, so two rules can share one path while keeping
+distinct expectation keys.
+
+**The degenerate-strategy floor had a blind spot.** It enumerated fixed replies
+for scalar fields but skipped `every`/`unique` entirely -- so "report every
+finding as indicative/medium/not-met" was never priced, and that is precisely
+the shape of the cases being added. With per-element constants enumerated (both
+an empty list and one long enough to satisfy any `min`), the check immediately
+found that a constant answer cleared 4 of 10 sage cases. Sage gained a second
+single-source case and a three-junior comparable quorum, and `confidence` is now
+graded on the cases where the rules determine it, which was the free ride the
+fixed "medium" answer had been taking.
