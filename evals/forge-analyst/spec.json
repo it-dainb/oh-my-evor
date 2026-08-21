@@ -1,0 +1,690 @@
+{
+  "role": "evor-forge-analyst",
+  "agent_file": "agents/evor-forge-analyst.md",
+  "arms": [
+    {
+      "model": "sonnet",
+      "effort": "medium",
+      "label": "current"
+    },
+    {
+      "model": "opus",
+      "effort": "medium",
+      "label": "main (pre-retier)"
+    }
+  ],
+  "contract": {
+    "heading": "Analyst Review",
+    "mode": "json",
+    "fields": [
+      {
+        "path": "verdict",
+        "kind": "enum",
+        "values": [
+          "rejected",
+          "approved"
+        ]
+      },
+      {
+        "path": "risk_assessment.oom_risk",
+        "kind": "enum",
+        "values": [
+          "critical",
+          "high",
+          "medium",
+          "low"
+        ]
+      },
+      {
+        "path": "risk_assessment.nan_risk",
+        "kind": "enum",
+        "values": [
+          "high",
+          "medium",
+          "low"
+        ]
+      },
+      {
+        "path": "risk_assessment.divergence_risk",
+        "kind": "enum",
+        "values": [
+          "high",
+          "medium",
+          "low"
+        ]
+      },
+      {
+        "path": "risk_assessment.throughput_risk",
+        "kind": "enum",
+        "values": [
+          "high",
+          "medium",
+          "low"
+        ]
+      },
+      {
+        "path": "loop_back_recommended",
+        "kind": "bool"
+      }
+    ]
+  },
+  "cases": [
+    {
+      "id": "all-clear",
+      "gate": "baseline",
+      "note": "12.0 GB of 24, benign recipe: nothing should fire",
+      "capability": {
+        "cpu_only": false,
+        "gpu_arch": "sm_86",
+        "supported_dtypes": [
+          "fp32",
+          "bf16"
+        ],
+        "available_vram_gb": 24
+      },
+      "analyst_pass_number": 1,
+      "profiler_report": {
+        "vram_estimate_gb": 12.0,
+        "param_count_estimate": 84000000.0,
+        "dataset_size": 120000,
+        "total_epochs": 10,
+        "steps_per_sec_estimate": 1.0,
+        "time_budget_min": 240
+      },
+      "proposal": {
+        "approach_family": "training",
+        "training_recipe": {
+          "optimizer": "AdamW",
+          "lr": 0.0003,
+          "grad_clip": 1.0,
+          "warmup_epochs": 2,
+          "lr_schedule": "cosine"
+        },
+        "loss": {
+          "class": "CrossEntropyLoss"
+        },
+        "module_seams": {
+          "backbone": "conv-stack",
+          "head": "linear",
+          "neck": null
+        }
+      },
+      "candidate_files": {
+        "model/backbone.py": "import torch.nn as nn\ndef build_backbone(cfg):\n    return nn.Sequential(nn.Conv2d(3,64,3,padding=1), nn.ReLU(), nn.AdaptiveAvgPool2d(1), nn.Flatten())\n",
+        "model/head.py": "import torch.nn as nn\ndef build_head(cfg):\n    return nn.Linear(64, cfg.num_classes)\n",
+        "train/trainer.py": "import os, json, torch\nfrom torch.utils.data import DataLoader\nfrom model.backbone import build_backbone\nfrom model.head import build_head\n\ndef train(cfg):\n    tel = os.environ.get(\"EVOR_TELEMETRY_PATH\")\n    backbone, head = build_backbone(cfg), build_head(cfg)\n    criterion = torch.nn.CrossEntropyLoss()\n    opt = torch.optim.AdamW(list(backbone.parameters()) + list(head.parameters()), lr=0.0003)\n    sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=cfg.total_steps)\n    loader = DataLoader(cfg.dataset, batch_size=cfg.batch_size, num_workers=4)\n    for step, (x, y) in enumerate(loader):\n        logits = head(backbone(x))\n        loss = criterion(logits, y)\n        loss.backward()\n        torch.nn.utils.clip_grad_norm_(backbone.parameters(), 1.0)\n        opt.step(); opt.zero_grad()\n        with open(tel, \"a\") as fh:\n            fh.write(json.dumps({\"step\": step, \"node_id\": cfg.node_id, \"run_id\": cfg.run_id,\n                                 \"timestamp\": cfg.now(), \"train_loss\": float(loss)}) + \"\\n\")\n        sched.step()\n"
+      },
+      "expect": {
+        "verdict": "approved",
+        "risk_assessment.oom_risk": "low",
+        "risk_assessment.nan_risk": "low",
+        "risk_assessment.divergence_risk": "low",
+        "risk_assessment.throughput_risk": "low",
+        "loop_back_recommended": false
+      }
+    },
+    {
+      "id": "oom-critical",
+      "gate": "oom",
+      "note": "30.2 GB estimated against 24 GB available: OOM is certain",
+      "capability": {
+        "cpu_only": false,
+        "gpu_arch": "sm_86",
+        "supported_dtypes": [
+          "fp32",
+          "bf16"
+        ],
+        "available_vram_gb": 24
+      },
+      "analyst_pass_number": 1,
+      "profiler_report": {
+        "vram_estimate_gb": 30.2,
+        "param_count_estimate": 84000000.0,
+        "dataset_size": 120000,
+        "total_epochs": 10,
+        "steps_per_sec_estimate": 1.0,
+        "time_budget_min": 240
+      },
+      "proposal": {
+        "approach_family": "training",
+        "training_recipe": {
+          "optimizer": "AdamW",
+          "lr": 0.0003,
+          "grad_clip": 1.0,
+          "warmup_epochs": 2,
+          "lr_schedule": "cosine"
+        },
+        "loss": {
+          "class": "CrossEntropyLoss"
+        },
+        "module_seams": {
+          "backbone": "conv-stack",
+          "head": "linear",
+          "neck": null
+        }
+      },
+      "candidate_files": {
+        "model/backbone.py": "import torch.nn as nn\ndef build_backbone(cfg):\n    return nn.Sequential(nn.Conv2d(3,64,3,padding=1), nn.ReLU(), nn.AdaptiveAvgPool2d(1), nn.Flatten())\n",
+        "model/head.py": "import torch.nn as nn\ndef build_head(cfg):\n    return nn.Linear(64, cfg.num_classes)\n",
+        "train/trainer.py": "import os, json, torch\nfrom torch.utils.data import DataLoader\nfrom model.backbone import build_backbone\nfrom model.head import build_head\n\ndef train(cfg):\n    tel = os.environ.get(\"EVOR_TELEMETRY_PATH\")\n    backbone, head = build_backbone(cfg), build_head(cfg)\n    criterion = torch.nn.CrossEntropyLoss()\n    opt = torch.optim.AdamW(list(backbone.parameters()) + list(head.parameters()), lr=0.0003)\n    sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=cfg.total_steps)\n    loader = DataLoader(cfg.dataset, batch_size=cfg.batch_size, num_workers=4)\n    for step, (x, y) in enumerate(loader):\n        logits = head(backbone(x))\n        loss = criterion(logits, y)\n        loss.backward()\n        torch.nn.utils.clip_grad_norm_(backbone.parameters(), 1.0)\n        opt.step(); opt.zero_grad()\n        with open(tel, \"a\") as fh:\n            fh.write(json.dumps({\"step\": step, \"node_id\": cfg.node_id, \"run_id\": cfg.run_id,\n                                 \"timestamp\": cfg.now(), \"train_loss\": float(loss)}) + \"\\n\")\n        sched.step()\n"
+      },
+      "expect": {
+        "verdict": "rejected",
+        "risk_assessment.oom_risk": "critical",
+        "risk_assessment.nan_risk": "low",
+        "risk_assessment.divergence_risk": "low"
+      }
+    },
+    {
+      "id": "oom-high-no-checkpointing",
+      "gate": "oom",
+      "note": "21.5 GB is over 0.85 x 24 = 20.4 and nothing mitigates it",
+      "capability": {
+        "cpu_only": false,
+        "gpu_arch": "sm_86",
+        "supported_dtypes": [
+          "fp32",
+          "bf16"
+        ],
+        "available_vram_gb": 24
+      },
+      "analyst_pass_number": 1,
+      "profiler_report": {
+        "vram_estimate_gb": 21.5,
+        "param_count_estimate": 84000000.0,
+        "dataset_size": 120000,
+        "total_epochs": 10,
+        "steps_per_sec_estimate": 1.0,
+        "time_budget_min": 240
+      },
+      "proposal": {
+        "approach_family": "training",
+        "training_recipe": {
+          "optimizer": "AdamW",
+          "lr": 0.0003,
+          "grad_clip": 1.0,
+          "warmup_epochs": 2,
+          "lr_schedule": "cosine"
+        },
+        "loss": {
+          "class": "CrossEntropyLoss"
+        },
+        "module_seams": {
+          "backbone": "conv-stack",
+          "head": "linear",
+          "neck": null
+        }
+      },
+      "candidate_files": {
+        "model/backbone.py": "import torch.nn as nn\ndef build_backbone(cfg):\n    return nn.Sequential(nn.Conv2d(3,64,3,padding=1), nn.ReLU(), nn.AdaptiveAvgPool2d(1), nn.Flatten())\n",
+        "model/head.py": "import torch.nn as nn\ndef build_head(cfg):\n    return nn.Linear(64, cfg.num_classes)\n",
+        "train/trainer.py": "import os, json, torch\nfrom torch.utils.data import DataLoader\nfrom model.backbone import build_backbone\nfrom model.head import build_head\n\ndef train(cfg):\n    tel = os.environ.get(\"EVOR_TELEMETRY_PATH\")\n    backbone, head = build_backbone(cfg), build_head(cfg)\n    criterion = torch.nn.CrossEntropyLoss()\n    opt = torch.optim.AdamW(list(backbone.parameters()) + list(head.parameters()), lr=0.0003)\n    sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=cfg.total_steps)\n    loader = DataLoader(cfg.dataset, batch_size=cfg.batch_size, num_workers=4)\n    for step, (x, y) in enumerate(loader):\n        logits = head(backbone(x))\n        loss = criterion(logits, y)\n        loss.backward()\n        torch.nn.utils.clip_grad_norm_(backbone.parameters(), 1.0)\n        opt.step(); opt.zero_grad()\n        with open(tel, \"a\") as fh:\n            fh.write(json.dumps({\"step\": step, \"node_id\": cfg.node_id, \"run_id\": cfg.run_id,\n                                 \"timestamp\": cfg.now(), \"train_loss\": float(loss)}) + \"\\n\")\n        sched.step()\n"
+      },
+      "expect": {
+        "verdict": "rejected",
+        "risk_assessment.oom_risk": "high",
+        "risk_assessment.nan_risk": "low",
+        "risk_assessment.divergence_risk": "low"
+      }
+    },
+    {
+      "id": "oom-high-with-checkpointing",
+      "gate": "oom_nc",
+      "note": "TRAP: same 21.5 GB, but gradient checkpointing is already in trainer.py, which the rule names as the mitigation",
+      "capability": {
+        "cpu_only": false,
+        "gpu_arch": "sm_86",
+        "supported_dtypes": [
+          "fp32",
+          "bf16"
+        ],
+        "available_vram_gb": 24
+      },
+      "analyst_pass_number": 1,
+      "profiler_report": {
+        "vram_estimate_gb": 21.5,
+        "param_count_estimate": 84000000.0,
+        "dataset_size": 120000,
+        "total_epochs": 10,
+        "steps_per_sec_estimate": 1.0,
+        "time_budget_min": 240
+      },
+      "proposal": {
+        "approach_family": "training",
+        "training_recipe": {
+          "optimizer": "AdamW",
+          "lr": 0.0003,
+          "grad_clip": 1.0,
+          "warmup_epochs": 2,
+          "lr_schedule": "cosine"
+        },
+        "loss": {
+          "class": "CrossEntropyLoss"
+        },
+        "module_seams": {
+          "backbone": "conv-stack",
+          "head": "linear",
+          "neck": null
+        }
+      },
+      "candidate_files": {
+        "model/backbone.py": "import torch.nn as nn\ndef build_backbone(cfg):\n    return nn.Sequential(nn.Conv2d(3,64,3,padding=1), nn.ReLU(), nn.AdaptiveAvgPool2d(1), nn.Flatten())\n",
+        "model/head.py": "import torch.nn as nn\ndef build_head(cfg):\n    return nn.Linear(64, cfg.num_classes)\n",
+        "train/trainer.py": "import os, json, torch\nfrom torch.utils.data import DataLoader\nfrom model.backbone import build_backbone\nfrom model.head import build_head\n\ndef train(cfg):\n    tel = os.environ.get(\"EVOR_TELEMETRY_PATH\")\n    backbone, head = build_backbone(cfg), build_head(cfg)\n    backbone.gradient_checkpointing_enable()\n    criterion = torch.nn.CrossEntropyLoss()\n    opt = torch.optim.AdamW(list(backbone.parameters()) + list(head.parameters()), lr=0.0003)\n    sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=cfg.total_steps)\n    loader = DataLoader(cfg.dataset, batch_size=cfg.batch_size, num_workers=4)\n    for step, (x, y) in enumerate(loader):\n        logits = head(backbone(x))\n        loss = criterion(logits, y)\n        loss.backward()\n        torch.nn.utils.clip_grad_norm_(backbone.parameters(), 1.0)\n        opt.step(); opt.zero_grad()\n        with open(tel, \"a\") as fh:\n            fh.write(json.dumps({\"step\": step, \"node_id\": cfg.node_id, \"run_id\": cfg.run_id,\n                                 \"timestamp\": cfg.now(), \"train_loss\": float(loss)}) + \"\\n\")\n        sched.step()\n"
+      },
+      "expect": {
+        "verdict": "approved",
+        "risk_assessment.oom_risk": "high",
+        "risk_assessment.nan_risk": "low"
+      }
+    },
+    {
+      "id": "oom-medium",
+      "gate": "oom",
+      "note": "17.5 GB is over 0.70 x 24 = 16.8 but under 0.85 x 24",
+      "capability": {
+        "cpu_only": false,
+        "gpu_arch": "sm_86",
+        "supported_dtypes": [
+          "fp32",
+          "bf16"
+        ],
+        "available_vram_gb": 24
+      },
+      "analyst_pass_number": 1,
+      "profiler_report": {
+        "vram_estimate_gb": 17.5,
+        "param_count_estimate": 84000000.0,
+        "dataset_size": 120000,
+        "total_epochs": 10,
+        "steps_per_sec_estimate": 1.0,
+        "time_budget_min": 240
+      },
+      "proposal": {
+        "approach_family": "training",
+        "training_recipe": {
+          "optimizer": "AdamW",
+          "lr": 0.0003,
+          "grad_clip": 1.0,
+          "warmup_epochs": 2,
+          "lr_schedule": "cosine"
+        },
+        "loss": {
+          "class": "CrossEntropyLoss"
+        },
+        "module_seams": {
+          "backbone": "conv-stack",
+          "head": "linear",
+          "neck": null
+        }
+      },
+      "candidate_files": {
+        "model/backbone.py": "import torch.nn as nn\ndef build_backbone(cfg):\n    return nn.Sequential(nn.Conv2d(3,64,3,padding=1), nn.ReLU(), nn.AdaptiveAvgPool2d(1), nn.Flatten())\n",
+        "model/head.py": "import torch.nn as nn\ndef build_head(cfg):\n    return nn.Linear(64, cfg.num_classes)\n",
+        "train/trainer.py": "import os, json, torch\nfrom torch.utils.data import DataLoader\nfrom model.backbone import build_backbone\nfrom model.head import build_head\n\ndef train(cfg):\n    tel = os.environ.get(\"EVOR_TELEMETRY_PATH\")\n    backbone, head = build_backbone(cfg), build_head(cfg)\n    backbone.gradient_checkpointing_enable()\n    criterion = torch.nn.CrossEntropyLoss()\n    opt = torch.optim.AdamW(list(backbone.parameters()) + list(head.parameters()), lr=0.0003)\n    sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=cfg.total_steps)\n    loader = DataLoader(cfg.dataset, batch_size=cfg.batch_size, num_workers=4)\n    for step, (x, y) in enumerate(loader):\n        logits = head(backbone(x))\n        loss = criterion(logits, y)\n        loss.backward()\n        torch.nn.utils.clip_grad_norm_(backbone.parameters(), 1.0)\n        opt.step(); opt.zero_grad()\n        with open(tel, \"a\") as fh:\n            fh.write(json.dumps({\"step\": step, \"node_id\": cfg.node_id, \"run_id\": cfg.run_id,\n                                 \"timestamp\": cfg.now(), \"train_loss\": float(loss)}) + \"\\n\")\n        sched.step()\n"
+      },
+      "expect": {
+        "verdict": "approved",
+        "risk_assessment.oom_risk": "medium",
+        "risk_assessment.nan_risk": "low",
+        "risk_assessment.divergence_risk": "low"
+      }
+    },
+    {
+      "id": "nan-high-lr-no-clip",
+      "gate": "nan",
+      "note": "lr 0.05 is above 0.01 and there is no gradient clipping",
+      "capability": {
+        "cpu_only": false,
+        "gpu_arch": "sm_86",
+        "supported_dtypes": [
+          "fp32",
+          "bf16"
+        ],
+        "available_vram_gb": 24
+      },
+      "analyst_pass_number": 1,
+      "profiler_report": {
+        "vram_estimate_gb": 12.0,
+        "param_count_estimate": 84000000.0,
+        "dataset_size": 120000,
+        "total_epochs": 10,
+        "steps_per_sec_estimate": 1.0,
+        "time_budget_min": 240
+      },
+      "proposal": {
+        "approach_family": "training",
+        "training_recipe": {
+          "optimizer": "AdamW",
+          "lr": 0.05,
+          "warmup_epochs": 2,
+          "lr_schedule": "cosine"
+        },
+        "loss": {
+          "class": "CrossEntropyLoss"
+        },
+        "module_seams": {
+          "backbone": "conv-stack",
+          "head": "linear",
+          "neck": null
+        }
+      },
+      "candidate_files": {
+        "model/backbone.py": "import torch.nn as nn\ndef build_backbone(cfg):\n    return nn.Sequential(nn.Conv2d(3,64,3,padding=1), nn.ReLU(), nn.AdaptiveAvgPool2d(1), nn.Flatten())\n",
+        "model/head.py": "import torch.nn as nn\ndef build_head(cfg):\n    return nn.Linear(64, cfg.num_classes)\n",
+        "train/trainer.py": "import os, json, torch\nfrom torch.utils.data import DataLoader\nfrom model.backbone import build_backbone\nfrom model.head import build_head\n\ndef train(cfg):\n    tel = os.environ.get(\"EVOR_TELEMETRY_PATH\")\n    backbone, head = build_backbone(cfg), build_head(cfg)\n    criterion = torch.nn.CrossEntropyLoss()\n    opt = torch.optim.AdamW(list(backbone.parameters()) + list(head.parameters()), lr=0.05)\n    sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=cfg.total_steps)\n    loader = DataLoader(cfg.dataset, batch_size=cfg.batch_size, num_workers=4)\n    for step, (x, y) in enumerate(loader):\n        logits = head(backbone(x))\n        loss = criterion(logits, y)\n        loss.backward()\n        opt.step(); opt.zero_grad()\n        with open(tel, \"a\") as fh:\n            fh.write(json.dumps({\"step\": step, \"node_id\": cfg.node_id, \"run_id\": cfg.run_id,\n                                 \"timestamp\": cfg.now(), \"train_loss\": float(loss)}) + \"\\n\")\n        sched.step()\n"
+      },
+      "expect": {
+        "risk_assessment.nan_risk": "high",
+        "risk_assessment.oom_risk": "low",
+        "verdict": "rejected"
+      }
+    },
+    {
+      "id": "nan-bf16-no-loss-scaling",
+      "gate": "nan",
+      "note": "bf16 autocast with no loss scaling in trainer.py",
+      "capability": {
+        "cpu_only": false,
+        "gpu_arch": "sm_86",
+        "supported_dtypes": [
+          "fp32",
+          "bf16"
+        ],
+        "available_vram_gb": 24
+      },
+      "analyst_pass_number": 1,
+      "profiler_report": {
+        "vram_estimate_gb": 12.0,
+        "param_count_estimate": 84000000.0,
+        "dataset_size": 120000,
+        "total_epochs": 10,
+        "steps_per_sec_estimate": 1.0,
+        "time_budget_min": 240
+      },
+      "proposal": {
+        "approach_family": "training",
+        "training_recipe": {
+          "optimizer": "AdamW",
+          "lr": 0.0003,
+          "grad_clip": 1.0,
+          "warmup_epochs": 2,
+          "lr_schedule": "cosine",
+          "mixed_precision": "bf16"
+        },
+        "loss": {
+          "class": "CrossEntropyLoss"
+        },
+        "module_seams": {
+          "backbone": "conv-stack",
+          "head": "linear",
+          "neck": null
+        }
+      },
+      "candidate_files": {
+        "model/backbone.py": "import torch.nn as nn\ndef build_backbone(cfg):\n    return nn.Sequential(nn.Conv2d(3,64,3,padding=1), nn.ReLU(), nn.AdaptiveAvgPool2d(1), nn.Flatten())\n",
+        "model/head.py": "import torch.nn as nn\ndef build_head(cfg):\n    return nn.Linear(64, cfg.num_classes)\n",
+        "train/trainer.py": "import os, json, torch\nfrom torch.utils.data import DataLoader\nfrom model.backbone import build_backbone\nfrom model.head import build_head\n\ndef train(cfg):\n    tel = os.environ.get(\"EVOR_TELEMETRY_PATH\")\n    backbone, head = build_backbone(cfg), build_head(cfg)\n    criterion = torch.nn.CrossEntropyLoss()\n    opt = torch.optim.AdamW(list(backbone.parameters()) + list(head.parameters()), lr=0.0003)\n    sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=cfg.total_steps)\n    # bf16 autocast with no GradScaler / loss scaling\n    loader = DataLoader(cfg.dataset, batch_size=cfg.batch_size, num_workers=4)\n    for step, (x, y) in enumerate(loader):\n        with torch.autocast(device_type=\"cuda\", dtype=torch.bfloat16):\n            logits = head(backbone(x))\n        loss = criterion(logits, y)\n        loss.backward()\n        torch.nn.utils.clip_grad_norm_(backbone.parameters(), 1.0)\n        opt.step(); opt.zero_grad()\n        with open(tel, \"a\") as fh:\n            fh.write(json.dumps({\"step\": step, \"node_id\": cfg.node_id, \"run_id\": cfg.run_id,\n                                 \"timestamp\": cfg.now(), \"train_loss\": float(loss)}) + \"\\n\")\n        sched.step()\n"
+      },
+      "expect": {
+        "risk_assessment.nan_risk": "medium",
+        "risk_assessment.oom_risk": "low"
+      }
+    },
+    {
+      "id": "divergence-no-warmup",
+      "gate": "divergence",
+      "note": "lr 0.002 is above 0.001 and warmup_epochs is 0",
+      "capability": {
+        "cpu_only": false,
+        "gpu_arch": "sm_86",
+        "supported_dtypes": [
+          "fp32",
+          "bf16"
+        ],
+        "available_vram_gb": 24
+      },
+      "analyst_pass_number": 1,
+      "profiler_report": {
+        "vram_estimate_gb": 12.0,
+        "param_count_estimate": 84000000.0,
+        "dataset_size": 120000,
+        "total_epochs": 10,
+        "steps_per_sec_estimate": 1.0,
+        "time_budget_min": 240
+      },
+      "proposal": {
+        "approach_family": "training",
+        "training_recipe": {
+          "optimizer": "AdamW",
+          "lr": 0.002,
+          "grad_clip": 1.0,
+          "warmup_epochs": 0,
+          "lr_schedule": "cosine"
+        },
+        "loss": {
+          "class": "CrossEntropyLoss"
+        },
+        "module_seams": {
+          "backbone": "conv-stack",
+          "head": "linear",
+          "neck": null
+        }
+      },
+      "candidate_files": {
+        "model/backbone.py": "import torch.nn as nn\ndef build_backbone(cfg):\n    return nn.Sequential(nn.Conv2d(3,64,3,padding=1), nn.ReLU(), nn.AdaptiveAvgPool2d(1), nn.Flatten())\n",
+        "model/head.py": "import torch.nn as nn\ndef build_head(cfg):\n    return nn.Linear(64, cfg.num_classes)\n",
+        "train/trainer.py": "import os, json, torch\nfrom torch.utils.data import DataLoader\nfrom model.backbone import build_backbone\nfrom model.head import build_head\n\ndef train(cfg):\n    tel = os.environ.get(\"EVOR_TELEMETRY_PATH\")\n    backbone, head = build_backbone(cfg), build_head(cfg)\n    criterion = torch.nn.CrossEntropyLoss()\n    opt = torch.optim.AdamW(list(backbone.parameters()) + list(head.parameters()), lr=0.002)\n    sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=cfg.total_steps)\n    loader = DataLoader(cfg.dataset, batch_size=cfg.batch_size, num_workers=4)\n    for step, (x, y) in enumerate(loader):\n        logits = head(backbone(x))\n        loss = criterion(logits, y)\n        loss.backward()\n        torch.nn.utils.clip_grad_norm_(backbone.parameters(), 1.0)\n        opt.step(); opt.zero_grad()\n        with open(tel, \"a\") as fh:\n            fh.write(json.dumps({\"step\": step, \"node_id\": cfg.node_id, \"run_id\": cfg.run_id,\n                                 \"timestamp\": cfg.now(), \"train_loss\": float(loss)}) + \"\\n\")\n        sched.step()\n"
+      },
+      "expect": {
+        "risk_assessment.divergence_risk": "medium",
+        "risk_assessment.oom_risk": "low",
+        "risk_assessment.nan_risk": "low"
+      }
+    },
+    {
+      "id": "divergence-constant-lr",
+      "gate": "divergence",
+      "note": "the learning rate never decays across the whole run",
+      "capability": {
+        "cpu_only": false,
+        "gpu_arch": "sm_86",
+        "supported_dtypes": [
+          "fp32",
+          "bf16"
+        ],
+        "available_vram_gb": 24
+      },
+      "analyst_pass_number": 1,
+      "profiler_report": {
+        "vram_estimate_gb": 12.0,
+        "param_count_estimate": 84000000.0,
+        "dataset_size": 120000,
+        "total_epochs": 10,
+        "steps_per_sec_estimate": 1.0,
+        "time_budget_min": 240
+      },
+      "proposal": {
+        "approach_family": "training",
+        "training_recipe": {
+          "optimizer": "AdamW",
+          "lr": 0.0005,
+          "grad_clip": 1.0,
+          "warmup_epochs": 2,
+          "lr_schedule": "constant"
+        },
+        "loss": {
+          "class": "CrossEntropyLoss"
+        },
+        "module_seams": {
+          "backbone": "conv-stack",
+          "head": "linear",
+          "neck": null
+        }
+      },
+      "candidate_files": {
+        "model/backbone.py": "import torch.nn as nn\ndef build_backbone(cfg):\n    return nn.Sequential(nn.Conv2d(3,64,3,padding=1), nn.ReLU(), nn.AdaptiveAvgPool2d(1), nn.Flatten())\n",
+        "model/head.py": "import torch.nn as nn\ndef build_head(cfg):\n    return nn.Linear(64, cfg.num_classes)\n",
+        "train/trainer.py": "import os, json, torch\nfrom torch.utils.data import DataLoader\nfrom model.backbone import build_backbone\nfrom model.head import build_head\n\ndef train(cfg):\n    tel = os.environ.get(\"EVOR_TELEMETRY_PATH\")\n    backbone, head = build_backbone(cfg), build_head(cfg)\n    criterion = torch.nn.CrossEntropyLoss()\n    opt = torch.optim.AdamW(list(backbone.parameters()) + list(head.parameters()), lr=0.0005)\n    # no scheduler: the learning rate is held constant for the whole run\n    loader = DataLoader(cfg.dataset, batch_size=cfg.batch_size, num_workers=4)\n    for step, (x, y) in enumerate(loader):\n        logits = head(backbone(x))\n        loss = criterion(logits, y)\n        loss.backward()\n        torch.nn.utils.clip_grad_norm_(backbone.parameters(), 1.0)\n        opt.step(); opt.zero_grad()\n        with open(tel, \"a\") as fh:\n            fh.write(json.dumps({\"step\": step, \"node_id\": cfg.node_id, \"run_id\": cfg.run_id,\n                                 \"timestamp\": cfg.now(), \"train_loss\": float(loss)}) + \"\\n\")\n"
+      },
+      "expect": {
+        "risk_assessment.divergence_risk": "medium",
+        "risk_assessment.oom_risk": "low",
+        "risk_assessment.nan_risk": "low"
+      }
+    },
+    {
+      "id": "throughput-workers-zero",
+      "gate": "throughput",
+      "note": "num_workers=0 against a 120k-sample dataset",
+      "capability": {
+        "cpu_only": false,
+        "gpu_arch": "sm_86",
+        "supported_dtypes": [
+          "fp32",
+          "bf16"
+        ],
+        "available_vram_gb": 24
+      },
+      "analyst_pass_number": 1,
+      "profiler_report": {
+        "vram_estimate_gb": 12.0,
+        "param_count_estimate": 84000000.0,
+        "dataset_size": 120000,
+        "total_epochs": 10,
+        "steps_per_sec_estimate": 1.0,
+        "time_budget_min": 240
+      },
+      "proposal": {
+        "approach_family": "training",
+        "training_recipe": {
+          "optimizer": "AdamW",
+          "lr": 0.0003,
+          "grad_clip": 1.0,
+          "warmup_epochs": 2,
+          "lr_schedule": "cosine"
+        },
+        "loss": {
+          "class": "CrossEntropyLoss"
+        },
+        "module_seams": {
+          "backbone": "conv-stack",
+          "head": "linear",
+          "neck": null
+        }
+      },
+      "candidate_files": {
+        "model/backbone.py": "import torch.nn as nn\ndef build_backbone(cfg):\n    return nn.Sequential(nn.Conv2d(3,64,3,padding=1), nn.ReLU(), nn.AdaptiveAvgPool2d(1), nn.Flatten())\n",
+        "model/head.py": "import torch.nn as nn\ndef build_head(cfg):\n    return nn.Linear(64, cfg.num_classes)\n",
+        "train/trainer.py": "import os, json, torch\nfrom torch.utils.data import DataLoader\nfrom model.backbone import build_backbone\nfrom model.head import build_head\n\ndef train(cfg):\n    tel = os.environ.get(\"EVOR_TELEMETRY_PATH\")\n    backbone, head = build_backbone(cfg), build_head(cfg)\n    criterion = torch.nn.CrossEntropyLoss()\n    opt = torch.optim.AdamW(list(backbone.parameters()) + list(head.parameters()), lr=0.0003)\n    sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=cfg.total_steps)\n    loader = DataLoader(cfg.dataset, batch_size=cfg.batch_size, num_workers=0)\n    for step, (x, y) in enumerate(loader):\n        logits = head(backbone(x))\n        loss = criterion(logits, y)\n        loss.backward()\n        torch.nn.utils.clip_grad_norm_(backbone.parameters(), 1.0)\n        opt.step(); opt.zero_grad()\n        with open(tel, \"a\") as fh:\n            fh.write(json.dumps({\"step\": step, \"node_id\": cfg.node_id, \"run_id\": cfg.run_id,\n                                 \"timestamp\": cfg.now(), \"train_loss\": float(loss)}) + \"\\n\")\n        sched.step()\n"
+      },
+      "expect": {
+        "risk_assessment.throughput_risk": "medium",
+        "risk_assessment.oom_risk": "low",
+        "risk_assessment.nan_risk": "low"
+      }
+    },
+    {
+      "id": "loop-back-first-pass",
+      "gate": "loopback",
+      "note": "first analyst pass, OOM high with a concrete batch-size fix: the loop-back conditions all hold",
+      "capability": {
+        "cpu_only": false,
+        "gpu_arch": "sm_86",
+        "supported_dtypes": [
+          "fp32",
+          "bf16"
+        ],
+        "available_vram_gb": 24
+      },
+      "analyst_pass_number": 1,
+      "profiler_report": {
+        "vram_estimate_gb": 21.5,
+        "param_count_estimate": 84000000.0,
+        "dataset_size": 120000,
+        "total_epochs": 10,
+        "steps_per_sec_estimate": 1.0,
+        "time_budget_min": 240
+      },
+      "proposal": {
+        "approach_family": "training",
+        "training_recipe": {
+          "optimizer": "AdamW",
+          "lr": 0.0003,
+          "grad_clip": 1.0,
+          "warmup_epochs": 2,
+          "lr_schedule": "cosine"
+        },
+        "loss": {
+          "class": "CrossEntropyLoss"
+        },
+        "module_seams": {
+          "backbone": "conv-stack",
+          "head": "linear",
+          "neck": null
+        }
+      },
+      "candidate_files": {
+        "model/backbone.py": "import torch.nn as nn\ndef build_backbone(cfg):\n    return nn.Sequential(nn.Conv2d(3,64,3,padding=1), nn.ReLU(), nn.AdaptiveAvgPool2d(1), nn.Flatten())\n",
+        "model/head.py": "import torch.nn as nn\ndef build_head(cfg):\n    return nn.Linear(64, cfg.num_classes)\n",
+        "train/trainer.py": "import os, json, torch\nfrom torch.utils.data import DataLoader\nfrom model.backbone import build_backbone\nfrom model.head import build_head\n\ndef train(cfg):\n    tel = os.environ.get(\"EVOR_TELEMETRY_PATH\")\n    backbone, head = build_backbone(cfg), build_head(cfg)\n    criterion = torch.nn.CrossEntropyLoss()\n    opt = torch.optim.AdamW(list(backbone.parameters()) + list(head.parameters()), lr=0.0003)\n    sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=cfg.total_steps)\n    loader = DataLoader(cfg.dataset, batch_size=cfg.batch_size, num_workers=4)\n    for step, (x, y) in enumerate(loader):\n        logits = head(backbone(x))\n        loss = criterion(logits, y)\n        loss.backward()\n        torch.nn.utils.clip_grad_norm_(backbone.parameters(), 1.0)\n        opt.step(); opt.zero_grad()\n        with open(tel, \"a\") as fh:\n            fh.write(json.dumps({\"step\": step, \"node_id\": cfg.node_id, \"run_id\": cfg.run_id,\n                                 \"timestamp\": cfg.now(), \"train_loss\": float(loss)}) + \"\\n\")\n        sched.step()\n"
+      },
+      "expect": {
+        "loop_back_recommended": true,
+        "risk_assessment.oom_risk": "high",
+        "verdict": "rejected"
+      }
+    },
+    {
+      "id": "loop-back-second-pass",
+      "gate": "loopback_nc",
+      "note": "TRAP: identical to the first-pass case, but this is analyst pass 2 and recovery loops are one-shot",
+      "capability": {
+        "cpu_only": false,
+        "gpu_arch": "sm_86",
+        "supported_dtypes": [
+          "fp32",
+          "bf16"
+        ],
+        "available_vram_gb": 24
+      },
+      "analyst_pass_number": 2,
+      "profiler_report": {
+        "vram_estimate_gb": 21.5,
+        "param_count_estimate": 84000000.0,
+        "dataset_size": 120000,
+        "total_epochs": 10,
+        "steps_per_sec_estimate": 1.0,
+        "time_budget_min": 240
+      },
+      "proposal": {
+        "approach_family": "training",
+        "training_recipe": {
+          "optimizer": "AdamW",
+          "lr": 0.0003,
+          "grad_clip": 1.0,
+          "warmup_epochs": 2,
+          "lr_schedule": "cosine"
+        },
+        "loss": {
+          "class": "CrossEntropyLoss"
+        },
+        "module_seams": {
+          "backbone": "conv-stack",
+          "head": "linear",
+          "neck": null
+        }
+      },
+      "candidate_files": {
+        "model/backbone.py": "import torch.nn as nn\ndef build_backbone(cfg):\n    return nn.Sequential(nn.Conv2d(3,64,3,padding=1), nn.ReLU(), nn.AdaptiveAvgPool2d(1), nn.Flatten())\n",
+        "model/head.py": "import torch.nn as nn\ndef build_head(cfg):\n    return nn.Linear(64, cfg.num_classes)\n",
+        "train/trainer.py": "import os, json, torch\nfrom torch.utils.data import DataLoader\nfrom model.backbone import build_backbone\nfrom model.head import build_head\n\ndef train(cfg):\n    tel = os.environ.get(\"EVOR_TELEMETRY_PATH\")\n    backbone, head = build_backbone(cfg), build_head(cfg)\n    criterion = torch.nn.CrossEntropyLoss()\n    opt = torch.optim.AdamW(list(backbone.parameters()) + list(head.parameters()), lr=0.0003)\n    sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=cfg.total_steps)\n    loader = DataLoader(cfg.dataset, batch_size=cfg.batch_size, num_workers=4)\n    for step, (x, y) in enumerate(loader):\n        logits = head(backbone(x))\n        loss = criterion(logits, y)\n        loss.backward()\n        torch.nn.utils.clip_grad_norm_(backbone.parameters(), 1.0)\n        opt.step(); opt.zero_grad()\n        with open(tel, \"a\") as fh:\n            fh.write(json.dumps({\"step\": step, \"node_id\": cfg.node_id, \"run_id\": cfg.run_id,\n                                 \"timestamp\": cfg.now(), \"train_loss\": float(loss)}) + \"\\n\")\n        sched.step()\n"
+      },
+      "expect": {
+        "loop_back_recommended": false,
+        "risk_assessment.oom_risk": "high",
+        "verdict": "rejected"
+      }
+    }
+  ]
+}

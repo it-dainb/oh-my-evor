@@ -1,0 +1,593 @@
+{
+  "role": "evor-mutagen",
+  "agent_file": "agents/evor-mutagen.md",
+  "arms": [
+    {
+      "model": "sonnet",
+      "effort": "medium",
+      "label": "current"
+    },
+    {
+      "model": "opus",
+      "effort": "medium",
+      "label": "main (pre-retier)"
+    }
+  ],
+  "contract": {
+    "heading": "Mutation Proposals",
+    "mode": "json",
+    "fields": [
+      {
+        "path": "wildness_used",
+        "kind": "number"
+      },
+      {
+        "path": "crossover_triggered",
+        "kind": "bool"
+      },
+      {
+        "path": "proposals",
+        "kind": "count"
+      },
+      {
+        "path": "proposals[].mutation_tier",
+        "kind": "every",
+        "values": [
+          "parametric",
+          "structural"
+        ]
+      },
+      {
+        "path": "proposals[].approach_family",
+        "kind": "unique"
+      }
+    ]
+  },
+  "cases": [
+    {
+      "id": "parametric-low-wildness",
+      "gate": "tier",
+      "note": "wildness 0.30 is below 0.5, so every mutation stays parametric",
+      "capability": {
+        "cpu_only": false,
+        "gpu_arch": "sm_86",
+        "supported_dtypes": [
+          "fp32",
+          "bf16"
+        ],
+        "available_vram_gb": 24
+      },
+      "wildness": 0.3,
+      "train_k": 3,
+      "parent_nodes": [
+        {
+          "node_id": "alpha-3",
+          "lineage_id": "lin-a",
+          "primary_metric": 0.812
+        },
+        {
+          "node_id": "alpha-5",
+          "lineage_id": "lin-a",
+          "primary_metric": 0.804
+        }
+      ],
+      "gotchas": [],
+      "last_three_winning_families": [
+        "training",
+        "arch",
+        "data-augmentation"
+      ],
+      "inspiration_menu": [
+        "domain-transfer",
+        "biological-analogy",
+        "constraint-inversion",
+        "scale-shift",
+        "representation-swap",
+        "curriculum-reordering",
+        "ensemble-topology",
+        "loss-reshaping"
+      ],
+      "expect": {
+        "wildness_used": 0.3,
+        "proposals": {
+          "min": 6
+        },
+        "proposals[].mutation_tier": "parametric",
+        "proposals[].approach_family": true,
+        "crossover_triggered": false
+      }
+    },
+    {
+      "id": "structural-high-wildness",
+      "gate": "tier",
+      "note": "wildness 0.70 is at or above 0.5, so mutations are structural",
+      "capability": {
+        "cpu_only": false,
+        "gpu_arch": "sm_86",
+        "supported_dtypes": [
+          "fp32",
+          "bf16"
+        ],
+        "available_vram_gb": 24
+      },
+      "wildness": 0.7,
+      "train_k": 3,
+      "parent_nodes": [
+        {
+          "node_id": "alpha-3",
+          "lineage_id": "lin-a",
+          "primary_metric": 0.812
+        },
+        {
+          "node_id": "alpha-5",
+          "lineage_id": "lin-a",
+          "primary_metric": 0.804
+        }
+      ],
+      "gotchas": [],
+      "last_three_winning_families": [
+        "training",
+        "arch",
+        "data-augmentation"
+      ],
+      "inspiration_menu": [
+        "domain-transfer",
+        "biological-analogy",
+        "constraint-inversion",
+        "scale-shift",
+        "representation-swap",
+        "curriculum-reordering",
+        "ensemble-topology",
+        "loss-reshaping"
+      ],
+      "expect": {
+        "wildness_used": 0.7,
+        "proposals": {
+          "min": 6
+        },
+        "proposals[].mutation_tier": "structural",
+        "proposals[].approach_family": true,
+        "crossover_triggered": false
+      }
+    },
+    {
+      "id": "wildness-boundary-at-half",
+      "gate": "tier",
+      "note": "BOUNDARY: 0.5 exactly. The rule is >= 0.5 -> structural",
+      "capability": {
+        "cpu_only": false,
+        "gpu_arch": "sm_86",
+        "supported_dtypes": [
+          "fp32",
+          "bf16"
+        ],
+        "available_vram_gb": 24
+      },
+      "wildness": 0.5,
+      "train_k": 3,
+      "parent_nodes": [
+        {
+          "node_id": "alpha-3",
+          "lineage_id": "lin-a",
+          "primary_metric": 0.812
+        },
+        {
+          "node_id": "alpha-5",
+          "lineage_id": "lin-a",
+          "primary_metric": 0.804
+        }
+      ],
+      "gotchas": [],
+      "last_three_winning_families": [
+        "training",
+        "arch",
+        "data-augmentation"
+      ],
+      "inspiration_menu": [
+        "domain-transfer",
+        "biological-analogy",
+        "constraint-inversion",
+        "scale-shift",
+        "representation-swap",
+        "curriculum-reordering",
+        "ensemble-topology",
+        "loss-reshaping"
+      ],
+      "expect": {
+        "wildness_used": 0.5,
+        "proposals": {
+          "min": 6
+        },
+        "proposals[].mutation_tier": "structural",
+        "proposals[].approach_family": true,
+        "crossover_triggered": false
+      }
+    },
+    {
+      "id": "wildness-boundary-just-below",
+      "gate": "tier",
+      "note": "BOUNDARY: 0.45 is under 0.5, so parametric",
+      "capability": {
+        "cpu_only": false,
+        "gpu_arch": "sm_86",
+        "supported_dtypes": [
+          "fp32",
+          "bf16"
+        ],
+        "available_vram_gb": 24
+      },
+      "wildness": 0.45,
+      "train_k": 3,
+      "parent_nodes": [
+        {
+          "node_id": "alpha-3",
+          "lineage_id": "lin-a",
+          "primary_metric": 0.812
+        },
+        {
+          "node_id": "alpha-5",
+          "lineage_id": "lin-a",
+          "primary_metric": 0.804
+        }
+      ],
+      "gotchas": [],
+      "last_three_winning_families": [
+        "training",
+        "arch",
+        "data-augmentation"
+      ],
+      "inspiration_menu": [
+        "domain-transfer",
+        "biological-analogy",
+        "constraint-inversion",
+        "scale-shift",
+        "representation-swap",
+        "curriculum-reordering",
+        "ensemble-topology",
+        "loss-reshaping"
+      ],
+      "expect": {
+        "wildness_used": 0.45,
+        "proposals": {
+          "min": 6
+        },
+        "proposals[].mutation_tier": "parametric",
+        "proposals[].approach_family": true,
+        "crossover_triggered": false
+      }
+    },
+    {
+      "id": "dream-k-scales-with-train-k",
+      "gate": "dream_k",
+      "note": "train_k is 5, so at least 10 proposals must be dreamt",
+      "capability": {
+        "cpu_only": false,
+        "gpu_arch": "sm_86",
+        "supported_dtypes": [
+          "fp32",
+          "bf16"
+        ],
+        "available_vram_gb": 24
+      },
+      "wildness": 0.8,
+      "train_k": 5,
+      "parent_nodes": [
+        {
+          "node_id": "alpha-3",
+          "lineage_id": "lin-a",
+          "primary_metric": 0.812
+        },
+        {
+          "node_id": "alpha-5",
+          "lineage_id": "lin-a",
+          "primary_metric": 0.804
+        }
+      ],
+      "gotchas": [],
+      "last_three_winning_families": [
+        "training",
+        "arch",
+        "data-augmentation"
+      ],
+      "inspiration_menu": [
+        "domain-transfer",
+        "biological-analogy",
+        "constraint-inversion",
+        "scale-shift",
+        "representation-swap",
+        "curriculum-reordering",
+        "ensemble-topology",
+        "loss-reshaping"
+      ],
+      "expect": {
+        "wildness_used": 0.8,
+        "proposals": {
+          "min": 10
+        },
+        "proposals[].mutation_tier": "structural",
+        "proposals[].approach_family": true,
+        "crossover_triggered": false
+      }
+    },
+    {
+      "id": "dream-k-small-tick",
+      "gate": "dream_k",
+      "note": "train_k is 2, so at least 4 proposals",
+      "capability": {
+        "cpu_only": false,
+        "gpu_arch": "sm_86",
+        "supported_dtypes": [
+          "fp32",
+          "bf16"
+        ],
+        "available_vram_gb": 24
+      },
+      "wildness": 0.35,
+      "train_k": 2,
+      "parent_nodes": [
+        {
+          "node_id": "alpha-3",
+          "lineage_id": "lin-a",
+          "primary_metric": 0.812
+        },
+        {
+          "node_id": "alpha-5",
+          "lineage_id": "lin-a",
+          "primary_metric": 0.804
+        }
+      ],
+      "gotchas": [],
+      "last_three_winning_families": [
+        "training",
+        "arch",
+        "data-augmentation"
+      ],
+      "inspiration_menu": [
+        "domain-transfer",
+        "biological-analogy",
+        "constraint-inversion",
+        "scale-shift",
+        "representation-swap",
+        "curriculum-reordering",
+        "ensemble-topology",
+        "loss-reshaping"
+      ],
+      "expect": {
+        "wildness_used": 0.35,
+        "proposals": {
+          "min": 4
+        },
+        "proposals[].mutation_tier": "parametric",
+        "proposals[].approach_family": true,
+        "crossover_triggered": false
+      }
+    },
+    {
+      "id": "crossover-two-close-lineages",
+      "gate": "crossover",
+      "note": "three distinct lineages whose scores sit within 10% of each other: crossover is available",
+      "capability": {
+        "cpu_only": false,
+        "gpu_arch": "sm_86",
+        "supported_dtypes": [
+          "fp32",
+          "bf16"
+        ],
+        "available_vram_gb": 24
+      },
+      "wildness": 0.6,
+      "train_k": 3,
+      "parent_nodes": [
+        {
+          "node_id": "alpha-3",
+          "lineage_id": "lin-a",
+          "primary_metric": 0.812
+        },
+        {
+          "node_id": "beta-7",
+          "lineage_id": "lin-b",
+          "primary_metric": 0.795
+        },
+        {
+          "node_id": "gamma-2",
+          "lineage_id": "lin-c",
+          "primary_metric": 0.788
+        }
+      ],
+      "gotchas": [],
+      "last_three_winning_families": [
+        "training",
+        "arch",
+        "data-augmentation"
+      ],
+      "inspiration_menu": [
+        "domain-transfer",
+        "biological-analogy",
+        "constraint-inversion",
+        "scale-shift",
+        "representation-swap",
+        "curriculum-reordering",
+        "ensemble-topology",
+        "loss-reshaping"
+      ],
+      "expect": {
+        "wildness_used": 0.6,
+        "proposals": {
+          "min": 6
+        },
+        "proposals[].mutation_tier": "structural",
+        "proposals[].approach_family": true,
+        "crossover_triggered": true
+      }
+    },
+    {
+      "id": "crossover-single-lineage",
+      "gate": "crossover_nc",
+      "note": "NEGATIVE CONTROL: both parents share one lineage, so there is nothing to cross",
+      "capability": {
+        "cpu_only": false,
+        "gpu_arch": "sm_86",
+        "supported_dtypes": [
+          "fp32",
+          "bf16"
+        ],
+        "available_vram_gb": 24
+      },
+      "wildness": 0.2,
+      "train_k": 3,
+      "parent_nodes": [
+        {
+          "node_id": "alpha-3",
+          "lineage_id": "lin-a",
+          "primary_metric": 0.812
+        },
+        {
+          "node_id": "alpha-5",
+          "lineage_id": "lin-a",
+          "primary_metric": 0.804
+        }
+      ],
+      "gotchas": [],
+      "last_three_winning_families": [
+        "training",
+        "arch",
+        "data-augmentation"
+      ],
+      "inspiration_menu": [
+        "domain-transfer",
+        "biological-analogy",
+        "constraint-inversion",
+        "scale-shift",
+        "representation-swap",
+        "curriculum-reordering",
+        "ensemble-topology",
+        "loss-reshaping"
+      ],
+      "expect": {
+        "wildness_used": 0.2,
+        "proposals": {
+          "min": 6
+        },
+        "proposals[].mutation_tier": "parametric",
+        "proposals[].approach_family": true,
+        "crossover_triggered": false
+      }
+    },
+    {
+      "id": "crossover-lineages-far-apart",
+      "gate": "crossover_nc",
+      "note": "NEGATIVE CONTROL: two distinct lineages, but 0.812 vs 0.610 is far outside 10%",
+      "capability": {
+        "cpu_only": false,
+        "gpu_arch": "sm_86",
+        "supported_dtypes": [
+          "fp32",
+          "bf16"
+        ],
+        "available_vram_gb": 24
+      },
+      "wildness": 0.65,
+      "train_k": 4,
+      "parent_nodes": [
+        {
+          "node_id": "alpha-3",
+          "lineage_id": "lin-a",
+          "primary_metric": 0.812
+        },
+        {
+          "node_id": "delta-1",
+          "lineage_id": "lin-d",
+          "primary_metric": 0.61
+        }
+      ],
+      "gotchas": [],
+      "last_three_winning_families": [
+        "training",
+        "arch",
+        "data-augmentation"
+      ],
+      "inspiration_menu": [
+        "domain-transfer",
+        "biological-analogy",
+        "constraint-inversion",
+        "scale-shift",
+        "representation-swap",
+        "curriculum-reordering",
+        "ensemble-topology",
+        "loss-reshaping"
+      ],
+      "expect": {
+        "wildness_used": 0.65,
+        "proposals": {
+          "min": 8
+        },
+        "proposals[].mutation_tier": "structural",
+        "proposals[].approach_family": true,
+        "crossover_triggered": false
+      }
+    },
+    {
+      "id": "hardware-gotcha-hard-block",
+      "gate": "gotcha",
+      "note": "a hardware-constraint gotcha at confidence 0.9 is a hard block; wildness 0.90 does not override it",
+      "capability": {
+        "cpu_only": false,
+        "gpu_arch": "sm_86",
+        "supported_dtypes": [
+          "fp32",
+          "bf16"
+        ],
+        "available_vram_gb": 24
+      },
+      "wildness": 0.9,
+      "train_k": 3,
+      "parent_nodes": [
+        {
+          "node_id": "alpha-3",
+          "lineage_id": "lin-a",
+          "primary_metric": 0.812
+        },
+        {
+          "node_id": "alpha-5",
+          "lineage_id": "lin-a",
+          "primary_metric": 0.804
+        }
+      ],
+      "gotchas": [
+        {
+          "kind": "hardware-constraint",
+          "signature": "flash-attn-2 requires sm_80+",
+          "context": {
+            "gpu_arch": "sm_86",
+            "library": "flash-attn-2"
+          },
+          "confidence": 0.9
+        }
+      ],
+      "last_three_winning_families": [
+        "training",
+        "arch",
+        "data-augmentation"
+      ],
+      "inspiration_menu": [
+        "domain-transfer",
+        "biological-analogy",
+        "constraint-inversion",
+        "scale-shift",
+        "representation-swap",
+        "curriculum-reordering",
+        "ensemble-topology",
+        "loss-reshaping"
+      ],
+      "expect": {
+        "wildness_used": 0.9,
+        "proposals": {
+          "min": 6
+        },
+        "proposals[].mutation_tier": "structural",
+        "proposals[].approach_family": true,
+        "crossover_triggered": false
+      }
+    }
+  ]
+}

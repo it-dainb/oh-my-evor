@@ -81,9 +81,17 @@ function oracleAnswer(
     const n = lengths.has(root) ? lengths.get(root)! : 1;
     const elements = Array.from({ length: n }, () => ({}) as Record<string, unknown>);
     for (const [path, value] of Object.entries(caseObj.expect)) {
-      if (kindOf.get(path) !== "every" || path.split("[]")[0] !== root) continue;
+      if (path.split("[]")[0] !== root) continue;
       const inner = path.split("[].")[1];
-      for (const el of elements) el[inner] = value;
+      if (kindOf.get(path) === "every") {
+        for (const el of elements) el[inner] = value;
+      } else if (kindOf.get(path) === "unique") {
+        // The oracle for a distinctness rule is distinct values, not the
+        // literal `true` the expectation carries.
+        elements.forEach((el, i) => {
+          el[inner] = `family-${i}`;
+        });
+      }
     }
     put(root, elements);
   }
@@ -150,6 +158,7 @@ describe.each(specs)("$dir", ({ spec }) => {
     const build = (choice: (f: { path: string; kind: string; values?: string[] }) => unknown) => {
       const out: Record<string, unknown> = {};
       for (const f of spec.contract.fields) {
+        if (f.kind === "every" || f.kind === "unique") continue;
         const parts = f.path.split(".");
         let node = out;
         for (const p of parts.slice(0, -1)) {
@@ -170,6 +179,7 @@ describe.each(specs)("$dir", ({ spec }) => {
             if (f.kind === "enum") return f.values![i % f.values!.length];
             if (f.kind === "bool") return flag;
             if (f.kind === "present") return flag ? {} : null;
+            if (f.kind === "count") return [];
             return 0;
           }),
         );

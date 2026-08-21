@@ -63,6 +63,8 @@ function fieldSpecText(f) {
       return '<list>';
     case 'every':
       return '<list of objects>';
+    case 'unique':
+      return '<list of objects>';
     case 'int_or_word':
       return `<integer, or "${f.word}">`;
     default:
@@ -78,11 +80,13 @@ export function buildContractText(contract) {
   // A per-element rule is a constraint on a list, not a key of its own. Emitting
   // "proposals[].mutation_tier" as a JSON key would ask the agent for a field
   // that does not exist in its own output format.
-  const keyed = contract.fields.filter((f) => f.kind !== 'every');
-  const perElement = contract.fields.filter((f) => f.kind === 'every');
+  const isPerElement = (f) => f.kind === 'every' || f.kind === 'unique';
+  const keyed = contract.fields.filter((f) => !isPerElement(f));
 
-  const constraints = perElement.map(
-    (f) => `- every entry of \`${arrayRoot(f.path)}\` must set \`${arrayInner(f.path)}\` to one of: ${(f.values ?? []).join(' | ')}`,
+  const constraints = contract.fields.filter(isPerElement).map((f) =>
+    f.kind === 'unique'
+      ? `- no two entries of \`${arrayRoot(f.path)}\` may share the same \`${arrayInner(f.path)}\``
+      : `- every entry of \`${arrayRoot(f.path)}\` must set \`${arrayInner(f.path)}\` to one of: ${(f.values ?? []).join(' | ')}`,
   );
 
   if (contract.mode === 'json') {
@@ -142,6 +146,8 @@ function jsonSkeletonValue(f) {
     case 'count':
       return '[ ... ]';
     case 'every':
+      return '[ { ... }, ... ]';
+    case 'unique':
       return '[ { ... }, ... ]';
     case 'int_or_word':
       return `<integer, or "${f.word}">`;
@@ -280,6 +286,13 @@ export function gradeField(f, expected, actual, opts = {}) {
     return mk(n === Number(expected));
   }
 
+  if (f.kind === 'unique') {
+    if (!Array.isArray(actual) || actual.length === 0) return mk(false);
+    const inner = arrayInner(f.path);
+    const seen = actual.map((el) => strip(getPath(el, inner)).toLowerCase());
+    return mk(new Set(seen).size === seen.length);
+  }
+
   if (f.kind === 'every') {
     // An empty list must not pass vacuously: an agent that returned nothing has
     // not demonstrated obedience to a rule, it has declined to answer.
@@ -385,7 +398,8 @@ export function scoreByContract(contract, caseObj, parsed) {
       if (String(gateExpected).toLowerCase() !== String(f.gradeWhen.equals).toLowerCase()) continue;
     }
     const opts = f.restatedFrom ? { restated: getPath(caseObj, f.restatedFrom) } : {};
-    const actual = f.kind === 'every' ? getPath(parsed, arrayRoot(path)) : getPath(parsed, path);
+    const actual =
+      f.kind === 'every' || f.kind === 'unique' ? getPath(parsed, arrayRoot(path)) : getPath(parsed, path);
     checks.push(gradeField(f, expected, actual, opts));
   }
 

@@ -242,6 +242,16 @@ describe("gradeField", () => {
     expect(gradeField(f, "parametric", []).correct).toBe(false);
   });
 
+  it("checks that a field is distinct across every element with `unique`", () => {
+    // H003: no two proposals in one tick may share an approach_family.
+    const f = { path: "proposals[].approach_family", kind: "unique" };
+    expect(gradeField(f, true, [{ approach_family: "arch" }, { approach_family: "training" }]).correct).toBe(true);
+    expect(gradeField(f, true, [{ approach_family: "arch" }, { approach_family: "arch" }]).correct).toBe(false);
+    // case-insensitively: "Arch" and "arch" are the same family
+    expect(gradeField(f, true, [{ approach_family: "Arch" }, { approach_family: "arch" }]).correct).toBe(false);
+    expect(gradeField(f, true, []).correct).toBe(false);
+  });
+
   it("counts a missing answer as wrong, not as absent", () => {
     const f = { path: "telemetry_sane", kind: "bool" };
     expect(gradeField(f, false, undefined).correct).toBe(false);
