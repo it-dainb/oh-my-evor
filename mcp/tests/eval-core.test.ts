@@ -208,20 +208,44 @@ describe("gradeField", () => {
   it("grades a field inside every element of an array with `every`", () => {
     // The count of proposals is not fixed, but "no proposal may be structural
     // at wildness 0.3" has to hold for all of them.
-    const f = { path: "proposals", kind: "every", inner: "mutation_tier" };
+    const f = { path: "proposals[].mutation_tier", kind: "every", values: ["parametric", "structural"] };
     expect(gradeField(f, "parametric", [{ mutation_tier: "parametric" }, { mutation_tier: "parametric" }]).correct).toBe(true);
     expect(gradeField(f, "parametric", [{ mutation_tier: "parametric" }, { mutation_tier: "structural" }]).correct).toBe(false);
   });
 
   it("does not let `every` pass vacuously on an empty array", () => {
     // An agent that returns nothing must not score as having obeyed the rule.
-    const f = { path: "proposals", kind: "every", inner: "mutation_tier" };
+    const f = { path: "proposals[].mutation_tier", kind: "every", values: ["parametric", "structural"] };
     expect(gradeField(f, "parametric", []).correct).toBe(false);
   });
 
   it("counts a missing answer as wrong, not as absent", () => {
     const f = { path: "telemetry_sane", kind: "bool" };
     expect(gradeField(f, false, undefined).correct).toBe(false);
+  });
+});
+
+describe("array-shaped contracts", () => {
+  const contract = {
+    heading: "Proposals",
+    mode: "json",
+    fields: [
+      { path: "proposals", kind: "count" },
+      { path: "proposals[].mutation_tier", kind: "every", values: ["parametric", "structural"] },
+    ],
+  };
+
+  it("reads the array from the part of the path before the brackets", () => {
+    const c = { id: "p", expect: { "proposals[].mutation_tier": "structural", proposals: { min: 2 } } };
+    const parsed = { proposals: [{ mutation_tier: "structural" }, { mutation_tier: "structural" }] };
+    expect(scoreByContract(contract, c, parsed).status).toBe("correct");
+  });
+
+  it("states the per-element rule in the prompt rather than inventing a bogus JSON key", () => {
+    const text = buildContractText(contract);
+    expect(text).not.toContain('"proposals[].mutation_tier"');
+    expect(text).toContain("mutation_tier");
+    expect(text).toMatch(/every|each/i);
   });
 });
 

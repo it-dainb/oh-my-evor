@@ -28,6 +28,11 @@
 // `risk_assessment.*`, so a flat field name is not enough.
 // ─────────────────────────────────────────────────────────────────────────────
 
+/** "proposals[].mutation_tier" -> "proposals" (the array to iterate). */
+export const arrayRoot = (path) => String(path).split('[]')[0];
+/** "proposals[].mutation_tier" -> "mutation_tier" (the field on each element). */
+export const arrayInner = (path) => String(path).split('[].')[1] ?? '';
+
 export function getPath(obj, path) {
   return String(path)
     .split('.')
@@ -70,22 +75,34 @@ function fieldSpecText(f) {
  * paths — see scoreByContract, which rejects any expectation outside it.
  */
 export function buildContractText(contract) {
-  const lines = contract.fields.map((f) => `${f.path}: ${fieldSpecText(f)}`);
+  // A per-element rule is a constraint on a list, not a key of its own. Emitting
+  // "proposals[].mutation_tier" as a JSON key would ask the agent for a field
+  // that does not exist in its own output format.
+  const keyed = contract.fields.filter((f) => f.kind !== 'every');
+  const perElement = contract.fields.filter((f) => f.kind === 'every');
+
+  const constraints = perElement.map(
+    (f) => `- every entry of \`${arrayRoot(f.path)}\` must set \`${arrayInner(f.path)}\` to one of: ${(f.values ?? []).join(' | ')}`,
+  );
+
   if (contract.mode === 'json') {
-    const body = contract.fields
-      .map((f) => `  "${f.path}": ${jsonSkeletonValue(f)}`)
-      .join(',\n');
+    const body = keyed.map((f) => `  "${f.path}": ${jsonSkeletonValue(f)}`).join(',\n');
     return [
-      `Emit your answer as a single fenced JSON block with exactly these keys:`,
+      'Emit your answer as a single fenced JSON block with exactly these keys:',
       '',
       '```json',
       '{',
       body,
       '}',
       '```',
+      ...(constraints.length ? ['', 'Constraints on the list entries:', ...constraints] : []),
     ].join('\n');
   }
-  return [`## ${contract.heading}`, ...lines.map((l) => `- ${l}`)].join('\n');
+  return [
+    `## ${contract.heading}`,
+    ...keyed.map((f) => `- ${f.path}: ${fieldSpecText(f)}`),
+    ...constraints,
+  ].join('\n');
 }
 
 function jsonSkeletonValue(f) {
@@ -247,9 +264,10 @@ export function gradeField(f, expected, actual, opts = {}) {
     // An empty list must not pass vacuously: an agent that returned nothing has
     // not demonstrated obedience to a rule, it has declined to answer.
     if (!Array.isArray(actual) || actual.length === 0) return mk(false);
-    const inner = { ...f, kind: f.innerKind ?? 'enum', path: f.inner, values: f.values };
+    const innerPath = arrayInner(f.path);
+    const inner = { ...f, kind: f.innerKind ?? 'enum', path: innerPath };
     const ok = actual.every((el) => {
-      const v = getPath(el, f.inner);
+      const v = getPath(el, innerPath);
       return f.innerKind
         ? gradeField(inner, expected, v).correct
         : String(strip(v)).toLowerCase() === String(expected).toLowerCase();
@@ -347,7 +365,8 @@ export function scoreByContract(contract, caseObj, parsed) {
       if (String(gateExpected).toLowerCase() !== String(f.gradeWhen.equals).toLowerCase()) continue;
     }
     const opts = f.restatedFrom ? { restated: getPath(caseObj, f.restatedFrom) } : {};
-    checks.push(gradeField(f, expected, getPath(parsed, path), opts));
+    const actual = f.kind === 'every' ? getPath(parsed, arrayRoot(path)) : getPath(parsed, path);
+    checks.push(gradeField(f, expected, actual, opts));
   }
 
   const failed = checks.filter((c) => !c.correct);

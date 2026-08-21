@@ -48,15 +48,50 @@ function oracleAnswer(
 ) {
   const kindOf = new Map(contract.fields.map((f) => [f.path, f.kind]));
   const out: Record<string, unknown> = {};
-  for (const [path, value] of Object.entries(caseObj.expect)) {
+
+  const put = (path: string, value: unknown) => {
     const parts = path.split(".");
     let node = out;
     for (const p of parts.slice(0, -1)) {
       node[p] = node[p] ?? {};
       node = node[p] as Record<string, unknown>;
     }
-    node[parts[parts.length - 1]] =
-      kindOf.get(path) === "present" ? (value ? { present: true } : null) : value;
+    node[parts[parts.length - 1]] = value;
+  };
+
+  // List-shaped fields share one array, so build the arrays first: a `count`
+  // expectation fixes the length and each `every` expectation fixes a field on
+  // every element. Doing these one path at a time would have each overwrite the
+  // last.
+  const lengths = new Map<string, number>();
+  for (const [path, value] of Object.entries(caseObj.expect)) {
+    if (kindOf.get(path) !== "count") continue;
+    const n =
+      value && typeof value === "object"
+        ? Math.max((value as { min?: number }).min ?? 1, 1)
+        : Number(value);
+    lengths.set(path, n);
+  }
+  const roots = new Set<string>(
+    Object.keys(caseObj.expect)
+      .filter((p) => kindOf.get(p) === "count" || kindOf.get(p) === "every")
+      .map((p) => p.split("[]")[0]),
+  );
+  for (const root of roots) {
+    const n = lengths.has(root) ? lengths.get(root)! : 1;
+    const elements = Array.from({ length: n }, () => ({}) as Record<string, unknown>);
+    for (const [path, value] of Object.entries(caseObj.expect)) {
+      if (kindOf.get(path) !== "every" || path.split("[]")[0] !== root) continue;
+      const inner = path.split("[].")[1];
+      for (const el of elements) el[inner] = value;
+    }
+    put(root, elements);
+  }
+
+  for (const [path, value] of Object.entries(caseObj.expect)) {
+    const kind = kindOf.get(path);
+    if (kind === "count" || kind === "every") continue;
+    put(path, kind === "present" ? (value ? { present: true } : null) : value);
   }
   return out;
 }
