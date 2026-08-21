@@ -152,10 +152,10 @@ and the cheap one worked.**
 
 ## Not benchmarked
 
-`evor-acquirer`'s sonnet->haiku retier is **unverified**. Its work is
-network-bound data acquisition that cannot be faithfully replayed offline, and a
-fragment of its behaviour dressed up as coverage would be worse than an honest
-gap.
+`evor-acquirer`'s sonnet->haiku retier was **unverified** for the reason given
+here — network-bound work that cannot be faithfully replayed offline. That was
+half right and is now superseded: see "The last unverified retier" below. The
+fetching cannot be replayed; every rule the role turns on can.
 
 ## Caveats
 
@@ -217,3 +217,110 @@ sage-junior, whose 48%-per-pass saving is real because its accuracy barely moved
 *passing* attempt, not per call. Per-call savings of 20–49% shrank to 10–30%
 once failures were priced in, and that is what turned two apparent passes into
 declines.
+
+---
+
+# The statistics were reading "not significant" as "no regression" (S35)
+
+The paragraph above — *failure to detect is not evidence of equivalence* — was
+right, and `ci/compare-arms.py` was printing the opposite. Every result with
+p >= 0.05 came out as **"no detectable difference -- retier holds"**. The sage
+sonnet->haiku ladder is what made this impossible to keep ignoring: 31/39 vs
+37/39, a 15-point drop, reported as a held retier.
+
+The verdict is now a non-inferiority test on a Newcombe interval for the
+difference between arms, with four outcomes instead of three:
+
+| verdict | means |
+|---|---|
+| REGRESSION | significantly worse |
+| IMPROVEMENT | significantly better |
+| non-inferior within 10pp | the interval rules OUT a drop worse than 10pp |
+| **UNDERPOWERED** | it does not, and the run cannot decide |
+
+**The margin is set by what n can reach, not by what would be comfortable.**
+At n=30, two arms that tie *perfectly* still leave a 15pp drop inside the
+interval. Ruling out 5pp would take n near 200:
+
+| n per arm (arms tied at 95%) | worst drop ruled out |
+|---|---|
+| 30 | 15.4pp |
+| 60 | 9.3pp |
+| 120 | 6.1pp |
+| 200 | 4.6pp |
+
+So a role that lands UNDERPOWERED needs repeats, not a softer margin. Lowering
+the number until a verdict appears would be assuming the answer the run exists
+to produce.
+
+## What this does to the standing claims
+
+| retier | n | difference CI | was | now |
+|---|---|---|---|---|
+| forge-analyst opus->sonnet | 36 | [-2.7, +26.1] | no difference | **non-inferior** |
+| sage opus->sonnet | 39 | [-4.0, +25.1] | no difference | **non-inferior** |
+| sage-junior sonnet->haiku | 33 | [-9.3, +21.9] | no difference | **non-inferior** |
+| probe opus->sonnet | 30 | [-11.4, +11.4] | no difference | UNDERPOWERED |
+| forge-architect opus->sonnet | 30 | [-10.0, +23.7] | no difference | UNDERPOWERED |
+| forge-critic opus->sonnet | 30 | [-22.5, +8.2] | no difference | UNDERPOWERED |
+| mutagen opus->sonnet | 30 | [-20.2, +20.2] | no difference | UNDERPOWERED |
+
+Four of the seven were never demonstrated — they were *not refuted*, which is a
+weaker thing that the report had been spelling the same way. None of the four
+is now suspected of regressing; the runs simply do not carry the claim, and the
+fix is more repeats. `ci/compare-arms.py` now accepts `a.json+b.json` for one
+arm so an arm can be topped up, and refuses to pool reports whose agent+spec
+fingerprints differ — averaging a before and an after would be worse than a
+small n.
+
+---
+
+# The last unverified retier: acquirer (S35)
+
+`evor-acquirer` had shipped on haiku since the day it was written and had never
+been measured. The earlier claim that its work "cannot be faithfully replayed
+offline" was true of the *fetching* and false of everything that matters: the
+leakage direction, the drop arithmetic, and the four signal conditions are all
+decidable from tool results, which the harness already inlines.
+
+| arm | n | accuracy | difference CI | $/call | $/pass |
+|---|---|---|---|---|---|
+| haiku (current) | 36 | 36/36 = 100.0% | [-9.6, +9.6] | $0.0232 | $0.0232 |
+| sonnet (pre-retier) | 36 | 36/36 = 100.0% | — | $0.0534 | $0.0534 |
+
+**non-inferior within 10pp — the retier holds**, at 57% less per call.
+
+Both arms perfect means the spec cannot resolve a *small* gap between them, and
+that limitation is the honest reading. What it does establish is that haiku
+handles every rule the role actually turns on: that enrich-train writes to
+`train` while de-duping against `test` (and harden-test the mirror), that
+`eval_version` moves only for harden-test, that a 45% collision rate is
+leakage-blocked but not contamination while 65% is both, and that an unknown
+license flags without gating — all 1500 items still integrated.
+
+Writing the spec surfaced two defects of the usual class in the agent file:
+`format_errors` and `validation_dropped` merged into a single output field with
+no rule saying so, and the license-gate condition ended in "e.g.", which made
+every unlisted license a coin flip. Both are fixed; the second is now decided
+by exclusion from a permissive set, so an unfamiliar license fails safe.
+
+---
+
+# Ladder round 2: haiku on the three roles that had never been tried (S33-S36)
+
+| role | haiku | sonnet | difference CI | $/pass | verdict |
+|---|---|---|---|---|---|
+| forge-critic | 29/30 = 96.7% | 27/30 = 90.0% | [-8.2, +22.5] | $0.0315 vs $0.0537 (**+41%**) | **non-inferior — adopt** |
+| sage | 31/39 = 79.5% | 37/39 = 94.9% | [-30.9, -0.1] | $0.0361 vs $0.0903 (+60%) | **UNDERPOWERED, pointing down — do not adopt** |
+
+forge-critic is the clean one: haiku scored *higher* than sonnet, and the
+interval rules out a drop worse than 8.2pp. At 41% less per passing attempt it
+is the second-largest saving in the exercise after sage-junior.
+
+sage is the opposite and the reason the margin exists. The point estimate is
+-15.4pp, Fisher p=0.0866, and the old report would have called it a held
+retier. The failures are concentrated, not diffuse: `divergence-just-outside`
+0/3 and `divergence-inside-band-incomparable` 1/3 — the two cases that turn on
+the 5% divergence arithmetic *and* the comparability gate at once. That is the
+shape of a capability limit rather than a buried rule, though it has not been
+ruled out; either way the evidence does not support adopting it.
