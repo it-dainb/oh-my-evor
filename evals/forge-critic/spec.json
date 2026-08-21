@@ -96,8 +96,7 @@
         "training_recipe": {
           "optimizer": "AdamW",
           "lr": 0.0003,
-          "grad_clip": 1.0,
-          "warmup_epochs": 2
+          "grad_clip": 1.0
         },
         "module_seams": {
           "backbone": "conv-stack",
@@ -109,10 +108,7 @@
             "random-crop"
           ]
         },
-        "genome_changes": {
-          "lr": 0.0003,
-          "batch_size": 64
-        },
+        "genome_changes": {},
         "citations": []
       },
       "evaluate_py_sha256_expected": "9f2c1a0000000000000000000000000000000000000000000000000000000000",
@@ -121,8 +117,8 @@
       "candidate_files": {
         "model/backbone.py": "import torch.nn as nn\ndef build_backbone(cfg):\n    return nn.Sequential(nn.Conv2d(3, 64, 3, padding=1), nn.ReLU(),\n                         nn.Conv2d(64, 64, 3, padding=1), nn.ReLU())\n",
         "model/head.py": "import torch.nn as nn\ndef build_head(cfg):\n    return nn.Conv2d(64, cfg.num_classes, kernel_size=1)\n",
-        "train/trainer.py": "import os, json, torch\nfrom torch.utils.data import DataLoader\nfrom model.backbone import build_backbone\nfrom model.head import build_head\n\ndef dice_loss(logits, target, eps=1e-7):\n    p = torch.sigmoid(logits)\n    inter = (p * target).sum()\n    denom = (p.sum() + target.sum()).clamp(min=eps)\n    return 1.0 - (2.0 * inter) / denom\n\ndef train(cfg):\n    tel = os.environ.get(\"EVOR_TELEMETRY_PATH\")\n    backbone, head = build_backbone(cfg), build_head(cfg)\n    opt = torch.optim.AdamW(list(backbone.parameters()) + list(head.parameters()), lr=3e-4)\n    loader = DataLoader(cfg.dataset, batch_size=cfg.batch_size, num_workers=4)\n    for step, (x, y) in enumerate(loader):\n        logits = head(backbone(x))\n        loss = dice_loss(logits, y)\n        loss.backward()\n        torch.nn.utils.clip_grad_norm_(backbone.parameters(), 1.0)\n        opt.step(); opt.zero_grad()\n        with open(tel, \"a\") as fh:\n            fh.write(json.dumps({\"step\": step, \"node_id\": cfg.node_id, \"run_id\": cfg.run_id,\n                                 \"timestamp\": cfg.now(), \"train_loss\": float(loss)}) + \"\\n\")\n",
-        "genome.yaml": "lr: 0.0003\nbatch_size: 64\noptimizer: adamw\nepochs: 10\n"
+        "train/trainer.py": "import os, json, torch\nfrom torch.utils.data import DataLoader\nfrom model.backbone import build_backbone\nfrom model.head import build_head\n\ndef dice_loss(logits, target, eps=1e-7):\n    p = torch.sigmoid(logits)\n    inter = (p * target).sum()\n    denom = (p.sum() + target.sum()).clamp(min=eps)\n    return 1.0 - (2.0 * inter) / denom\n\ndef train(cfg):\n    tel = os.environ.get(\"EVOR_TELEMETRY_PATH\")\n    backbone, head = build_backbone(cfg), build_head(cfg)\n    opt = torch.optim.AdamW(list(backbone.parameters()) + list(head.parameters()), lr=cfg.lr)\n    loader = DataLoader(cfg.dataset, batch_size=cfg.batch_size, num_workers=4)\n    for step, (x, y) in enumerate(loader):\n        logits = head(backbone(x))\n        loss = dice_loss(logits, y)\n        loss.backward()\n        torch.nn.utils.clip_grad_norm_(backbone.parameters(), cfg.grad_clip)\n        opt.step(); opt.zero_grad()\n        with open(tel, \"a\") as fh:\n            fh.write(json.dumps({\"step\": step, \"node_id\": cfg.node_id, \"run_id\": cfg.run_id,\n                                 \"timestamp\": cfg.now(), \"train_loss\": float(loss)}) + \"\\n\")\n",
+        "genome.yaml": "lr: 0.0003\nbatch_size: 64\nepochs: 10\ngrad_clip: 1.0\noptimizer: adamw\n"
       },
       "expect": {
         "verdict": "approved",
@@ -131,7 +127,8 @@
         "checks.numeric_stability": "pass",
         "checks.structural_quality.model_seams": "pass",
         "checks.structural_quality.overall": "pass"
-      }
+      },
+      "base_genome": "lr: 0.0003\nbatch_size: 64\nepochs: 10\ngrad_clip: 1.0\noptimizer: adamw\n"
     },
     {
       "id": "hash-mismatch",
@@ -161,8 +158,7 @@
         "training_recipe": {
           "optimizer": "AdamW",
           "lr": 0.0003,
-          "grad_clip": 1.0,
-          "warmup_epochs": 2
+          "grad_clip": 1.0
         },
         "module_seams": {
           "backbone": "conv-stack",
@@ -174,10 +170,7 @@
             "random-crop"
           ]
         },
-        "genome_changes": {
-          "lr": 0.0003,
-          "batch_size": 64
-        },
+        "genome_changes": {},
         "citations": []
       },
       "evaluate_py_sha256_expected": "9f2c1a0000000000000000000000000000000000000000000000000000000000",
@@ -186,8 +179,8 @@
       "candidate_files": {
         "model/backbone.py": "import torch.nn as nn\ndef build_backbone(cfg):\n    return nn.Sequential(nn.Conv2d(3, 64, 3, padding=1), nn.ReLU(),\n                         nn.Conv2d(64, 64, 3, padding=1), nn.ReLU())\n",
         "model/head.py": "import torch.nn as nn\ndef build_head(cfg):\n    return nn.Conv2d(64, cfg.num_classes, kernel_size=1)\n",
-        "train/trainer.py": "import os, json, torch\nfrom torch.utils.data import DataLoader\nfrom model.backbone import build_backbone\nfrom model.head import build_head\n\ndef dice_loss(logits, target, eps=1e-7):\n    p = torch.sigmoid(logits)\n    inter = (p * target).sum()\n    denom = (p.sum() + target.sum()).clamp(min=eps)\n    return 1.0 - (2.0 * inter) / denom\n\ndef train(cfg):\n    tel = os.environ.get(\"EVOR_TELEMETRY_PATH\")\n    backbone, head = build_backbone(cfg), build_head(cfg)\n    opt = torch.optim.AdamW(list(backbone.parameters()) + list(head.parameters()), lr=3e-4)\n    loader = DataLoader(cfg.dataset, batch_size=cfg.batch_size, num_workers=4)\n    for step, (x, y) in enumerate(loader):\n        logits = head(backbone(x))\n        loss = dice_loss(logits, y)\n        loss.backward()\n        torch.nn.utils.clip_grad_norm_(backbone.parameters(), 1.0)\n        opt.step(); opt.zero_grad()\n        with open(tel, \"a\") as fh:\n            fh.write(json.dumps({\"step\": step, \"node_id\": cfg.node_id, \"run_id\": cfg.run_id,\n                                 \"timestamp\": cfg.now(), \"train_loss\": float(loss)}) + \"\\n\")\n",
-        "genome.yaml": "lr: 0.0003\nbatch_size: 64\noptimizer: adamw\nepochs: 10\n"
+        "train/trainer.py": "import os, json, torch\nfrom torch.utils.data import DataLoader\nfrom model.backbone import build_backbone\nfrom model.head import build_head\n\ndef dice_loss(logits, target, eps=1e-7):\n    p = torch.sigmoid(logits)\n    inter = (p * target).sum()\n    denom = (p.sum() + target.sum()).clamp(min=eps)\n    return 1.0 - (2.0 * inter) / denom\n\ndef train(cfg):\n    tel = os.environ.get(\"EVOR_TELEMETRY_PATH\")\n    backbone, head = build_backbone(cfg), build_head(cfg)\n    opt = torch.optim.AdamW(list(backbone.parameters()) + list(head.parameters()), lr=cfg.lr)\n    loader = DataLoader(cfg.dataset, batch_size=cfg.batch_size, num_workers=4)\n    for step, (x, y) in enumerate(loader):\n        logits = head(backbone(x))\n        loss = dice_loss(logits, y)\n        loss.backward()\n        torch.nn.utils.clip_grad_norm_(backbone.parameters(), cfg.grad_clip)\n        opt.step(); opt.zero_grad()\n        with open(tel, \"a\") as fh:\n            fh.write(json.dumps({\"step\": step, \"node_id\": cfg.node_id, \"run_id\": cfg.run_id,\n                                 \"timestamp\": cfg.now(), \"train_loss\": float(loss)}) + \"\\n\")\n",
+        "genome.yaml": "lr: 0.0003\nbatch_size: 64\nepochs: 10\ngrad_clip: 1.0\noptimizer: adamw\n"
       },
       "expect": {
         "verdict": "rejected",
@@ -196,7 +189,8 @@
         "checks.numeric_stability": "pass",
         "checks.structural_quality.model_seams": "pass",
         "checks.structural_quality.overall": "fail"
-      }
+      },
+      "base_genome": "lr: 0.0003\nbatch_size: 64\nepochs: 10\ngrad_clip: 1.0\noptimizer: adamw\n"
     },
     {
       "id": "telemetry-env-only",
@@ -226,8 +220,7 @@
         "training_recipe": {
           "optimizer": "AdamW",
           "lr": 0.0003,
-          "grad_clip": 1.0,
-          "warmup_epochs": 2
+          "grad_clip": 1.0
         },
         "module_seams": {
           "backbone": "conv-stack",
@@ -239,10 +232,7 @@
             "random-crop"
           ]
         },
-        "genome_changes": {
-          "lr": 0.0003,
-          "batch_size": 64
-        },
+        "genome_changes": {},
         "citations": []
       },
       "evaluate_py_sha256_expected": "9f2c1a0000000000000000000000000000000000000000000000000000000000",
@@ -251,8 +241,8 @@
       "candidate_files": {
         "model/backbone.py": "import torch.nn as nn\ndef build_backbone(cfg):\n    return nn.Sequential(nn.Conv2d(3, 64, 3, padding=1), nn.ReLU(),\n                         nn.Conv2d(64, 64, 3, padding=1), nn.ReLU())\n",
         "model/head.py": "import torch.nn as nn\ndef build_head(cfg):\n    return nn.Conv2d(64, cfg.num_classes, kernel_size=1)\n",
-        "train/trainer.py": "import os, json, torch\nfrom torch.utils.data import DataLoader\nfrom model.backbone import build_backbone\nfrom model.head import build_head\n\ndef dice_loss(logits, target, eps=1e-7):\n    p = torch.sigmoid(logits)\n    inter = (p * target).sum()\n    denom = (p.sum() + target.sum()).clamp(min=eps)\n    return 1.0 - (2.0 * inter) / denom\n\ndef train(cfg):\n    tel = os.environ.get(\"EVOR_TELEMETRY_PATH\")\n    backbone, head = build_backbone(cfg), build_head(cfg)\n    opt = torch.optim.AdamW(list(backbone.parameters()) + list(head.parameters()), lr=3e-4)\n    loader = DataLoader(cfg.dataset, batch_size=cfg.batch_size, num_workers=4)\n    for step, (x, y) in enumerate(loader):\n        logits = head(backbone(x))\n        loss = dice_loss(logits, y)\n        loss.backward()\n        torch.nn.utils.clip_grad_norm_(backbone.parameters(), 1.0)\n        opt.step(); opt.zero_grad()\n        # telemetry path resolved at init; nothing is written in the loop\n",
-        "genome.yaml": "lr: 0.0003\nbatch_size: 64\noptimizer: adamw\nepochs: 10\n"
+        "train/trainer.py": "import os, json, torch\nfrom torch.utils.data import DataLoader\nfrom model.backbone import build_backbone\nfrom model.head import build_head\n\ndef dice_loss(logits, target, eps=1e-7):\n    p = torch.sigmoid(logits)\n    inter = (p * target).sum()\n    denom = (p.sum() + target.sum()).clamp(min=eps)\n    return 1.0 - (2.0 * inter) / denom\n\ndef train(cfg):\n    tel = os.environ.get(\"EVOR_TELEMETRY_PATH\")\n    backbone, head = build_backbone(cfg), build_head(cfg)\n    opt = torch.optim.AdamW(list(backbone.parameters()) + list(head.parameters()), lr=cfg.lr)\n    loader = DataLoader(cfg.dataset, batch_size=cfg.batch_size, num_workers=4)\n    for step, (x, y) in enumerate(loader):\n        logits = head(backbone(x))\n        loss = dice_loss(logits, y)\n        loss.backward()\n        torch.nn.utils.clip_grad_norm_(backbone.parameters(), cfg.grad_clip)\n        opt.step(); opt.zero_grad()\n        # telemetry path resolved at init; nothing is written in the loop\n",
+        "genome.yaml": "lr: 0.0003\nbatch_size: 64\nepochs: 10\ngrad_clip: 1.0\noptimizer: adamw\n"
       },
       "expect": {
         "verdict": "rejected",
@@ -261,7 +251,8 @@
         "checks.numeric_stability": "pass",
         "checks.structural_quality.model_seams": "pass",
         "checks.structural_quality.overall": "pass"
-      }
+      },
+      "base_genome": "lr: 0.0003\nbatch_size: 64\nepochs: 10\ngrad_clip: 1.0\noptimizer: adamw\n"
     },
     {
       "id": "clamp-missing",
@@ -291,8 +282,7 @@
         "training_recipe": {
           "optimizer": "AdamW",
           "lr": 0.0003,
-          "grad_clip": 1.0,
-          "warmup_epochs": 2
+          "grad_clip": 1.0
         },
         "module_seams": {
           "backbone": "conv-stack",
@@ -304,10 +294,7 @@
             "random-crop"
           ]
         },
-        "genome_changes": {
-          "lr": 0.0003,
-          "batch_size": 64
-        },
+        "genome_changes": {},
         "citations": []
       },
       "evaluate_py_sha256_expected": "9f2c1a0000000000000000000000000000000000000000000000000000000000",
@@ -316,8 +303,8 @@
       "candidate_files": {
         "model/backbone.py": "import torch.nn as nn\ndef build_backbone(cfg):\n    return nn.Sequential(nn.Conv2d(3, 64, 3, padding=1), nn.ReLU(),\n                         nn.Conv2d(64, 64, 3, padding=1), nn.ReLU())\n",
         "model/head.py": "import torch.nn as nn\ndef build_head(cfg):\n    return nn.Conv2d(64, cfg.num_classes, kernel_size=1)\n",
-        "train/trainer.py": "import os, json, torch\nfrom torch.utils.data import DataLoader\nfrom model.backbone import build_backbone\nfrom model.head import build_head\n\ndef dice_loss(logits, target, eps=1e-7):\n    p = torch.sigmoid(logits)\n    inter = (p * target).sum()\n    denom = p.sum() + target.sum()\n    return 1.0 - (2.0 * inter) / denom\n\ndef train(cfg):\n    tel = os.environ.get(\"EVOR_TELEMETRY_PATH\")\n    backbone, head = build_backbone(cfg), build_head(cfg)\n    opt = torch.optim.AdamW(list(backbone.parameters()) + list(head.parameters()), lr=3e-4)\n    loader = DataLoader(cfg.dataset, batch_size=cfg.batch_size, num_workers=4)\n    for step, (x, y) in enumerate(loader):\n        logits = head(backbone(x))\n        loss = dice_loss(logits, y)\n        loss.backward()\n        torch.nn.utils.clip_grad_norm_(backbone.parameters(), 1.0)\n        opt.step(); opt.zero_grad()\n        with open(tel, \"a\") as fh:\n            fh.write(json.dumps({\"step\": step, \"node_id\": cfg.node_id, \"run_id\": cfg.run_id,\n                                 \"timestamp\": cfg.now(), \"train_loss\": float(loss)}) + \"\\n\")\n",
-        "genome.yaml": "lr: 0.0003\nbatch_size: 64\noptimizer: adamw\nepochs: 10\n"
+        "train/trainer.py": "import os, json, torch\nfrom torch.utils.data import DataLoader\nfrom model.backbone import build_backbone\nfrom model.head import build_head\n\ndef dice_loss(logits, target, eps=1e-7):\n    p = torch.sigmoid(logits)\n    inter = (p * target).sum()\n    denom = p.sum() + target.sum()\n    return 1.0 - (2.0 * inter) / denom\n\ndef train(cfg):\n    tel = os.environ.get(\"EVOR_TELEMETRY_PATH\")\n    backbone, head = build_backbone(cfg), build_head(cfg)\n    opt = torch.optim.AdamW(list(backbone.parameters()) + list(head.parameters()), lr=cfg.lr)\n    loader = DataLoader(cfg.dataset, batch_size=cfg.batch_size, num_workers=4)\n    for step, (x, y) in enumerate(loader):\n        logits = head(backbone(x))\n        loss = dice_loss(logits, y)\n        loss.backward()\n        torch.nn.utils.clip_grad_norm_(backbone.parameters(), cfg.grad_clip)\n        opt.step(); opt.zero_grad()\n        with open(tel, \"a\") as fh:\n            fh.write(json.dumps({\"step\": step, \"node_id\": cfg.node_id, \"run_id\": cfg.run_id,\n                                 \"timestamp\": cfg.now(), \"train_loss\": float(loss)}) + \"\\n\")\n",
+        "genome.yaml": "lr: 0.0003\nbatch_size: 64\nepochs: 10\ngrad_clip: 1.0\noptimizer: adamw\n"
       },
       "expect": {
         "verdict": "rejected",
@@ -326,7 +313,8 @@
         "checks.numeric_stability": "fail",
         "checks.structural_quality.model_seams": "pass",
         "checks.structural_quality.overall": "pass"
-      }
+      },
+      "base_genome": "lr: 0.0003\nbatch_size: 64\nepochs: 10\ngrad_clip: 1.0\noptimizer: adamw\n"
     },
     {
       "id": "clamp-output-only",
@@ -356,8 +344,7 @@
         "training_recipe": {
           "optimizer": "AdamW",
           "lr": 0.0003,
-          "grad_clip": 1.0,
-          "warmup_epochs": 2
+          "grad_clip": 1.0
         },
         "module_seams": {
           "backbone": "conv-stack",
@@ -369,10 +356,7 @@
             "random-crop"
           ]
         },
-        "genome_changes": {
-          "lr": 0.0003,
-          "batch_size": 64
-        },
+        "genome_changes": {},
         "citations": []
       },
       "evaluate_py_sha256_expected": "9f2c1a0000000000000000000000000000000000000000000000000000000000",
@@ -381,8 +365,8 @@
       "candidate_files": {
         "model/backbone.py": "import torch.nn as nn\ndef build_backbone(cfg):\n    return nn.Sequential(nn.Conv2d(3, 64, 3, padding=1), nn.ReLU(),\n                         nn.Conv2d(64, 64, 3, padding=1), nn.ReLU())\n",
         "model/head.py": "import torch.nn as nn\ndef build_head(cfg):\n    return nn.Conv2d(64, cfg.num_classes, kernel_size=1)\n",
-        "train/trainer.py": "import os, json, torch\nfrom torch.utils.data import DataLoader\nfrom model.backbone import build_backbone\nfrom model.head import build_head\n\ndef dice_loss(logits, target, eps=1e-7):\n    p = torch.sigmoid(logits)\n    inter = (p * target).sum()\n    denom = p.sum() + target.sum()\n    return (1.0 - (2.0 * inter) / denom).clamp(min=eps)\n\ndef train(cfg):\n    tel = os.environ.get(\"EVOR_TELEMETRY_PATH\")\n    backbone, head = build_backbone(cfg), build_head(cfg)\n    opt = torch.optim.AdamW(list(backbone.parameters()) + list(head.parameters()), lr=3e-4)\n    loader = DataLoader(cfg.dataset, batch_size=cfg.batch_size, num_workers=4)\n    for step, (x, y) in enumerate(loader):\n        logits = head(backbone(x))\n        loss = dice_loss(logits, y)\n        loss.backward()\n        torch.nn.utils.clip_grad_norm_(backbone.parameters(), 1.0)\n        opt.step(); opt.zero_grad()\n        with open(tel, \"a\") as fh:\n            fh.write(json.dumps({\"step\": step, \"node_id\": cfg.node_id, \"run_id\": cfg.run_id,\n                                 \"timestamp\": cfg.now(), \"train_loss\": float(loss)}) + \"\\n\")\n",
-        "genome.yaml": "lr: 0.0003\nbatch_size: 64\noptimizer: adamw\nepochs: 10\n"
+        "train/trainer.py": "import os, json, torch\nfrom torch.utils.data import DataLoader\nfrom model.backbone import build_backbone\nfrom model.head import build_head\n\ndef dice_loss(logits, target, eps=1e-7):\n    p = torch.sigmoid(logits)\n    inter = (p * target).sum()\n    denom = p.sum() + target.sum()\n    return (1.0 - (2.0 * inter) / denom).clamp(min=eps)\n\ndef train(cfg):\n    tel = os.environ.get(\"EVOR_TELEMETRY_PATH\")\n    backbone, head = build_backbone(cfg), build_head(cfg)\n    opt = torch.optim.AdamW(list(backbone.parameters()) + list(head.parameters()), lr=cfg.lr)\n    loader = DataLoader(cfg.dataset, batch_size=cfg.batch_size, num_workers=4)\n    for step, (x, y) in enumerate(loader):\n        logits = head(backbone(x))\n        loss = dice_loss(logits, y)\n        loss.backward()\n        torch.nn.utils.clip_grad_norm_(backbone.parameters(), cfg.grad_clip)\n        opt.step(); opt.zero_grad()\n        with open(tel, \"a\") as fh:\n            fh.write(json.dumps({\"step\": step, \"node_id\": cfg.node_id, \"run_id\": cfg.run_id,\n                                 \"timestamp\": cfg.now(), \"train_loss\": float(loss)}) + \"\\n\")\n",
+        "genome.yaml": "lr: 0.0003\nbatch_size: 64\nepochs: 10\ngrad_clip: 1.0\noptimizer: adamw\n"
       },
       "expect": {
         "verdict": "rejected",
@@ -391,7 +375,8 @@
         "checks.numeric_stability": "fail",
         "checks.structural_quality.model_seams": "pass",
         "checks.structural_quality.overall": "pass"
-      }
+      },
+      "base_genome": "lr: 0.0003\nbatch_size: 64\nepochs: 10\ngrad_clip: 1.0\noptimizer: adamw\n"
     },
     {
       "id": "clamp-epsilon-too-large",
@@ -421,8 +406,7 @@
         "training_recipe": {
           "optimizer": "AdamW",
           "lr": 0.0003,
-          "grad_clip": 1.0,
-          "warmup_epochs": 2
+          "grad_clip": 1.0
         },
         "module_seams": {
           "backbone": "conv-stack",
@@ -434,10 +418,7 @@
             "random-crop"
           ]
         },
-        "genome_changes": {
-          "lr": 0.0003,
-          "batch_size": 64
-        },
+        "genome_changes": {},
         "citations": []
       },
       "evaluate_py_sha256_expected": "9f2c1a0000000000000000000000000000000000000000000000000000000000",
@@ -446,8 +427,8 @@
       "candidate_files": {
         "model/backbone.py": "import torch.nn as nn\ndef build_backbone(cfg):\n    return nn.Sequential(nn.Conv2d(3, 64, 3, padding=1), nn.ReLU(),\n                         nn.Conv2d(64, 64, 3, padding=1), nn.ReLU())\n",
         "model/head.py": "import torch.nn as nn\ndef build_head(cfg):\n    return nn.Conv2d(64, cfg.num_classes, kernel_size=1)\n",
-        "train/trainer.py": "import os, json, torch\nfrom torch.utils.data import DataLoader\nfrom model.backbone import build_backbone\nfrom model.head import build_head\n\ndef dice_loss(logits, target, eps=1e-3):\n    p = torch.sigmoid(logits)\n    inter = (p * target).sum()\n    denom = (p.sum() + target.sum()).clamp(min=eps)\n    return 1.0 - (2.0 * inter) / denom\n\ndef train(cfg):\n    tel = os.environ.get(\"EVOR_TELEMETRY_PATH\")\n    backbone, head = build_backbone(cfg), build_head(cfg)\n    opt = torch.optim.AdamW(list(backbone.parameters()) + list(head.parameters()), lr=3e-4)\n    loader = DataLoader(cfg.dataset, batch_size=cfg.batch_size, num_workers=4)\n    for step, (x, y) in enumerate(loader):\n        logits = head(backbone(x))\n        loss = dice_loss(logits, y)\n        loss.backward()\n        torch.nn.utils.clip_grad_norm_(backbone.parameters(), 1.0)\n        opt.step(); opt.zero_grad()\n        with open(tel, \"a\") as fh:\n            fh.write(json.dumps({\"step\": step, \"node_id\": cfg.node_id, \"run_id\": cfg.run_id,\n                                 \"timestamp\": cfg.now(), \"train_loss\": float(loss)}) + \"\\n\")\n",
-        "genome.yaml": "lr: 0.0003\nbatch_size: 64\noptimizer: adamw\nepochs: 10\n"
+        "train/trainer.py": "import os, json, torch\nfrom torch.utils.data import DataLoader\nfrom model.backbone import build_backbone\nfrom model.head import build_head\n\ndef dice_loss(logits, target, eps=1e-3):\n    p = torch.sigmoid(logits)\n    inter = (p * target).sum()\n    denom = (p.sum() + target.sum()).clamp(min=eps)\n    return 1.0 - (2.0 * inter) / denom\n\ndef train(cfg):\n    tel = os.environ.get(\"EVOR_TELEMETRY_PATH\")\n    backbone, head = build_backbone(cfg), build_head(cfg)\n    opt = torch.optim.AdamW(list(backbone.parameters()) + list(head.parameters()), lr=cfg.lr)\n    loader = DataLoader(cfg.dataset, batch_size=cfg.batch_size, num_workers=4)\n    for step, (x, y) in enumerate(loader):\n        logits = head(backbone(x))\n        loss = dice_loss(logits, y)\n        loss.backward()\n        torch.nn.utils.clip_grad_norm_(backbone.parameters(), cfg.grad_clip)\n        opt.step(); opt.zero_grad()\n        with open(tel, \"a\") as fh:\n            fh.write(json.dumps({\"step\": step, \"node_id\": cfg.node_id, \"run_id\": cfg.run_id,\n                                 \"timestamp\": cfg.now(), \"train_loss\": float(loss)}) + \"\\n\")\n",
+        "genome.yaml": "lr: 0.0003\nbatch_size: 64\nepochs: 10\ngrad_clip: 1.0\noptimizer: adamw\n"
       },
       "expect": {
         "verdict": "rejected",
@@ -456,7 +437,8 @@
         "checks.numeric_stability": "fail",
         "checks.structural_quality.model_seams": "pass",
         "checks.structural_quality.overall": "pass"
-      }
+      },
+      "base_genome": "lr: 0.0003\nbatch_size: 64\nepochs: 10\ngrad_clip: 1.0\noptimizer: adamw\n"
     },
     {
       "id": "style-noise-negative-control",
@@ -487,8 +469,7 @@
           "optimizer": "SGD",
           "lr": 0.01,
           "momentum": 0.9,
-          "grad_clip": 1.0,
-          "warmup_epochs": 2
+          "grad_clip": 1.0
         },
         "module_seams": {
           "backbone": "conv-stack",
@@ -500,10 +481,7 @@
             "random-crop"
           ]
         },
-        "genome_changes": {
-          "lr": 0.0003,
-          "batch_size": 64
-        },
+        "genome_changes": {},
         "citations": []
       },
       "evaluate_py_sha256_expected": "9f2c1a0000000000000000000000000000000000000000000000000000000000",
@@ -512,8 +490,8 @@
       "candidate_files": {
         "model/backbone.py": "import torch.nn as nn\ndef build_backbone(cfg):\n    return nn.Sequential(nn.Conv2d(3, 64, 3, padding=1), nn.ReLU(),\n                         nn.AdaptiveAvgPool2d(1), nn.Flatten())\n",
         "model/head.py": "import torch.nn as nn\ndef build_head(cfg):\n    return nn.Linear(64, cfg.num_classes)\n",
-        "train/trainer.py": "import os, json, torch\nfrom torch.utils.data import DataLoader\nfrom model.backbone import build_backbone\nfrom model.head import build_head\n\ndef train(cfg):\n    tel = os.environ.get(\"EVOR_TELEMETRY_PATH\")\n    backbone, head = build_backbone(cfg), build_head(cfg)\n    criterion = torch.nn.CrossEntropyLoss()\n    opt = torch.optim.SGD(list(backbone.parameters()) + list(head.parameters()), lr=0.01, momentum=0.9)\n    loader = DataLoader(cfg.dataset, batch_size=cfg.batch_size, num_workers=4)\n    for step, (x, y) in enumerate(loader):\n        l0GITS=head(backbone( x ))\n        _tmp=l0GITS\n        loss=criterion(_tmp,y)\n        loss.backward()\n        torch.nn.utils.clip_grad_norm_(backbone.parameters(), 1.0)\n        opt.step(); opt.zero_grad()\n        with open(tel, \"a\") as fh:\n            fh.write(json.dumps({\"step\": step, \"node_id\": cfg.node_id, \"run_id\": cfg.run_id,\n                                 \"timestamp\": cfg.now(), \"train_loss\": float(loss)}) + \"\\n\")\n",
-        "genome.yaml": "lr: 0.0003\nbatch_size: 64\noptimizer: adamw\nepochs: 10\n"
+        "train/trainer.py": "import os, json, torch\nfrom torch.utils.data import DataLoader\nfrom model.backbone import build_backbone\nfrom model.head import build_head\n\ndef train(cfg):\n    tel = os.environ.get(\"EVOR_TELEMETRY_PATH\")\n    backbone, head = build_backbone(cfg), build_head(cfg)\n    criterion = torch.nn.CrossEntropyLoss()\n    opt = torch.optim.SGD(list(backbone.parameters()) + list(head.parameters()),\n                          lr=cfg.lr, momentum=cfg.momentum)\n    loader = DataLoader(cfg.dataset, batch_size=cfg.batch_size, num_workers=4)\n    for step, (x, y) in enumerate(loader):\n        l0GITS=head(backbone( x ))\n        _tmp=l0GITS\n        loss=criterion(_tmp,y)\n        loss.backward()\n        torch.nn.utils.clip_grad_norm_(backbone.parameters(), cfg.grad_clip)\n        opt.step(); opt.zero_grad()\n        with open(tel, \"a\") as fh:\n            fh.write(json.dumps({\"step\": step, \"node_id\": cfg.node_id, \"run_id\": cfg.run_id,\n                                 \"timestamp\": cfg.now(), \"train_loss\": float(loss)}) + \"\\n\")\n",
+        "genome.yaml": "lr: 0.01\nbatch_size: 64\nepochs: 10\nmomentum: 0.9\ngrad_clip: 1.0\noptimizer: sgd\n"
       },
       "expect": {
         "verdict": "approved",
@@ -521,7 +499,8 @@
         "checks.telemetry_append_wired": "pass",
         "checks.structural_quality.model_seams": "pass",
         "checks.structural_quality.overall": "pass"
-      }
+      },
+      "base_genome": "lr: 0.01\nbatch_size: 64\nepochs: 10\nmomentum: 0.9\ngrad_clip: 1.0\noptimizer: sgd\n"
     },
     {
       "id": "no-singular-loss",
@@ -552,8 +531,7 @@
           "optimizer": "SGD",
           "lr": 0.01,
           "momentum": 0.9,
-          "grad_clip": 1.0,
-          "warmup_epochs": 2
+          "grad_clip": 1.0
         },
         "module_seams": {
           "backbone": "conv-stack",
@@ -565,10 +543,7 @@
             "random-crop"
           ]
         },
-        "genome_changes": {
-          "lr": 0.0003,
-          "batch_size": 64
-        },
+        "genome_changes": {},
         "citations": []
       },
       "evaluate_py_sha256_expected": "9f2c1a0000000000000000000000000000000000000000000000000000000000",
@@ -577,8 +552,8 @@
       "candidate_files": {
         "model/backbone.py": "import torch.nn as nn\ndef build_backbone(cfg):\n    return nn.Sequential(nn.Conv2d(3, 64, 3, padding=1), nn.ReLU(),\n                         nn.AdaptiveAvgPool2d(1), nn.Flatten())\n",
         "model/head.py": "import torch.nn as nn\ndef build_head(cfg):\n    return nn.Linear(64, cfg.num_classes)\n",
-        "train/trainer.py": "import os, json, torch\nfrom torch.utils.data import DataLoader\nfrom model.backbone import build_backbone\nfrom model.head import build_head\n\ndef train(cfg):\n    tel = os.environ.get(\"EVOR_TELEMETRY_PATH\")\n    backbone, head = build_backbone(cfg), build_head(cfg)\n    criterion = torch.nn.CrossEntropyLoss()\n    opt = torch.optim.SGD(list(backbone.parameters()) + list(head.parameters()), lr=0.01, momentum=0.9)\n    loader = DataLoader(cfg.dataset, batch_size=cfg.batch_size, num_workers=4)\n    for step, (x, y) in enumerate(loader):\n        logits = head(backbone(x))\n        loss = criterion(logits, y)\n        loss.backward()\n        torch.nn.utils.clip_grad_norm_(backbone.parameters(), 1.0)\n        opt.step(); opt.zero_grad()\n        with open(tel, \"a\") as fh:\n            fh.write(json.dumps({\"step\": step, \"node_id\": cfg.node_id, \"run_id\": cfg.run_id,\n                                 \"timestamp\": cfg.now(), \"train_loss\": float(loss)}) + \"\\n\")\n",
-        "genome.yaml": "lr: 0.0003\nbatch_size: 64\noptimizer: adamw\nepochs: 10\n"
+        "train/trainer.py": "import os, json, torch\nfrom torch.utils.data import DataLoader\nfrom model.backbone import build_backbone\nfrom model.head import build_head\n\ndef train(cfg):\n    tel = os.environ.get(\"EVOR_TELEMETRY_PATH\")\n    backbone, head = build_backbone(cfg), build_head(cfg)\n    criterion = torch.nn.CrossEntropyLoss()\n    opt = torch.optim.SGD(list(backbone.parameters()) + list(head.parameters()),\n                          lr=cfg.lr, momentum=cfg.momentum)\n    loader = DataLoader(cfg.dataset, batch_size=cfg.batch_size, num_workers=4)\n    for step, (x, y) in enumerate(loader):\n        logits = head(backbone(x))\n        loss = criterion(logits, y)\n        loss.backward()\n        torch.nn.utils.clip_grad_norm_(backbone.parameters(), cfg.grad_clip)\n        opt.step(); opt.zero_grad()\n        with open(tel, \"a\") as fh:\n            fh.write(json.dumps({\"step\": step, \"node_id\": cfg.node_id, \"run_id\": cfg.run_id,\n                                 \"timestamp\": cfg.now(), \"train_loss\": float(loss)}) + \"\\n\")\n",
+        "genome.yaml": "lr: 0.01\nbatch_size: 64\nepochs: 10\nmomentum: 0.9\ngrad_clip: 1.0\noptimizer: sgd\n"
       },
       "expect": {
         "verdict": "approved",
@@ -586,7 +561,8 @@
         "checks.telemetry_append_wired": "pass",
         "checks.structural_quality.model_seams": "pass",
         "checks.structural_quality.overall": "pass"
-      }
+      },
+      "base_genome": "lr: 0.01\nbatch_size: 64\nepochs: 10\nmomentum: 0.9\ngrad_clip: 1.0\noptimizer: sgd\n"
     },
     {
       "id": "missing-head",
@@ -616,8 +592,7 @@
         "training_recipe": {
           "optimizer": "AdamW",
           "lr": 0.0003,
-          "grad_clip": 1.0,
-          "warmup_epochs": 2
+          "grad_clip": 1.0
         },
         "module_seams": {
           "backbone": "conv-stack",
@@ -629,10 +604,7 @@
             "random-crop"
           ]
         },
-        "genome_changes": {
-          "lr": 0.0003,
-          "batch_size": 64
-        },
+        "genome_changes": {},
         "citations": []
       },
       "evaluate_py_sha256_expected": "9f2c1a0000000000000000000000000000000000000000000000000000000000",
@@ -640,8 +612,8 @@
       "frozen_splits_clean": true,
       "candidate_files": {
         "model/backbone.py": "import torch.nn as nn\ndef build_backbone(cfg):\n    return nn.Sequential(nn.Conv2d(3, 64, 3, padding=1), nn.ReLU(),\n                         nn.Conv2d(64, 64, 3, padding=1), nn.ReLU())\n",
-        "train/trainer.py": "import os, json, torch\nfrom torch.utils.data import DataLoader\nfrom model.backbone import build_backbone\nfrom model.head import build_head\n\ndef dice_loss(logits, target, eps=1e-7):\n    p = torch.sigmoid(logits)\n    inter = (p * target).sum()\n    denom = (p.sum() + target.sum()).clamp(min=eps)\n    return 1.0 - (2.0 * inter) / denom\n\ndef train(cfg):\n    tel = os.environ.get(\"EVOR_TELEMETRY_PATH\")\n    backbone, head = build_backbone(cfg), build_head(cfg)\n    opt = torch.optim.AdamW(list(backbone.parameters()) + list(head.parameters()), lr=3e-4)\n    loader = DataLoader(cfg.dataset, batch_size=cfg.batch_size, num_workers=4)\n    for step, (x, y) in enumerate(loader):\n        logits = head(backbone(x))\n        loss = dice_loss(logits, y)\n        loss.backward()\n        torch.nn.utils.clip_grad_norm_(backbone.parameters(), 1.0)\n        opt.step(); opt.zero_grad()\n        with open(tel, \"a\") as fh:\n            fh.write(json.dumps({\"step\": step, \"node_id\": cfg.node_id, \"run_id\": cfg.run_id,\n                                 \"timestamp\": cfg.now(), \"train_loss\": float(loss)}) + \"\\n\")\n",
-        "genome.yaml": "lr: 0.0003\nbatch_size: 64\noptimizer: adamw\nepochs: 10\n"
+        "train/trainer.py": "import os, json, torch\nfrom torch.utils.data import DataLoader\nfrom model.backbone import build_backbone\nfrom model.head import build_head\n\ndef dice_loss(logits, target, eps=1e-7):\n    p = torch.sigmoid(logits)\n    inter = (p * target).sum()\n    denom = (p.sum() + target.sum()).clamp(min=eps)\n    return 1.0 - (2.0 * inter) / denom\n\ndef train(cfg):\n    tel = os.environ.get(\"EVOR_TELEMETRY_PATH\")\n    backbone, head = build_backbone(cfg), build_head(cfg)\n    opt = torch.optim.AdamW(list(backbone.parameters()) + list(head.parameters()), lr=cfg.lr)\n    loader = DataLoader(cfg.dataset, batch_size=cfg.batch_size, num_workers=4)\n    for step, (x, y) in enumerate(loader):\n        logits = head(backbone(x))\n        loss = dice_loss(logits, y)\n        loss.backward()\n        torch.nn.utils.clip_grad_norm_(backbone.parameters(), cfg.grad_clip)\n        opt.step(); opt.zero_grad()\n        with open(tel, \"a\") as fh:\n            fh.write(json.dumps({\"step\": step, \"node_id\": cfg.node_id, \"run_id\": cfg.run_id,\n                                 \"timestamp\": cfg.now(), \"train_loss\": float(loss)}) + \"\\n\")\n",
+        "genome.yaml": "lr: 0.0003\nbatch_size: 64\nepochs: 10\ngrad_clip: 1.0\noptimizer: adamw\n"
       },
       "expect": {
         "verdict": "rejected",
@@ -650,7 +622,8 @@
         "checks.numeric_stability": "pass",
         "checks.structural_quality.model_seams": "fail",
         "checks.structural_quality.overall": "fail"
-      }
+      },
+      "base_genome": "lr: 0.0003\nbatch_size: 64\nepochs: 10\ngrad_clip: 1.0\noptimizer: adamw\n"
     },
     {
       "id": "neck-contradiction",
@@ -680,8 +653,7 @@
         "training_recipe": {
           "optimizer": "AdamW",
           "lr": 0.0003,
-          "grad_clip": 1.0,
-          "warmup_epochs": 2
+          "grad_clip": 1.0
         },
         "module_seams": {
           "backbone": "conv-stack",
@@ -693,10 +665,7 @@
             "random-crop"
           ]
         },
-        "genome_changes": {
-          "lr": 0.0003,
-          "batch_size": 64
-        },
+        "genome_changes": {},
         "citations": []
       },
       "evaluate_py_sha256_expected": "9f2c1a0000000000000000000000000000000000000000000000000000000000",
@@ -705,8 +674,8 @@
       "candidate_files": {
         "model/backbone.py": "import torch.nn as nn\ndef build_backbone(cfg):\n    return nn.Sequential(nn.Conv2d(3, 64, 3, padding=1), nn.ReLU(),\n                         nn.Conv2d(64, 64, 3, padding=1), nn.ReLU())\n",
         "model/head.py": "import torch.nn as nn\ndef build_head(cfg):\n    return nn.Conv2d(64, cfg.num_classes, kernel_size=1)\n",
-        "train/trainer.py": "import os, json, torch\nfrom torch.utils.data import DataLoader\nfrom model.backbone import build_backbone\nfrom model.head import build_head\n\ndef dice_loss(logits, target, eps=1e-7):\n    p = torch.sigmoid(logits)\n    inter = (p * target).sum()\n    denom = (p.sum() + target.sum()).clamp(min=eps)\n    return 1.0 - (2.0 * inter) / denom\n\ndef train(cfg):\n    tel = os.environ.get(\"EVOR_TELEMETRY_PATH\")\n    backbone, head = build_backbone(cfg), build_head(cfg)\n    opt = torch.optim.AdamW(list(backbone.parameters()) + list(head.parameters()), lr=3e-4)\n    loader = DataLoader(cfg.dataset, batch_size=cfg.batch_size, num_workers=4)\n    for step, (x, y) in enumerate(loader):\n        logits = head(backbone(x))\n        loss = dice_loss(logits, y)\n        loss.backward()\n        torch.nn.utils.clip_grad_norm_(backbone.parameters(), 1.0)\n        opt.step(); opt.zero_grad()\n        with open(tel, \"a\") as fh:\n            fh.write(json.dumps({\"step\": step, \"node_id\": cfg.node_id, \"run_id\": cfg.run_id,\n                                 \"timestamp\": cfg.now(), \"train_loss\": float(loss)}) + \"\\n\")\n",
-        "genome.yaml": "lr: 0.0003\nbatch_size: 64\noptimizer: adamw\nepochs: 10\n",
+        "train/trainer.py": "import os, json, torch\nfrom torch.utils.data import DataLoader\nfrom model.backbone import build_backbone\nfrom model.head import build_head\n\ndef dice_loss(logits, target, eps=1e-7):\n    p = torch.sigmoid(logits)\n    inter = (p * target).sum()\n    denom = (p.sum() + target.sum()).clamp(min=eps)\n    return 1.0 - (2.0 * inter) / denom\n\ndef train(cfg):\n    tel = os.environ.get(\"EVOR_TELEMETRY_PATH\")\n    backbone, head = build_backbone(cfg), build_head(cfg)\n    opt = torch.optim.AdamW(list(backbone.parameters()) + list(head.parameters()), lr=cfg.lr)\n    loader = DataLoader(cfg.dataset, batch_size=cfg.batch_size, num_workers=4)\n    for step, (x, y) in enumerate(loader):\n        logits = head(backbone(x))\n        loss = dice_loss(logits, y)\n        loss.backward()\n        torch.nn.utils.clip_grad_norm_(backbone.parameters(), cfg.grad_clip)\n        opt.step(); opt.zero_grad()\n        with open(tel, \"a\") as fh:\n            fh.write(json.dumps({\"step\": step, \"node_id\": cfg.node_id, \"run_id\": cfg.run_id,\n                                 \"timestamp\": cfg.now(), \"train_loss\": float(loss)}) + \"\\n\")\n",
+        "genome.yaml": "lr: 0.0003\nbatch_size: 64\nepochs: 10\ngrad_clip: 1.0\noptimizer: adamw\n",
         "model/neck.py": "import torch.nn as nn\ndef build_neck(cfg):\n    return nn.MultiheadAttention(64, 4, batch_first=True)\n"
       },
       "expect": {
@@ -716,7 +685,8 @@
         "checks.numeric_stability": "pass",
         "checks.structural_quality.model_seams": "fail",
         "checks.structural_quality.overall": "fail"
-      }
+      },
+      "base_genome": "lr: 0.0003\nbatch_size: 64\nepochs: 10\ngrad_clip: 1.0\noptimizer: adamw\n"
     }
   ]
 }
