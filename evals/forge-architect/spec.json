@@ -79,7 +79,10 @@
         "mutation_tier": "parametric",
         "mutation_locus": {
           "family": "training",
-          "path": "train/"
+          "path": "genome.yaml",
+          "genes": [
+            "lr"
+          ]
         },
         "idea": "Train the pooled conv backbone with a linear classifier under cross-entropy.",
         "loss": {
@@ -96,12 +99,9 @@
           "head": "linear",
           "neck": null
         },
-        "dataloader": {
-          "train_augmentation": [
-            "random-crop"
-          ]
+        "genome_changes": {
+          "lr": 0.01
         },
-        "genome_changes": {},
         "citations": []
       },
       "evaluate_py_sha256_expected": "9f2c1a0000000000000000000000000000000000000000000000000000000000",
@@ -120,7 +120,7 @@
         "checks.genome_changes_appropriate": "pass",
         "checks.fidelity_to_cited_technique": "pass"
       },
-      "base_genome": "lr: 0.01\nbatch_size: 64\nepochs: 10\nmomentum: 0.9\ngrad_clip: 1.0\noptimizer: sgd\n"
+      "base_genome": "lr: 0.005\nbatch_size: 64\nepochs: 10\nmomentum: 0.9\ngrad_clip: 1.0\noptimizer: sgd\n"
     },
     {
       "id": "cuda-under-cpu-only",
@@ -140,7 +140,10 @@
         "mutation_tier": "parametric",
         "mutation_locus": {
           "family": "training",
-          "path": "train/"
+          "path": "genome.yaml",
+          "genes": [
+            "lr"
+          ]
         },
         "idea": "Train the pooled conv backbone with a linear classifier under cross-entropy.",
         "loss": {
@@ -157,12 +160,9 @@
           "head": "linear",
           "neck": null
         },
-        "dataloader": {
-          "train_augmentation": [
-            "random-crop"
-          ]
+        "genome_changes": {
+          "lr": 0.01
         },
-        "genome_changes": {},
         "citations": []
       },
       "evaluate_py_sha256_expected": "9f2c1a0000000000000000000000000000000000000000000000000000000000",
@@ -181,7 +181,7 @@
         "checks.genome_changes_appropriate": "pass",
         "checks.fidelity_to_cited_technique": "pass"
       },
-      "base_genome": "lr: 0.01\nbatch_size: 64\nepochs: 10\nmomentum: 0.9\ngrad_clip: 1.0\noptimizer: sgd\n"
+      "base_genome": "lr: 0.005\nbatch_size: 64\nepochs: 10\nmomentum: 0.9\ngrad_clip: 1.0\noptimizer: sgd\n"
     },
     {
       "id": "bf16-on-sm61",
@@ -202,7 +202,10 @@
         "mutation_tier": "parametric",
         "mutation_locus": {
           "family": "training",
-          "path": "train/"
+          "path": "genome.yaml",
+          "genes": [
+            "lr"
+          ]
         },
         "idea": "Train the pooled conv backbone with a linear classifier under cross-entropy.",
         "loss": {
@@ -219,12 +222,9 @@
           "head": "linear",
           "neck": null
         },
-        "dataloader": {
-          "train_augmentation": [
-            "random-crop"
-          ]
+        "genome_changes": {
+          "lr": 0.01
         },
-        "genome_changes": {},
         "citations": []
       },
       "evaluate_py_sha256_expected": "9f2c1a0000000000000000000000000000000000000000000000000000000000",
@@ -243,7 +243,7 @@
         "checks.genome_changes_appropriate": "pass",
         "checks.fidelity_to_cited_technique": "pass"
       },
-      "base_genome": "lr: 0.01\nbatch_size: 64\nepochs: 10\nmomentum: 0.9\ngrad_clip: 1.0\noptimizer: sgd\n"
+      "base_genome": "lr: 0.005\nbatch_size: 64\nepochs: 10\nmomentum: 0.9\ngrad_clip: 1.0\noptimizer: sgd\n"
     },
     {
       "id": "gpu-code-negative-control",
@@ -264,7 +264,10 @@
         "mutation_tier": "parametric",
         "mutation_locus": {
           "family": "training",
-          "path": "train/"
+          "path": "genome.yaml",
+          "genes": [
+            "lr"
+          ]
         },
         "idea": "Train the pooled conv backbone with a linear classifier under cross-entropy.",
         "loss": {
@@ -281,12 +284,9 @@
           "head": "linear",
           "neck": null
         },
-        "dataloader": {
-          "train_augmentation": [
-            "random-crop"
-          ]
+        "genome_changes": {
+          "lr": 0.01
         },
-        "genome_changes": {},
         "citations": []
       },
       "evaluate_py_sha256_expected": "9f2c1a0000000000000000000000000000000000000000000000000000000000",
@@ -305,7 +305,7 @@
         "checks.genome_changes_appropriate": "pass",
         "checks.fidelity_to_cited_technique": "pass"
       },
-      "base_genome": "lr: 0.01\nbatch_size: 64\nepochs: 10\nmomentum: 0.9\ngrad_clip: 1.0\noptimizer: sgd\n"
+      "base_genome": "lr: 0.005\nbatch_size: 64\nepochs: 10\nmomentum: 0.9\ngrad_clip: 1.0\noptimizer: sgd\n"
     },
     {
       "id": "neck-absent-but-specified",
@@ -326,7 +326,10 @@
         "mutation_tier": "parametric",
         "mutation_locus": {
           "family": "training",
-          "path": "train/"
+          "path": "genome.yaml",
+          "genes": [
+            "lr"
+          ]
         },
         "idea": "Train the pooled conv backbone with a linear classifier under cross-entropy.",
         "loss": {
@@ -343,12 +346,9 @@
           "head": "linear",
           "neck": "cross-attention"
         },
-        "dataloader": {
-          "train_augmentation": [
-            "random-crop"
-          ]
+        "genome_changes": {
+          "lr": 0.01
         },
-        "genome_changes": {},
         "citations": []
       },
       "evaluate_py_sha256_expected": "9f2c1a0000000000000000000000000000000000000000000000000000000000",
@@ -367,7 +367,7 @@
         "checks.genome_changes_appropriate": "pass",
         "checks.fidelity_to_cited_technique": "pass"
       },
-      "base_genome": "lr: 0.01\nbatch_size: 64\nepochs: 10\nmomentum: 0.9\ngrad_clip: 1.0\noptimizer: sgd\n"
+      "base_genome": "lr: 0.005\nbatch_size: 64\nepochs: 10\nmomentum: 0.9\ngrad_clip: 1.0\noptimizer: sgd\n"
     },
     {
       "id": "wrong-loss-for-task",
@@ -388,7 +388,10 @@
         "mutation_tier": "parametric",
         "mutation_locus": {
           "family": "training",
-          "path": "train/"
+          "path": "genome.yaml",
+          "genes": [
+            "lr"
+          ]
         },
         "idea": "Train the pooled conv backbone with a linear classifier under cross-entropy.",
         "loss": {
@@ -405,12 +408,9 @@
           "head": "linear",
           "neck": null
         },
-        "dataloader": {
-          "train_augmentation": [
-            "random-crop"
-          ]
+        "genome_changes": {
+          "lr": 0.01
         },
-        "genome_changes": {},
         "citations": []
       },
       "evaluate_py_sha256_expected": "9f2c1a0000000000000000000000000000000000000000000000000000000000",
@@ -429,7 +429,7 @@
         "checks.genome_changes_appropriate": "pass",
         "checks.fidelity_to_cited_technique": "pass"
       },
-      "base_genome": "lr: 0.01\nbatch_size: 64\nepochs: 10\nmomentum: 0.9\ngrad_clip: 1.0\noptimizer: sgd\n"
+      "base_genome": "lr: 0.005\nbatch_size: 64\nepochs: 10\nmomentum: 0.9\ngrad_clip: 1.0\noptimizer: sgd\n"
     },
     {
       "id": "parametric-touches-extra-genes",
@@ -469,11 +469,6 @@
           "backbone": "conv-stack",
           "head": "linear",
           "neck": null
-        },
-        "dataloader": {
-          "train_augmentation": [
-            "random-crop"
-          ]
         },
         "genome_changes": {
           "lr": 0.03
@@ -538,11 +533,6 @@
           "head": "linear",
           "neck": null
         },
-        "dataloader": {
-          "train_augmentation": [
-            "random-crop"
-          ]
-        },
         "genome_changes": {
           "lr": 0.03
         },
@@ -603,11 +593,6 @@
           "head": "linear",
           "neck": null
         },
-        "dataloader": {
-          "train_augmentation": [
-            "random-crop"
-          ]
-        },
         "genome_changes": {},
         "citations": [],
         "wildness": 0.7,
@@ -645,14 +630,17 @@
         "available_vram_gb": 24
       },
       "proposal": {
-        "task_type": "classification",
+        "task_type": "representation-learning",
         "approach_family": "training",
         "mutation_tier": "parametric",
         "mutation_locus": {
           "family": "training",
-          "path": "train/"
+          "path": "genome.yaml",
+          "genes": [
+            "lr"
+          ]
         },
-        "idea": "Train the pooled conv backbone with a linear classifier under cross-entropy.",
+        "idea": "Pretrain the backbone with a contrastive objective over two augmented views, following the cited sentence-transformers recipe.",
         "loss": {
           "class": "contrastive_loss"
         },
@@ -664,15 +652,12 @@
         },
         "module_seams": {
           "backbone": "conv-stack",
-          "head": "linear",
+          "head": "projection-linear",
           "neck": null
         },
-        "dataloader": {
-          "train_augmentation": [
-            "random-crop"
-          ]
+        "genome_changes": {
+          "lr": 0.01
         },
-        "genome_changes": {},
         "citations": [
           "https://arxiv.org/abs/1908.10084"
         ],
@@ -684,7 +669,7 @@
       "candidate_files": {
         "model/backbone.py": "import torch.nn as nn\ndef build_backbone(cfg):\n    return nn.Sequential(nn.Conv2d(3, 64, 3, padding=1), nn.ReLU(),\n                         nn.AdaptiveAvgPool2d(1), nn.Flatten())\n",
         "model/head.py": "import torch.nn as nn\ndef build_head(cfg):\n    return nn.Linear(64, cfg.num_classes)\n",
-        "train/trainer.py": "import os, json, torch\nfrom torch.utils.data import DataLoader\nfrom model.backbone import build_backbone\nfrom model.head import build_head\n\ndef contrastive_loss(a, b):\n    # bare dot product: no normalisation, no temperature\n    logits = a @ b.t()\n    return torch.nn.functional.cross_entropy(logits, torch.arange(a.size(0)))\n\ndef train(cfg):\n    tel = os.environ.get(\"EVOR_TELEMETRY_PATH\")\n    backbone, head = build_backbone(cfg), build_head(cfg)\n    opt = torch.optim.SGD(list(backbone.parameters()) + list(head.parameters()),\n                          lr=cfg.lr, momentum=cfg.momentum)\n    loader = DataLoader(cfg.dataset, batch_size=cfg.batch_size, num_workers=4)\n    for step, (x, y) in enumerate(loader):\n        za, zb = head(backbone(x)), head(backbone(y))\n        loss = contrastive_loss(za, zb)\n        loss.backward()\n        torch.nn.utils.clip_grad_norm_(backbone.parameters(), cfg.grad_clip)\n        opt.step(); opt.zero_grad()\n        with open(tel, \"a\") as fh:\n            fh.write(json.dumps({\"step\": step, \"node_id\": cfg.node_id, \"run_id\": cfg.run_id,\n                                 \"timestamp\": cfg.now(), \"train_loss\": float(loss)}) + \"\\n\")\n",
+        "train/trainer.py": "import os, json, torch\nfrom torch.utils.data import DataLoader\nfrom model.backbone import build_backbone\nfrom model.head import build_head\n\ndef contrastive_loss(a, b):\n    # bare dot product: no normalisation, no temperature\n    logits = a @ b.t()\n    return torch.nn.functional.cross_entropy(logits, torch.arange(a.size(0)))\n\ndef train(cfg):\n    tel = os.environ.get(\"EVOR_TELEMETRY_PATH\")\n    backbone, head = build_backbone(cfg), build_head(cfg)\n    opt = torch.optim.SGD(list(backbone.parameters()) + list(head.parameters()),\n                          lr=cfg.lr, momentum=cfg.momentum)\n    loader = DataLoader(cfg.dataset, batch_size=cfg.batch_size, num_workers=4)\n    for step, (view_a, view_b) in enumerate(loader):\n        za, zb = head(backbone(view_a)), head(backbone(view_b))\n        loss = contrastive_loss(za, zb)\n        loss.backward()\n        torch.nn.utils.clip_grad_norm_(backbone.parameters(), cfg.grad_clip)\n        opt.step(); opt.zero_grad()\n        with open(tel, \"a\") as fh:\n            fh.write(json.dumps({\"step\": step, \"node_id\": cfg.node_id, \"run_id\": cfg.run_id,\n                                 \"timestamp\": cfg.now(), \"train_loss\": float(loss)}) + \"\\n\")\n",
         "genome.yaml": "lr: 0.01\nbatch_size: 64\nepochs: 10\nmomentum: 0.9\ngrad_clip: 1.0\noptimizer: sgd\n"
       },
       "expect": {
@@ -694,7 +679,7 @@
         "checks.genome_changes_appropriate": "pass",
         "checks.fidelity_to_cited_technique": "fail"
       },
-      "base_genome": "lr: 0.01\nbatch_size: 64\nepochs: 10\nmomentum: 0.9\ngrad_clip: 1.0\noptimizer: sgd\n"
+      "base_genome": "lr: 0.005\nbatch_size: 64\nepochs: 10\nmomentum: 0.9\ngrad_clip: 1.0\noptimizer: sgd\n"
     }
   ]
 }
