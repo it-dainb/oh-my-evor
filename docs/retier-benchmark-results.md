@@ -1,0 +1,88 @@
+# Retier benchmark: seven roles, cheaper tier vs the tier it replaced
+
+Branch `evor/optimization-s0-s6` retiers seven agents downward. This measures
+each one against the tier it replaced on `main`, so that "no regression" is a
+measured claim rather than an assumption about model capability.
+
+**Method.** Each role has a spec under `evals/<role>/spec.json` declaring two
+arms that differ *only* in model — effort is held at `medium` throughout, so the
+retier is the only variable. Cases are graded offline against a contract built
+from the agent file's own `<Output_Format>`; `ci/eval-core.mjs` builds the
+prompt and scores the answer from the same `contract.fields` array, so a graded
+field is necessarily a stated field. 3 repeats per case per arm.
+
+**Statistics.** Wilson score intervals (Wald collapses to a point at k=n and
+would assert certainty from 30 samples) and an exact two-sided Fisher test (cell
+counts are single digits, where the normal approximation is unreliable).
+`python3 ci/retier-report.py --self-test` checks both against scipy.
+
+**Cost** is reported per *passing attempt*, not per call: a tier that is 40%
+cheaper and fails a third of the time is not cheaper, because the retry is part
+of the price.
+
+## Results
+
+| role | retier | current | pre-retier | delta | Fisher p | verdict | $/pass |
+|---|---|---|---|---|---|---|---|
+| probe | opus->sonnet | 30/30 = 100.0% [89–100] | 30/30 = 100.0% [89–100] | +0.0pp | 1.000 | no difference | $0.0853 vs $0.1193 (+29%) |
+| forge-analyst | opus->sonnet | 35/36 = 97.2% [86–100] | 31/36 = 86.1% [71–94] | +11.1pp | 0.199 | no difference | $0.0502 vs $0.1095 (+54%) |
+| forge-architect | opus->sonnet | 28/30 = 93.3% [79–98] | 26/30 = 86.7% [70–95] | +6.7pp | 0.671 | no difference | $0.0508 vs $0.0846 (+40%) |
+| forge-critic | opus->sonnet | 27/30 = 90.0% [74–97] | 29/30 = 96.7% [83–99] | -6.7pp | 0.612 | no difference | $0.0537 vs $0.0882 (+39%) |
+| sage | opus->sonnet | 25/30 = 83.3% [66–93] | 24/30 = 80.0% [63–90] | +3.3pp | 1.000 | no difference | $0.0774 vs $0.1367 (+43%) |
+| sage-junior | sonnet->haiku | 21/27 = 77.8% [59–89] | 22/27 = 81.5% [63–92] | -3.7pp | 1.000 | no difference | $0.0378 vs $0.0721 (+48%) |
+| mutagen † | opus->sonnet | 23/30 = 76.7% [59–88] | 22/30 = 73.3% [56–86] | +3.3pp | 1.000 | no difference | $0.1994 vs $0.2888 (+31%) |
+
+Sum of mean per-call cost across the seven roles: **$0.4766** current vs **$0.7521** pre-retier (**37% cheaper**).
+
+† mutagen's current arm is sonnet:medium **with the S26 prompt fix**. As
+shipped before that fix it was 7/30 (23.3%) against opus's 22/30 — a genuine
+regression at p=0.0002. See below.
+
+**Verdict: 7 of 7 retiers hold.** No role regresses at p<0.05. Four of the seven
+point cheaper-arm-ahead, though none significantly.
+
+## The one real regression, and why effort was the wrong lever
+
+mutagen failed on exactly one check in both arms: the proposal count. Sonnet
+emitted 4 proposals in 25 of 30 runs where `dream_k >= train_k * 2` requires 6.
+
+Three levers, measured:
+
+| mutagen arm | accuracy | vs opus:medium | $/call | $/pass |
+|---|---|---|---|---|
+| sonnet:medium, as shipped | 7/30 = 23.3% | **REGRESSION** p=0.0002 | $0.1273 | $0.5458 |
+| opus:medium (pre-retier) | 22/30 = 73.3% | baseline | $0.2118 | $0.2888 |
+| sonnet:**high** (raise effort) | 13/30 = 43.3% | **still REGRESSION** p=0.035 | $0.2294 | $0.5294 |
+| sonnet:medium + **prompt fix** | 23/30 = 76.7% | no difference p=1.000 | $0.1529 | $0.1994 |
+
+Raising effort was wrong twice over: it did not clear the regression, and at
+$0.2294/call it costs **more than the opus:medium it was meant to replace**.
+The ceiling was never sonnet's reasoning — it was an instruction the model could
+not find, stated once in a parenthetical and once in a checklist, with a default
+value (`5`) that contradicted the floor it was supposed to satisfy
+(`train_k * 2`, which is 6 at `train_k=3`).
+
+Making the computation explicit recovered the role past its opus baseline at 31%
+less per passing attempt. **This is the general lesson: benchmark before
+attributing a failure to the model. Two of the three levers here were dead ends,
+and the cheap one worked.**
+
+## Not benchmarked
+
+`evor-acquirer`'s sonnet->haiku retier is **unverified**. Its work is
+network-bound data acquisition that cannot be faithfully replayed offline, and a
+fragment of its behaviour dressed up as coverage would be worse than an honest
+gap.
+
+## Caveats
+
+- `n=30` per arm (36 for forge-analyst). The intervals are wide; several roles
+  span 20+ points. This detects a large regression, not a small one.
+- `cost_usd` is the CLI's modelled figure, reconciled against `costUSD`. It is
+  an estimate, not an invoice.
+- Two sage-junior cases and one sage case are unwinnable as specified — the
+  agent files answer them twice, differently. They depress both arms equally and
+  move no verdict. See `docs/agent-file-defects.md`.
+- Every fixture defect found during this work (~8) was mine, and the model was
+  right every time. Fixtures are now verified against the strictest arm before a
+  matrix is launched.
