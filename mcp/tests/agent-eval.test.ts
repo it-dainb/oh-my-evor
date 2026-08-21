@@ -19,6 +19,7 @@ import { spawnSync } from "child_process";
 
 import {
   computeCostFromModelUsage,
+  costReconciliation,
   checkTierMatch,
   parseVerdictText,
   scoreCase,
@@ -130,6 +131,31 @@ describe("agent-eval — cost mirrors scripts/session-analyze.mjs", () => {
       },
     }).by_model["claude-sonnet-5"];
     expect(actual).toBeCloseTo(expected, 8);
+  });
+
+  // Every cost test above proves the table agrees with session-analyze.mjs —
+  // i.e. that our model agrees with our other copy of the same model. Neither
+  // is checked against what Anthropic actually billed. On the one artifact
+  // where both numbers exist (ci/out/bench-tick-report.json, 2026-08-21) the
+  // modelled total was $9.6956 and the CLI's own total_cost_usd was $15.6950:
+  // the table understated the bill by 38%. So record the CLI figure alongside
+  // the modelled one and let the run say so.
+  it("reconciles the modelled cost against the CLI's own total_cost_usd", () => {
+    const envelope = {
+      total_cost_usd: 15.6950246,
+      modelUsage: { "claude-sonnet-5": { inputTokens: 1_000_000, outputTokens: 0 } },
+    };
+    const r = costReconciliation(envelope);
+    expect(r.modeled_usd).toBeCloseTo(2.0, 6);
+    expect(r.billed_usd).toBeCloseTo(15.6950246, 6);
+    expect(r.ratio).toBeCloseTo(15.6950246 / 2.0, 6);
+  });
+
+  it("reports a null billed cost rather than inventing one", () => {
+    const r = costReconciliation({ modelUsage: { "claude-sonnet-5": { inputTokens: 1_000_000 } } });
+    expect(r.billed_usd).toBeNull();
+    expect(r.ratio).toBeNull();
+    expect(r.modeled_usd).toBeCloseTo(2.0, 6);
   });
 
   it("reports unpriced models rather than silently costing them $0", () => {

@@ -41,7 +41,7 @@ import { dirname, join, resolve } from 'path';
 import { fileURLToPath } from 'url';
 
 import {
-  computeCostFromModelUsage,
+  costReconciliation,
   checkTierMatch,
   extractAgentPromptBlock,
   parseTiers,
@@ -282,14 +282,15 @@ function runOneCall({ agentPromptBlock, caseObj, tier, maxTurns, timeoutMs }) {
   // baseline three times is worse than not measuring at all.
   if (!tierCheck.ok) throw new Error(tierCheck.error);
 
-  const cost = computeCostFromModelUsage(envelope.modelUsage);
+  const recon = costReconciliation(envelope);
   const text = String(envelope.result ?? '');
   const scored = scoreGateCase(caseObj, parseGateSection(text));
 
   return {
     status: scored.status,
     wall_ms,
-    cost_usd: cost.total,
+    cost_usd: recon.modeled_usd,
+    cli_cost_usd: recon.billed_usd,
     model: tierCheck.model,
     result: scored,
     // Kept for every status, not just failures: an `unparseable` verdict is a

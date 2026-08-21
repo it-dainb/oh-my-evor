@@ -84,7 +84,7 @@ import { fileURLToPath } from 'url';
 import { tmpdir } from 'os';
 
 import {
-  computeCostFromModelUsage,
+  costReconciliation,
   checkTierMatch,
   extractAgentPromptBlock,
   parseTiers,
@@ -569,7 +569,7 @@ async function authorAttempt({ agentPromptBlock, caseObj, tier, maxTurns, timeou
   const tierCheck = checkTierMatch(tier.model, envelope.modelUsage);
   if (!tierCheck.ok) throw new Error(tierCheck.error); // FAIL LOUDLY — see agent-eval.mjs
 
-  const cost = computeCostFromModelUsage(envelope.modelUsage);
+  const recon = costReconciliation(envelope);
 
   // Snapshot BEFORE running the evaluator: the evaluator import can create
   // files, and those are not the agent's writes.
@@ -578,7 +578,8 @@ async function authorAttempt({ agentPromptBlock, caseObj, tier, maxTurns, timeou
   return {
     authored: true,
     wall_ms,
-    cost_usd: cost.total,
+    cost_usd: recon.modeled_usd,
+    cli_cost_usd: recon.billed_usd,
     model: tierCheck.model,
     num_turns: envelope.num_turns,
     worktree: worktreeDir,

@@ -111,6 +111,35 @@ export function computeCostFromModelUsage(modelUsage) {
   };
 }
 
+/**
+ * The modelled cost next to the one the CLI itself reports.
+ *
+ * WHY THIS EXISTS. computeCostFromModelUsage is checked against
+ * scripts/session-analyze.mjs, which is a copy of the same table — the two
+ * agreeing proves only that we are consistent with ourselves. On the single
+ * artifact where a modelled total and a billed total both exist
+ * (ci/out/bench-tick-report.json, 2026-08-21) they were $9.6956 and $15.6950:
+ * the table understated the bill by 38%, and no test could have caught it,
+ * because nothing recorded the second number.
+ *
+ * Every tier decision in this repo is made on modelled dollars. A bias that
+ * lands unevenly across models — and a cache-write or list-vs-introductory
+ * pricing error would — moves the comparisons, not just the absolute totals.
+ * So the CLI's figure is now carried on every record.
+ *
+ * `billed_usd` is null when the envelope does not report one; a missing number
+ * is not a zero.
+ */
+export function costReconciliation(envelope) {
+  const modeled = computeCostFromModelUsage(envelope?.modelUsage).total;
+  const billed = typeof envelope?.total_cost_usd === 'number' ? envelope.total_cost_usd : null;
+  return {
+    modeled_usd: modeled,
+    billed_usd: billed,
+    ratio: billed !== null && modeled > 0 ? billed / modeled : null,
+  };
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Tier-mismatch guard — FAILS LOUDLY. A harness that silently measures the
 // baseline four times (because the CLI ignored --model, or an alias resolved
@@ -545,14 +574,16 @@ function runOneCall({ agentPromptBlock, caseObj, tier, maxTurns, timeoutMs }) {
     throw new Error(tierCheck.error);
   }
 
-  const cost = computeCostFromModelUsage(envelope.modelUsage);
+  const recon = costReconciliation(envelope);
   const parsed = parseVerdictText(envelope.result ?? '');
   const scored = scoreCase(caseObj, parsed);
 
   return {
     status: scored.status,
     wall_ms,
-    cost_usd: cost.total,
+    cost_usd: recon.modeled_usd,
+    // What Anthropic actually charged, when the CLI says. See costReconciliation.
+    cli_cost_usd: recon.billed_usd,
     model: tierCheck.model,
     result: scored,
   };
