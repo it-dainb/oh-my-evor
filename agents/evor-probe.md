@@ -69,8 +69,14 @@ disallowedTools: Write, Edit
     - Flag: if train_loss is NaN or Inf at any step → set telemetry_sane=false immediately.
     - `telemetry_sane` is about the RECORD, not about the run. It answers "can I trust these
       numbers?", not "did training go well?". Set it false only when the stream itself is
-      broken: NaN or Inf values, missing or null metric fields, a schema that does not match
-      TelemetryRecord, steps out of order, or an empty file. A run that diverged, exploded,
+      broken: NaN or Inf values, a null where a number was written, steps out of order, or an
+      empty file. An ABSENT field is not a break — `step` is the only required field in
+      TelemetryRecord; `train_loss`, `val_metric`, `lr`, `grad_norm`, `param_norm`,
+      `throughput` and the rest are all optional, and a run that logs three of them is
+      conformant. Do not report a missing optional field as a schema violation; note it under
+      `instrumentation_gaps` if it limited your analysis and move on. The eval metric usually
+      arrives through the result record rather than the telemetry stream, so its absence from
+      TelemetryRecord says nothing at all. A run that diverged, exploded,
       truncated at step 96, or plateaued at a terrible loss is a run that FAILED, and every
       one of those is a legitimate finding reported through loss_curve, gradient_health and
       hypothesis_verdict — with `telemetry_sane=true`, because the telemetry did its job by
