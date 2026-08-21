@@ -24,6 +24,7 @@ import {
   gradeField,
   scoreByContract,
   getPath,
+  buildRolePrompt,
 } from "../../ci/eval-core.mjs";
 
 // A contract exercising every field kind, in both output modes.
@@ -179,6 +180,18 @@ describe("gradeField", () => {
     expect(gradeField(f, 128, "128").correct).toBe(true);
   });
 
+  it("distinguishes a null field from a missing one for `present`", () => {
+    // probe's benchmark_upgrade_proposal is null-or-object: `null` is a real,
+    // correct answer meaning "no proposal", not a failure to answer. Every
+    // other kind treats null as unanswered, so this needs its own kind.
+    const f = { path: "benchmark_upgrade_proposal", kind: "present" };
+    expect(gradeField(f, false, null).correct).toBe(true);
+    expect(gradeField(f, false, undefined).correct).toBe(true);
+    expect(gradeField(f, true, { reason: "saturation" }).correct).toBe(true);
+    expect(gradeField(f, true, null).correct).toBe(false);
+    expect(gradeField(f, false, { reason: "saturation" }).correct).toBe(false);
+  });
+
   it("counts a missing answer as wrong, not as absent", () => {
     const f = { path: "telemetry_sane", kind: "bool" };
     expect(gradeField(f, false, undefined).correct).toBe(false);
@@ -262,5 +275,44 @@ describe("the prompt states everything the scorer grades", () => {
       // Every gradable path must be reachable from the text the agent is given.
       expect(text).toContain(path.split(".")[0]);
     }
+  });
+});
+
+describe("buildRolePrompt", () => {
+  const contract = {
+    heading: "Probe Report",
+    mode: "json",
+    fields: [{ path: "telemetry_sane", kind: "bool" }],
+  };
+  const caseObj = {
+    id: "nan-run",
+    gate: "sanity",
+    note: "the giveaway is that train_loss goes NaN at step 40",
+    telemetry: { train_loss: [1.2, 0.9, null] },
+    expect: { telemetry_sane: false },
+  };
+  const prompt = buildRolePrompt("<Agent_Prompt>do the thing</Agent_Prompt>", contract, caseObj);
+
+  it("carries the agent's own prompt block and the output contract", () => {
+    expect(prompt).toContain("do the thing");
+    expect(prompt).toContain("telemetry_sane");
+  });
+
+  it("inlines the case payload the agent has to reason over", () => {
+    expect(prompt).toContain("train_loss");
+    expect(prompt).toContain("1.2");
+  });
+
+  it("leaks neither the expected answer nor the case note", () => {
+    // `note` is authoring commentary and `expect` is the answer key. Either one
+    // in the prompt turns the benchmark into a reading-comprehension test.
+    expect(prompt).not.toContain("the giveaway");
+    expect(prompt).not.toMatch(/"expect"/);
+    expect(prompt).not.toMatch(/\bnote\b/);
+  });
+
+  it("omits the bookkeeping keys that are not part of the scenario", () => {
+    expect(prompt).not.toMatch(/"gate"/);
+    expect(prompt).not.toMatch(/nan-run/);
   });
 });

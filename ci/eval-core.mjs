@@ -52,6 +52,8 @@ function fieldSpecText(f) {
       return '<number>';
     case 'set':
       return '<comma-separated tokens, or "none">';
+    case 'present':
+      return '<the object, or null if none>';
     case 'int_or_word':
       return `<integer, or "${f.word}">`;
     default:
@@ -94,11 +96,46 @@ function jsonSkeletonValue(f) {
       return '<number>';
     case 'set':
       return '["<token>", ...]';
+    case 'present':
+      return '{ ... } | null';
     case 'int_or_word':
       return `<integer, or "${f.word}">`;
     default:
       throw new Error(`unknown field kind: ${f.kind}`);
   }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Prompt construction.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Case keys that describe the benchmark rather than the scenario. None of these
+ * may reach the agent: `expect` is the answer key, `note` is authoring
+ * commentary that usually names the giveaway outright, and `id`/`gate` are
+ * bookkeeping that would hint at which rule is under test.
+ */
+export const RESERVED_CASE_KEYS = new Set(['id', 'gate', 'note', 'expect']);
+
+export function buildRolePrompt(agentPromptBlock, contract, caseObj) {
+  const payload = {};
+  for (const [k, v] of Object.entries(caseObj)) {
+    if (!RESERVED_CASE_KEYS.has(k)) payload[k] = v;
+  }
+  return [
+    agentPromptBlock,
+    '',
+    '---',
+    '',
+    'The tool results you would normally fetch are inlined below. Treat them as',
+    'authoritative and do not call any tool; reason from them directly.',
+    '',
+    '```json',
+    JSON.stringify(payload, null, 2),
+    '```',
+    '',
+    buildContractText(contract),
+  ].join('\n');
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -181,6 +218,10 @@ function normEnum(f, raw) {
 
 export function gradeField(f, expected, actual, opts = {}) {
   const mk = (correct) => ({ name: f.path, expected, actual: actual ?? null, correct });
+
+  // `present` asks whether the field was filled in at all, so it must be graded
+  // before the missing-answer guard that every other kind depends on.
+  if (f.kind === 'present') return mk((actual !== undefined && actual !== null) === Boolean(expected));
 
   if (actual === undefined || actual === null || strip(actual) === '') return mk(false);
 

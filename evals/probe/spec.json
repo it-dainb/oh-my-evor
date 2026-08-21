@@ -1,0 +1,1680 @@
+{
+  "role": "evor-probe",
+  "agent_file": "agents/evor-probe.md",
+  "arms": [
+    {
+      "model": "sonnet",
+      "effort": "medium",
+      "label": "current"
+    },
+    {
+      "model": "opus",
+      "effort": "medium",
+      "label": "main (pre-retier)"
+    }
+  ],
+  "contract": {
+    "heading": "Probe Report",
+    "mode": "json",
+    "fields": [
+      {
+        "path": "eda_summary.loss_curve",
+        "kind": "enum",
+        "values": [
+          "diverging",
+          "oscillating",
+          "plateaued",
+          "decreasing"
+        ]
+      },
+      {
+        "path": "eda_summary.gradient_health",
+        "kind": "enum",
+        "values": [
+          "exploding",
+          "vanishing",
+          "unstable",
+          "healthy"
+        ]
+      },
+      {
+        "path": "eda_summary.telemetry_sane",
+        "kind": "bool"
+      },
+      {
+        "path": "eda_summary.per_domain_gap_pp",
+        "kind": "number",
+        "tol": 0.6
+      },
+      {
+        "path": "hypothesis_verdict",
+        "kind": "enum",
+        "values": [
+          "inconclusive",
+          "refuted",
+          "confirmed"
+        ]
+      },
+      {
+        "path": "benchmark_upgrade_proposal",
+        "kind": "present"
+      }
+    ]
+  },
+  "cases": [
+    {
+      "id": "healthy-confirmed",
+      "gate": "baseline",
+      "note": "clean decreasing run, delta lands inside the predicted band",
+      "run": {
+        "expected_steps": 500,
+        "completed_steps": 500,
+        "lr_schedule": "cosine",
+        "lr_values": [
+          0.0003,
+          0.00026,
+          0.00017,
+          8e-05,
+          1e-05
+        ]
+      },
+      "hypothesis": {
+        "predicted_delta_pp": "+2 to +4",
+        "primary_metric": "val_acc",
+        "parent_value": 0.72
+      },
+      "result": {
+        "node_value": 0.741
+      },
+      "per_domain": {
+        "scanned": 0.76,
+        "printed": 0.744,
+        "handwritten": 0.72
+      },
+      "telemetry": [
+        {
+          "step": 0,
+          "train_loss": 2.475,
+          "grad_norm": 2.0,
+          "param_norm": 11.8
+        },
+        {
+          "step": 20,
+          "train_loss": 2.2251,
+          "grad_norm": 2.2104,
+          "param_norm": 11.82
+        },
+        {
+          "step": 40,
+          "train_loss": 2.0024,
+          "grad_norm": 2.2273,
+          "param_norm": 11.84
+        },
+        {
+          "step": 60,
+          "train_loss": 1.8039,
+          "grad_norm": 2.0353,
+          "param_norm": 11.86
+        },
+        {
+          "step": 80,
+          "train_loss": 1.627,
+          "grad_norm": 1.8108,
+          "param_norm": 11.88
+        },
+        {
+          "step": 100,
+          "train_loss": 1.4692,
+          "grad_norm": 1.7603,
+          "param_norm": 11.9
+        },
+        {
+          "step": 120,
+          "train_loss": 1.3286,
+          "grad_norm": 1.9301,
+          "param_norm": 11.92
+        },
+        {
+          "step": 140,
+          "train_loss": 1.2033,
+          "grad_norm": 2.1642,
+          "param_norm": 11.94
+        },
+        {
+          "step": 160,
+          "train_loss": 1.0916,
+          "grad_norm": 2.2473,
+          "param_norm": 11.96
+        },
+        {
+          "step": 180,
+          "train_loss": 0.992,
+          "grad_norm": 2.103,
+          "param_norm": 11.98
+        },
+        {
+          "step": 200,
+          "train_loss": 0.9033,
+          "grad_norm": 1.864,
+          "param_norm": 12.0
+        },
+        {
+          "step": 220,
+          "train_loss": 0.8242,
+          "grad_norm": 1.75,
+          "param_norm": 12.02
+        },
+        {
+          "step": 240,
+          "train_loss": 0.7536,
+          "grad_norm": 1.8659,
+          "param_norm": 12.04
+        },
+        {
+          "step": 260,
+          "train_loss": 0.6908,
+          "grad_norm": 2.105,
+          "param_norm": 12.06
+        },
+        {
+          "step": 280,
+          "train_loss": 0.6347,
+          "grad_norm": 2.2477,
+          "param_norm": 12.08
+        },
+        {
+          "step": 300,
+          "train_loss": 0.5848,
+          "grad_norm": 2.1626,
+          "param_norm": 12.1
+        },
+        {
+          "step": 320,
+          "train_loss": 0.5403,
+          "grad_norm": 1.928,
+          "param_norm": 12.12
+        },
+        {
+          "step": 340,
+          "train_loss": 0.5006,
+          "grad_norm": 1.7597,
+          "param_norm": 12.14
+        },
+        {
+          "step": 360,
+          "train_loss": 0.4652,
+          "grad_norm": 1.8123,
+          "param_norm": 12.16
+        },
+        {
+          "step": 380,
+          "train_loss": 0.4337,
+          "grad_norm": 2.0375,
+          "param_norm": 12.18
+        },
+        {
+          "step": 400,
+          "train_loss": 0.4056,
+          "grad_norm": 2.2282,
+          "param_norm": 12.2
+        },
+        {
+          "step": 420,
+          "train_loss": 0.3805,
+          "grad_norm": 2.2092,
+          "param_norm": 12.22
+        },
+        {
+          "step": 440,
+          "train_loss": 0.3582,
+          "grad_norm": 1.9978,
+          "param_norm": 12.24
+        },
+        {
+          "step": 460,
+          "train_loss": 0.3383,
+          "grad_norm": 1.7884,
+          "param_norm": 12.26
+        },
+        {
+          "step": 480,
+          "train_loss": 0.3206,
+          "grad_norm": 1.7736,
+          "param_norm": 12.28
+        }
+      ],
+      "tick_history": [
+        {
+          "tick": 1,
+          "primary_metric": 0.681
+        },
+        {
+          "tick": 2,
+          "primary_metric": 0.72
+        }
+      ],
+      "expect": {
+        "eda_summary.loss_curve": "decreasing",
+        "eda_summary.gradient_health": "healthy",
+        "eda_summary.telemetry_sane": true,
+        "hypothesis_verdict": "confirmed",
+        "eda_summary.per_domain_gap_pp": 4.0,
+        "benchmark_upgrade_proposal": false
+      }
+    },
+    {
+      "id": "nan-telemetry",
+      "gate": "sanity",
+      "note": "train_loss is null at steps 40 and 60; sanity must fail and the verdict cannot be confirmed",
+      "run": {
+        "expected_steps": 500,
+        "completed_steps": 500,
+        "lr_schedule": "cosine",
+        "lr_values": [
+          0.0003,
+          0.00026,
+          0.00017,
+          8e-05,
+          1e-05
+        ]
+      },
+      "hypothesis": {
+        "predicted_delta_pp": "+2 to +4",
+        "primary_metric": "val_acc",
+        "parent_value": 0.72
+      },
+      "result": {
+        "node_value": 0.744
+      },
+      "telemetry": [
+        {
+          "step": 0,
+          "train_loss": 2.475,
+          "grad_norm": 2.0
+        },
+        {
+          "step": 20,
+          "train_loss": 2.2251,
+          "grad_norm": 2.2104
+        },
+        {
+          "step": 40,
+          "train_loss": null,
+          "grad_norm": 2.2273
+        },
+        {
+          "step": 60,
+          "train_loss": null,
+          "grad_norm": 2.0353
+        },
+        {
+          "step": 80,
+          "train_loss": 1.627,
+          "grad_norm": 1.8108
+        },
+        {
+          "step": 100,
+          "train_loss": 1.4692,
+          "grad_norm": 1.7603
+        },
+        {
+          "step": 120,
+          "train_loss": 1.3286,
+          "grad_norm": 1.9301
+        },
+        {
+          "step": 140,
+          "train_loss": 1.2033,
+          "grad_norm": 2.1642
+        },
+        {
+          "step": 160,
+          "train_loss": 1.0916,
+          "grad_norm": 2.2473
+        },
+        {
+          "step": 180,
+          "train_loss": 0.992,
+          "grad_norm": 2.103
+        },
+        {
+          "step": 200,
+          "train_loss": 0.9033,
+          "grad_norm": 1.864
+        },
+        {
+          "step": 220,
+          "train_loss": 0.8242,
+          "grad_norm": 1.75
+        },
+        {
+          "step": 240,
+          "train_loss": 0.7536,
+          "grad_norm": 1.8659
+        },
+        {
+          "step": 260,
+          "train_loss": 0.6908,
+          "grad_norm": 2.105
+        },
+        {
+          "step": 280,
+          "train_loss": 0.6347,
+          "grad_norm": 2.2477
+        },
+        {
+          "step": 300,
+          "train_loss": 0.5848,
+          "grad_norm": 2.1626
+        },
+        {
+          "step": 320,
+          "train_loss": 0.5403,
+          "grad_norm": 1.928
+        },
+        {
+          "step": 340,
+          "train_loss": 0.5006,
+          "grad_norm": 1.7597
+        },
+        {
+          "step": 360,
+          "train_loss": 0.4652,
+          "grad_norm": 1.8123
+        },
+        {
+          "step": 380,
+          "train_loss": 0.4337,
+          "grad_norm": 2.0375
+        },
+        {
+          "step": 400,
+          "train_loss": 0.4056,
+          "grad_norm": 2.2282
+        },
+        {
+          "step": 420,
+          "train_loss": 0.3805,
+          "grad_norm": 2.2092
+        },
+        {
+          "step": 440,
+          "train_loss": 0.3582,
+          "grad_norm": 1.9978
+        },
+        {
+          "step": 460,
+          "train_loss": 0.3383,
+          "grad_norm": 1.7884
+        },
+        {
+          "step": 480,
+          "train_loss": 0.3206,
+          "grad_norm": 1.7736
+        }
+      ],
+      "expect": {
+        "eda_summary.telemetry_sane": false,
+        "hypothesis_verdict": "inconclusive"
+      }
+    },
+    {
+      "id": "grad-explosion",
+      "gate": "grad",
+      "note": "grad_norm max 341.7, well over the 100 threshold",
+      "run": {
+        "expected_steps": 500,
+        "completed_steps": 500,
+        "lr_schedule": "constant",
+        "lr_values": [
+          0.001,
+          0.001,
+          0.001,
+          0.001,
+          0.001
+        ]
+      },
+      "hypothesis": {
+        "predicted_delta_pp": "+1 to +3",
+        "primary_metric": "val_acc",
+        "parent_value": 0.7
+      },
+      "result": {
+        "node_value": 0.694
+      },
+      "telemetry": [
+        {
+          "step": 0,
+          "train_loss": 2.5,
+          "grad_norm": 2.0
+        },
+        {
+          "step": 20,
+          "train_loss": 2.7048,
+          "grad_norm": 2.1683
+        },
+        {
+          "step": 40,
+          "train_loss": 2.2425,
+          "grad_norm": 2.1819
+        },
+        {
+          "step": 60,
+          "train_loss": 1.9576,
+          "grad_norm": 2.0282
+        },
+        {
+          "step": 80,
+          "train_loss": 2.3038,
+          "grad_norm": 1.8486
+        },
+        {
+          "step": 100,
+          "train_loss": 2.3193,
+          "grad_norm": 1.8082
+        },
+        {
+          "step": 120,
+          "train_loss": 1.7976,
+          "grad_norm": 1.9441
+        },
+        {
+          "step": 140,
+          "train_loss": 1.7535,
+          "grad_norm": 2.1314
+        },
+        {
+          "step": 160,
+          "train_loss": 2.1314,
+          "grad_norm": 2.1979
+        },
+        {
+          "step": 180,
+          "train_loss": 1.9305,
+          "grad_norm": 2.0824
+        },
+        {
+          "step": 200,
+          "train_loss": 1.464,
+          "grad_norm": 1.8912
+        },
+        {
+          "step": 220,
+          "train_loss": 1.6515,
+          "grad_norm": 1.8
+        },
+        {
+          "step": 240,
+          "train_loss": 1.9427,
+          "grad_norm": 1.8927
+        },
+        {
+          "step": 260,
+          "train_loss": 1.5593,
+          "grad_norm": 2.084
+        },
+        {
+          "step": 280,
+          "train_loss": 1.252,
+          "grad_norm": 88.0
+        },
+        {
+          "step": 300,
+          "train_loss": 1.6052,
+          "grad_norm": 341.7
+        },
+        {
+          "step": 320,
+          "train_loss": 1.7175,
+          "grad_norm": 126.4
+        },
+        {
+          "step": 340,
+          "train_loss": 1.2364,
+          "grad_norm": 1.8077
+        },
+        {
+          "step": 360,
+          "train_loss": 1.154,
+          "grad_norm": 1.8498
+        },
+        {
+          "step": 380,
+          "train_loss": 1.5668,
+          "grad_norm": 2.03
+        },
+        {
+          "step": 400,
+          "train_loss": 1.4577,
+          "grad_norm": 2.1826
+        },
+        {
+          "step": 420,
+          "train_loss": 0.992,
+          "grad_norm": 2.1673
+        },
+        {
+          "step": 440,
+          "train_loss": 1.1441,
+          "grad_norm": 1.9982
+        },
+        {
+          "step": 460,
+          "train_loss": 1.4973,
+          "grad_norm": 1.8308
+        },
+        {
+          "step": 480,
+          "train_loss": 1.1845,
+          "grad_norm": 1.8189
+        }
+      ],
+      "expect": {
+        "eda_summary.gradient_health": "exploding",
+        "eda_summary.telemetry_sane": true
+      }
+    },
+    {
+      "id": "grad-vanishing",
+      "gate": "grad",
+      "note": "last-10 grad mean well under 0.001 while param_norm stays above 0.01",
+      "run": {
+        "expected_steps": 500,
+        "completed_steps": 500,
+        "lr_schedule": "step",
+        "lr_values": [
+          1e-05,
+          1e-05,
+          1e-05,
+          1e-05,
+          1e-05
+        ]
+      },
+      "hypothesis": {
+        "predicted_delta_pp": "+2 to +5",
+        "primary_metric": "val_acc",
+        "parent_value": 0.7
+      },
+      "result": {
+        "node_value": 0.701
+      },
+      "telemetry": [
+        {
+          "step": 0,
+          "train_loss": 1.05,
+          "grad_norm": 1.4,
+          "param_norm": 12.5
+        },
+        {
+          "step": 20,
+          "train_loss": 1.0534,
+          "grad_norm": 0.9199,
+          "param_norm": 12.501
+        },
+        {
+          "step": 40,
+          "train_loss": 1.0536,
+          "grad_norm": 0.6044,
+          "param_norm": 12.502
+        },
+        {
+          "step": 60,
+          "train_loss": 1.0506,
+          "grad_norm": 0.3971,
+          "param_norm": 12.503
+        },
+        {
+          "step": 80,
+          "train_loss": 1.047,
+          "grad_norm": 0.2609,
+          "param_norm": 12.504
+        },
+        {
+          "step": 100,
+          "train_loss": 1.0462,
+          "grad_norm": 0.1714,
+          "param_norm": 12.505
+        },
+        {
+          "step": 120,
+          "train_loss": 1.0489,
+          "grad_norm": 0.1126,
+          "param_norm": 12.506
+        },
+        {
+          "step": 140,
+          "train_loss": 1.0526,
+          "grad_norm": 0.074,
+          "param_norm": 12.507
+        },
+        {
+          "step": 160,
+          "train_loss": 1.054,
+          "grad_norm": 0.0486,
+          "param_norm": 12.508
+        },
+        {
+          "step": 180,
+          "train_loss": 1.0516,
+          "grad_norm": 0.032,
+          "param_norm": 12.509
+        },
+        {
+          "step": 200,
+          "train_loss": 1.0478,
+          "grad_norm": 0.021,
+          "param_norm": 12.51
+        },
+        {
+          "step": 220,
+          "train_loss": 1.046,
+          "grad_norm": 0.0138,
+          "param_norm": 12.511
+        },
+        {
+          "step": 240,
+          "train_loss": 1.0479,
+          "grad_norm": 0.0091,
+          "param_norm": 12.512
+        },
+        {
+          "step": 260,
+          "train_loss": 1.0517,
+          "grad_norm": 0.006,
+          "param_norm": 12.513
+        },
+        {
+          "step": 280,
+          "train_loss": 1.054,
+          "grad_norm": 0.0039,
+          "param_norm": 12.514
+        },
+        {
+          "step": 300,
+          "train_loss": 1.0526,
+          "grad_norm": 0.0026,
+          "param_norm": 12.515
+        },
+        {
+          "step": 320,
+          "train_loss": 1.0488,
+          "grad_norm": 0.0017,
+          "param_norm": 12.516
+        },
+        {
+          "step": 340,
+          "train_loss": 1.0462,
+          "grad_norm": 0.0011,
+          "param_norm": 12.517
+        },
+        {
+          "step": 360,
+          "train_loss": 1.047,
+          "grad_norm": 0.0007,
+          "param_norm": 12.518
+        },
+        {
+          "step": 380,
+          "train_loss": 1.0506,
+          "grad_norm": 0.0005,
+          "param_norm": 12.519
+        },
+        {
+          "step": 400,
+          "train_loss": 1.0537,
+          "grad_norm": 0.0003,
+          "param_norm": 12.52
+        },
+        {
+          "step": 420,
+          "train_loss": 1.0533,
+          "grad_norm": 0.0003,
+          "param_norm": 12.521
+        },
+        {
+          "step": 440,
+          "train_loss": 1.05,
+          "grad_norm": 0.0003,
+          "param_norm": 12.522
+        },
+        {
+          "step": 460,
+          "train_loss": 1.0466,
+          "grad_norm": 0.0003,
+          "param_norm": 12.523
+        },
+        {
+          "step": 480,
+          "train_loss": 1.0464,
+          "grad_norm": 0.0003,
+          "param_norm": 12.524
+        }
+      ],
+      "expect": {
+        "eda_summary.gradient_health": "vanishing",
+        "eda_summary.loss_curve": "plateaued"
+      }
+    },
+    {
+      "id": "plateaued-curve",
+      "gate": "curve",
+      "note": "loss flat inside 0.5% across the last 20% of steps",
+      "run": {
+        "expected_steps": 500,
+        "completed_steps": 500,
+        "lr_schedule": "cosine",
+        "lr_values": [
+          0.0003,
+          0.00026,
+          0.00017,
+          8e-05,
+          1e-05
+        ]
+      },
+      "hypothesis": {
+        "predicted_delta_pp": "+3 to +6",
+        "primary_metric": "val_acc",
+        "parent_value": 0.7
+      },
+      "result": {
+        "node_value": 0.704
+      },
+      "telemetry": [
+        {
+          "step": 0,
+          "train_loss": 1.52,
+          "grad_norm": 2.0
+        },
+        {
+          "step": 20,
+          "train_loss": 0.9859,
+          "grad_norm": 2.2104
+        },
+        {
+          "step": 40,
+          "train_loss": 0.7688,
+          "grad_norm": 2.2273
+        },
+        {
+          "step": 60,
+          "train_loss": 0.6805,
+          "grad_norm": 2.0353
+        },
+        {
+          "step": 80,
+          "train_loss": 0.6446,
+          "grad_norm": 1.8108
+        },
+        {
+          "step": 100,
+          "train_loss": 0.63,
+          "grad_norm": 1.7603
+        },
+        {
+          "step": 120,
+          "train_loss": 0.6241,
+          "grad_norm": 1.9301
+        },
+        {
+          "step": 140,
+          "train_loss": 0.6217,
+          "grad_norm": 2.1642
+        },
+        {
+          "step": 160,
+          "train_loss": 0.6207,
+          "grad_norm": 2.2473
+        },
+        {
+          "step": 180,
+          "train_loss": 0.6203,
+          "grad_norm": 2.103
+        },
+        {
+          "step": 200,
+          "train_loss": 0.6201,
+          "grad_norm": 1.864
+        },
+        {
+          "step": 220,
+          "train_loss": 0.62,
+          "grad_norm": 1.75
+        },
+        {
+          "step": 240,
+          "train_loss": 0.62,
+          "grad_norm": 1.8659
+        },
+        {
+          "step": 260,
+          "train_loss": 0.62,
+          "grad_norm": 2.105
+        },
+        {
+          "step": 280,
+          "train_loss": 0.62,
+          "grad_norm": 2.2477
+        },
+        {
+          "step": 300,
+          "train_loss": 0.62,
+          "grad_norm": 2.1626
+        },
+        {
+          "step": 320,
+          "train_loss": 0.62,
+          "grad_norm": 1.928
+        },
+        {
+          "step": 340,
+          "train_loss": 0.62,
+          "grad_norm": 1.7597
+        },
+        {
+          "step": 360,
+          "train_loss": 0.62,
+          "grad_norm": 1.8123
+        },
+        {
+          "step": 380,
+          "train_loss": 0.62,
+          "grad_norm": 2.0375
+        },
+        {
+          "step": 400,
+          "train_loss": 0.62,
+          "grad_norm": 2.2282
+        },
+        {
+          "step": 420,
+          "train_loss": 0.62,
+          "grad_norm": 2.2092
+        },
+        {
+          "step": 440,
+          "train_loss": 0.62,
+          "grad_norm": 1.9978
+        },
+        {
+          "step": 460,
+          "train_loss": 0.62,
+          "grad_norm": 1.7884
+        },
+        {
+          "step": 480,
+          "train_loss": 0.62,
+          "grad_norm": 1.7736
+        }
+      ],
+      "expect": {
+        "eda_summary.loss_curve": "plateaued",
+        "hypothesis_verdict": "refuted"
+      }
+    },
+    {
+      "id": "diverging-curve",
+      "gate": "curve",
+      "note": "loss climbs across the final 10% of steps",
+      "run": {
+        "expected_steps": 500,
+        "completed_steps": 500,
+        "lr_schedule": "constant",
+        "lr_values": [
+          0.002,
+          0.002,
+          0.002,
+          0.002,
+          0.002
+        ]
+      },
+      "hypothesis": {
+        "predicted_delta_pp": "+2 to +4",
+        "primary_metric": "val_acc",
+        "parent_value": 0.7
+      },
+      "result": {
+        "node_value": 0.648
+      },
+      "telemetry": [
+        {
+          "step": 0,
+          "train_loss": 2.32,
+          "grad_norm": 2.0
+        },
+        {
+          "step": 20,
+          "train_loss": 1.9448,
+          "grad_norm": 2.2104
+        },
+        {
+          "step": 40,
+          "train_loss": 1.6437,
+          "grad_norm": 2.2273
+        },
+        {
+          "step": 60,
+          "train_loss": 1.402,
+          "grad_norm": 2.0353
+        },
+        {
+          "step": 80,
+          "train_loss": 1.2081,
+          "grad_norm": 1.8108
+        },
+        {
+          "step": 100,
+          "train_loss": 1.0525,
+          "grad_norm": 1.7603
+        },
+        {
+          "step": 120,
+          "train_loss": 0.9276,
+          "grad_norm": 1.9301
+        },
+        {
+          "step": 140,
+          "train_loss": 0.8273,
+          "grad_norm": 2.1642
+        },
+        {
+          "step": 160,
+          "train_loss": 0.7469,
+          "grad_norm": 2.2473
+        },
+        {
+          "step": 180,
+          "train_loss": 0.6823,
+          "grad_norm": 2.103
+        },
+        {
+          "step": 200,
+          "train_loss": 0.6305,
+          "grad_norm": 1.864
+        },
+        {
+          "step": 220,
+          "train_loss": 0.589,
+          "grad_norm": 1.75
+        },
+        {
+          "step": 240,
+          "train_loss": 0.5556,
+          "grad_norm": 1.8659
+        },
+        {
+          "step": 260,
+          "train_loss": 0.5288,
+          "grad_norm": 2.105
+        },
+        {
+          "step": 280,
+          "train_loss": 0.5073,
+          "grad_norm": 2.2477
+        },
+        {
+          "step": 300,
+          "train_loss": 0.4901,
+          "grad_norm": 2.1626
+        },
+        {
+          "step": 320,
+          "train_loss": 0.4762,
+          "grad_norm": 1.928
+        },
+        {
+          "step": 340,
+          "train_loss": 0.4651,
+          "grad_norm": 1.7597
+        },
+        {
+          "step": 360,
+          "train_loss": 0.99,
+          "grad_norm": 1.8123
+        },
+        {
+          "step": 380,
+          "train_loss": 1.02,
+          "grad_norm": 2.0375
+        },
+        {
+          "step": 400,
+          "train_loss": 1.05,
+          "grad_norm": 2.2282
+        },
+        {
+          "step": 420,
+          "train_loss": 1.08,
+          "grad_norm": 2.2092
+        },
+        {
+          "step": 440,
+          "train_loss": 1.11,
+          "grad_norm": 1.9978
+        },
+        {
+          "step": 460,
+          "train_loss": 1.14,
+          "grad_norm": 1.7884
+        },
+        {
+          "step": 480,
+          "train_loss": 1.17,
+          "grad_norm": 1.7736
+        }
+      ],
+      "expect": {
+        "eda_summary.loss_curve": "diverging",
+        "hypothesis_verdict": "refuted"
+      }
+    },
+    {
+      "id": "truncated-run-trap",
+      "gate": "truncation",
+      "note": "TRAP: only 96/500 steps ran, but the delta sits inside the predicted band. Must be inconclusive, not confirmed.",
+      "run": {
+        "expected_steps": 500,
+        "completed_steps": 96,
+        "lr_schedule": "cosine",
+        "lr_values": [
+          0.0003,
+          0.00029
+        ]
+      },
+      "hypothesis": {
+        "predicted_delta_pp": "+2 to +4",
+        "primary_metric": "val_acc",
+        "parent_value": 0.72
+      },
+      "result": {
+        "node_value": 0.755
+      },
+      "telemetry": [
+        {
+          "step": 0,
+          "train_loss": 2.475,
+          "grad_norm": 2.0
+        },
+        {
+          "step": 20,
+          "train_loss": 2.2251,
+          "grad_norm": 2.2104
+        },
+        {
+          "step": 40,
+          "train_loss": 2.0024,
+          "grad_norm": 2.2273
+        },
+        {
+          "step": 60,
+          "train_loss": 1.8039,
+          "grad_norm": 2.0353
+        },
+        {
+          "step": 80,
+          "train_loss": 1.627,
+          "grad_norm": 1.8108
+        }
+      ],
+      "expect": {
+        "hypothesis_verdict": "inconclusive",
+        "eda_summary.telemetry_sane": true
+      }
+    },
+    {
+      "id": "upgrade-negative-control",
+      "gate": "upgrade_nc",
+      "note": "NEGATIVE CONTROL: one stalled tick and a 6pp domain gap. Neither saturation nor the 15% gap is met.",
+      "run": {
+        "expected_steps": 500,
+        "completed_steps": 500,
+        "lr_schedule": "cosine",
+        "lr_values": [
+          0.0003,
+          0.00026,
+          0.00017,
+          8e-05,
+          1e-05
+        ]
+      },
+      "hypothesis": {
+        "predicted_delta_pp": "+1 to +2",
+        "primary_metric": "val_acc",
+        "parent_value": 0.8
+      },
+      "result": {
+        "node_value": 0.804
+      },
+      "per_domain": {
+        "scanned": 0.826,
+        "printed": 0.812,
+        "handwritten": 0.766
+      },
+      "telemetry": [
+        {
+          "step": 0,
+          "train_loss": 2.475,
+          "grad_norm": 2.0,
+          "param_norm": 11.8
+        },
+        {
+          "step": 20,
+          "train_loss": 2.2251,
+          "grad_norm": 2.2104,
+          "param_norm": 11.82
+        },
+        {
+          "step": 40,
+          "train_loss": 2.0024,
+          "grad_norm": 2.2273,
+          "param_norm": 11.84
+        },
+        {
+          "step": 60,
+          "train_loss": 1.8039,
+          "grad_norm": 2.0353,
+          "param_norm": 11.86
+        },
+        {
+          "step": 80,
+          "train_loss": 1.627,
+          "grad_norm": 1.8108,
+          "param_norm": 11.88
+        },
+        {
+          "step": 100,
+          "train_loss": 1.4692,
+          "grad_norm": 1.7603,
+          "param_norm": 11.9
+        },
+        {
+          "step": 120,
+          "train_loss": 1.3286,
+          "grad_norm": 1.9301,
+          "param_norm": 11.92
+        },
+        {
+          "step": 140,
+          "train_loss": 1.2033,
+          "grad_norm": 2.1642,
+          "param_norm": 11.94
+        },
+        {
+          "step": 160,
+          "train_loss": 1.0916,
+          "grad_norm": 2.2473,
+          "param_norm": 11.96
+        },
+        {
+          "step": 180,
+          "train_loss": 0.992,
+          "grad_norm": 2.103,
+          "param_norm": 11.98
+        },
+        {
+          "step": 200,
+          "train_loss": 0.9033,
+          "grad_norm": 1.864,
+          "param_norm": 12.0
+        },
+        {
+          "step": 220,
+          "train_loss": 0.8242,
+          "grad_norm": 1.75,
+          "param_norm": 12.02
+        },
+        {
+          "step": 240,
+          "train_loss": 0.7536,
+          "grad_norm": 1.8659,
+          "param_norm": 12.04
+        },
+        {
+          "step": 260,
+          "train_loss": 0.6908,
+          "grad_norm": 2.105,
+          "param_norm": 12.06
+        },
+        {
+          "step": 280,
+          "train_loss": 0.6347,
+          "grad_norm": 2.2477,
+          "param_norm": 12.08
+        },
+        {
+          "step": 300,
+          "train_loss": 0.5848,
+          "grad_norm": 2.1626,
+          "param_norm": 12.1
+        },
+        {
+          "step": 320,
+          "train_loss": 0.5403,
+          "grad_norm": 1.928,
+          "param_norm": 12.12
+        },
+        {
+          "step": 340,
+          "train_loss": 0.5006,
+          "grad_norm": 1.7597,
+          "param_norm": 12.14
+        },
+        {
+          "step": 360,
+          "train_loss": 0.4652,
+          "grad_norm": 1.8123,
+          "param_norm": 12.16
+        },
+        {
+          "step": 380,
+          "train_loss": 0.4337,
+          "grad_norm": 2.0375,
+          "param_norm": 12.18
+        },
+        {
+          "step": 400,
+          "train_loss": 0.4056,
+          "grad_norm": 2.2282,
+          "param_norm": 12.2
+        },
+        {
+          "step": 420,
+          "train_loss": 0.3805,
+          "grad_norm": 2.2092,
+          "param_norm": 12.22
+        },
+        {
+          "step": 440,
+          "train_loss": 0.3582,
+          "grad_norm": 1.9978,
+          "param_norm": 12.24
+        },
+        {
+          "step": 460,
+          "train_loss": 0.3383,
+          "grad_norm": 1.7884,
+          "param_norm": 12.26
+        },
+        {
+          "step": 480,
+          "train_loss": 0.3206,
+          "grad_norm": 1.7736,
+          "param_norm": 12.28
+        }
+      ],
+      "tick_history": [
+        {
+          "tick": 7,
+          "primary_metric": 0.8
+        },
+        {
+          "tick": 8,
+          "primary_metric": 0.804
+        }
+      ],
+      "expect": {
+        "benchmark_upgrade_proposal": false,
+        "eda_summary.per_domain_gap_pp": 6.0
+      }
+    },
+    {
+      "id": "upgrade-positive",
+      "gate": "upgrade",
+      "note": "three consecutive ticks under 1% AND an 18.5pp domain gap: both conditions met",
+      "run": {
+        "expected_steps": 500,
+        "completed_steps": 500,
+        "lr_schedule": "cosine",
+        "lr_values": [
+          0.0003,
+          0.00026,
+          0.00017,
+          8e-05,
+          1e-05
+        ]
+      },
+      "hypothesis": {
+        "predicted_delta_pp": "+1 to +2",
+        "primary_metric": "val_acc",
+        "parent_value": 0.836
+      },
+      "result": {
+        "node_value": 0.838
+      },
+      "per_domain": {
+        "scanned": 0.872,
+        "printed": 0.851,
+        "handwritten": 0.687
+      },
+      "telemetry": [
+        {
+          "step": 0,
+          "train_loss": 1.52,
+          "grad_norm": 2.0
+        },
+        {
+          "step": 20,
+          "train_loss": 0.9859,
+          "grad_norm": 2.2104
+        },
+        {
+          "step": 40,
+          "train_loss": 0.7688,
+          "grad_norm": 2.2273
+        },
+        {
+          "step": 60,
+          "train_loss": 0.6805,
+          "grad_norm": 2.0353
+        },
+        {
+          "step": 80,
+          "train_loss": 0.6446,
+          "grad_norm": 1.8108
+        },
+        {
+          "step": 100,
+          "train_loss": 0.63,
+          "grad_norm": 1.7603
+        },
+        {
+          "step": 120,
+          "train_loss": 0.6241,
+          "grad_norm": 1.9301
+        },
+        {
+          "step": 140,
+          "train_loss": 0.6217,
+          "grad_norm": 2.1642
+        },
+        {
+          "step": 160,
+          "train_loss": 0.6207,
+          "grad_norm": 2.2473
+        },
+        {
+          "step": 180,
+          "train_loss": 0.6203,
+          "grad_norm": 2.103
+        },
+        {
+          "step": 200,
+          "train_loss": 0.6201,
+          "grad_norm": 1.864
+        },
+        {
+          "step": 220,
+          "train_loss": 0.62,
+          "grad_norm": 1.75
+        },
+        {
+          "step": 240,
+          "train_loss": 0.62,
+          "grad_norm": 1.8659
+        },
+        {
+          "step": 260,
+          "train_loss": 0.62,
+          "grad_norm": 2.105
+        },
+        {
+          "step": 280,
+          "train_loss": 0.62,
+          "grad_norm": 2.2477
+        },
+        {
+          "step": 300,
+          "train_loss": 0.62,
+          "grad_norm": 2.1626
+        },
+        {
+          "step": 320,
+          "train_loss": 0.62,
+          "grad_norm": 1.928
+        },
+        {
+          "step": 340,
+          "train_loss": 0.62,
+          "grad_norm": 1.7597
+        },
+        {
+          "step": 360,
+          "train_loss": 0.62,
+          "grad_norm": 1.8123
+        },
+        {
+          "step": 380,
+          "train_loss": 0.62,
+          "grad_norm": 2.0375
+        },
+        {
+          "step": 400,
+          "train_loss": 0.62,
+          "grad_norm": 2.2282
+        },
+        {
+          "step": 420,
+          "train_loss": 0.62,
+          "grad_norm": 2.2092
+        },
+        {
+          "step": 440,
+          "train_loss": 0.62,
+          "grad_norm": 1.9978
+        },
+        {
+          "step": 460,
+          "train_loss": 0.62,
+          "grad_norm": 1.7884
+        },
+        {
+          "step": 480,
+          "train_loss": 0.62,
+          "grad_norm": 1.7736
+        }
+      ],
+      "tick_history": [
+        {
+          "tick": 9,
+          "primary_metric": 0.828
+        },
+        {
+          "tick": 10,
+          "primary_metric": 0.833
+        },
+        {
+          "tick": 11,
+          "primary_metric": 0.836
+        },
+        {
+          "tick": 12,
+          "primary_metric": 0.838
+        }
+      ],
+      "expect": {
+        "benchmark_upgrade_proposal": true,
+        "eda_summary.per_domain_gap_pp": 18.5
+      }
+    },
+    {
+      "id": "refuted-verdict",
+      "gate": "verdict",
+      "note": "predicted a gain, measured a loss",
+      "run": {
+        "expected_steps": 500,
+        "completed_steps": 500,
+        "lr_schedule": "cosine",
+        "lr_values": [
+          0.0003,
+          0.00026,
+          0.00017,
+          8e-05,
+          1e-05
+        ]
+      },
+      "hypothesis": {
+        "predicted_delta_pp": "+2 to +4",
+        "primary_metric": "val_acc",
+        "parent_value": 0.72
+      },
+      "result": {
+        "node_value": 0.712
+      },
+      "telemetry": [
+        {
+          "step": 0,
+          "train_loss": 2.475,
+          "grad_norm": 2.0,
+          "param_norm": 11.8
+        },
+        {
+          "step": 20,
+          "train_loss": 2.2251,
+          "grad_norm": 2.2104,
+          "param_norm": 11.82
+        },
+        {
+          "step": 40,
+          "train_loss": 2.0024,
+          "grad_norm": 2.2273,
+          "param_norm": 11.84
+        },
+        {
+          "step": 60,
+          "train_loss": 1.8039,
+          "grad_norm": 2.0353,
+          "param_norm": 11.86
+        },
+        {
+          "step": 80,
+          "train_loss": 1.627,
+          "grad_norm": 1.8108,
+          "param_norm": 11.88
+        },
+        {
+          "step": 100,
+          "train_loss": 1.4692,
+          "grad_norm": 1.7603,
+          "param_norm": 11.9
+        },
+        {
+          "step": 120,
+          "train_loss": 1.3286,
+          "grad_norm": 1.9301,
+          "param_norm": 11.92
+        },
+        {
+          "step": 140,
+          "train_loss": 1.2033,
+          "grad_norm": 2.1642,
+          "param_norm": 11.94
+        },
+        {
+          "step": 160,
+          "train_loss": 1.0916,
+          "grad_norm": 2.2473,
+          "param_norm": 11.96
+        },
+        {
+          "step": 180,
+          "train_loss": 0.992,
+          "grad_norm": 2.103,
+          "param_norm": 11.98
+        },
+        {
+          "step": 200,
+          "train_loss": 0.9033,
+          "grad_norm": 1.864,
+          "param_norm": 12.0
+        },
+        {
+          "step": 220,
+          "train_loss": 0.8242,
+          "grad_norm": 1.75,
+          "param_norm": 12.02
+        },
+        {
+          "step": 240,
+          "train_loss": 0.7536,
+          "grad_norm": 1.8659,
+          "param_norm": 12.04
+        },
+        {
+          "step": 260,
+          "train_loss": 0.6908,
+          "grad_norm": 2.105,
+          "param_norm": 12.06
+        },
+        {
+          "step": 280,
+          "train_loss": 0.6347,
+          "grad_norm": 2.2477,
+          "param_norm": 12.08
+        },
+        {
+          "step": 300,
+          "train_loss": 0.5848,
+          "grad_norm": 2.1626,
+          "param_norm": 12.1
+        },
+        {
+          "step": 320,
+          "train_loss": 0.5403,
+          "grad_norm": 1.928,
+          "param_norm": 12.12
+        },
+        {
+          "step": 340,
+          "train_loss": 0.5006,
+          "grad_norm": 1.7597,
+          "param_norm": 12.14
+        },
+        {
+          "step": 360,
+          "train_loss": 0.4652,
+          "grad_norm": 1.8123,
+          "param_norm": 12.16
+        },
+        {
+          "step": 380,
+          "train_loss": 0.4337,
+          "grad_norm": 2.0375,
+          "param_norm": 12.18
+        },
+        {
+          "step": 400,
+          "train_loss": 0.4056,
+          "grad_norm": 2.2282,
+          "param_norm": 12.2
+        },
+        {
+          "step": 420,
+          "train_loss": 0.3805,
+          "grad_norm": 2.2092,
+          "param_norm": 12.22
+        },
+        {
+          "step": 440,
+          "train_loss": 0.3582,
+          "grad_norm": 1.9978,
+          "param_norm": 12.24
+        },
+        {
+          "step": 460,
+          "train_loss": 0.3383,
+          "grad_norm": 1.7884,
+          "param_norm": 12.26
+        },
+        {
+          "step": 480,
+          "train_loss": 0.3206,
+          "grad_norm": 1.7736,
+          "param_norm": 12.28
+        }
+      ],
+      "expect": {
+        "hypothesis_verdict": "refuted",
+        "eda_summary.telemetry_sane": true
+      }
+    }
+  ]
+}
