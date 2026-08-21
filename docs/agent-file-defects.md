@@ -201,6 +201,39 @@ under a constant too-high LR so the schedule does not argue against the answer.
 
 ---
 
+## 7. `evor-sage.md` — confidence is doubly determined (the same defect as #2)
+
+Found in the sonnet->haiku ladder, where sage came back 31/39 vs 37/39. The
+failures were not diffuse: `divergence-just-outside` 0/3 and
+`divergence-inside-band-incomparable` 1/3.
+
+Reading the answers is what settled it. In every failing attempt haiku set
+`quorum_met=false` and `trust_level="indicative"`, and its evidence string spelled
+out exactly why the two numbers were not comparable — "different dataset,
+different backbone, scales unspecified". Then it wrote `confidence: "medium"`.
+
+It had found both rules and picked the wrong one:
+
+  - Success_Criteria: *"confidence is 'medium' when a single authoritative source
+    exists"* — and an arXiv paper is authoritative.
+  - Step 2b: *"if they are not comparable... confidence='low'"*.
+
+Nothing said which wins, so the model applied the one stated where confidence is
+defined rather than the one stated where the gate is. sage-junior has carried the
+resolution since #2 was fixed — its line 31 reads *"low ... for two sources whose
+protocols are not comparable"* — and sage never got the same sentence.
+
+**Fixed.** confidence is now stated as a CEILING, lowest applicable one wins,
+with authority explicitly unable to lift a ceiling something else imposed:
+`quorum_met=false` with `confidence="medium"` is named as a contradiction.
+
+The lesson repeats: **when the cheaper tier misses one specific field, read what
+it actually wrote before concluding it cannot do the task.** Three times now the
+answer has been a rule the file states twice, or states far from the point of
+use, and zero times has it been the model failing to reason.
+
+---
+
 ## Cross-cutting note
 
 All five are the same defect class this session has been chasing: **a rule that

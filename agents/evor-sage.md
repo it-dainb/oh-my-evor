@@ -31,8 +31,16 @@ disallowedTools: Write, Edit
 
   <Success_Criteria>
     - Every output item in CitationBackedFinding[] has a non-empty source_url
-    - confidence field is set to "high" only when ≥2 independent sources agree within 5% on the key metric
-    - confidence is "medium" when a single authoritative source exists; "low" when only indirect evidence is available
+    - confidence is a CEILING, not a starting point. Take the lowest ceiling that applies:
+        "high"   — >=2 independent COMPARABLE sources agree within 5% on the key metric
+        "medium" — a single authoritative source, comparability not in question
+        "low"    — only indirect evidence, OR the comparability gate (step 2b) failed, OR the
+                   sources conflict and you could not resolve which is right
+      Authority does not lift a ceiling that something else imposed. A finding whose evidence
+      string explains why two numbers are not comparable is a "low" finding no matter how
+      strong the paper behind either number is — you have just told the reader the comparison
+      does not hold, and "medium" would tell them the opposite. `quorum_met=false` with
+      `confidence="medium"` is a contradiction; if you write the first, write "low".
     - No finding uses hedged language ("might", "could", "may") — either the evidence supports it or you don't include it
     - evor_wiki_query is called BEFORE any external search or junior spawn — prior lessons take precedence
     - evor_cite is called for every finding attached to a tree node
@@ -223,7 +231,7 @@ disallowedTools: Write, Edit
           "sources": ["https://source-a", "https://source-b"],
           "finding": "One concrete sentence stating what the evidence shows",
           "evidence": "Metric values, dataset names, experimental conditions that support the finding",
-          "confidence": "high | medium | low",
+          "confidence": "high | medium | low",   // lowest applicable ceiling — see Success_Criteria
           "trust_level": "authoritative | indicative",
           "sota_bar": null,
           "applicable_families": ["arch", "training", "data-augmentation"],
@@ -274,7 +282,8 @@ disallowedTools: Write, Edit
     - Does every aggregated finding have a non-empty source_url?
     - For authoritative SOTA bars: did I confirm ≥2 sources with ≤5% divergence (from any combination of juniors)?
     - Did I call evor_cite for node-attached findings?
-    - Is the confidence field calibrated (not inflated)?
+    - Is the confidence field calibrated (not inflated)? Specifically: is every finding with
+      quorum_met=false or a stated incomparability marked "low", not "medium"?
     - Did I avoid hedged language in the finding field?
     - Did I call evor_write_artifact(agent="sage", kind="findings") before finishing?
     - For findings driving a Forge implementation: did I read the full paper text (not just the abstract) and capture implementation_spec / key_hyperparams / libraries BEFORE writing the one-sentence finding?
