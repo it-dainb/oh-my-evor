@@ -1,8 +1,14 @@
 #!/usr/bin/env bash
-# Host entrypoint for the per-agent MODEL-TIER eval harness.
+# Host entrypoint for the per-agent MODEL-TIER eval harnesses.
 #
 #   bash ci/agent-eval.sh
 #   AGENT_EVAL_REPEATS=5 AGENT_EVAL_TIERS='haiku:high,sonnet:medium' bash ci/agent-eval.sh
+#   bash ci/agent-eval.sh ci/forge-gate-eval.mjs      # evor-forge's capability gate
+#
+# The optional argument selects WHICH harness runs inside the container. Every
+# harness here has the same shape (a tier x case x repeat matrix over the real
+# CLI, writing ci/out/agent-eval-<role>.json), so they share one container
+# recipe rather than each growing a near-identical copy of this file.
 #
 # Requires credentials, since this drives real Claude calls: either
 # CLAUDE_CODE_OAUTH_TOKEN / ANTHROPIC_API_KEY in the environment, or a
@@ -14,6 +20,12 @@
 # ci/out back so a case run cannot touch the working checkout.
 set -uo pipefail
 cd "$(dirname "$0")/.."
+
+EVAL_SCRIPT="${1:-ci/agent-eval.mjs}"
+if [ ! -f "$EVAL_SCRIPT" ]; then
+  echo "✗ no such harness script: $EVAL_SCRIPT"
+  exit 2
+fi
 
 IMG="evor-plugin-test"
 echo "▶ building $IMG (CPU image, pinned CLI) ..."
@@ -62,14 +74,17 @@ fi
 # caller asked for — unreachable-config is the same shape ci/bench-tick.sh's
 # BENCH_MISSION/BENCH_EFFORT comment already warns about.
 for var in AGENT_EVAL_ROLE AGENT_EVAL_CASES AGENT_EVAL_AGENT_FILE AGENT_EVAL_TIERS \
-           AGENT_EVAL_REPEATS AGENT_EVAL_MAX_TURNS AGENT_EVAL_TIMEOUT_MS EVOR_PRICING_DATE; do
+           AGENT_EVAL_REPEATS AGENT_EVAL_MAX_TURNS AGENT_EVAL_TIMEOUT_MS \
+           FORGE_GATE_CASES FORGE_GATE_AGENT_FILE FORGE_GATE_TIERS \
+           FORGE_GATE_REPEATS FORGE_GATE_MAX_TURNS FORGE_GATE_TIMEOUT_MS \
+           EVOR_PRICING_DATE; do
   if [ -n "${!var:-}" ]; then
     RUN_ARGS+=(-e "$var=${!var}")
   fi
 done
 
-echo "▶ running the tier x case x repeat matrix in an isolated container ..."
-docker run "${RUN_ARGS[@]}" --entrypoint node "$IMG" ci/agent-eval.mjs
+echo "▶ running $EVAL_SCRIPT (tier x case x repeat) in an isolated container ..."
+docker run "${RUN_ARGS[@]}" --entrypoint node "$IMG" "$EVAL_SCRIPT"
 code=$?
 
 echo "▶ done (exit $code) — report: ci/out/agent-eval-<role>.json"
