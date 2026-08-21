@@ -265,7 +265,7 @@
     {
       "id": "dream-k-scales-with-train-k",
       "gate": "dream_k",
-      "note": "train_k is 5, so at least 10 proposals must be dreamt",
+      "note": "train_k is 5, so dream_k wants 10 -- but only SEVEN approach_families exist and H003 forbids two proposals sharing one, so seven is the ceiling. This case tests that the ceiling is applied rather than the arithmetic. It previously demanded 10 and was unwinnable: both arms capped at 7 and were right, which is the both-arms-at-0/3 signature of a fixture bug.",
       "capability": {
         "cpu_only": false,
         "gpu_arch": "sm_86",
@@ -308,7 +308,7 @@
       "expect": {
         "wildness_used": 0.8,
         "proposals": {
-          "min": 10
+          "min": 7
         },
         "proposals[].approach_family": true,
         "crossover_triggered": false,
@@ -482,7 +482,7 @@
     {
       "id": "crossover-lineages-far-apart",
       "gate": "crossover_nc",
-      "note": "NEGATIVE CONTROL: two distinct lineages, but 0.812 vs 0.610 is far outside 10%",
+      "note": "NEGATIVE CONTROL: two distinct lineages, but 0.812 vs 0.610 is far outside 10%. dream_k wants 8, which the seven-family ceiling caps at 7; the case was previously unwinnable for the same reason as dream-k-scales-with-train-k.",
       "capability": {
         "cpu_only": false,
         "gpu_arch": "sm_86",
@@ -525,7 +525,7 @@
       "expect": {
         "wildness_used": 0.65,
         "proposals": {
-          "min": 8
+          "min": 7
         },
         "proposals[].approach_family": true,
         "crossover_triggered": false,

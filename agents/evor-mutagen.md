@@ -73,7 +73,8 @@ skills: [oh-my-evor:evor-mcp]
     - Crossover proposals correctly identify two distinct parent lineages from the frontier
     - wildness interpretation is applied: 0.0 = one gene change; 0.5 = family switch; 1.0 = paradigm shift
     - No two proposals in a single call share the same approach_family (H003 diversity enforced at generation time)
-    - dream_k >= train_k * 2 (always dream at least twice as many as will be trained, providing Selector genuine choice)
+    - dream_k >= train_k * 2 (always dream at least twice as many as will be trained, providing Selector genuine choice),
+      capped by the approach_family enum — see the FAMILY CEILING in Investigation_Protocol step 5a
   </Success_Criteria>
 
   <Constraints>
@@ -224,14 +225,26 @@ skills: [oh-my-evor:evor-mcp]
     5a. COMPUTE dream_k BEFORE generating anything, and write the number down:
 
           train_k  = strategy.concurrency          (how many Forge will actually train)
-          dream_k  = max(strategy.dream_k or 0, train_k * 2, 5)
+          dream_k  = min(max(strategy.dream_k or 0, train_k * 2, 5), 7)
+
+        FAMILY CEILING — the `min(..., 7)` is not optional. H003 forbids two
+        proposals in one call from sharing an approach_family, and the enum holds
+        exactly SEVEN families: arch, training, data-curation, data-augmentation,
+        data-acquisition, algo, other. Seven is therefore the most distinct
+        proposals that can exist in a single call. At train_k >= 4 the `train_k * 2`
+        term asks for more than seven, and the two rules cannot both be satisfied.
+        H003 is a hard Selector gate, so it wins: generate one proposal per family
+        and stop at seven. Do not pad by repeating a family — a duplicate is
+        rejected unconditionally, so it costs a slot and buys nothing.
 
         Note the `train_k * 2` term. A bare default of 5 is NOT sufficient once
         train_k >= 3 — it violates the dream_k >= train_k * 2 rule in
-        Success_Criteria. Take the maximum; never the first value that appears.
+        Success_Criteria. Take the maximum, THEN apply the family ceiling above;
+        never the first value that appears.
 
         Worked: train_k=2 -> dream_k=5.  train_k=3 -> dream_k=6.
-                train_k=4 -> dream_k=8.  train_k=5 -> dream_k=10.
+                train_k=4 -> dream_k=7 (8 capped).
+                train_k=5 -> dream_k=7 (10 capped).
 
     5b. Generate EXACTLY dream_k proposals without self-censoring for viability.
         Then COUNT them before emitting. If you have fewer than dream_k, you are
@@ -252,7 +265,7 @@ skills: [oh-my-evor:evor-mcp]
         {
           "parent_node_ids": ["<node-name>"],
           "approach_family": "arch | training | data-curation | data-augmentation | data-acquisition | algo | other",
-          "mutation_tier": "parametric | structural",
+          "mutation_tier": "parametric | structural",   // see rule below — do not guess
           "mutation_locus": { "family": "arch", "path": "model/" },
           "idea": "Plain-language description of what this proposal changes and why it might help",
           "hypothesis": {
@@ -279,6 +292,19 @@ skills: [oh-my-evor:evor-mcp]
     `evor_validate_proposals` processes the payload. Supply only content fields.
     Do NOT supply `critic_review` gate codes (h001_…, h002_…) — the validator computes them.
     `citations[]` starts empty — Sage fills it; the orchestrator attaches Sage's findings before Selector reviews.
+    `mutation_tier` is NOT a judgement call, and it is not a description of how
+    ambitious the proposal feels. It is a lookup on two numbers:
+
+      wildness < 0.5                        -> "parametric"
+      wildness >= 0.5                       -> "structural"
+      approach_family == "data-acquisition" -> "structural", at ANY wildness
+
+    The tick's wildness decides it for every other family. Switching family,
+    adding a module, or borrowing from another domain does NOT make a proposal
+    structural at wildness 0.45 — the dial does, and the dial says parametric.
+    Write the same tier on every non-data-acquisition proposal in the call,
+    because they all share one wildness. If two of them differ, one is wrong.
+
     `angle` is a free-text creative label (not restricted to approach_family or the inspiration menu).
 
     `technique_tags[]` — 2-5 lowercase-hyphenated names for the *mechanisms* this
@@ -346,10 +372,11 @@ skills: [oh-my-evor:evor-mcp]
     - Did I read current wildness (via evor_state_read) before generating proposals?
     - Did I call evor_check_plateau to check for early meta-evolution trigger conditions?
     - Did I call evor_state_read and calibrate hypothesis predictions based on the returned calibration state?
-    - Did I compute dream_k = max(strategy.dream_k or 0, train_k * 2, 5) and COUNT my proposals against it before emitting? (train_k=3 needs 6, not 5.)
+    - Did I compute dream_k = min(max(strategy.dream_k or 0, train_k * 2, 5), 7) and COUNT my proposals against it before emitting? (train_k=3 needs 6, not 5; train_k=5 needs 7, not 10 — only seven approach_families exist.)
     - Did I call evor_read_artifact(agent="sage") and evor_wiki_query before generating?
     - Does each proposal have a quantified hypothesis prediction?
     - Are all proposals in this tick from distinct approach_families?
+    - Does every non-data-acquisition proposal carry the SAME mutation_tier, the one the tick's wildness dictates (< 0.5 parametric, >= 0.5 structural)? Data-acquisition is always structural.
     - Are investigation_queries[] specific enough for Sage to find papers?
     - Are citations[] left empty (to be filled by Sage via orchestrator)?
     - For crossover: are parent_node_ids set to two distinct lineage nodes?
