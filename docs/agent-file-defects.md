@@ -5,7 +5,7 @@ models. They were found by benchmarking, which is the point: a contract that
 contradicts itself cannot be graded, and until you try to grade it nobody
 notices.
 
-**Status: all eleven are fixed.** They were deliberately left alone while the
+**Status: all twelve are fixed.** They were deliberately left alone while the
 retier matrices ran -- editing an agent file mid-benchmark changes what the
 matrices are measuring, and the exercise is worthless if the two arms do not see
 the same prompt. Each fix landed after the matrix it would have disturbed, and
@@ -326,9 +326,32 @@ an explicit "an ABSENT field is not a break" and a pointer to
 
 ---
 
+## 12. `evor-probe.md` — a null value and an absent field are not the same thing
+
+This one was introduced by the fix for #11, which is the point of recording it.
+
+S40 wrote that the stream is broken on "a null where a number was written". That
+sentence does not say how to tell a null from an absent optional field, and JSON
+`null` on an optional field can genuinely mean "never instrumented". haiku read
+`train_loss: null` at steps 40 and 60 as exactly that, wrote
+`telemetry_sane=true`, and filed it under `instrumentation_gaps` as "null values;
+noted as optional field absence". `nan-telemetry` went 6/6 -> 3/6 in the same
+edit that took `truncated-run-trap` from 2/6 to 6/6.
+
+The disambiguator is the rest of the stream, and it is mechanical: a field the
+run never instrumented is absent from EVERY record; a field that is null in 2
+records and numeric in 23 was being written and the write failed.
+
+**Fixed.** Stated per-field, before the `telemetry_sane` paragraph rather than
+inside it, with both halves of this fixture worked through — `train_loss` is the
+null case, `val_metric` the absent case, and both are true of the same file at
+once. probe haiku went to 66/66.
+
+---
+
 ## Cross-cutting note
 
-All eleven are the same defect class this session has been chasing: **a rule that
+All twelve are the same defect class this session has been chasing: **a rule that
 is graded but not stated, or stated twice with different answers.** The harness
 catches the first shape structurally — `scoreByContract` throws on an
 expectation outside the contract. It cannot catch the second, because both

@@ -367,6 +367,7 @@ Applied to agent frontmatter on this branch:
 | `evor-acquirer` | sonnet | haiku | 36/36 vs 36/36, CI [-9.6, +9.6] | **-59.2%** |
 | `evor-forge-critic` | sonnet | haiku | 29/30 vs 27/30, CI [-8.2, +22.5] | **-44.6%** |
 | `evor-sage` | sonnet | haiku | 75/78 vs 77/78, CI [-9.5, +3.6] | **-58.6%** |
+| `evor-probe` | sonnet | haiku | 66/66 vs 66/66, CI [-5.5, +5.5] | **-39.9%** |
 
 `effort:` was dropped from the two retiered files — haiku does not support it,
 and `tests/agent-frontmatter.test.ts` fails if an inert tag is left behind.
@@ -403,3 +404,31 @@ untouched by any of this.
 
 What is still unexplained is *why* the bill exceeds the model at all; knowing
 the direction is not knowing the cause. No accuracy conclusion depends on it.
+
+# probe: the same row, read three times, would have given three answers
+
+probe is the clearest illustration in the exercise of why a single measurement
+of a cheap tier is not a capability finding. Nothing about haiku changed across
+these three runs — two rules in `agents/evor-probe.md` did:
+
+| reading | haiku | difference CI | verdict it supported |
+|---|---|---|---|
+| pre-fix | 59/66 = 89.4% | [-20.3, -2.9] | **REGRESSION — do not adopt** |
+| after S40 | 63/66 = 95.5% | [-12.5, +1.7] | underpowered |
+| after S43 | 66/66 = 100% | [-5.5, +5.5] | **non-inferior — adopt** |
+
+sonnet was 66/66 throughout. Had the first reading been filed as "haiku cannot
+do telemetry EDA", probe would have stayed on sonnet permanently on the strength
+of two defects in its own prompt — and the defects would still be there,
+costing sonnet nothing visible and so never getting found.
+
+The second fix is the one worth remembering, because **S40 caused the problem
+S43 repaired.** S40 rescued `truncated-run-trap` and broke `nan-telemetry` in
+the same edit, taking it 6/6 → 3/6. The wording "a null where a number was
+written" never said how to tell a null from an absent field, and haiku filed
+`train_loss: null` under "optional field absence" — a defensible reading of the
+sentence as written. Both arms have to be re-measured after every prompt edit,
+including the ones that are obviously improvements.
+
+haiku is 3.6x slower on this role (78s vs 22s per call). Cost outranks latency
+here, so it goes; if that ever inverts, probe is the first row to revisit.
