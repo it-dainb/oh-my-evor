@@ -192,6 +192,33 @@ describe("gradeField", () => {
     expect(gradeField(f, false, { reason: "saturation" }).correct).toBe(false);
   });
 
+  it("grades the length of an array with `count`", () => {
+    // Sage's "2-5 angles per compound query" and "fan-out is mandatory at 2+
+    // unresolved angles" are rules about how many, not about which.
+    const f = { path: "angles_decomposed", kind: "count" };
+    expect(gradeField(f, 3, ["a", "b", "c"]).correct).toBe(true);
+    expect(gradeField(f, 3, ["a", "b"]).correct).toBe(false);
+    expect(gradeField(f, { min: 2, max: 5 }, ["a", "b"]).correct).toBe(true);
+    expect(gradeField(f, { min: 2, max: 5 }, ["a"]).correct).toBe(false);
+    expect(gradeField(f, { min: 2, max: 5 }, ["a", "b", "c", "d", "e", "f"]).correct).toBe(false);
+    expect(gradeField(f, 0, []).correct).toBe(true);
+    expect(gradeField(f, 2, "not an array").correct).toBe(false);
+  });
+
+  it("grades a field inside every element of an array with `every`", () => {
+    // The count of proposals is not fixed, but "no proposal may be structural
+    // at wildness 0.3" has to hold for all of them.
+    const f = { path: "proposals", kind: "every", inner: "mutation_tier" };
+    expect(gradeField(f, "parametric", [{ mutation_tier: "parametric" }, { mutation_tier: "parametric" }]).correct).toBe(true);
+    expect(gradeField(f, "parametric", [{ mutation_tier: "parametric" }, { mutation_tier: "structural" }]).correct).toBe(false);
+  });
+
+  it("does not let `every` pass vacuously on an empty array", () => {
+    // An agent that returns nothing must not score as having obeyed the rule.
+    const f = { path: "proposals", kind: "every", inner: "mutation_tier" };
+    expect(gradeField(f, "parametric", []).correct).toBe(false);
+  });
+
   it("counts a missing answer as wrong, not as absent", () => {
     const f = { path: "telemetry_sane", kind: "bool" };
     expect(gradeField(f, false, undefined).correct).toBe(false);

@@ -54,6 +54,10 @@ function fieldSpecText(f) {
       return '<comma-separated tokens, or "none">';
     case 'present':
       return '<the object, or null if none>';
+    case 'count':
+      return '<list>';
+    case 'every':
+      return '<list of objects>';
     case 'int_or_word':
       return `<integer, or "${f.word}">`;
     default:
@@ -98,6 +102,10 @@ function jsonSkeletonValue(f) {
       return '["<token>", ...]';
     case 'present':
       return '{ ... } | null';
+    case 'count':
+      return '[ ... ]';
+    case 'every':
+      return '[ { ... }, ... ]';
     case 'int_or_word':
       return `<integer, or "${f.word}">`;
     default:
@@ -222,6 +230,32 @@ export function gradeField(f, expected, actual, opts = {}) {
   // `present` asks whether the field was filled in at all, so it must be graded
   // before the missing-answer guard that every other kind depends on.
   if (f.kind === 'present') return mk((actual !== undefined && actual !== null) === Boolean(expected));
+
+  // `count` and `every` are about the shape of a list, so they must be graded
+  // before the scalar missing-answer guard below.
+  if (f.kind === 'count') {
+    if (!Array.isArray(actual)) return mk(false);
+    const n = actual.length;
+    if (expected && typeof expected === 'object') {
+      const { min = -Infinity, max = Infinity } = expected;
+      return mk(n >= min && n <= max);
+    }
+    return mk(n === Number(expected));
+  }
+
+  if (f.kind === 'every') {
+    // An empty list must not pass vacuously: an agent that returned nothing has
+    // not demonstrated obedience to a rule, it has declined to answer.
+    if (!Array.isArray(actual) || actual.length === 0) return mk(false);
+    const inner = { ...f, kind: f.innerKind ?? 'enum', path: f.inner, values: f.values };
+    const ok = actual.every((el) => {
+      const v = getPath(el, f.inner);
+      return f.innerKind
+        ? gradeField(inner, expected, v).correct
+        : String(strip(v)).toLowerCase() === String(expected).toLowerCase();
+    });
+    return mk(ok);
+  }
 
   if (actual === undefined || actual === null || strip(actual) === '') return mk(false);
 

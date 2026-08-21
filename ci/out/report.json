@@ -1,10 +1,10 @@
 {
   "plugin": "oh-my-evor",
-  "in_docker": true,
+  "in_docker": false,
   "agentic_enabled": false,
   "summary": {
-    "required_total": 7,
-    "required_pass": 7,
+    "required_total": 10,
+    "required_pass": 10,
     "verdict": "PASS"
   },
   "results": [
@@ -12,13 +12,13 @@
       "name": "manifest_validate",
       "ok": true,
       "required": true,
-      "detail": "Validating plugin manifest: /plugin/.claude-plugin/plugin.json\n\n✔ Validation passed"
+      "detail": "Validating marketplace manifest: /storages_local/research/oh-my-evor/.claude-plugin/marketplace.json\n\n✔ Validation passed"
     },
     {
       "name": "mcp_tools_list",
       "ok": true,
       "required": true,
-      "detail": "12 tools: evor_record_node, evor_record_eval, evor_tree_read, evor_select, evor_schedule, evor_wiki_add, evor_wiki_query, evor_state_read, evor_state_write, evor_integrity_check, evor_cite, evor_telemetry_ingest"
+      "detail": "49 tools, all required present"
     },
     {
       "name": "hook_posttooluse_graceful",
@@ -34,21 +34,27 @@
     },
     {
       "name": "hook_continuation_guard_fires",
-      "ok": false,
-      "required": false,
-      "detail": "exit 0 :: "
+      "ok": true,
+      "required": true,
+      "detail": "exit 2 :: [EVOR CONTINUATION GUARD] Tick ? started but tree DB not updated.\nCall evor_record_node for: 1 pending node(s).\nDo not f"
+    },
+    {
+      "name": "hook_runid_resolves_without_env",
+      "ok": true,
+      "required": true,
+      "detail": "exit 2 :: [EVOR CONTINUATION GUARD] Tick ? started but tree DB not updated.\nCall evor_record_node for: 1 pending node(s).\nDo not f"
     },
     {
       "name": "pytest_harness",
       "ok": true,
       "required": true,
-      "detail": "340 passed"
+      "detail": "893 passed"
     },
     {
       "name": "vitest_mcp",
       "ok": true,
       "required": true,
-      "detail": "162 passed"
+      "detail": "901 passed"
     },
     {
       "name": "l3_real_evolution",
@@ -57,10 +63,22 @@
       "detail": "winner=mut-b acc=0.6188 cheat_rejected=true"
     },
     {
-      "name": "agentic_skill_discovery",
+      "name": "governor_replay",
+      "ok": true,
+      "required": true,
+      "detail": "167/294 recorded calls denied — all 153 orchestrator leaf calls blocked except 2 skill-dispatch reads; 5 named evor spawns blocked"
+    },
+    {
+      "name": "cost_baseline",
       "ok": true,
       "required": false,
-      "detail": "SKIPPED — pass CLAUDE_CODE_OAUTH_TOKEN (subscription, from `claude setup-token`) or ANTHROPIC_API_KEY to enable the real-Claude layer"
+      "detail": "reference: $52.30 · 288 turns · 3h42m · 82.5M cache-read · hook fires 3"
+    },
+    {
+      "name": "agentic_skill_discovery",
+      "ok": false,
+      "required": false,
+      "detail": "headless Claude saw evor skills"
     }
   ]
 }

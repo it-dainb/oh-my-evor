@@ -4,6 +4,7 @@
 #   bash ci/agent-eval.sh
 #   AGENT_EVAL_REPEATS=5 AGENT_EVAL_TIERS='haiku:high,sonnet:medium' bash ci/agent-eval.sh
 #   bash ci/agent-eval.sh ci/forge-gate-eval.mjs      # evor-forge's capability gate
+#   bash ci/agent-eval.sh ci/role-eval.mjs evals/probe/spec.json
 #
 # The optional argument selects WHICH harness runs inside the container. Every
 # harness here has the same shape (a tier x case x repeat matrix over the real
@@ -26,6 +27,17 @@ if [ ! -f "$EVAL_SCRIPT" ]; then
   echo "✗ no such harness script: $EVAL_SCRIPT"
   exit 2
 fi
+# Anything after the script name is forwarded to it. ci/role-eval.mjs takes the
+# spec path this way, so a role is selected by argument rather than by yet
+# another env var the container might silently ignore.
+shift || true
+SCRIPT_ARGS=("$@")
+for a in "${SCRIPT_ARGS[@]}"; do
+  if [ ! -e "$a" ]; then
+    echo "✗ no such file passed to $EVAL_SCRIPT: $a"
+    exit 2
+  fi
+done
 
 IMG="evor-plugin-test"
 echo "▶ building $IMG (CPU image, pinned CLI) ..."
@@ -77,6 +89,8 @@ for var in AGENT_EVAL_ROLE AGENT_EVAL_CASES AGENT_EVAL_AGENT_FILE AGENT_EVAL_TIE
            AGENT_EVAL_REPEATS AGENT_EVAL_MAX_TURNS AGENT_EVAL_TIMEOUT_MS \
            FORGE_GATE_CASES FORGE_GATE_AGENT_FILE FORGE_GATE_TIERS \
            FORGE_GATE_REPEATS FORGE_GATE_MAX_TURNS FORGE_GATE_TIMEOUT_MS \
+           ROLE_EVAL_TIERS ROLE_EVAL_REPEATS ROLE_EVAL_MAX_TURNS \
+           ROLE_EVAL_TIMEOUT_MS ROLE_EVAL_OUT \
            EVOR_PRICING_DATE; do
   if [ -n "${!var:-}" ]; then
     RUN_ARGS+=(-e "$var=${!var}")
@@ -84,7 +98,7 @@ for var in AGENT_EVAL_ROLE AGENT_EVAL_CASES AGENT_EVAL_AGENT_FILE AGENT_EVAL_TIE
 done
 
 echo "▶ running $EVAL_SCRIPT (tier x case x repeat) in an isolated container ..."
-docker run "${RUN_ARGS[@]}" --entrypoint node "$IMG" "$EVAL_SCRIPT"
+docker run "${RUN_ARGS[@]}" --entrypoint node "$IMG" "$EVAL_SCRIPT" "${SCRIPT_ARGS[@]}"
 code=$?
 
 echo "▶ done (exit $code) — report: ci/out/agent-eval-<role>.json"
