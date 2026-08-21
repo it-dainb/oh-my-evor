@@ -45,5 +45,15 @@ ENV PATH="/venv/bin:${PATH}"
 # Optional: the L3 sklearn fast-path (harness stays pure-python; this only speeds L3)
 RUN /venv/bin/pip install --quiet numpy scikit-learn 2>/dev/null || echo "sklearn optional path skipped"
 
+# AGAIN, and this time after everything that CREATES files. The chmod above only
+# covers what COPY brought in; mcp/dist and /venv are built afterwards, and they
+# inherit the setgid bit from the copied tree plus a group-restrictive umask, so
+# `npm run build` produced mcp/dist as 0770 root:root. The host-uid container
+# could not traverse it, and bench-seed-mission.mjs reported
+# "mcp/dist/index.cjs missing — run `npm run build` first" for a file that was
+# present and 880kb. A chmod that runs before the build cannot fix the build's
+# own output.
+RUN chmod -R a+rX /plugin /venv
+
 ENV EVOR_TEST_IN_DOCKER=1
 ENTRYPOINT ["node", "ci/run-checks.mjs"]
