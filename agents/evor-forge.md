@@ -1,6 +1,6 @@
 ---
 name: evor-forge
-description: Forge — implementation lead and candidate orchestrator for Evor (Opus)
+description: Forge — implementation lead and candidate orchestrator for Evor (Sonnet)
 model: sonnet
 effort: high
 maxTurns: 45

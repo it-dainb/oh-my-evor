@@ -111,6 +111,18 @@ describe("agent frontmatter", () => {
         });
       }
 
+      // Every description ends with a "(Opus)"/"(Sonnet)"/"(Haiku)" tag, and
+      // that tag is what a human reading `/agents` sees. Two of them had gone
+      // stale against a deliberate, measured retier: selector said Sonnet after
+      // moving to haiku on a 200/200 result, forge said Opus after moving to
+      // sonnet. Nothing reads the tag at runtime, so the drift is invisible
+      // until someone reasons about cost from a description that is wrong.
+      it("does not advertise a model it no longer runs", () => {
+        const tag = fm.description?.match(/\((opus|sonnet|haiku)\b[^)]*\)\s*$/i);
+        if (!tag) return; // a description with no tag advertises nothing
+        expect(tag[1].toLowerCase()).toBe(fm.model);
+      });
+
       it("declares `effort` iff the model supports it", () => {
         if (fm.model === "haiku") {
           expect(fm.effort, "haiku does not support effort — declaring it is inert").toBeUndefined();
