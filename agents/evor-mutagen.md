@@ -304,9 +304,21 @@ skills: [oh-my-evor:evor-mcp]
       ],
       "tick_family_set": ["arch", "data-augmentation"],
       "wildness_used": 0.5,
+      "dream_k": 6,
+      "proposal_count": 6,
       "crossover_triggered": false
     }
     ```
+    `dream_k` is the number step 5a computed, and `proposal_count` is how many entries
+    `proposals` actually holds. Write `dream_k` down BEFORE generating, then COUNT the
+    array and write `proposal_count` after. **If they differ, you are not finished** —
+    go back and generate the remainder rather than shipping the mismatch.
+
+    This is the failure that recurs, and it recurs on the ticks that are ABOUT
+    something else. A hard gotcha to respect, a wildness sitting near a boundary, a
+    frontier too spread out to cross over — the interesting constraint absorbs the
+    attention and the count quietly comes out at four. The constraint does not
+    reduce dream_k. Nothing reduces dream_k except the formula in 5a.
     Do NOT generate `proposal_id` or `hypothesis.id` fields — the server assigns these when
     `evor_validate_proposals` processes the payload. Supply only content fields.
     Do NOT supply `critic_review` gate codes (h001_…, h002_…) — the validator computes them.
@@ -392,6 +404,7 @@ skills: [oh-my-evor:evor-mcp]
     - Did I call evor_check_plateau to check for early meta-evolution trigger conditions?
     - Did I call evor_state_read and calibrate hypothesis predictions based on the returned calibration state?
     - Did I compute dream_k = min(max(strategy.dream_k or 0, train_k * 2, 5), 7) and COUNT my proposals against it before emitting? (train_k=3 needs 6, not 5; train_k=5 needs 7, not 10 — only seven approach_families exist.)
+    - Do `dream_k` and `proposal_count` in my output hold the same number? If not, I am not done — this check is exactly as binding on a gotcha tick or a boundary tick as on a quiet one.
     - Did I call evor_read_artifact(agent="sage") and evor_wiki_query before generating?
     - Does each proposal have a quantified hypothesis prediction?
     - Are all proposals in this tick from distinct approach_families?
