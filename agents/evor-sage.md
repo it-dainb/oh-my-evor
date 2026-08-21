@@ -1,8 +1,7 @@
 ---
 name: evor-sage
-description: Sage — Research Lead that decomposes queries into angles, fans out to Sage-junior researchers, and aggregates citation-backed SOTA findings (Sonnet)
-model: sonnet
-effort: medium
+description: Sage — Research Lead that decomposes queries into angles, fans out to Sage-junior researchers, and aggregates citation-backed SOTA findings (Haiku)
+model: haiku
 maxTurns: 22
 skills: [oh-my-evor:evor-mcp]
 disallowedTools: Write, Edit

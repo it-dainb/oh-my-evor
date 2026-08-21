@@ -311,7 +311,7 @@ by exclusion from a permissive set, so an unfamiliar license fails safe.
 | role | haiku | sonnet | difference CI | $/pass | verdict |
 |---|---|---|---|---|---|
 | forge-critic | 29/30 = 96.7% | 27/30 = 90.0% | [-8.2, +22.5] | $0.0315 vs $0.0537 (**+41%**) | **non-inferior — adopt** |
-| sage | 31/39 = 79.5% | 37/39 = 94.9% | [-30.9, -0.1] | $0.0361 vs $0.0903 (+60%) | **UNDERPOWERED, pointing down — do not adopt** |
+| sage | 31/39 = 79.5% | 37/39 = 94.9% | [-30.9, -0.1] | $0.0361 vs $0.0903 (+60%) | UNDERPOWERED, pointing down — *superseded, see S36–S39 below* |
 
 forge-critic is the clean one: haiku scored *higher* than sonnet, and the
 interval rules out a drop worse than 8.2pp. At 41% less per passing attempt it
@@ -324,3 +324,53 @@ retier. The failures are concentrated, not diffuse: `divergence-just-outside`
 the 5% divergence arithmetic *and* the comparability gate at once. That is the
 shape of a capability limit rather than a buried rule, though it has not been
 ruled out; either way the evidence does not support adopting it.
+
+# S36-S39: sage was a buried rule after all, and the fix first broke the strong arm
+
+The round-2 sage row above read like a capability limit — failures concentrated
+on the two cases that need the 5% divergence arithmetic and the comparability
+gate at the same time. It was not. Reading haiku's actual answers showed it was
+picking `confidence` before it had finished the comparability step, because the
+file stated the confidence rule far from the point where the field is written.
+
+The first fix (S36) made `confidence` an explicit ceiling. It also declared
+`quorum_met=false` with `confidence="medium"` a contradiction. That is wrong —
+a single authoritative source is exactly that pairing, and three fixtures
+expect it. The measurement caught it in the only way it could: **the cheap arm
+started outscoring the strong one.** sonnet fell 37/39 to 61/78, with
+`mirrored-source-trap` at 0/6.
+
+S39 narrowed the "low" ceiling to *a comparison was attempted and failed*,
+leaving *never had a second measurement to attempt* at "medium". Both arms then
+came back healthy:
+
+| arm | n | correct | accuracy | 95% CI | $/pass |
+|---|---|---|---|---|---|
+| haiku (candidate) | 78 | 75 | 96.2% | [89.3, 98.7] | $0.0285 |
+| sonnet (baseline) | 78 | 77 | 98.7% | [93.1, 99.8] | $0.0637 |
+
+delta -2.6pp, Fisher p=0.6201, difference CI **[-9.5, +3.6]pp** →
+**non-inferior within 10pp — retier holds**, at **-55.3% per passing attempt**.
+
+Two things are worth keeping from this. The prompt fix lifted *both* arms
+(sonnet 94.9% → 98.7%), so the round-2 verdict was measuring a defective file,
+not a tier. And re-measuring the baseline is not optional: had S39 reused the
+round-2 sonnet numbers to save an hour, the S36 regression would have shipped
+invisibly. Recorded as [[prompt-fix-can-regress-strong-arm]].
+
+# Adopted
+
+Applied to agent frontmatter on this branch:
+
+| agent | was | now | evidence |
+|---|---|---|---|
+| `evor-acquirer` | sonnet | haiku | 36/36 vs 36/36, CI [-9.6, +9.6] |
+| `evor-forge-critic` | sonnet | haiku | 29/30 vs 27/30, CI [-8.2, +22.5] |
+| `evor-sage` | sonnet | haiku | 75/78 vs 77/78, CI [-9.5, +3.6] |
+
+`effort:` was dropped from the two retiered files — haiku does not support it,
+and `tests/agent-frontmatter.test.ts` fails if an inert tag is left behind.
+
+Everything else stays where it is. Roles whose haiku arm is merely
+*underpowered* are not adopted: "we could not demonstrate a regression" is not
+"there is no regression", and at n=30 the interval still admits a 15pp drop.

@@ -5,7 +5,7 @@ models. They were found by benchmarking, which is the point: a contract that
 contradicts itself cannot be graded, and until you try to grade it nobody
 notices.
 
-**Status: all nine are fixed.** They were deliberately left alone while the
+**Status: all eleven are fixed.** They were deliberately left alone while the
 retier matrices ran -- editing an agent file mid-benchmark changes what the
 matrices are measuring, and the exercise is worthless if the two arms do not see
 the same prompt. Each fix landed after the matrix it would have disturbed, and
@@ -282,9 +282,53 @@ at the protocol as authoritative.
 
 ---
 
+## 10. `evor-mutagen.md` — the crossover protocol had no trigger
+
+`<Crossover_Protocol>` described *how* to cross two lineages in detail and never
+said *when*. The only thing that started it was the caller asking. The frontier
+that mutagen reads every tick is exactly where the answer lives — two nodes from
+distinct lineages with scores within 10% of each other — but nothing connected
+the two, so the crossover gate scored 0/3 in both arms. Both-arms-zero, again.
+
+**Fixed.** `<Crossover_Protocol>` now opens with the trigger: nobody asks you to
+check, you check every tick, and ">=2 nodes from DISTINCT lineages whose scores
+sit within 10% of each other" is the condition. Gate went 0/3 to 3/3.
+
+The same commit restated the proposal count in `Output_Format` as a pair of
+fields that must agree (`dream_k` and `proposal_count`), because the count was
+still being missed on ticks that were *about* something else — the failure
+recurs precisely when attention is elsewhere. haiku 24/30 -> 28/30, sonnet
+26/30 -> 29/30: the fix lifted both arms, which is the signature of a file
+defect rather than a tier difference.
+
+---
+
+## 11. `evor-probe.md` — a missing optional field was read as a schema violation
+
+S38 rewrote `telemetry_sane` as "NaN or Inf values, **missing or null metric
+fields**, a schema that does not match TelemetryRecord, ...". The middle clause
+was wrong. `TelemetryRecordSchema` in `mcp/src/contracts.ts` makes every metric
+field optional — `step` is the only required one — and no probe fixture carries
+`val_metric`, because the eval metric arrives through the result record, not the
+telemetry stream.
+
+`truncated-run-trap` dropped to 2/6 on haiku, every failure
+`telemetry_sane: expected true, got false`, and haiku said why in its own
+`instrumentation_gaps`: "val_metric field missing from all TelemetryRecord
+entries (schema violation)". It was reading the file correctly. Truncation
+primes a model to go looking for what else is wrong, which is why only this
+case tripped.
+
+**Fixed.** `telemetry_sane` is now about values that are present and wrong — NaN,
+Inf, a null where a number was written, steps out of order, an empty file — with
+an explicit "an ABSENT field is not a break" and a pointer to
+`instrumentation_gaps` as the right home for it.
+
+---
+
 ## Cross-cutting note
 
-All five are the same defect class this session has been chasing: **a rule that
+All eleven are the same defect class this session has been chasing: **a rule that
 is graded but not stated, or stated twice with different answers.** The harness
 catches the first shape structurally — `scoreByContract` throws on an
 expectation outside the contract. It cannot catch the second, because both

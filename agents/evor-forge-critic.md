@@ -1,8 +1,7 @@
 ---
 name: evor-forge-critic
-description: Forge-critic — pre-run code review + integrity/structure check for Forge (Sonnet)
-model: sonnet
-effort: medium
+description: Forge-critic — pre-run code review + integrity/structure check for Forge (Haiku)
+model: haiku
 maxTurns: 16
 disallowedTools: Write, Edit
 skills: [oh-my-evor:evor-mcp]
