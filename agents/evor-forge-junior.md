@@ -2,7 +2,7 @@
 name: evor-forge-junior
 description: Forge-junior — writes the candidate training code from the proposal for Forge (Sonnet)
 model: sonnet
-effort: high
+effort: low
 maxTurns: 28
 skills: [oh-my-evor:evor-mcp]
 ---
