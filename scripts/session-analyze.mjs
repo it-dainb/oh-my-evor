@@ -30,22 +30,43 @@ import { readFileSync } from 'fs';
  * different times and a long mission can straddle the boundary. Override with
  * EVOR_PRICING_DATE to model a run on the other side of it.
  */
-const SONNET_INTRO_ENDS = Date.parse('2026-09-01T00:00:00Z');
-const pricingAt = Date.parse(process.env.EVOR_PRICING_DATE ?? new Date().toISOString());
-const sonnetIntro = pricingAt < SONNET_INTRO_ENDS;
-
+/**
+ * $/Mtok, first-party, RECONCILED AGAINST WHAT THE CLI ACTUALLY CHARGED.
+ *
+ * Sonnet 5 was priced here at "$2/$10 introductory through 2026-08-31", on the
+ * documented introductory rate. The bench tick of 2026-08-21 — inside that
+ * window — was charged $12.486398 for sonnet by the CLI's own per-model
+ * accounting (ci/out/bench-tick-raw.json). $3/$15 reproduces that to six
+ * decimals; $2/$10 gives $8.324265. So the introductory rate is documented but
+ * is not what this account pays, and assuming it understated the largest line
+ * item of every measurement by a third. Opus and haiku both reconciled exactly
+ * at their list rates, which is what makes the sonnet discrepancy a rate error
+ * rather than a units error.
+ *
+ * EVOR_PRICING_DATE no longer selects a rate — there is nothing left to select.
+ * Reinstate a date branch only against a bill that shows one.
+ */
 const PRICING = {
   'claude-opus-5': { input: 5, output: 25 },
   'claude-opus-4-8': { input: 5, output: 25 },
-  'claude-sonnet-5': sonnetIntro ? { input: 2, output: 10 } : { input: 3, output: 15 },
+  'claude-sonnet-5': { input: 3, output: 15 },
   'claude-sonnet-4-6': { input: 3, output: 15 },
   'claude-haiku-4-5': { input: 1, output: 5 },
 };
-const PRICING_NOTE = sonnetIntro
-  ? 'sonnet-5 $2/$10 introductory (ends 2026-08-31)'
-  : 'sonnet-5 $3/$15 list';
+const PRICING_NOTE = 'sonnet-5 $3/$15 list (reconciled to CLI costUSD 2026-08-21)';
 const CACHE_READ_MULT = 0.1;
-const CACHE_WRITE_MULT = 1.25;
+
+/**
+ * Cache writes are billed by TTL: 1.25x input at the 5-minute default, 2x at
+ * 1 hour. A single flat 1.25x undercharged the opus main session — which wrote
+ * all 77,140 of its cache tokens at 1h — by $0.289275, the exact gap between
+ * the modelled $1.481971 and the billed $1.771245.
+ */
+const CACHE_WRITE_MULT_5M = 1.25;
+const CACHE_WRITE_MULT_1H = 2.0;
+
+/** $/request for the server-side web search tool. Modelled as free until now. */
+const WEB_SEARCH_USD = 0.01;
 
 const files = process.argv.slice(2);
 if (files.length === 0) {
@@ -77,10 +98,15 @@ let lastTs = null;
 const spawns = { total: 0, named: 0, named_examples: [] };
 let orchestratorLeafCalls = 0;
 
-/** message.id values already charged, per scope — usage is repeated per block. */
-const chargedGlobal = new Set();
-const chargedScope = new Set();
-const chargedModel = new Set();
+/**
+ * message.id -> the largest usage already charged for it, per scope. A Map, not
+ * a Set: `usage` is repeated across the blocks of one message but is not always
+ * IDENTICAL across them, so the running maximum has to be remembered in order
+ * to charge only the increment. See the accounting note at the accumulator.
+ */
+const chargedGlobal = new Map();
+const chargedScope = new Map();
+const chargedModel = new Map();
 const hookCharged = new Set();
 
 const LEAF_TOOLS = new Set(['Bash', 'Write', 'Edit']);
@@ -137,34 +163,72 @@ for (const file of files) {
     const scopeKey = `${rec.isSidechain ? 'sub' : 'main'}:${msgId}`;
     const modelKey = `${model}:${msgId}`;
 
-    // ── Turns and tokens: once per message ───────────────────────────────────
-    if (!chargedGlobal.has(msgId)) {
-      chargedGlobal.add(msgId);
-      totals.turns++;
-      const u = rec.message.usage ?? {};
-      totals.input_tokens += u.input_tokens ?? 0;
-      totals.output_tokens += u.output_tokens ?? 0;
-      totals.cache_read_input_tokens += u.cache_read_input_tokens ?? 0;
-      totals.cache_creation_input_tokens += u.cache_creation_input_tokens ?? 0;
-    }
-    if (!chargedScope.has(scopeKey)) {
-      chargedScope.add(scopeKey);
-      scope.turns++;
-      const u = rec.message.usage ?? {};
-      scope.input_tokens += u.input_tokens ?? 0;
-      scope.output_tokens += u.output_tokens ?? 0;
-      scope.cache_read_input_tokens += u.cache_read_input_tokens ?? 0;
-      scope.cache_creation_input_tokens += u.cache_creation_input_tokens ?? 0;
-    }
-    if (!chargedModel.has(modelKey)) {
-      chargedModel.add(modelKey);
-      const u = rec.message.usage ?? {};
-      const m = (byModel[model] ??= { turns: 0, input: 0, output: 0, cache_read: 0, cache_write: 0 });
+    // ── Turns and tokens: once per message, at its LARGEST reported usage ─────
+    //
+    // The original rule charged the first block of a message and skipped the
+    // rest, on the documented premise that `usage` is stamped identically on
+    // every block. That premise holds for the cache fields — they reconciled to
+    // the token against the CLI's own numbers — and fails for output_tokens,
+    // which grows block by block within one message. First-block-wins recorded
+    // 19,720 sonnet output tokens where the CLI billed 142,226.
+    //
+    // Max is exact everywhere first-wins was exact, so this is a strict
+    // improvement, not a different guess. It is still not complete: max
+    // recovers 135,697 of those 142,226 (95.4%) and 57,032 of haiku's 60,540
+    // (94.2%), and haiku's input_tokens are short by more than that (2,489 vs
+    // 13,692). Some usage is evidently never written to the transcripts. Treat
+    // transcript-derived cost as a LOWER BOUND and prefer a recorded
+    // total_cost_usd when one exists.
+    const u = rec.message.usage ?? {};
+    const cc = u.cache_creation ?? {};
+    const usageFields = {
+      input_tokens: u.input_tokens ?? 0,
+      output_tokens: u.output_tokens ?? 0,
+      cache_read_input_tokens: u.cache_read_input_tokens ?? 0,
+      cache_creation_input_tokens: u.cache_creation_input_tokens ?? 0,
+      cache_write_1h: cc.ephemeral_1h_input_tokens ?? 0,
+      // A write with no TTL breakdown is charged at the 5-minute rate — the
+      // API default, and the cheaper of the two, so an unknown never inflates.
+      cache_write_5m:
+        cc.ephemeral_5m_input_tokens ??
+        (cc.ephemeral_1h_input_tokens === undefined ? u.cache_creation_input_tokens ?? 0 : 0),
+      web_search_requests: u.server_tool_use?.web_search_requests ?? 0,
+    };
+
+    const applyMax = (acc, seen, key, fields) => {
+      const prev = seen.get(key);
+      if (prev === undefined) {
+        seen.set(key, { ...fields });
+        for (const [k, v] of Object.entries(fields)) acc[k] = (acc[k] ?? 0) + v;
+        return true;
+      }
+      for (const [k, v] of Object.entries(fields)) {
+        if (v > prev[k]) {
+          acc[k] = (acc[k] ?? 0) + (v - prev[k]);
+          prev[k] = v;
+        }
+      }
+      return false;
+    };
+
+    if (applyMax(totals, chargedGlobal, msgId, usageFields)) totals.turns++;
+    if (applyMax(scope, chargedScope, scopeKey, usageFields)) scope.turns++;
+    const m = (byModel[model] ??= {
+      turns: 0, input: 0, output: 0, cache_read: 0, cache_write: 0,
+      cache_write_1h: 0, cache_write_5m: 0, web_search_requests: 0,
+    });
+    if (
+      applyMax(m, chargedModel, modelKey, {
+        input: usageFields.input_tokens,
+        output: usageFields.output_tokens,
+        cache_read: usageFields.cache_read_input_tokens,
+        cache_write: usageFields.cache_creation_input_tokens,
+        cache_write_1h: usageFields.cache_write_1h,
+        cache_write_5m: usageFields.cache_write_5m,
+        web_search_requests: usageFields.web_search_requests,
+      })
+    ) {
       m.turns++;
-      m.input += u.input_tokens ?? 0;
-      m.output += u.output_tokens ?? 0;
-      m.cache_read += u.cache_read_input_tokens ?? 0;
-      m.cache_write += u.cache_creation_input_tokens ?? 0;
     }
 
     // ── Hook fires: a per-message property, so dedup it too ──────────────────
@@ -208,8 +272,18 @@ let costTotal = 0;
  * every run cost $0 in our accounting. Silent, and precisely backwards for a
  * project evaluating whether to move work ONTO haiku.
  */
-const priceFor = (model) =>
-  PRICING[model] ?? PRICING[String(model).replace(/-\d{8}$/, '')];
+/**
+ * Resolve a pricing entry from a model key as the CLI reports it.
+ *
+ * Two suffixes have to come off. `-20251001` is a dated snapshot. `[1m]` is the
+ * 1M-context variant, and the opus main session of every bench tick is reported
+ * as `claude-opus-5[1m]` — which matched nothing, so it was counted as an
+ * UNPRICED model and cost $0. That is the same silent-zero failure the haiku
+ * note below describes, on the most expensive model in the mix.
+ */
+const stripModelSuffixes = (model) =>
+  String(model).replace(/\[[^\]]*\]$/, '').replace(/-\d{8}$/, '');
+const priceFor = (model) => PRICING[model] ?? PRICING[stripModelSuffixes(model)];
 
 let unpriced = 0;
 for (const [model, m] of Object.entries(byModel)) {
@@ -222,9 +296,11 @@ for (const [model, m] of Object.entries(byModel)) {
   const c =
     (m.input * p.input +
       m.cache_read * p.input * CACHE_READ_MULT +
-      m.cache_write * p.input * CACHE_WRITE_MULT +
+      (m.cache_write_1h ?? 0) * p.input * CACHE_WRITE_MULT_1H +
+      (m.cache_write_5m ?? m.cache_write) * p.input * CACHE_WRITE_MULT_5M +
       m.output * p.output) /
-    1_000_000;
+      1_000_000 +
+    (m.web_search_requests ?? 0) * WEB_SEARCH_USD;
   costByModel[model] = c;
   costTotal += c;
 }

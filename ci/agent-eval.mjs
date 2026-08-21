@@ -53,24 +53,56 @@ const REPO_ROOT = resolve(__dirname, '..');
 // comparing it to computeCostFromModelUsage() here.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const SONNET_INTRO_ENDS = Date.parse('2026-09-01T00:00:00Z');
-const pricingAt = Date.parse(process.env.EVOR_PRICING_DATE ?? new Date().toISOString());
-const sonnetIntro = pricingAt < SONNET_INTRO_ENDS;
-
+/**
+ * $/Mtok, first-party, RECONCILED AGAINST WHAT THE CLI ACTUALLY CHARGED.
+ *
+ * Sonnet 5 was priced here at "$2/$10 introductory through 2026-08-31", on the
+ * documented introductory rate. The bench tick of 2026-08-21 — inside that
+ * window — was charged $12.486398 for sonnet by the CLI's own per-model
+ * accounting (ci/out/bench-tick-raw.json). $3/$15 reproduces that to six
+ * decimals; $2/$10 gives $8.324265. So the introductory rate is documented but
+ * is not what this account pays, and assuming it understated the largest line
+ * item of every measurement by a third. Opus and haiku both reconciled exactly
+ * at their list rates, which is what makes the sonnet discrepancy a rate error
+ * rather than a units error.
+ *
+ * EVOR_PRICING_DATE no longer selects a rate — there is nothing left to select.
+ * Reinstate a date branch only against a bill that shows one.
+ */
 const PRICING = {
   'claude-opus-5': { input: 5, output: 25 },
   'claude-opus-4-8': { input: 5, output: 25 },
-  'claude-sonnet-5': sonnetIntro ? { input: 2, output: 10 } : { input: 3, output: 15 },
+  'claude-sonnet-5': { input: 3, output: 15 },
   'claude-sonnet-4-6': { input: 3, output: 15 },
   'claude-haiku-4-5': { input: 1, output: 5 },
 };
-const PRICING_NOTE = sonnetIntro
-  ? 'sonnet-5 $2/$10 introductory (ends 2026-08-31)'
-  : 'sonnet-5 $3/$15 list';
+const PRICING_NOTE = 'sonnet-5 $3/$15 list (reconciled to CLI costUSD 2026-08-21)';
 const CACHE_READ_MULT = 0.1;
-const CACHE_WRITE_MULT = 1.25;
 
-const priceFor = (model) => PRICING[model] ?? PRICING[String(model).replace(/-\d{8}$/, '')];
+/**
+ * Cache writes are billed by TTL: 1.25x input at the 5-minute default, 2x at
+ * 1 hour. A single flat 1.25x undercharged the opus main session — which wrote
+ * all 77,140 of its cache tokens at 1h — by $0.289275, the exact gap between
+ * the modelled $1.481971 and the billed $1.771245.
+ */
+const CACHE_WRITE_MULT_5M = 1.25;
+const CACHE_WRITE_MULT_1H = 2.0;
+
+/** $/request for the server-side web search tool. Modelled as free until now. */
+const WEB_SEARCH_USD = 0.01;
+
+/**
+ * Resolve a pricing entry from a model key as the CLI reports it.
+ *
+ * Two suffixes have to come off. `-20251001` is a dated snapshot. `[1m]` is the
+ * 1M-context variant, and the opus main session of every bench tick is reported
+ * as `claude-opus-5[1m]` — which matched nothing, so it was counted as an
+ * UNPRICED model and cost $0. That is the same silent-zero failure the haiku
+ * note below describes, on the most expensive model in the mix.
+ */
+const stripModelSuffixes = (model) =>
+  String(model).replace(/\[[^\]]*\]$/, '').replace(/-\d{8}$/, '');
+const priceFor = (model) => PRICING[model] ?? PRICING[stripModelSuffixes(model)];
 
 /**
  * modelUsage: the `modelUsage` object from a `claude -p --output-format json`
@@ -94,12 +126,24 @@ export function computeCostFromModelUsage(modelUsage) {
       unpriced++;
       continue;
     }
+    // TTL-aware, matching session-analyze.mjs. `modelUsage` in a CLI result
+    // envelope carries no TTL breakdown, so an absent split is charged at the
+    // 5-minute rate — the API default and the cheaper of the two, so an unknown
+    // never inflates. When the caller does know (the envelope's top-level
+    // `usage.cache_creation` does report it for a single-model call) it can
+    // pass the split through and get the exact number.
+    const cc = m.cacheCreation ?? m.cache_creation ?? {};
+    const write1h = cc.ephemeral_1h_input_tokens ?? 0;
+    const write5m = cc.ephemeral_5m_input_tokens ?? (write1h ? 0 : cacheWrite);
+    const webSearches = m.webSearchRequests ?? m.web_search_requests ?? 0;
     const c =
       (input * p.input +
         cacheRead * p.input * CACHE_READ_MULT +
-        cacheWrite * p.input * CACHE_WRITE_MULT +
+        write1h * p.input * CACHE_WRITE_MULT_1H +
+        write5m * p.input * CACHE_WRITE_MULT_5M +
         output * p.output) /
-      1_000_000;
+        1_000_000 +
+      webSearches * WEB_SEARCH_USD;
     byModel[model] = c;
     total += c;
   }

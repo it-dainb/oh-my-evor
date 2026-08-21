@@ -42,15 +42,21 @@ function analyze(lines: unknown[]) {
 function block(
   id: string,
   content: unknown[],
-  usage: Record<string, number>,
+  // `usage` carries nested objects too (cache_creation, server_tool_use), not
+  // just token counts.
+  usage: Record<string, unknown>,
   extra: Record<string, unknown> = {},
 ) {
+  // `model` belongs on the message, everything else on the record — otherwise a
+  // model override lands at the top level where nothing reads it, and the case
+  // silently measures the default model.
+  const { model, ...rest } = extra as { model?: string };
   return {
     type: "assistant",
     timestamp: "2026-07-26T12:00:00.000Z",
     isSidechain: false,
-    message: { id, model: "claude-opus-5", role: "assistant", content, usage },
-    ...extra,
+    message: { id, model: model ?? "claude-opus-5", role: "assistant", content, usage },
+    ...rest,
   };
 }
 
@@ -117,6 +123,105 @@ describe("session-analyze — turn and token accounting", () => {
     ]);
     // Opus 5 input is $5/Mtok, so 1M cache-read tokens = $0.50.
     expect(out.cost.by_model["claude-opus-5"]).toBeCloseTo(0.5, 5);
+  });
+
+  // ── Reconciled against what the CLI actually charged ──────────────────────
+  //
+  // Everything above (and the mirror suite in agent-eval.test.ts) checks this
+  // analyzer against our own second copy of the same pricing table. On
+  // 2026-08-21 the first external check was finally possible —
+  // ci/out/bench-tick-raw.json carries per-model `costUSD` straight from the
+  // CLI — and the analyzer was 38% low. These cases pin each cause with the
+  // exact numbers from that envelope.
+
+  it("takes the largest usage seen for a message id, not the first block's", () => {
+    // The documented rule was "usage is stamped on every block of the same
+    // message, so charge the first and skip the rest". True for the cache
+    // fields — they reconciled to the token — and false for output_tokens,
+    // which grows block by block. First-block-wins recorded 19,720 sonnet
+    // output tokens against 142,226 billed, a 7.2x undercount; on haiku it was
+    // 183 against 60,540. Max is exact wherever first-wins was exact, so it is
+    // a strict improvement rather than a different guess.
+    const out = analyze([
+      block("msg_1", [{ type: "text", text: "a" }], {
+        input_tokens: 10, output_tokens: 5,
+        cache_read_input_tokens: 1_000, cache_creation_input_tokens: 200,
+      }),
+      block("msg_1", [{ type: "text", text: "b" }], {
+        input_tokens: 10, output_tokens: 900,
+        cache_read_input_tokens: 1_000, cache_creation_input_tokens: 200,
+      }),
+    ]);
+    expect(out.totals.turns, "still one message, one turn").toBe(1);
+    expect(out.totals.output_tokens).toBe(900);
+    expect(out.totals.cache_read_input_tokens, "unchanged — max equals first here").toBe(1_000);
+    expect(out.totals.cache_creation_input_tokens).toBe(200);
+  });
+
+  it("charges a 1-hour cache write at 2x input, not 1.25x", () => {
+    // The opus main session wrote all 77,140 of its cache tokens at the 1h TTL.
+    // At the flat 1.25x the analyzer modelled $1.481971; the CLI charged
+    // $1.771245. 2x reproduces it to six decimals.
+    const out = analyze([
+      block("msg_1", [{ type: "text", text: "a" }], {
+        input_tokens: 0, output_tokens: 0,
+        cache_read_input_tokens: 0, cache_creation_input_tokens: 1_000_000,
+        cache_creation: { ephemeral_1h_input_tokens: 1_000_000, ephemeral_5m_input_tokens: 0 },
+      }),
+    ]);
+    // Opus input is $5/Mtok, so 1M tokens of 1h write = $10.
+    expect(out.cost.by_model["claude-opus-5"]).toBeCloseTo(10.0, 5);
+  });
+
+  it("still charges a 5-minute cache write at 1.25x", () => {
+    const out = analyze([
+      block("msg_1", [{ type: "text", text: "a" }], {
+        input_tokens: 0, output_tokens: 0,
+        cache_read_input_tokens: 0, cache_creation_input_tokens: 1_000_000,
+        cache_creation: { ephemeral_1h_input_tokens: 0, ephemeral_5m_input_tokens: 1_000_000 },
+      }),
+    ]);
+    expect(out.cost.by_model["claude-opus-5"]).toBeCloseTo(6.25, 5);
+  });
+
+  it("assumes the 5-minute rate when no TTL split is reported", () => {
+    const out = analyze([
+      block("msg_1", [{ type: "text", text: "a" }], {
+        input_tokens: 0, output_tokens: 0,
+        cache_read_input_tokens: 0, cache_creation_input_tokens: 1_000_000,
+      }),
+    ]);
+    expect(out.cost.by_model["claude-opus-5"]).toBeCloseTo(6.25, 5);
+  });
+
+  it("prices sonnet-5 at the $3/$15 list rate the CLI actually bills", () => {
+    // The table applied a $2/$10 "introductory through 2026-08-31" rate. The
+    // bench tick ran on 2026-08-21, inside that window, and the CLI charged
+    // sonnet $12.486398 for 610 in / 142,226 out / 15,078,189 cache-read /
+    // 1,554,059 cache-write. $3/$15 with a 1.25x write reproduces that figure
+    // exactly; $2/$10 gives $8.324265. The introductory rate is documented but
+    // is not what this account is charged, and assuming it understated the
+    // largest line item in every measurement by a third.
+    const out = analyze([
+      block("msg_1", [{ type: "text", text: "a" }], {
+        input_tokens: 610, output_tokens: 142_226,
+        cache_read_input_tokens: 15_078_189, cache_creation_input_tokens: 1_554_059,
+      }, { model: "claude-sonnet-5" }),
+    ]);
+    expect(out.cost.by_model["claude-sonnet-5"]).toBeCloseTo(12.486398, 5);
+  });
+
+  it("charges web searches, which were free in the model and are not", () => {
+    // $0.01/request. Trivial next to the rest, but it was the last cent
+    // standing between the model and the CLI's total.
+    const out = analyze([
+      block("msg_1", [{ type: "text", text: "a" }], {
+        input_tokens: 0, output_tokens: 0,
+        cache_read_input_tokens: 0, cache_creation_input_tokens: 0,
+        server_tool_use: { web_search_requests: 3 },
+      }),
+    ]);
+    expect(out.cost.by_model["claude-opus-5"]).toBeCloseTo(0.03, 6);
   });
 
   it("reports wall-clock from first to last timestamp", () => {

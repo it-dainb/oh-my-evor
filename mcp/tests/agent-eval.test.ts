@@ -146,16 +146,61 @@ describe("agent-eval — cost mirrors scripts/session-analyze.mjs", () => {
       modelUsage: { "claude-sonnet-5": { inputTokens: 1_000_000, outputTokens: 0 } },
     };
     const r = costReconciliation(envelope);
-    expect(r.modeled_usd).toBeCloseTo(2.0, 6);
+    expect(r.modeled_usd).toBeCloseTo(3.0, 6);
     expect(r.billed_usd).toBeCloseTo(15.6950246, 6);
-    expect(r.ratio).toBeCloseTo(15.6950246 / 2.0, 6);
+    expect(r.ratio).toBeCloseTo(15.6950246 / 3.0, 6);
   });
 
   it("reports a null billed cost rather than inventing one", () => {
     const r = costReconciliation({ modelUsage: { "claude-sonnet-5": { inputTokens: 1_000_000 } } });
     expect(r.billed_usd).toBeNull();
     expect(r.ratio).toBeNull();
-    expect(r.modeled_usd).toBeCloseTo(2.0, 6);
+    expect(r.modeled_usd).toBeCloseTo(3.0, 6);
+  });
+
+  // The golden case: the ENTIRE modelUsage block of the 2026-08-21 bench tick,
+  // verbatim from ci/out/bench-tick-raw.json, against the total_cost_usd the
+  // CLI reported for it. Inlined rather than read from ci/out because that
+  // directory is gitignored — and this is the one external check the pricing
+  // table has, so it must survive the artifact being deleted.
+  //
+  // Before the fix this produced $11.2336 against a billed $15.6950. Every cent
+  // of the difference is accounted for: sonnet at list not introductory
+  // (+$4.1621), opus 1h cache writes at 2x (+$0.2893), one web search (+$0.01).
+  it("reproduces the CLI's own total for the 2026-08-21 bench tick", () => {
+    const modelUsage = {
+      "claude-opus-5[1m]": {
+        inputTokens: 49,
+        outputTokens: 9_404,
+        cacheReadInputTokens: 1_529_001,
+        cacheCreationInputTokens: 77_140,
+        cacheCreation: { ephemeral_1h_input_tokens: 77_140, ephemeral_5m_input_tokens: 0 },
+        webSearchRequests: 0,
+        canonicalModel: "claude-opus-5",
+      },
+      "claude-sonnet-5": {
+        inputTokens: 610,
+        outputTokens: 142_226,
+        cacheReadInputTokens: 15_078_189,
+        cacheCreationInputTokens: 1_554_059,
+        webSearchRequests: 0,
+      },
+      "claude-haiku-4-5-20251001": {
+        inputTokens: 13_692,
+        outputTokens: 60_540,
+        cacheReadInputTokens: 4_665_479,
+        cacheCreationInputTokens: 515_553,
+        webSearchRequests: 1,
+      },
+    };
+    const out = computeCostFromModelUsage(modelUsage);
+    // Per-model, because a total that matches while two models are wrong in
+    // opposite directions is not a reconciliation.
+    expect(out.by_model["claude-opus-5[1m]"]).toBeCloseTo(1.7712455, 6);
+    expect(out.by_model["claude-sonnet-5"]).toBeCloseTo(12.48639795, 6);
+    expect(out.by_model["claude-haiku-4-5-20251001"]).toBeCloseTo(1.43738115, 6);
+    expect(out.total).toBeCloseTo(15.6950246, 5);
+    expect(out.unpriced_models).toBe(0);
   });
 
   it("reports unpriced models rather than silently costing them $0", () => {
