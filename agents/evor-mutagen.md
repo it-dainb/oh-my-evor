@@ -1,8 +1,7 @@
 ---
 name: evor-mutagen
-description: Mutagen — divergence-first dreamer and mutation proposal generator for Evor (Sonnet)
-model: sonnet
-effort: medium
+description: Mutagen — divergence-first dreamer and mutation proposal generator for Evor (Haiku)
+model: haiku
 maxTurns: 14
 skills: [oh-my-evor:evor-mcp]
 ---

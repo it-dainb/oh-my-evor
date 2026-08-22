@@ -368,6 +368,7 @@ Applied to agent frontmatter on this branch:
 | `evor-forge-critic` | sonnet | haiku | 29/30 vs 27/30, CI [-8.2, +22.5] | **-44.6%** |
 | `evor-sage` | sonnet | haiku | 75/78 vs 77/78, CI [-9.5, +3.6] | **-58.6%** |
 | `evor-probe` | sonnet | haiku | 66/66 vs 66/66, CI [-5.5, +5.5] | **-39.9%** |
+| `evor-mutagen` | sonnet | haiku | 116/120 vs 116/120, CI [-5.3, +5.3] | **-56.9%** |
 
 `effort:` was dropped from the two retiered files — haiku does not support it,
 and `tests/agent-frontmatter.test.ts` fails if an inert tag is left behind.
@@ -432,3 +433,54 @@ including the ones that are obviously improvements.
 
 haiku is 3.6x slower on this role (78s vs 22s per call). Cost outranks latency
 here, so it goes; if that ever inverts, probe is the first row to revisit.
+
+# mutagen at n=120: an exact tie, and the only arm powered enough to say so
+
+mutagen is the one role where the top-up to n=120 per arm was worth four hours
+of sequential harness time, because it is also the most expensive role per call
+and so the most valuable to move:
+
+| arm | n | correct | accuracy | 95% CI | $/call billed |
+|---|---|---|---|---|---|
+| haiku | 120 | 116 | 96.7% | [91.7, 98.7] | $0.0736 |
+| sonnet | 120 | 116 | 96.7% | [91.7, 98.7] | $0.1710 |
+
+Identical counts, Fisher p=1.0000, difference CI **[-5.3, +5.3]pp** —
+**non-inferior**, at **-56.9%** per passing attempt. At n=30 this same tie would
+have read "underpowered" with 15.4pp still inside the interval; n=120 is what
+buys the right to say the arms match.
+
+The five cases where the arms differ each differ by one attempt out of twelve,
+in both directions (haiku loses `crossover-two-close-lineages`,
+`hardware-gotcha-hard-block` and `wildness-boundary-at-half` by one; sonnet
+loses `crossover-single-lineage` by one and `dream-k-scales-with-train-k` by
+two). That is scatter, not a pattern — the concentrated single-case failure that
+marked every real defect this session is absent.
+
+# Where the branch ends up
+
+Summing one call of each of the eight retiered roles, on billed dollars, against
+the tier each ran at on `main`:
+
+| role | was | $/call | now | $/call | saving |
+|---|---|---|---|---|---|
+| acquirer | sonnet | 0.0720 | haiku | 0.0294 | 59.2% |
+| forge-critic | sonnet | 0.0626 | haiku | 0.0365 | 41.7% |
+| sage | opus | 0.1581 | haiku | 0.0327 | 79.3% |
+| probe | opus | 0.1588 | haiku | 0.0493 | 69.0% |
+| mutagen | opus | 0.2754 | haiku | 0.0774 | 71.9% |
+| sage-junior | sonnet | 0.1043 | haiku | 0.0358 | 65.7% |
+| forge-analyst | opus | 0.1156 | sonnet | 0.0629 | 45.6% |
+| forge-architect | opus | 0.1040 | sonnet | 0.0618 | 40.6% |
+| **sum** | | **1.0508** | | **0.3858** | **63.3%** |
+
+**This is one call of each role, not a tick.** Roles are not invoked equally
+often — sage-junior fans out several per angle, forge-critic runs once per
+candidate — so the tick-level figure will differ and is not derivable from this
+table. It is a like-for-like comparison of eight prices, nothing more.
+
+Six of the eight roles now run haiku. None of the six was adopted on a tie at
+n=30; each has an interval that excludes a 10pp drop. The three that remain
+merely *underpowered* — forge-analyst, forge-architect, and forge-junior at
+haiku — are not adopted, and the honest reason is that we ran out of measurement
+budget before we ran out of doubt.
