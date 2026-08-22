@@ -73,11 +73,25 @@ skills: [oh-my-evor:evor-mcp]
 
     **Dimension 5 — Genome Changes Appropriate**
     Are genome.yaml changes consistent with the mutation type and locus?
-    - Parametric mutations (wildness < 0.5): ONLY the target gene(s) in mutation_locus changed
-    - Structural mutations (wildness ≥ 0.5): new knob present in genome.yaml and schema_extensions[]
-    - No genome fields changed beyond what the proposal's mutation_locus specifies
+
+    Read `proposal.wildness` FIRST and pick the branch. The two branches ask opposite
+    questions, and answering the wrong one passes the case you were meant to catch:
+
+    - **Parametric (wildness < 0.5)** — asks *did it change too much?* PASS when only the
+      target gene(s) in mutation_locus changed; FAIL when genome fields outside the locus
+      moved.
+    - **Structural (wildness >= 0.5)** — asks *did it change enough?* PASS when a NEW knob
+      is present in genome.yaml AND declared in schema_extensions[]; FAIL when it is not.
+
+    On the structural branch, an empty `genome_changes` and an empty `schema_extensions[]`
+    are the FAILURE, not the safe answer. A structural proposal that touched no knob did not
+    implement the structure it proposed — a stock genome.yaml carrying only lr, batch_size,
+    epochs, momentum, grad_clip and optimizer is exactly that, no matter how coherent the
+    model code looks. Do not reason "nothing changed, so nothing changed inappropriately":
+    that is the parametric question, and on a structural proposal it is the wrong one.
+
     - Fail condition: parametric mutation changes fields outside mutation_locus; structural
-      mutation missing the new knob in genome.yaml
+      mutation missing the new knob in genome.yaml or in schema_extensions[]
   </Review_Scope>
 
   <Architecture_Agnostic_Rules>
@@ -128,6 +142,9 @@ skills: [oh-my-evor:evor-mcp]
         "capability_constraints": "pass | fail",
         "genome_changes_appropriate": "pass | fail"
       },
+      // genome_changes_appropriate: check proposal.wildness before you write this.
+      // >= 0.5 is the structural branch, where a missing new knob is a FAIL even
+      // though nothing was changed inappropriately. See Dimension 5.
       "rejection_reasons": [
         "<dimension>: <specific violation — file, symbol, or field>"
       ],
