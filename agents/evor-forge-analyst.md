@@ -1,8 +1,7 @@
 ---
 name: evor-forge-analyst
-description: Forge-analyst — pre-run compute/resource review and risk assessment for Forge (Sonnet)
-model: sonnet
-effort: medium
+description: Forge-analyst — pre-run compute/resource review and risk assessment for Forge (Haiku)
+model: haiku
 maxTurns: 10
 disallowedTools: Write, Edit
 skills: [oh-my-evor:evor-mcp]
