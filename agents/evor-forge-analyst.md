@@ -47,15 +47,32 @@ skills: [oh-my-evor:evor-mcp]
 
     **Pass 2 — OOM Risk**
     Classify OOM risk from the resource estimate:
+    Compute the ratio first, then read the band off it. Do not eyeball "close to the limit".
+    Worked: 21.5 GB on a 24 GB device is 21.5 / 24 = 0.896, which is above 0.85, so the band
+    is **high** — not medium. The bands are strict inequalities against the ratio, in order.
+
     - critical: vram_estimate_gb > available_vram_gb (OOM is certain; reject)
     - high: vram_estimate_gb > 0.85 × available_vram_gb (very likely OOM; reject unless
             gradient checkpointing is already present in trainer.py)
     - medium: vram_estimate_gb > 0.70 × available_vram_gb (possible OOM; approve with signal)
     - low: vram_estimate_gb ≤ 0.70 × available_vram_gb
 
-    OOM at critical or high → verdict="rejected" with suggested batch_size reduction or
-    gradient checkpointing addition. Include specific values (e.g. "reduce batch_size from 256
-    to 64 to bring VRAM estimate from 22.1 GB to ~6.8 GB on 24 GB device").
+    OOM at critical, or at high with no mitigation → verdict="rejected", with suggested
+    batch_size reduction or gradient checkpointing addition. Include specific values (e.g.
+    "reduce batch_size from 256 to 64 to bring VRAM estimate from 22.1 GB to ~6.8 GB on 24 GB
+    device").
+
+    **The mitigation exception, stated on its own because it is the case that gets missed.**
+    If `oom_risk` is "high" AND gradient checkpointing is ALREADY present in trainer.py, the
+    verdict is **approved** — and `oom_risk` still reports "high". The risk level describes
+    the memory situation; the verdict describes what to do about it, and those are different
+    answers. Do not lower the risk to "medium" to justify approving, and do not reject to
+    stay on the safe side.
+
+    Rejecting here is not conservatism, it is a wasted iteration: checkpointing IS the fix
+    this dimension asks for, so the rejection would send forge-junior to add something the
+    code already has. "Do not produce optimistic risk assessments" elsewhere in this file
+    constrains the RISK field, which stays "high". It does not license a reject.
 
     **Pass 3 — Training Time Estimate**
     Estimate training time from throughput and total_epochs:
@@ -98,8 +115,13 @@ skills: [oh-my-evor:evor-mcp]
 
     **Pass 5 — Verdict and Loop-back**
     verdict="rejected" when:
-    - oom_risk is "critical" or "high" (without gradient checkpointing mitigation), OR
+    - oom_risk is "critical", OR
+    - oom_risk is "high" AND gradient checkpointing is NOT already in trainer.py
+      (if it IS already there: approved, with oom_risk still reported as "high"), OR
     - nan_risk is "high" AND suggested fix is concrete and implementable by forge-junior
+
+    Otherwise approved. A "medium" on any dimension is an approve-with-signal, never a
+    reject — the signal is how a medium gets acted on.
 
     loop_back_recommended=True only when ALL hold:
     a. The rejection is diagnosable (not "unknown model size")
