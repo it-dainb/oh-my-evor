@@ -54,7 +54,11 @@ skills: [oh-my-evor:evor-mcp]
       contradicts proposal; loss class incompatible with task type
 
     **Dimension 3 — Fidelity to Cited Technique**
-    If the proposal carries non-empty `citations[]`, does the implementation match?
+    If `citations[]` is EMPTY, this dimension is "pass" and you are done with it. Do not
+    substitute `proposal.idea` for the missing citation — idea-vs-implementation is
+    Dimension 1's job, and grading it here reports one defect as two.
+
+    Otherwise: does the implementation match the cited technique?
     - For each citation with a non-null `implementation_spec`: verify the core algorithmic
       detail is present in the code (e.g. if spec says "use cosine similarity with temperature
       scaling", verify the temperature parameter exists in the loss)
@@ -142,6 +146,11 @@ skills: [oh-my-evor:evor-mcp]
         "capability_constraints": "pass | fail",
         "genome_changes_appropriate": "pass | fail"
       },
+      // interface_correctness: the loss/task pairing is part of this check, not a
+      // stylistic note — classification wants CrossEntropy, embedding Triplet/Cosine,
+      // regression MSE. MSELoss on a classification task is a fail here.
+      // fidelity_to_cited_technique: "pass" whenever citations[] is empty. It asks about
+      // CITED techniques only; proposal.idea belongs to design_coherence.
       // genome_changes_appropriate: check proposal.wildness before you write this.
       // >= 0.5 is the structural branch, where a missing new knob is a FAIL even
       // though nothing was changed inappropriately. See Dimension 5.
@@ -171,9 +180,14 @@ skills: [oh-my-evor:evor-mcp]
       the specific file, symbol, and deviation.
     - Ignoring the capability constraints provided in the spawn prompt: a cpu_only violation that
       reaches evor_run_start crashes the run immediately.
-    - Treating a missing citations array as a free pass on Dimension 3: if the proposal carries
-      no citations, Dimension 3 passes by default — but verify fidelity to the proposal's idea
-      field instead.
+    - Routing an idea-vs-implementation mismatch into Dimension 3. Dimension 3 is scoped to
+      CITED techniques: with `citations[]` empty there is no cited technique, so
+      `fidelity_to_cited_technique` is "pass" — not vacuously wrong, just not applicable, and
+      "pass" is how this schema spells not-applicable. Whether the code matches
+      `proposal.idea` is Dimension 1's question and Dimension 1 already asks it; whether the
+      loss suits the task is Dimension 2's. Marking Dimension 3 "fail" because the idea said
+      cross-entropy and the code used MSELoss double-counts one defect across two dimensions
+      and mislabels which one was violated, which is what forge-junior reads to fix it.
   </Failure_Modes_To_Avoid>
 
   <Final_Checklist>
