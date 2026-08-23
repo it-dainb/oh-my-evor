@@ -5,43 +5,49 @@ row actually is, and what is explicitly NOT verified. Every cost figure is
 **billed** (`cli_cost_usd` from the CLI), never modeled — see the tier-asymmetry
 note at the end for why that distinction is not cosmetic.
 
-## 1. Shipped tiers
+## 1. Shipped tiers — all twelve agents
 
-| agent | main | v1 | changed |
+| agent | main | this release | changed |
 |---|---|---|---|
+| evor-selector | opus | **haiku** | yes |
 | evor-sage | opus | **haiku** | yes |
 | evor-probe | opus | **haiku** | yes |
 | evor-mutagen | opus | **haiku** | yes |
 | evor-forge-analyst | opus | **haiku** | yes |
-| evor-forge-architect | opus | **sonnet** | yes |
+| evor-forge-critic | opus | **haiku** | yes |
 | evor-sage-junior | sonnet | **haiku** | yes |
 | evor-acquirer | sonnet | **haiku** | yes |
-| evor-forge-critic | sonnet | **haiku** | yes |
-| evor-forge | sonnet | sonnet | no |
-| evor-forge-junior | sonnet | sonnet | no |
-| evor-tick | sonnet | sonnet | no |
-| evor-selector | haiku | haiku | no |
+| evor-forge-architect | opus | **sonnet** | yes |
+| evor-forge | opus | **sonnet** | yes |
+| evor-forge-junior | sonnet `effort: high` | sonnet **`effort: low`** | yes (effort) |
+| evor-tick | — (new agent) | sonnet | n/a |
 
-Eight of twelve roles moved down at least one tier. Seven run haiku.
+Ten of eleven inherited agents moved down at least one tier; `evor-tick` is new
+on this branch and has never been benchmarked.
 
 ## 2. Cost breakdown, billed
 
-One call of each retiered role, at the tier it ran on `main` vs the tier it runs
-now:
+One call of each role, at the tier it ran on `main` vs the tier it runs now:
 
-| role | main tier | $/call | v1 tier | $/call | saving |
+| role | from | to | $/call was | $/call now | saving |
 |---|---|---|---|---|---|
-| mutagen | opus | 0.2754 | haiku | 0.0774 | **71.9%** |
-| probe | opus | 0.1588 | haiku | 0.0493 | **69.0%** |
-| sage | opus | 0.1581 | haiku | 0.0327 | **79.3%** |
-| forge-analyst | opus | 0.1156 | haiku | 0.0422 | **63.5%** |
-| forge-architect | opus | 0.1040 | sonnet | 0.0618 | **40.6%** |
-| sage-junior | sonnet | 0.1043 | haiku | 0.0358 | **65.7%** |
-| acquirer | sonnet | 0.0720 | haiku | 0.0294 | **59.2%** |
-| forge-critic | sonnet | 0.0626 | haiku | 0.0365 | **41.7%** |
-| **total** | | **1.0508** | | **0.3651** | **65.3%** |
+| sage | opus | haiku | 0.1581 | 0.0327 | **79.3%** |
+| mutagen | opus | haiku | 0.2754 | 0.0774 | **71.9%** |
+| probe | opus | haiku | 0.1588 | 0.0493 | **69.0%** |
+| forge-critic | opus | haiku | 0.1142 | 0.0365 | **68.0%** |
+| sage-junior | sonnet | haiku | 0.1043 | 0.0358 | **65.7%** |
+| forge-analyst | opus | haiku | 0.1156 | 0.0422 | **63.5%** |
+| acquirer | sonnet | haiku | 0.0720 | 0.0294 | **59.2%** |
+| forge-architect | opus | sonnet | 0.1040 | 0.0618 | **40.6%** |
+| selector | sonnet | haiku | 0.0396 | 0.0307 | **22.5%** |
+| **total** | | | **1.1420** | **0.3958** | **65.3%** |
 
-**This is eight prices compared like for like. It is NOT a tick.** Roles are not
+Not in the table: `evor-forge` (measured as a 3-tick A/B, not per call — 17%
+cheaper) and `evor-forge-junior` (an effort change, 42.5% cheaper high→low).
+Selector's row covers only its measured sonnet→haiku leg; its opus→sonnet leg
+has no billed figure, so the total **understates** the real saving.
+
+**This is nine prices compared like for like. It is NOT a tick.** Roles are not
 invoked equally often — sage-junior fans out several per angle, forge-critic
 runs once per candidate, tick runs once — so the per-tick saving does not follow
 from this table and has not been measured. Anyone quoting a tick-level number
