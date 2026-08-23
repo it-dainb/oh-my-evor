@@ -1,7 +1,7 @@
 {
   "name": "oh-my-evor",
   "displayName": "oh-my-evor",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Autonomous ML research evolution engine for Claude Code",
   "author": {
     "name": "oh-my-evor contributors"
