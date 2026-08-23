@@ -6,10 +6,10 @@
 
 [![Claude Code Plugin](https://img.shields.io/badge/Claude_Code-plugin-8A2BE2)](https://code.claude.com)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
-[![Tests](https://img.shields.io/badge/tests-1150_passing-brightgreen)](#-proof-it-works)
-[![MCP tools](https://img.shields.io/badge/MCP_tools-39-blue)](#architecture)
+[![Tests](https://img.shields.io/badge/tests-2219_passing-brightgreen)](#-proof-it-works)
+[![MCP tools](https://img.shields.io/badge/MCP_tools-49-blue)](#architecture)
 [![Hooks](https://img.shields.io/badge/lifecycle_hooks-14-blueviolet)](#the-reflex-layer)
-[![Agents](https://img.shields.io/badge/agents-11-orange)](#the-agent-roster)
+[![Agents](https://img.shields.io/badge/agents-12-orange)](#the-agent-roster)
 
 <img src="ci/out/evor-tree.png" alt="An evolution tree produced by oh-my-evor" width="620" />
 
@@ -38,6 +38,7 @@ Most "AI improves your model" tools hand you a number and ask you to trust it. A
 | 🔒 **Agents editing the referee** | A **hook-enforced capability governor** + an always-on **write-guard** make it impossible for any agent to write the evaluator, touch frozen splits, hand-edit run state, or run training out of turn — enforced at the tool-call layer, not by prompt politeness |
 | 📉 **Comparability drift** | Eval-version is pinned; hardening the test bumps the version and re-scores comparably — never a silent swap |
 | 📎 **Hand-wavy research** | Every SOTA claim the research agent makes is **anchored to a source URL** — no citation, no claim |
+| 💸 **Paying frontier prices for clerical work** | Every agent's model tier is **benchmarked, not assumed** — a tier only ships when a difference confidence interval rules out a 10pp accuracy drop. Five of the twelve run Haiku, at **68.8% lower cost per call** |
 
 The result is an engine you can point at a real dataset and *leave alone* — and still defend the number it gives you.
 
@@ -98,7 +99,8 @@ The orchestrator (**Evor**) runs as the main Claude Code session. It spawns spec
 
 | Agent | Role | What it does |
 |---|---|---|
-| **Evor** | Orchestrator | Runs the tick loop, meta-evolution, doom-loop detection; spawns leads. Opus. |
+| **Evor** | Orchestrator | Runs the tick loop, meta-evolution, doom-loop detection; spawns leads. |
+| **Tick** | Loop driver | Advances one tick end-to-end so a mission can sleep between ticks and wake to continue. |
 | **Sage** → *Sage-juniors* | Research lead | Citation-backed SOTA findings; fans out research by angle. Every claim carries a source URL. |
 | **Mutagen** | Dreamer | Mutation proposals across `arch / training / data-* / algo`, driven by a wildness dial. Never researches — stays anchoring-free. |
 | **Probe** | EDA / Analyst | Structured telemetry checks (loss curve, gradient health, LR sensitivity, error clustering) to confirm or refute the hypothesis. |
@@ -106,13 +108,15 @@ The orchestrator (**Evor**) runs as the main Claude Code session. It spawns spec
 | **Selector** | Critic | Hard gates on every proposal before a training run is spent. Errs toward rejection. |
 | **Acquirer** | Data | Fetches enrichment/hardening data under strict no-leakage rules. |
 
+*Model tiers are per-agent and measured — see [the cost report](docs/v1-cost-and-verification.md).*
+
 *Children are spawnable **only** by their parent — enforced by the governor hook.*
 
 ---
 
 ## 🧰 MCP-native — the harness is invisible
 
-Every agent operates through **one surface: ~40 `evor_*` MCP tools.** Agents never write `.evor/` state by hand, never shell out to a CLI, and never touch the Python harness directly — they don't even know it exists. A single reference skill (`evor-mcp`) auto-loads the tool catalog into every agent like muscle memory.
+Every agent operates through **one surface: 49 `evor_*` MCP tools.** Agents never write `.evor/` state by hand, never shell out to a CLI, and never touch the Python harness directly — they don't even know it exists. A single reference skill (`evor-mcp`) auto-loads the tool catalog into every agent like muscle memory.
 
 Why this matters:
 
@@ -120,7 +124,7 @@ Why this matters:
 - **Guard-enforced** — a `PreToolUse` write-guard *structurally* denies any direct `.evor` write or harness call and points the agent to the right tool. Agents can't drift off the sanctioned path even if they try.
 - **Read-first** — agents read upstream artifacts through MCP before acting; a missing upstream read is a hard stop, never a fabrication.
 
-The MCP tools cover the whole loop: `init_run`, `record_node`, `record_eval`, `integrity_check`, `tree_read`, `select`, `write_artifact`/`read_artifact`, `state_read`/`state_write`, `signal_emit`/`query`/`digest`, `run_start`/`run_status`, `store_patch`/`store_blob`, `write_handoff`/`read_handoff`, `cite`, `wiki_*`, `gotcha_*`, and the compute wrappers — **39 in all**.
+The MCP tools cover the whole loop: `init_run`, `record_node`, `record_eval`, `integrity_check`, `tree_read`, `select`, `write_artifact`/`read_artifact`, `state_read`/`state_write`, `signal_emit`/`query`/`digest`, `run_start`/`run_status`, `store_patch`/`store_blob`, `write_handoff`/`read_handoff`, `cite`, `wiki_*`, `gotcha_*`, and the compute wrappers — **49 in all**.
 
 ---
 
@@ -154,10 +158,10 @@ A `failed` verdict marks the node and permanently excludes it from the frontier 
 
 We hold ourselves to the same standard we hold the agents to — **claims are backed by evidence you can reproduce**:
 
-**✅ 1150 automated tests pass** — the safety-critical logic is covered, not asserted.
+**✅ 2219 automated tests pass** — the safety-critical logic is covered, not asserted.
 ```bash
-cd mcp && npx vitest run          # 465 passing  (MCP server, 39 tools, 14 hooks, governor, write-guard)
-python -m pytest harness/tests -q # 685 passing  (integrity gate, signals, tree search, evaluator, telemetry)
+cd mcp && npx vitest run          # 1295 passing (MCP server, 49 tools, 14 hooks, governor, write-guard)
+python -m pytest harness/tests -q # 924 passing  (integrity gate, signals, tree search, evaluator, telemetry)
 ```
 
 **✅ MCP-native, verified.** Every agent, skill, and command was migrated onto the `evor_*` tools and audited to **zero** direct-`.evor`-write or harness-CLI references — the harness is genuinely invisible to the agent layer, enforced by the write-guard and a repo-wide grep gate in CI.
@@ -166,14 +170,31 @@ python -m pytest harness/tests -q # 685 passing  (integrity gate, signals, tree 
 
 **✅ Adversarially audited.** The codebase was put through repeated multi-agent audits that root-cause-fixed dozens of real defects (silent data loss, a dead signal pipeline, dead circuit-breakers, leakage-check false-negatives, lineage gaps) — each fix locked in by a proving test.
 
+**✅ Every model tier is measured, and the ones that failed were reverted.** Each agent has an offline eval spec graded against a contract built from its own `<Output_Format>`, so a graded field is necessarily a stated field. A cheaper tier ships only when the **95% confidence interval on the accuracy difference rules out a 10pp drop** — a non-significant p-value is *not* accepted as evidence of equivalence. Eleven retiers were measured; **six shipped and five were reverted** to their previous tier for falling short, at a known cost of $0.26 per call. Reproduce any row:
+
+```bash
+# both arms in one paired run — the arms differ only in model
+ROLE_EVAL_TIERS="haiku:medium,sonnet:medium" ROLE_EVAL_REPEATS=6 \
+ROLE_EVAL_OUT=ci/out/probe.json node ci/role-eval.mjs evals/probe/spec.json
+
+# the verdict, with cost per *passing* attempt on billed dollars
+python3 ci/compare-arms.py "haiku:ci/out/probe.json:haiku-medium" \
+                           "sonnet:ci/out/probe.json:sonnet-medium"
+
+# the statistics themselves, cross-checked against scipy
+python3 ci/retier-report.py --self-test
+```
+
+**✅ The savings came from fixing our own prompts, not from trusting cheaper models.** Thirteen times a cheap tier looked like a capability limit; thirteen times, reading the model's actual answer found a rule that was graded but never stated, stated twice with different answers, or stated far from where the field is written. Zero times was it the model failing to reason. Probe read as a **regression** (59/66), then *underpowered* (63/66), then **100%** (66/66) across three runs in which nothing about the model changed and two rules in its prompt did. Every defect is written up in [`docs/agent-file-defects.md`](docs/agent-file-defects.md).
+
 ---
 
 ## Architecture
 
 | Layer | What | Detail |
 |---|---|---|
-| **Orchestration** | Skills + agents | `/oh-my-evor:*` skills, 11 hierarchical agents, one auto-loading `evor-mcp` reference skill, Autonomy Charter (never-halt, monotonic-honesty) |
-| **MCP server** | **39 tools** (TypeScript, prebuilt bundle) | The complete agent surface — lifecycle, tree/select, artifacts, state, signals, run/compute, citations, wiki, gotchas, handoffs |
+| **Orchestration** | Skills + agents | `/oh-my-evor:*` skills, 12 hierarchical agents, one auto-loading `evor-mcp` reference skill, Autonomy Charter (never-halt, monotonic-honesty) |
+| **MCP server** | **49 tools** (TypeScript, prebuilt bundle) | The complete agent surface — lifecycle, tree/select, artifacts, state, signals, run/compute, citations, wiki, gotchas, handoffs |
 | **Compute harness** | Python | Integrity gate (13 checks), tree engine (UCB1 + crossover + prune), signal bus, evaluator, telemetry, live dashboard — reached **only** via MCP |
 | **Reflex layer** | **14 lifecycle hooks** | Capability governor + `.evor` write-guard, per-role spawn injection, next-step reflexes, run-watching, compaction flush/rehydrate, stop-guards |
 | **Bundled MCPs** | Research | Semantic Scholar, arXiv (isolated, auto-provisioned Python) + Hugging Face (token via plugin config) |
