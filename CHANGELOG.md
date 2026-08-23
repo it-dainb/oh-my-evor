@@ -2,7 +2,7 @@
 
 All notable changes to Evor. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
-## [Unreleased] — model-tier optimization
+## [1.2.0] — 2026-08-22 — model-tier optimization
 
 Six tier/effort changes ship, chosen by a gate both angles must clear:
 **accuracy ≥95% absolute, the difference CI clearing −10pp, both arms from one
