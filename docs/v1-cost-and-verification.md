@@ -80,8 +80,8 @@ sufficient and never was.
 forge-architect has no haiku row: its last measurement was 81/90 vs 89/90,
 CI [-16.9, -2.1], a **REGRESSION**. It ships on sonnet, which is where the
 opus→sonnet step left it, and that step is one of the four original claims now
-classed underpowered (see §5). The S47 fix aimed at that regression is unmeasured
-and lives on v2.
+classed underpowered (see §5). A fix aimed at that regression exists but is
+unmeasured, and lives on `evor/v2-optimize`.
 
 ## 4. Verification status — every adopted row
 
@@ -129,11 +129,13 @@ at 08:06 before both, and both reports cover the same 10 cases. What is not
 controlled is run-to-run variation, so this row is the softest of the seven
 despite being verified on file identity.
 
-**S47 and S49 were reverted from this branch** rather than shipped unmeasured.
-Both were agent-file edits committed after the runs that measured those files,
-and their verification runs were killed. Neither fix is suspect — S49 targeted a
-case weak in both arms, S47 removed a self-contradicting redirect — but
-unmeasured is unmeasured. `evor/optimization-v2` carries both.
+**Two further agent-file fixes are not on this branch at all.** Both were
+written after the runs that measured those files, and their verification runs
+were killed before producing a report, so shipping them would have meant
+shipping a prompt no measurement describes. Neither is suspect — one targeted a
+case weak in both arms, the other removed a self-contradicting redirect — but
+unmeasured is unmeasured. They live on `evor/v2-optimize`, which exists to
+measure them.
 
 ## 5. Claims that are NOT supported
 
