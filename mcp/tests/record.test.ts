@@ -253,6 +253,45 @@ describe("recordEval", () => {
     // No recordNode call — tree.json won't have this node; must not throw
     expect(() => recordEval(runId, nodeId, makeResult(nodeId, runId), "test-mission")).not.toThrow();
   });
+
+  // ── A1: tree entry carries the evaluation's metrics/fitness ───────────────
+
+  it("A1: recordEval writes the evaluation's metrics onto the tree node", () => {
+    const runId = "run-eval-a1-a";
+    const node = makeNode({ status: "running" });
+    recordNode(runId, node, "test-mission");
+
+    recordEval(runId, node.id, makeResult(node.id, runId), "test-mission");
+
+    const treePath = join(tmpRoot, "runs", "test-mission", runId, "tree.json");
+    const tree = JSON.parse(readFileSync(treePath, "utf8"));
+    expect(tree.nodes[node.id].metrics).toEqual({ accuracy: 0.88 });
+  });
+
+  it("A1: tree node metrics equal nodes/<id>/results.json metrics", () => {
+    const runId = "run-eval-a1-b";
+    const node = makeNode({ status: "running" });
+    recordNode(runId, node, "test-mission");
+
+    const { resultsPath } = recordEval(runId, node.id, makeResult(node.id, runId), "test-mission");
+    const results = JSON.parse(readFileSync(resultsPath, "utf8"));
+
+    const treePath = join(tmpRoot, "runs", "test-mission", runId, "tree.json");
+    const tree = JSON.parse(readFileSync(treePath, "utf8"));
+    expect(tree.nodes[node.id].metrics).toEqual(results.metrics);
+  });
+
+  it("A1: recordEval writes the evaluation's fitness_value onto the tree node", () => {
+    const runId = "run-eval-a1-c";
+    const node = makeNode({ status: "running" });
+    recordNode(runId, node, "test-mission");
+
+    recordEval(runId, node.id, makeResult(node.id, runId), "test-mission");
+
+    const treePath = join(tmpRoot, "runs", "test-mission", runId, "tree.json");
+    const tree = JSON.parse(readFileSync(treePath, "utf8"));
+    expect(tree.nodes[node.id].fitness_value).toBe(0.88);
+  });
 });
 
 // ── P2-1: auto-ID on evor_record_node ──────────────────────────────────────

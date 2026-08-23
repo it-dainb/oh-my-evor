@@ -20,7 +20,6 @@ Coverage:
     test_write_sage_valid_findings           — valid CitationBackedFinding list passes
     test_write_sage_invalid_fails            — missing required field returns {error}
     test_write_acquirer_valid               — valid AcquisitionProvenance passes
-    test_write_selector_passthrough          — no Pydantic model → passes through
     test_write_forge_passthrough             — no Pydantic model → passes through
     test_write_partial_artifact              — -partial.json written when partial=True
     test_write_overwrites_existing           — second write replaces first
@@ -163,11 +162,11 @@ def _minimal_provenance() -> dict:
 
 class TestWriteArtifact:
     def test_write_creates_file_atomically(self, tmp_path: Path) -> None:
-        result = write_artifact(tmp_path, tick=1, agent="selector", payload={"verdict": "approved"})
+        result = write_artifact(tmp_path, tick=1, agent="forge", payload={"summary": "ok"})
         assert result.get("ok") is True
-        target = tmp_path / "ticks/1/selector/verdict.json"
+        target = tmp_path / "ticks/1/forge/forge-report.json"
         assert target.exists()
-        assert json.loads(target.read_text()) == {"verdict": "approved"}
+        assert json.loads(target.read_text()) == {"summary": "ok"}
 
     def test_write_creates_intermediate_dirs(self, tmp_path: Path) -> None:
         result = write_artifact(tmp_path, tick=7, agent="probe", payload={"findings": []})
@@ -203,12 +202,6 @@ class TestWriteArtifact:
         )
         assert result.get("ok") is True, result.get("error")
 
-    def test_write_selector_passthrough(self, tmp_path: Path) -> None:
-        # selector has no Pydantic model — any dict passes through
-        payload = {"verdict": "approved", "approved_ids": ["p1"], "rejected_ids": []}
-        result = write_artifact(tmp_path, tick=1, agent="selector", payload=payload)
-        assert result.get("ok") is True
-
     def test_write_forge_passthrough(self, tmp_path: Path) -> None:
         payload = {"node_id": "n1", "approach": "ResNet50", "summary": "works"}
         result = write_artifact(tmp_path, tick=1, agent="forge", payload=payload)
@@ -222,9 +215,9 @@ class TestWriteArtifact:
         assert target.exists()
 
     def test_write_overwrites_existing(self, tmp_path: Path) -> None:
-        write_artifact(tmp_path, tick=1, agent="selector", payload={"v": 1})
-        write_artifact(tmp_path, tick=1, agent="selector", payload={"v": 2})
-        target = tmp_path / "ticks/1/selector/verdict.json"
+        write_artifact(tmp_path, tick=1, agent="forge", payload={"v": 1})
+        write_artifact(tmp_path, tick=1, agent="forge", payload={"v": 2})
+        target = tmp_path / "ticks/1/forge/forge-report.json"
         assert json.loads(target.read_text())["v"] == 2
 
     def test_sage_junior_write(self, tmp_path: Path) -> None:
@@ -235,6 +228,148 @@ class TestWriteArtifact:
         assert result.get("ok") is True
         target = tmp_path / "ticks/2/sage/juniors/attention.json"
         assert target.exists()
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# selector verdict contract (C4) — three real shapes seen across one live run:
+#   tick 1: canonical — "reviews" + nested "critic_review" + "selected" + top "winner"
+#   tick 2: gate results hoisted to top level of each review; container renamed
+#           "per_proposal_reviews"; no "selected"/"winner"
+#   tick 3: adds a stray top-level "critic_approved" alongside "critic_review";
+#           uses "selected_for_forge" instead of "selected"
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _minimal_critic_review(verdict: str = "approved") -> dict:
+    review = {
+        "h001_one_hypothesis": "pass",
+        "h002_family_streak": "pass",
+        "h003_intra_tick_diversity": "pass",
+        "h004_parent_diversity": "pass",
+        "integrity_risk": "pass",
+        "instrumentation_check": "pass",
+        "schema_valid": "pass",
+        "acquisition_contamination": None,
+        "gotcha_avoidance": "pass",
+        "verdict": verdict,
+    }
+    if verdict == "rejected":
+        review["rejection_reason"] = "h001 fail: prediction unquantified"
+    return review
+
+
+def _minimal_selector_verdict() -> dict:
+    """Canonical SelectorVerdict payload — the tick-1 shape from the C4 evidence."""
+    return {
+        "reviews": [
+            {
+                "proposal_id": "p1",
+                "approach_family": "algo",
+                "critic_review": _minimal_critic_review("approved"),
+                "selected": True,
+                "selection_note": "best fit for this tick",
+            }
+        ],
+        "winner": "p1",
+    }
+
+
+class TestSelectorVerdictContract:
+    def test_canonical_shape_accepted(self, tmp_path: Path) -> None:
+        result = write_artifact(tmp_path, tick=1, agent="selector", payload=_minimal_selector_verdict())
+        assert result.get("ok") is True, result.get("error")
+
+    def test_tick2_shape_rejected(self, tmp_path: Path) -> None:
+        # Real tick-2 shape: hoisted gate fields, renamed container, no reviews/selected/winner.
+        payload = {
+            "per_proposal_reviews": [
+                {
+                    "proposal_id": "p2",
+                    "approach_family": "algo",
+                    "h001_one_hypothesis": "pass",
+                    "h002_family_streak": "pass",
+                    "h003_intra_tick_diversity": "pass",
+                    "verdict": "deferred",
+                }
+            ],
+            "fast_path": True,
+            "selected_winner": "p2",
+            "summary": "deferred pending review",
+        }
+        result = write_artifact(tmp_path, tick=2, agent="selector", payload=payload)
+        assert "error" in result
+        assert "reviews" in result["error"]
+
+    def test_tick3_shape_rejected(self, tmp_path: Path) -> None:
+        # Real tick-3 shape: stray critic_approved alongside critic_review,
+        # selected_for_forge instead of selected.
+        payload = {
+            "reviews": [
+                {
+                    "proposal_id": "p4",
+                    "approach_family": "algo",
+                    "critic_approved": True,
+                    "critic_review": _minimal_critic_review("approved"),
+                    "selected_for_forge": True,
+                    "selection_note": "chosen",
+                }
+            ]
+        }
+        result = write_artifact(tmp_path, tick=3, agent="selector", payload=payload)
+        assert "error" in result
+        # Actionable: names the offending fields, not just "invalid".
+        assert "critic_approved" in result["error"]
+        assert "selected" in result["error"]
+
+    def test_round_trip_unchanged(self, tmp_path: Path) -> None:
+        payload = _minimal_selector_verdict()
+        write_result = write_artifact(tmp_path, tick=5, agent="selector", payload=payload)
+        assert write_result.get("ok") is True, write_result.get("error")
+        read_result = read_artifact(tmp_path, tick=5, agent="selector")
+        assert read_result.get("ok") is True, read_result.get("error")
+        assert read_result["payload"] == payload
+
+    def test_error_names_offending_field_not_generic(self, tmp_path: Path) -> None:
+        # Missing required 'proposal_id' — error must name it, not say "invalid".
+        payload = {
+            "reviews": [
+                {
+                    "approach_family": "algo",
+                    "critic_review": _minimal_critic_review("approved"),
+                    "selected": True,
+                }
+            ]
+        }
+        result = write_artifact(tmp_path, tick=6, agent="selector", payload=payload)
+        assert "error" in result
+        assert "proposal_id" in result["error"]
+
+    def test_selector_md_documents_same_field_names_as_validator(self) -> None:
+        """The Output_Format block in agents/evor-selector.md must use exactly the
+        field names the validator requires — a schema the agent's own instructions
+        contradict is a trap (per the C4 task). Extract field names from the md
+        file itself rather than hardcoding a second copy of the schema."""
+        import re
+
+        from evor.contracts import CriticReview, SelectorReview, SelectorVerdict
+
+        md_path = _HARNESS_DIR.parent / "agents" / "evor-selector.md"
+        text = md_path.read_text()
+
+        # Grab the first fenced ```json ... ``` block inside Output_Format.
+        output_format = text.split("<Output_Format>", 1)[1].split("</Output_Format>", 1)[0]
+        code_block = re.search(r"```json(.*?)```", output_format, re.DOTALL)
+        assert code_block, "Output_Format must contain a fenced json example"
+
+        documented_fields = set(re.findall(r'"([a-zA-Z_][a-zA-Z0-9_]*)"\s*:', code_block.group(1)))
+
+        required_fields = (
+            set(SelectorVerdict.model_fields)
+            | set(SelectorReview.model_fields)
+            | set(CriticReview.model_fields)
+        )
+
+        missing = required_fields - documented_fields
+        assert not missing, f"evor-selector.md Output_Format is missing fields: {missing}"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -319,11 +454,11 @@ class TestArtifactBridge:
 
 class TestReadArtifact:
     def test_returns_payload_when_found(self, tmp_path: Path) -> None:
-        write_artifact(tmp_path, tick=1, agent="selector", payload={"verdict": "approved"})
-        result = read_artifact(tmp_path, tick=1, agent="selector")
+        write_artifact(tmp_path, tick=1, agent="forge", payload={"summary": "ok"})
+        result = read_artifact(tmp_path, tick=1, agent="forge")
         assert result.get("ok") is True
-        assert result["payload"] == {"verdict": "approved"}
-        assert result["path"].endswith("selector/verdict.json")
+        assert result["payload"] == {"summary": "ok"}
+        assert result["path"].endswith("forge/forge-report.json")
 
     def test_not_found_returns_error_not_found(self, tmp_path: Path) -> None:
         result = read_artifact(tmp_path, tick=1, agent="selector")
@@ -404,17 +539,17 @@ class TestReadArtifactBridge:
         assert data == {"error": "not found"}
 
     def test_found_returns_payload(self, tmp_path: Path) -> None:
-        write_artifact(tmp_path, tick=2, agent="selector", payload={"verdict": "approved"})
+        write_artifact(tmp_path, tick=2, agent="forge", payload={"summary": "ok"})
         result = _run_read_bridge(
             tmp_path,
             "--run-dir", str(tmp_path),
             "--tick", "2",
-            "--agent", "selector",
+            "--agent", "forge",
         )
         assert result.returncode == 0, result.stderr
         data = json.loads(result.stdout)
         assert data.get("ok") is True
-        assert data["payload"] == {"verdict": "approved"}
+        assert data["payload"] == {"summary": "ok"}
 
     def test_bad_agent_exits_one(self, tmp_path: Path) -> None:
         result = _run_read_bridge(

@@ -1,0 +1,353 @@
+{
+  "role": "evor-sage-junior",
+  "agent_file": "agents/evor-sage-junior.md",
+  "arms": [
+    {
+      "model": "haiku",
+      "effort": "medium",
+      "label": "current"
+    },
+    {
+      "model": "sonnet",
+      "effort": "medium",
+      "label": "main (pre-retier)"
+    }
+  ],
+  "contract": {
+    "heading": "Angle Findings",
+    "mode": "json",
+    "fields": [
+      {
+        "path": "findings",
+        "kind": "count"
+      },
+      {
+        "path": "findings[].trust_level",
+        "kind": "every",
+        "values": [
+          "indicative",
+          "authoritative"
+        ]
+      },
+      {
+        "path": "findings[].confidence",
+        "kind": "every",
+        "values": [
+          "low",
+          "medium",
+          "high"
+        ]
+      },
+      {
+        "path": "findings[].quorum_met",
+        "kind": "every",
+        "values": [
+          "true",
+          "false"
+        ]
+      }
+    ]
+  },
+  "cases": [
+    {
+      "id": "two-sources-agree",
+      "gate": "quorum",
+      "note": "94.2 vs 94.0 is 0.21% divergence AND both sources state the same dataset, split and preprocessing, so the comparability gate passes and the arithmetic decides",
+      "angle_slug": "trocr-handwriting-sota",
+      "angle_query": "What is the current SOTA accuracy for transformer OCR on handwritten text?",
+      "metric_name": "top-1 accuracy on IAM-handwriting",
+      "search_results": [
+        {
+          "url": "https://arxiv.org/abs/2109.10282",
+          "title": "TrOCR: Transformer-based OCR with Pre-trained Models",
+          "venue": "arXiv preprint",
+          "type": "paper",
+          "reported_metric": 94.2,
+          "excerpt": "On the standard IAM handwriting test split, under the official preprocessing at 384x384 input, TrOCR-Large reaches 94.2% character accuracy."
+        },
+        {
+          "url": "https://aclanthology.org/2023.emnlp-main.417",
+          "title": "Revisiting Handwritten Text Recognition",
+          "venue": "EMNLP 2023",
+          "type": "paper",
+          "reported_metric": 94.0,
+          "excerpt": "Our reproduction of TrOCR-Large obtains 94.0% on the same IAM test split, using the authors' released preprocessing and 384x384 input."
+        }
+      ],
+      "expect": {
+        "findings": {
+          "min": 1
+        },
+        "findings[].trust_level": "authoritative",
+        "findings[].confidence": "high",
+        "findings[].quorum_met": true
+      }
+    },
+    {
+      "id": "single-source",
+      "gate": "quorum",
+      "note": "one authoritative paper and nothing to corroborate it",
+      "angle_slug": "donut-ocr-free",
+      "angle_query": "What accuracy does OCR-free document understanding reach on CORD?",
+      "metric_name": "top-1 accuracy on IAM-handwriting",
+      "search_results": [
+        {
+          "url": "https://arxiv.org/abs/2111.15664",
+          "title": "Donut: Document Understanding Transformer",
+          "venue": "ECCV 2022",
+          "type": "paper",
+          "reported_metric": 91.6,
+          "excerpt": "Donut-Base attains 91.6 F1 on the CORD receipt benchmark."
+        }
+      ],
+      "expect": {
+        "findings": {
+          "min": 1
+        },
+        "findings[].trust_level": "indicative",
+        "findings[].confidence": "medium",
+        "findings[].quorum_met": false
+      }
+    },
+    {
+      "id": "single-source-second",
+      "gate": "quorum",
+      "note": "a second single-source angle, to keep the always-indicative strategy from being cheap",
+      "angle_slug": "layoutlm-forms",
+      "angle_query": "What is the reported F1 for LayoutLMv3 on FUNSD?",
+      "metric_name": "F1 on FUNSD",
+      "search_results": [
+        {
+          "url": "https://arxiv.org/abs/2204.08387",
+          "title": "LayoutLMv3: Pre-training for Document AI",
+          "venue": "ACM MM 2022",
+          "type": "paper",
+          "reported_metric": 92.08,
+          "excerpt": "LayoutLMv3-Large reaches 92.08 F1 on FUNSD entity labelling."
+        }
+      ],
+      "expect": {
+        "findings": {
+          "min": 1
+        },
+        "findings[].trust_level": "indicative",
+        "findings[].confidence": "medium",
+        "findings[].quorum_met": false
+      }
+    },
+    {
+      "id": "divergence-inside-band-incomparable",
+      "gate": "threshold",
+      "note": "94.2 vs 90.0 is 4.46% divergence -- INSIDE the 5% band -- but source A reports on an unnamed 'evaluated split' while B reports under matched preprocessing in a fair-comparison study. The comparability gate runs before the arithmetic, so quorum does not apply. Answering from the 5% test alone gives 'high'.",
+      "angle_slug": "crnn-vs-transformer",
+      "angle_query": "What accuracy do CTC-based recognisers reach on IAM?",
+      "metric_name": "top-1 accuracy on IAM-handwriting",
+      "search_results": [
+        {
+          "url": "https://arxiv.org/abs/1507.05717",
+          "title": "An End-to-End Trainable Neural Network for Image-based Sequence Recognition",
+          "venue": "TPAMI 2017",
+          "type": "paper",
+          "reported_metric": 94.2,
+          "excerpt": "The CRNN achieves 94.2% on the evaluated split."
+        },
+        {
+          "url": "https://openaccess.thecvf.com/content/WACV2022/html/handwriting",
+          "title": "A Fair Comparison of Sequence Recognisers",
+          "venue": "WACV 2022",
+          "type": "paper",
+          "reported_metric": 90.0,
+          "excerpt": "Under matched preprocessing the CRNN obtains 90.0%."
+        }
+      ],
+      "expect": {
+        "findings": {
+          "min": 1
+        },
+        "findings[].trust_level": "indicative",
+        "findings[].confidence": "low",
+        "findings[].quorum_met": "false"
+      }
+    },
+    {
+      "id": "divergence-just-inside-comparable",
+      "gate": "quorum",
+      "note": "94.2 vs 90.0 is 4.46% divergence and both sources state the SAME dataset, split, preprocessing and input size, so the gate passes and the number decides: just inside the band, quorum met",
+      "angle_slug": "ctc-recogniser-matched-protocol",
+      "angle_query": "What accuracy do CTC-based recognisers reach on IAM under a matched protocol?",
+      "metric_name": "top-1 accuracy on IAM-handwriting",
+      "search_results": [
+        {
+          "url": "https://arxiv.org/abs/1507.05717v2",
+          "title": "An End-to-End Trainable Neural Network for Image-based Sequence Recognition",
+          "venue": "TPAMI 2017",
+          "type": "paper",
+          "reported_metric": 94.2,
+          "excerpt": "On the standard IAM test split, with the official preprocessing and 32px input height, the CRNN obtains 94.2%."
+        },
+        {
+          "url": "https://openaccess.thecvf.com/content/WACV2022/html/crnn-rerun",
+          "title": "Re-running CRNN under the standard protocol",
+          "venue": "WACV 2022",
+          "type": "paper",
+          "reported_metric": 90.0,
+          "excerpt": "Re-running the same CRNN on the standard IAM test split, official preprocessing, 32px input height, we measure 90.0%."
+        }
+      ],
+      "expect": {
+        "findings": {
+          "min": 1
+        },
+        "findings[].trust_level": "authoritative",
+        "findings[].confidence": "high",
+        "findings[].quorum_met": "true"
+      }
+    },
+    {
+      "id": "divergence-just-outside",
+      "gate": "threshold",
+      "note": "94.2 vs 89.0 is 5.52% divergence: outside the band. The two also disagree on protocol -- an 'internal split' against the standard IAM protocol -- so the gate fires as well.",
+      "angle_slug": "attention-ocr-gap",
+      "angle_query": "What accuracy do attention-based recognisers reach on IAM?",
+      "metric_name": "top-1 accuracy on IAM-handwriting",
+      "search_results": [
+        {
+          "url": "https://arxiv.org/abs/1704.03549",
+          "title": "Attention-based Extraction of Structured Information",
+          "venue": "ICDAR 2017",
+          "type": "paper",
+          "reported_metric": 94.2,
+          "excerpt": "Reported 94.2% on the internal split."
+        },
+        {
+          "url": "https://openreview.net/forum?id=handwriting-reeval",
+          "title": "Re-evaluating Attention OCR",
+          "venue": "ICLR 2024 workshop",
+          "type": "paper",
+          "reported_metric": 89.0,
+          "excerpt": "Under the standard IAM protocol we measure 89.0%."
+        }
+      ],
+      "expect": {
+        "findings": {
+          "min": 1
+        },
+        "findings[].trust_level": "indicative",
+        "findings[].confidence": "low",
+        "findings[].quorum_met": "false"
+      }
+    },
+    {
+      "id": "wide-disagreement",
+      "gate": "threshold",
+      "note": "94.2 vs 71.5 is a 24% divergence, and the first source names neither split nor protocol while the second reports under the official one; nothing here supports a quorum",
+      "angle_slug": "scene-text-claims",
+      "angle_query": "What accuracy is reported for scene-text recognition on ICDAR2015?",
+      "metric_name": "top-1 accuracy on IAM-handwriting",
+      "search_results": [
+        {
+          "url": "https://arxiv.org/abs/2103.06495",
+          "title": "Scene Text Recognition Revisited",
+          "venue": "arXiv preprint",
+          "type": "paper",
+          "reported_metric": 94.2,
+          "excerpt": "We report 94.2% word accuracy."
+        },
+        {
+          "url": "https://aclanthology.org/2024.findings-emnlp.88",
+          "title": "On Reproducibility in Scene Text",
+          "venue": "EMNLP Findings 2024",
+          "type": "paper",
+          "reported_metric": 71.5,
+          "excerpt": "Independent reimplementation reaches 71.5% under the official protocol."
+        }
+      ],
+      "expect": {
+        "findings": {
+          "min": 1
+        },
+        "findings[].trust_level": "indicative",
+        "findings[].confidence": "low",
+        "findings[].quorum_met": "false"
+      }
+    },
+    {
+      "id": "inadmissible-marketing-copy",
+      "gate": "confidence",
+      "note": "a vendor page whose only evidence is customer testimonials: marketing copy with no method, which Source_Admissibility bars from being reported at all. Reporting it at 'low' is the failure under test.",
+      "angle_slug": "ocr-vendor-claims",
+      "angle_query": "Do commercial OCR engines outperform open models on receipts?",
+      "metric_name": "top-1 accuracy on IAM-handwriting",
+      "search_results": [
+        {
+          "url": "https://example-vendor.com/blog/ocr-accuracy",
+          "title": "Our OCR is the most accurate on the market",
+          "venue": "vendor blog",
+          "type": "blog",
+          "excerpt": "Customers consistently tell us our engine is more accurate than open-source alternatives."
+        }
+      ],
+      "expect": {
+        "findings": 0
+      }
+    },
+    {
+      "id": "inadmissible-forum-anecdote",
+      "gate": "confidence",
+      "note": "a forum thread of anecdotes, again with no measurement",
+      "angle_slug": "augmentation-anecdote",
+      "angle_query": "Does elastic distortion augmentation help handwriting recognition?",
+      "metric_name": "top-1 accuracy on IAM-handwriting",
+      "search_results": [
+        {
+          "url": "https://forum.example.org/t/elastic-distortion",
+          "title": "Does elastic distortion actually help?",
+          "venue": "community forum",
+          "type": "forum",
+          "excerpt": "Several people report it 'seemed to help a bit' on their own datasets; no metrics given."
+        }
+      ],
+      "expect": {
+        "findings": 0
+      }
+    },
+    {
+      "id": "no-evidence",
+      "gate": "empty",
+      "note": "both search paths came back empty; there is nothing to report",
+      "angle_slug": "nonexistent-benchmark",
+      "angle_query": "What is the SOTA on the QZ-9000 handwriting benchmark?",
+      "metric_name": "top-1 accuracy on IAM-handwriting",
+      "search_results": [],
+      "expect": {
+        "findings": 0
+      }
+    },
+    {
+      "id": "indirect-evidence-admissible",
+      "gate": "confidence",
+      "note": "an engineering blog post from the model authors that states a method and a number: INDIRECT, so capped at \"low\", but reportable. Returning nothing here discards real signal.",
+      "angle_slug": "distillation-throughput",
+      "angle_query": "Does distilling the recogniser cost accuracy on IAM?",
+      "metric_name": "top-1 accuracy on IAM-handwriting",
+      "search_results": [
+        {
+          "url": "https://engineering.example-lab.org/blog/distilling-our-recogniser",
+          "title": "Distilling our handwriting recogniser",
+          "venue": "authors' engineering blog",
+          "type": "blog",
+          "reported_metric": 93.1,
+          "excerpt": "We distilled the 300M recogniser into a 60M student and measured 93.1% on our IAM test split, against 94.2% for the teacher. Training and eval scripts are linked, but this has not been peer reviewed and we did not run the standard preprocessing."
+        }
+      ],
+      "expect": {
+        "findings": {
+          "min": 1
+        },
+        "findings[].trust_level": "indicative",
+        "findings[].confidence": "low",
+        "findings[].quorum_met": "false"
+      }
+    }
+  ]
+}

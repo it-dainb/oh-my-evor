@@ -145,6 +145,72 @@ export function recordNode(runId: string, node: TreeNode, missionId?: string): {
  * inline, so the orchestrator never needs a separate evor_integrity_check call for the
  * normal eval flow.
  */
+/**
+ * Propagate a completed evaluation's fitness into run-state's `best_score`.
+ *
+ * Nothing did this before, so `best_score` stayed at its initial null and
+ * `harness/evor/tree.py:701` read it as 0.0 — making BOTH score-based stop
+ * conditions unreachable:
+ *   beat-baseline: 0.0 > baseline_value   never true
+ *   target:        0.0 >= target_value    never true
+ * An evolutionary search that cannot recognise success runs to max_iterations
+ * regardless of what it finds.
+ *
+ * P3: only an integrity-PASSED node may move the score. A failed — or merely
+ * unchecked — node setting best_score would let a cheating candidate define the
+ * mission's own success criterion, which is exactly what the integrity gate
+ * exists to prevent. Absence of a failure verdict is not evidence of integrity.
+ */
+export function updateBestScore(
+  runId: string,
+  nodeId: string,
+  result: unknown,
+  integrityVerdict: string | null,
+  missionId?: string,
+): void {
+  if (integrityVerdict !== "passed") return;
+
+  try {
+    const paths = resolveRunPaths(runId, missionId);
+
+    // The primary metric is declared in the contract; a secondary metric that
+    // happens to score higher must never be mistaken for fitness.
+    const contractPath = join(paths.runDir, "goal-contract.json");
+    if (!existsSync(contractPath)) return;
+    const contract = JSON.parse(readFileSync(contractPath, "utf8"));
+    const primary = (contract?.metric_specs ?? []).find(
+      (m: Record<string, unknown>) => m?.role === "primary_fitness",
+    );
+    if (!primary?.metric_name) return;
+
+    const metrics = (result as Record<string, unknown> | null)?.metrics as
+      | Record<string, unknown>
+      | undefined;
+    const value = metrics?.[primary.metric_name as string];
+    if (typeof value !== "number" || Number.isNaN(value)) return;
+
+    const runStatePath = join(paths.runDir, "run-state.json");
+    const state = readRunState(runStatePath, runId);
+    const current = state.best_score;
+    const lowerIsBetter = primary.direction === "lower";
+
+    const improves =
+      typeof current !== "number"
+        ? true
+        : lowerIsBetter
+          ? value < current
+          : value > current;
+    if (!improves) return;
+
+    state.best_score = value;
+    state.best_node_id = nodeId;
+    writeRunState(runStatePath, state);
+  } catch {
+    // Non-fatal: a bookkeeping failure must not sink a completed evaluation.
+    // The score is recoverable from results.json; the eval is not.
+  }
+}
+
 export function recordEval(
   runId: string,
   nodeId: string,
@@ -188,6 +254,12 @@ export function recordEval(
   // Cascade status → "done" and write integrity_status back to tree.json.
   // Without this, tree nodes stay status="running" forever after Forge writes results —
   // the orchestrator had to call evor_record_node 4+ extra times per run to fix it (P0-5).
+  //
+  // A1: the tree node's own metrics/fitness_value are also cascaded here, from the
+  // very `result` object this function just wrote to results.json. Before this, the
+  // scoreboard lived only in nodes/<id>/results.json — tree.json kept whatever
+  // (usually empty) metrics the node had at evor_record_node time, so evor_tree_read
+  // (what evor-mutagen calls to pick a parent) returned a frontier with no fitness.
   try {
     const nodes = readTree(runId, missionId);
     const node = nodes[nodeId];
@@ -196,12 +268,22 @@ export function recordEval(
       if (integrityVerdict === "passed" || integrityVerdict === "failed") {
         updates.integrity_status = integrityVerdict as "passed" | "failed";
       }
+      const r = result as Record<string, unknown> | null;
+      if (r && typeof r.metrics === "object" && r.metrics !== null) {
+        updates.metrics = r.metrics as Record<string, number>;
+      }
+      if (typeof r?.fitness_value === "number") {
+        updates.fitness_value = r.fitness_value;
+      }
       upsertNode(runId, { ...node, ...updates }, missionId);
     }
   } catch {
     // Non-fatal: if tree.json cannot be updated the run continues; the
     // orchestrator can re-check integrity explicitly via evor_integrity_check.
   }
+
+  // Stage 1.7: propagate fitness so the score-based stop conditions can fire.
+  updateBestScore(runId, nodeId, result, integrityVerdict, missionId);
 
   return { resultsPath, integrityVerdict, integrityError, integrityReport };
 }
@@ -374,8 +456,8 @@ export function registerRecordTools(server: McpServer): void {
           {
             type: "text" as const,
             text: result.ok
-              ? JSON.stringify(result.data)
-              : JSON.stringify({ error: result.error }),
+              ? JSON.stringify({ ok: true, ...(result.data as Record<string, unknown>) })
+              : JSON.stringify({ ok: false, error: result.error }),
           },
         ],
       };

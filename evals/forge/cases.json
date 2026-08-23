@@ -1,0 +1,216 @@
+{
+  "role": "evor-forge",
+  "notes": [
+    "Cases for the capability gate that agents/evor-forge.md specifies under",
+    "<Check_Capability_And_Gotchas>. Every expectation here is derivable from",
+    "that section's three HARD RULES and nothing else — no property is graded",
+    "that the agent file does not already mandate.",
+    "",
+    "The gate is the only part of forge's job with a derivable answer. The rest",
+    "of forge (spawning a team, materialising a genome, storing deltas) needs",
+    "live MCP state and a worktree, and is covered by ci/bench-tick.sh instead.",
+    "",
+    "Three of the six cases expect proceed-with-no-change, so an agent that",
+    "always aborts scores 1/6 and one that always proceeds untouched scores",
+    "3/6. Both negative controls (hw-gotcha-no-match, batch-size-no-match)",
+    "carry a real gotcha that must be read and rejected, not merely absent."
+  ],
+  "cases": [
+    {
+      "id": "clean-proceed",
+      "gate": "baseline",
+      "note": "Ampere GPU, no gotchas, ordinary proposal — nothing to gate on.",
+      "tick": 3,
+      "capability": {
+        "gpu_arch": "sm_80",
+        "cpu_only": false,
+        "supported_dtypes": ["fp32", "fp16", "bf16"],
+        "vram_gb": 40
+      },
+      "gotchas": [],
+      "signals": [],
+      "proposal": {
+        "proposal_id": "p-clean-01",
+        "task": "cifar10-resnet",
+        "technique": "cosine learning-rate schedule with 5-epoch linear warmup",
+        "batch_size": 128,
+        "mutation_tier": "parametric"
+      },
+      "expect": {
+        "decision": "proceed",
+        "batch_size": "unchanged",
+        "constraints": []
+      }
+    },
+    {
+      "id": "cpu-only-constraint",
+      "gate": "cpu_only",
+      "note": "HARD RULE 1: cpu_only=True means the constraint is passed down to forge-junior. The proposal itself is CPU-runnable, so this is a proceed, not an abort.",
+      "tick": 3,
+      "capability": {
+        "gpu_arch": null,
+        "cpu_only": true,
+        "supported_dtypes": ["fp32"],
+        "vram_gb": 0
+      },
+      "gotchas": [],
+      "signals": [],
+      "proposal": {
+        "proposal_id": "p-cpu-01",
+        "task": "cifar10-resnet",
+        "technique": "label smoothing 0.1 with a wider first conv block",
+        "batch_size": 64,
+        "mutation_tier": "structural"
+      },
+      "expect": {
+        "decision": "proceed",
+        "batch_size": "unchanged",
+        "constraints": ["cpu_only"]
+      }
+    },
+    {
+      "id": "hw-gotcha-abort",
+      "gate": "hw_abort",
+      "note": "HARD RULE 2: a hardware-constraint gotcha whose signature matches the proposal's technique. Pascal card, flash-attention-2 proposal — the hardware cannot run this.",
+      "tick": 4,
+      "capability": {
+        "gpu_arch": "sm_61",
+        "cpu_only": false,
+        "supported_dtypes": ["fp32", "fp16"],
+        "vram_gb": 12
+      },
+      "gotchas": [
+        {
+          "gotcha_id": "g-hw-01",
+          "kind": "hardware-constraint",
+          "confidence": 0.93,
+          "signature": "flash-attention-2 requires Ampere (sm_80) or newer; it does not build on Pascal",
+          "context": { "gpu_arch": "sm_61" }
+        }
+      ],
+      "signals": [],
+      "proposal": {
+        "proposal_id": "p-fa2-01",
+        "task": "cifar10-resnet",
+        "technique": "replace the attention block with a flash-attention-2 kernel",
+        "batch_size": 128,
+        "mutation_tier": "structural"
+      },
+      "expect": {
+        "decision": "abort",
+        "batch_size": "unchanged",
+        "constraints": []
+      }
+    },
+    {
+      "id": "hw-gotcha-no-match",
+      "gate": "hw_no_match",
+      "note": "Negative control for HARD RULE 2: a high-confidence hardware-constraint gotcha is present but names a technique the proposal does not use. Aborting here would be a false positive.",
+      "tick": 4,
+      "capability": {
+        "gpu_arch": "sm_80",
+        "cpu_only": false,
+        "supported_dtypes": ["fp32", "fp16", "bf16"],
+        "vram_gb": 40
+      },
+      "gotchas": [
+        {
+          "gotcha_id": "g-hw-02",
+          "kind": "hardware-constraint",
+          "confidence": 0.91,
+          "signature": "8-bit bitsandbytes optimizers require CUDA >= 11.8; this host ships 11.4",
+          "context": { "cuda_version": "11.4" }
+        }
+      ],
+      "signals": [],
+      "proposal": {
+        "proposal_id": "p-nomatch-01",
+        "task": "cifar10-resnet",
+        "technique": "mixup augmentation with alpha 0.2, plain fp32 SGD optimizer",
+        "batch_size": 128,
+        "mutation_tier": "parametric"
+      },
+      "expect": {
+        "decision": "proceed",
+        "batch_size": "unchanged",
+        "constraints": []
+      }
+    },
+    {
+      "id": "batch-size-substitution",
+      "gate": "bs_subst",
+      "note": "HARD RULE 3: a runtime-failure gotcha whose context.batch_size equals the proposal's batch_size on the SAME task. The known-safe batch_size (128) is passed down instead; the proposal is not aborted.",
+      "tick": 5,
+      "capability": {
+        "gpu_arch": "sm_80",
+        "cpu_only": false,
+        "supported_dtypes": ["fp32", "fp16", "bf16"],
+        "vram_gb": 16
+      },
+      "gotchas": [
+        {
+          "gotcha_id": "g-rt-01",
+          "kind": "runtime-failure",
+          "confidence": 0.88,
+          "signature": "CUDA OOM at batch_size 512 on 16GB; batch_size 128 completed",
+          "context": {
+            "task": "cifar10-resnet",
+            "batch_size": 512,
+            "safe_batch_size": 128
+          }
+        }
+      ],
+      "signals": [],
+      "proposal": {
+        "proposal_id": "p-bs-01",
+        "task": "cifar10-resnet",
+        "technique": "larger-batch training with a linearly scaled LR",
+        "batch_size": 512,
+        "mutation_tier": "parametric"
+      },
+      "expect": {
+        "decision": "proceed",
+        "batch_size": 128,
+        "constraints": []
+      }
+    },
+    {
+      "id": "batch-size-no-match",
+      "gate": "bs_no_match",
+      "note": "Negative control for HARD RULE 3: the same OOM gotcha is present, but the proposal asks for batch_size 64, which the gotcha does not name. Substituting 128 here would RAISE the batch size on the strength of an OOM report.",
+      "tick": 5,
+      "capability": {
+        "gpu_arch": "sm_80",
+        "cpu_only": false,
+        "supported_dtypes": ["fp32", "fp16", "bf16"],
+        "vram_gb": 16
+      },
+      "gotchas": [
+        {
+          "gotcha_id": "g-rt-01",
+          "kind": "runtime-failure",
+          "confidence": 0.88,
+          "signature": "CUDA OOM at batch_size 512 on 16GB; batch_size 128 completed",
+          "context": {
+            "task": "cifar10-resnet",
+            "batch_size": 512,
+            "safe_batch_size": 128
+          }
+        }
+      ],
+      "signals": [],
+      "proposal": {
+        "proposal_id": "p-bs-02",
+        "task": "cifar10-resnet",
+        "technique": "gradient accumulation over 8 micro-batches",
+        "batch_size": 64,
+        "mutation_tier": "parametric"
+      },
+      "expect": {
+        "decision": "proceed",
+        "batch_size": "unchanged",
+        "constraints": []
+      }
+    }
+  ]
+}

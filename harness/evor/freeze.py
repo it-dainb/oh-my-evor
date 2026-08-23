@@ -61,6 +61,15 @@ def _sample_to_bytes(sample: Any, idx: str, dest_dir: Path) -> bytes:
     return encoded
 
 
+def _sample_bytes(sample: Any) -> bytes:
+    """Byte encoding of a sample WITHOUT materialising it (mirrors _sample_to_bytes)."""
+    if isinstance(sample, bytes):
+        return sample
+    if isinstance(sample, (str, Path)):
+        return Path(sample).read_bytes()
+    return json.dumps(sample, sort_keys=True, default=str).encode()
+
+
 def _compute_split_hash(per_sample_hashes: dict[str, str]) -> str:
     """sha256(sorted_indices_json_bytes || sorted_hashes_json_bytes)."""
     sorted_indices = sorted(per_sample_hashes.keys())
@@ -83,6 +92,7 @@ class FrozenSplitManager:
         split_config: dict[str, Any],
         eval_version: str,
         run_dir: Path,
+        allow_refreeze: bool = False,
     ) -> tuple[FrozenSplit, FrozenSplit]:
         """Create FrozenSplit records for test and val splits.
 
@@ -110,6 +120,7 @@ class FrozenSplitManager:
             eval_version=eval_version,
             run_dir=run_dir,
             mission_id=mission_id,
+            allow_refreeze=allow_refreeze,
         )
         val_split = self._freeze_one(
             split_type="val",
@@ -117,6 +128,7 @@ class FrozenSplitManager:
             eval_version=eval_version,
             run_dir=run_dir,
             mission_id=mission_id,
+            allow_refreeze=allow_refreeze,
         )
         return test_split, val_split
 
@@ -127,6 +139,7 @@ class FrozenSplitManager:
         eval_version: str,
         run_dir: Path,
         mission_id: str,
+        allow_refreeze: bool = False,
     ) -> FrozenSplit:
         frozen_dir = run_dir / "frozen-splits"
         split_dir = frozen_dir / f"{eval_version}-{split_type}"
@@ -136,6 +149,49 @@ class FrozenSplitManager:
             list(entries) if isinstance(entries, list)
             else [(str(k), v) for k, v in entries.items()]
         )
+
+        storage_path = frozen_dir / f"{eval_version}-{split_type}.json"
+
+        # ── Decide BEFORE materialising anything ──────────────────────────────
+        # The first freeze chmods every materialised sample to 444, so a second
+        # freeze into the same split_dir raises PermissionError inside
+        # _sample_to_bytes before any guard placed after the loop could run. That
+        # is the PermissionError seen in run 29d17abc, and it is the same
+        # mechanism as the shrink rather than a separate fault: the failed second
+        # call left the split untouched, and a third call over a narrower dataset
+        # (fewer indices, so no collision with the read-only files) then wrote a
+        # smaller split over the original.
+        #
+        # Hashing without writing lets the decision happen first, so a rejected
+        # re-freeze touches neither the samples nor the JSON.
+        prospective = {str(idx): _sha256_bytes(_sample_bytes(sample)) for idx, sample in items}
+        prospective_hash = _compute_split_hash(prospective)
+
+        if storage_path.exists() and not allow_refreeze:
+            try:
+                prior = FrozenSplit.model_validate_json(storage_path.read_text())
+            except Exception:
+                prior = None  # unreadable prior — treat as absent and re-freeze
+            if prior is not None:
+                if prior.split_hash == prospective_hash:
+                    return prior  # identical content: idempotent, nothing to do
+                raise ValueError(
+                    f"refusing to re-freeze the {split_type} split for eval_version "
+                    f"{eval_version!r}: it is already frozen with item_count="
+                    f"{prior.item_count} (hash {prior.split_hash[:12]}…) and this call "
+                    f"would replace it with item_count={len(prospective)} "
+                    f"(hash {prospective_hash[:12]}…). A frozen split is the denominator "
+                    f"of every fitness comparison already recorded, so it cannot change "
+                    f"silently. Use a new eval_version for a new eval set, or pass "
+                    f"allow_refreeze=True to state that replacing it is intended."
+                )
+
+        # A deliberate re-freeze must be able to overwrite the read-only samples
+        # its predecessor left behind.
+        if split_dir.exists():
+            for f in split_dir.iterdir():
+                if f.is_file():
+                    f.chmod(0o644)
 
         per_sample_hashes: dict[str, str] = {}
         for idx, sample in items:
@@ -148,7 +204,6 @@ class FrozenSplitManager:
                 _make_readonly(f)
 
         split_hash = _compute_split_hash(per_sample_hashes)
-        storage_path = frozen_dir / f"{eval_version}-{split_type}.json"
 
         split = FrozenSplit(
             split_id=f"{mission_id}-{eval_version}-{split_type}",
@@ -161,7 +216,10 @@ class FrozenSplitManager:
             storage_path=str(storage_path.resolve()),
             eval_version=eval_version,
         )
-        storage_path.write_text(split.model_dump_json(indent=2))
+        # Atomic: a reader must never observe a half-written split.
+        tmp_path = storage_path.with_suffix(".json.tmp")
+        tmp_path.write_text(split.model_dump_json(indent=2))
+        tmp_path.replace(storage_path)
         return split
 
     def verify_frozen_split(self, split: FrozenSplit, run_dir: Path) -> bool:

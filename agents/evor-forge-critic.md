@@ -2,7 +2,8 @@
 name: evor-forge-critic
 description: Forge-critic — pre-run code review + integrity/structure check for Forge (Opus)
 model: opus
-level: 3
+effort: medium
+maxTurns: 16
 disallowedTools: Write, Edit
 skills: [oh-my-evor:evor-mcp]
 ---

@@ -25,6 +25,7 @@ Coverage:
 
 from __future__ import annotations
 
+import json
 import math
 from pathlib import Path
 from unittest.mock import MagicMock
@@ -314,6 +315,87 @@ def test_pruned_nodes_excluded_from_select(tmp_path: Path) -> None:
     selected = engine.select(count=2)
     ids = {n.id for n in selected}
     assert "pruned" not in ids
+
+
+# ── Tests: A5 visit_count persistence ───────────────────────────────────────────
+
+
+def test_select_increments_visit_count_and_persists(tmp_path: Path) -> None:
+    """Selecting a node bumps its visit_count and writes it back to tree.json.
+
+    Before the A5 fix, select() was pure read/compute — nothing ever wrote
+    the increment back, so every node stayed visit_count=0 forever.
+    """
+    node = _make_node("n1", [], 0, 0.80, visit_count=0, status="done")
+    engine = TreeEngine(nodes=[node], goal=_make_goal(), strategy=_make_strategy(), run_dir=tmp_path)
+
+    selected = engine.select(count=1)
+
+    assert selected[0].visit_count == 1
+    tree_data = json.loads((tmp_path / "tree.json").read_text())
+    assert tree_data["nodes"]["n1"]["visit_count"] == 1
+
+
+def test_select_ucb1_ordering_changes_with_visits(tmp_path: Path) -> None:
+    """Exploration is LIVE: a heavily-visited high-fitness node eventually
+    loses to a less-visited, lower-fitness one.
+
+    Without persisted visit_count increments, node-a's score never changes
+    across iterations and it wins every single round forever. With
+    increments wired up, node-a's own exploration term shrinks each time
+    it's picked while node-b's exploration term keeps growing (N grows every
+    round, node-b's n_i never does) — until node-b's score overtakes it.
+    """
+    node_a = _make_node("node-a", [], 0, 0.90, visit_count=1)  # higher fitness
+    node_b = _make_node("node-b", [], 0, 0.50, visit_count=1)  # lower fitness
+    goal = _make_goal(baseline=0.0, target=1.0)
+    strategy = _make_strategy(ucb1_c=1.41)
+    engine = TreeEngine(nodes=[node_a, node_b], goal=goal, strategy=strategy, run_dir=tmp_path)
+
+    picked: list[str] = []
+    for _ in range(40):
+        picked.append(engine.select(count=1)[0].id)
+
+    assert picked[0] == "node-a", "higher-fitness node must win the opening round"
+    assert "node-b" in picked, (
+        "node-b's exploration bonus must eventually overtake node-a's — "
+        "this only happens if visit_count increments are actually persisted"
+    )
+
+
+def test_select_cold_start_all_zero_is_deterministic(tmp_path: Path) -> None:
+    """All visit_count=0 → +inf tie is broken by stable-sort insertion order,
+    not accidental dict/set ordering — and each selected node is bumped to 1."""
+    nodes = [_make_node(f"n{i}", [], 0, 0.5, visit_count=0) for i in range(3)]
+    engine = TreeEngine(nodes=nodes, goal=_make_goal(), strategy=_make_strategy(), run_dir=tmp_path)
+
+    selected = engine.select(count=3)
+
+    # Documented tie-break: ties at +inf preserve original list order.
+    assert [n.id for n in selected] == ["n0", "n1", "n2"]
+    assert all(n.visit_count == 1 for n in selected)
+
+
+def test_select_total_visits_equals_sum_of_per_node_visits(tmp_path: Path) -> None:
+    """total_visits (N, recomputed fresh each select() call) always equals the
+    sum of per-node visit_count — never drifts out of sync."""
+    node_a = _make_node("node-a", [], 0, 0.9, visit_count=1)
+    node_b = _make_node("node-b", [], 0, 0.5, visit_count=1)
+    engine = TreeEngine(
+        nodes=[node_a, node_b], goal=_make_goal(baseline=0.0, target=1.0),
+        strategy=_make_strategy(), run_dir=tmp_path,
+    )
+
+    for _ in range(10):
+        engine.select(count=1)
+
+    total_visits = sum(n.visit_count for n in engine._nodes)
+    tree_data = json.loads((tmp_path / "tree.json").read_text())
+    persisted_total = sum(n["visit_count"] for n in tree_data["nodes"].values())
+
+    # 2 starting visits (1 each) + 10 selections of 1 node each = 12
+    assert total_visits == 12
+    assert persisted_total == total_visits
 
 
 # ── Tests: propose_crossover() ─────────────────────────────────────────────────

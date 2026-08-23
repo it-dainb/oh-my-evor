@@ -44,3 +44,6 @@ mcp/.uv/
 ci/out/
 
 logs/
+
+# Local benchmark mission scratch (see ci/bench-tick.sh — normally runs in-container)
+.evor-bench/

@@ -20,6 +20,7 @@
  */
 
 import { readFileSync } from 'fs';
+import { resolveActiveRun } from './lib/active-run.mjs';
 
 // ── Kill switches ─────────────────────────────────────────────────────────────
 if (process.env.DISABLE_EVOR) process.exit(0);
@@ -28,7 +29,7 @@ const skipHooks = (process.env.EVOR_SKIP_HOOKS ?? '').split(',').map(s => s.trim
 if (skipHooks.includes('post-tool-batch')) process.exit(0);
 
 // ── Active run guard ──────────────────────────────────────────────────────────
-if (!(process.env.EVOR_ACTIVE_RUN_ID ?? '')) process.exit(0);
+if (!resolveActiveRun().runId) process.exit(0);
 
 // ── Parse STDIN payload ───────────────────────────────────────────────────────
 let input;

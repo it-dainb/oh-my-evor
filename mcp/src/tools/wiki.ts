@@ -27,6 +27,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { LessonEntry, LessonEntrySchema, ApproachFamilySchema } from "../contracts.js";
 import { resolveRunPaths, getEvorRoot } from "../run-store.js";
+import { ok } from "../tool-result.js";
 
 // ── Markdown renderer (mirrors wiki.py._render_lesson) ────────────────────
 
@@ -135,6 +136,9 @@ function pruneAndWrite(indexPath: string, newEntry: LessonEntry): void {
   const tmp = `${indexPath}.tmp.${process.pid}`;
   writeFileSync(tmp, entries.map((e) => JSON.stringify(e)).join("\n") + "\n", "utf8");
   renameSync(tmp, indexPath);
+  // Invalidate explicitly. mtime cannot be relied on: two writes inside the same
+  // millisecond share a timestamp, and the reader would serve the pre-write corpus.
+  bumpWikiGeneration();
 }
 
 // ── TF-IDF helpers ────────────────────────────────────────────────────────
@@ -182,11 +186,26 @@ function cosineSim(a: Map<string, number>, b: Map<string, number>): number {
  * These are IDF-dependent and do not change while the file is unchanged.
  * Query vectors are built per-call (cheap: just the query tokens × IDF lookup).
  *
- * Cache key: (indexPath → mtime).  A write via pruneAndWrite (tmp→rename) always
- * produces a fresh mtime so the next wikiGetRelevant call triggers a cold load.
+ * Cache key: (indexPath → mtime + generation).
+ *
+ * mtime ALONE IS NOT SUFFICIENT, which the original design assumed: "a write via
+ * pruneAndWrite (tmp→rename) always produces a fresh mtime". It does not. mtimeMs
+ * is millisecond-resolution and the kernel's timestamp source is coarser still —
+ * measured on this host, two immediate writes to the same file produced identical
+ * `mtime_ns`. So a wikiAdd followed by a wikiGetRelevant inside the same tick
+ * served the PREVIOUS corpus, silently missing the lesson just written.
+ *
+ * That is a data-loss path, not a performance detail: Sage writes a finding and
+ * Mutagen queries the wiki in the same tick, so the reader can miss exactly the
+ * lesson the writer just produced — with no error anywhere.
+ *
+ * The generation counter is bumped by every in-process write, so invalidation no
+ * longer depends on clock resolution. mtime is retained as the secondary key so
+ * writes from ANOTHER process still invalidate.
  */
 interface WikiCache {
   mtime: number;
+  generation: number;
   entries: LessonEntry[];
   entryVecs: Map<string, number>[];
   df: Map<string, number>;
@@ -194,6 +213,14 @@ interface WikiCache {
 }
 
 const idfCache = new Map<string, WikiCache>();
+
+/** Bumped on every in-process write; part of the cache key. See WikiCache. */
+let wikiGeneration = 0;
+
+/** Invalidate the corpus cache for a path after a write. */
+function bumpWikiGeneration(): void {
+  wikiGeneration++;
+}
 
 /** Hit/miss counters exposed for tests. */
 export const _wikiCacheStats = { hits: 0, misses: 0 };
@@ -206,6 +233,7 @@ export function _resetWikiCache(): void {
   idfCache.clear();
   _wikiCacheStats.hits = 0;
   _wikiCacheStats.misses = 0;
+  wikiGeneration = 0;
 }
 
 /**
@@ -219,11 +247,11 @@ function loadCorpus(indexPath: string): WikiCache {
   try {
     mtime = statSync(indexPath).mtimeMs;
   } catch {
-    return { mtime: 0, entries: [], entryVecs: [], df: new Map(), N: 0 };
+    return { mtime: 0, generation: wikiGeneration, entries: [], entryVecs: [], df: new Map(), N: 0 };
   }
 
   const cached = idfCache.get(indexPath);
-  if (cached && cached.mtime === mtime) {
+  if (cached && cached.mtime === mtime && cached.generation === wikiGeneration) {
     _wikiCacheStats.hits++;
     return cached;
   }
@@ -268,7 +296,7 @@ function loadCorpus(indexPath: string): WikiCache {
     return vec;
   });
 
-  const result: WikiCache = { mtime, entries, entryVecs, df, N };
+  const result: WikiCache = { mtime, generation: wikiGeneration, entries, entryVecs, df, N };
   idfCache.set(indexPath, result);
   return result;
 }
@@ -321,8 +349,7 @@ export function wikiAdd(
  *
  * Filters: `family` and `confirmedOnly` applied before scoring.
  *
- * Prefer evor_wiki_get_relevant for semantic/bounded reads; use this tool
- * only for exact keyword filtering or family/verdict narrowing.
+ * Search is one tool: evor_wiki_query with mode=semantic|keyword.
  */
 export function wikiQuery(
   query: string,
@@ -476,64 +503,43 @@ export function registerWikiTools(server: McpServer): void {
     }
   );
 
-  // ── evor_wiki_get_relevant ────────────────────────────────────────────────
-  server.tool(
-    "evor_wiki_get_relevant",
-    [
-      "Retrieve the k most semantically-relevant wiki lessons for the given context string.",
-      "Uses TF-IDF (cached per-file-mtime) to surface lessons about related concepts",
-      "even without exact keyword match.",
-      "Prefer this over evor_wiki_query when looking for lessons about the current",
-      "tick's approach, metric, or failure mode.",
-    ].join(" "),
-    {
-      run_id: z.string(),
-      context: z.string().describe("Current tick context: approach, metric, error, or architecture name"),
-      k: z.number().int().positive().optional().describe("Max results, default 5"),
-    },
-    async ({ run_id, context, k }) => {
-      const lessons = wikiGetRelevant(context, k ?? 5);
-      return {
-        content: [
-          {
-            type: "text" as const,
-            text: JSON.stringify({ lessons, run_id, context, count: lessons.length }),
-          },
-        ],
-      };
-    }
-  );
-
   // ── evor_wiki_query ───────────────────────────────────────────────────────
   server.tool(
     "evor_wiki_query",
     [
-      "Legacy keyword search over .evor/wiki/index.jsonl.",
-      "Filter by approach_family and/or confirmed_only; cross-run scope.",
-      "Prefer evor_wiki_get_relevant for semantic context-based retrieval;",
-      "use this tool only for exact keyword filtering or family/verdict narrowing.",
+      "Search wiki lessons across runs.",
+      "mode=semantic ranks by TF-IDF relevance to a context string (approach, metric,",
+      "error, architecture) and surfaces related concepts without exact keyword match;",
+      "mode=keyword filters by exact phrase, approach_family and verdict.",
     ].join(" "),
     {
-      run_id: z.string().describe("Active run identifier (sets cross-run scope)"),
-      query: z.string().describe("Keyword or phrase to search"),
-      approach_family: ApproachFamilySchema.optional().describe("Filter to a specific approach family"),
-      confirmed_only: z.boolean().optional().describe("If true, return only hypothesis_verdict=confirmed entries"),
-      limit: z.number().int().positive().optional().describe("Maximum results to return (default 10)"),
+      // One tool, one enum, replacing two whose descriptions each told the caller
+      // to use the other. Cross-recommendation in prose is a design smell: the
+      // choice belongs in the interface, where it cannot drift from the behaviour
+      // and costs no description bytes to restate (rubric rule 1).
+      //
+      // evor_wiki_get_relevant was folded in rather than the reverse because it
+      // had ZERO references in agents/ or skills/, while evor_wiki_query is
+      // referenced in six files — removing the referenced one would have broken
+      // callers for a cosmetic gain.
+      mode: z
+        .enum(["semantic", "keyword"])
+        .default("semantic")
+        .describe("semantic = TF-IDF relevance ranking; keyword = exact filtering"),
+      query: z.string().describe("Context string (semantic) or keyword/phrase (keyword)"),
+      approach_family: ApproachFamilySchema.optional().describe("keyword mode: filter to an approach family"),
+      confirmed_only: z.boolean().optional().describe("keyword mode: only hypothesis_verdict=confirmed"),
+      limit: z.number().int().positive().optional().describe("Max results (semantic default 5, keyword default 10)"),
+      // Accepted and ignored: never reached the query functions. Kept optional so
+      // a caller still passing it is not rejected (PM3).
+      run_id: z.string().optional().describe("Unused; accepted for backward compatibility"),
     },
-    async ({ run_id, query, approach_family, confirmed_only, limit }) => {
-      const lessons = wikiQuery(query, {
-        family: approach_family,
-        confirmedOnly: confirmed_only,
-        limit,
-      });
-      return {
-        content: [
-          {
-            type: "text" as const,
-            text: JSON.stringify({ lessons, run_id, query, count: lessons.length }),
-          },
-        ],
-      };
+    async ({ mode, run_id, query, approach_family, confirmed_only, limit }) => {
+      const lessons =
+        mode === "keyword"
+          ? wikiQuery(query, { family: approach_family, confirmedOnly: confirmed_only, limit })
+          : wikiGetRelevant(query, limit ?? 5);
+      return ok({ run_id, mode, query, count: lessons.length, lessons });
     }
   );
 }

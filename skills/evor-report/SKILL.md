@@ -2,7 +2,6 @@
 name: evor-report
 description: Generate a final Evor mission report with tree visualization, frontier table, and static HTML export
 argument-hint: "[run-id]"
-level: 2
 skills: [oh-my-evor:evor-mcp]
 ---
 

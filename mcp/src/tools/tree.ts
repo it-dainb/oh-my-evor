@@ -8,8 +8,16 @@
  * agent-facing output is name-mapped via nameForId / namesForIds.
  *
  * Area 5: evor_tree_read accepts optional filters:
- *   status, integrity_status, min_score, approach_family
+ *   status, integrity_status, approach_family
  * NamedTreeNode now includes integrity_status.
+ *
+ * A6: ucb1_score / min_score were removed from the agent-facing surface.
+ * ucb1_score is a UCB1 selection-time value (a function of visit counts at
+ * the instant of selection) that nothing ever populated on TreeNode, so
+ * `score` was always undefined and `min_score` always filtered on nothing.
+ * fitness_value (populated, stable) is the field agents should rank/filter
+ * on instead. harness/evor/tree.py still computes UCB1 internally during
+ * select() — that ranking logic is untouched.
  */
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -33,7 +41,11 @@ export type NamedTreeNode = {
   integrity_status: TreeNode["integrity_status"];
   depth: number;
   approach_family: TreeNode["approach_family"];
-  score?: number;
+  // A1: the node's own scoreboard. Undefined whenever integrity_status is
+  // "failed" — a cheating candidate must never look like a scored, selectable
+  // frontier node just because evor-mutagen forgot to pass the integrity filter.
+  metrics?: TreeNode["metrics"];
+  fitness_value?: number;
   parent_names: string[];
 };
 
@@ -81,13 +93,15 @@ function dfsCollect(
 
 /** Map a raw TreeNode to the agent-facing name-only shape. */
 function toNamedNode(node: TreeNode, runId: string, missionId: string | undefined): NamedTreeNode {
+  const scored = node.integrity_status !== "failed";
   return {
     name: nameForId(runId, node.id, missionId),
     status: node.status,
     integrity_status: node.integrity_status,
     depth: node.depth,
     approach_family: node.approach_family,
-    score: node.ucb1_score,
+    metrics: scored ? node.metrics : undefined,
+    fitness_value: scored ? node.fitness_value : undefined,
     parent_names: namesForIds(runId, node.parent_ids, missionId),
   };
 }
@@ -96,7 +110,6 @@ function toNamedNode(node: TreeNode, runId: string, missionId: string | undefine
 export interface TreeReadFilters {
   status?: TreeNode["status"];
   integrity_status?: TreeNode["integrity_status"];
-  min_score?: number;
   approach_family?: TreeNode["approach_family"];
 }
 
@@ -141,10 +154,6 @@ export function treeRead(
     }
     if (filters.integrity_status !== undefined) {
       raw = raw.filter((n) => n.integrity_status === filters.integrity_status);
-    }
-    if (filters.min_score !== undefined) {
-      const minScore = filters.min_score;
-      raw = raw.filter((n) => n.ucb1_score !== undefined && n.ucb1_score >= minScore);
     }
     if (filters.approach_family !== undefined) {
       raw = raw.filter((n) => n.approach_family === filters.approach_family);
@@ -218,8 +227,8 @@ export function registerTreeTools(server: McpServer): void {
   server.tool(
     "evor_tree_read",
     "Read the evolution tree for a run, optionally filtered to a subtree rooted at subtree_root up to depth levels. " +
-    "Optional filters: status, integrity_status, min_score, approach_family (all applied after depth/subtree filter). " +
-    "Each NamedTreeNode includes integrity_status for downstream gate checks.",
+    "Optional filters: status, integrity_status, approach_family (all applied after depth/subtree filter). " +
+    "Each NamedTreeNode includes integrity_status for downstream gate checks and fitness_value/metrics for ranking.",
     {
       run_id: z.string().describe("Active run identifier"),
       subtree_root: z.string().optional().describe("Node ID to root the subtree at; omit for full tree"),
@@ -230,9 +239,6 @@ export function registerTreeTools(server: McpServer): void {
       integrity_status: z.enum(["passed", "failed", "pending"]).optional().describe(
         "Filter: only return nodes with this integrity_status; nodes lacking integrity_status are excluded"
       ),
-      min_score: z.number().optional().describe(
-        "Filter: only return nodes with ucb1_score >= min_score; nodes without a score are excluded"
-      ),
       approach_family: z.enum([
         "arch", "training", "data-curation", "data-augmentation",
         "data-acquisition", "algo", "other",
@@ -240,12 +246,11 @@ export function registerTreeTools(server: McpServer): void {
         "Filter: only return nodes from this approach family"
       ),
     },
-    async ({ run_id, subtree_root, depth, status, integrity_status, min_score, approach_family }) => {
+    async ({ run_id, subtree_root, depth, status, integrity_status, approach_family }) => {
       const missionId = process.env.EVOR_MISSION_ID;
       const filters: TreeReadFilters = {};
       if (status !== undefined) filters.status = status as TreeNode["status"];
       if (integrity_status !== undefined) filters.integrity_status = integrity_status as TreeNode["integrity_status"];
-      if (min_score !== undefined) filters.min_score = min_score;
       if (approach_family !== undefined) filters.approach_family = approach_family as TreeNode["approach_family"];
       const nodes = treeRead(run_id, subtree_root, depth, missionId, filters);
       return {

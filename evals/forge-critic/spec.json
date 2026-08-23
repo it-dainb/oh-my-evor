@@ -1,0 +1,643 @@
+{
+  "role": "evor-forge-critic",
+  "agent_file": "agents/evor-forge-critic.md",
+  "arms": [
+    {
+      "model": "sonnet",
+      "effort": "medium",
+      "label": "current"
+    },
+    {
+      "model": "opus",
+      "effort": "medium",
+      "label": "main (pre-retier)"
+    }
+  ],
+  "contract": {
+    "heading": "Critic Review",
+    "mode": "json",
+    "fields": [
+      {
+        "path": "verdict",
+        "kind": "enum",
+        "values": [
+          "rejected",
+          "approved"
+        ]
+      },
+      {
+        "path": "checks.integrity_evaluate_py",
+        "kind": "enum",
+        "values": [
+          "fail",
+          "pass"
+        ]
+      },
+      {
+        "path": "checks.telemetry_append_wired",
+        "kind": "enum",
+        "values": [
+          "fail",
+          "pass"
+        ]
+      },
+      {
+        "path": "checks.numeric_stability",
+        "kind": "enum",
+        "values": [
+          "fail",
+          "pass"
+        ]
+      },
+      {
+        "path": "checks.structural_quality.model_seams",
+        "kind": "enum",
+        "values": [
+          "fail",
+          "pass"
+        ]
+      },
+      {
+        "path": "checks.structural_quality.overall",
+        "kind": "enum",
+        "values": [
+          "fail",
+          "pass"
+        ]
+      }
+    ],
+    "verdict_note": "evor-forge-critic.md:119 emits verdict=approved only when all SIX checks pass: correctness_vs_proposal, integrity_evaluate_py, integrity_frozen_splits, telemetry_append_wired, structural_quality, numeric_stability. This contract grades five of them. A rejection driven by an ungraded check is therefore invisible here and shows up only as a verdict mismatch -- which is exactly how the train_augmentation defect surfaced. Any case added later must keep the ungraded checks satisfiable, or verdict becomes ungradeable."
+  },
+  "cases": [
+    {
+      "id": "clean-approve",
+      "gate": "baseline",
+      "note": "a coherent segmentation candidate with every check satisfied",
+      "capability": {
+        "cpu_only": false,
+        "gpu_arch": "sm_86",
+        "supported_dtypes": [
+          "fp32",
+          "bf16"
+        ],
+        "available_vram_gb": 24
+      },
+      "proposal": {
+        "task_type": "segmentation",
+        "approach_family": "training",
+        "mutation_tier": "parametric",
+        "mutation_locus": {
+          "family": "training",
+          "path": "train/"
+        },
+        "idea": "Use a Dice objective so the small foreground class is not swamped by background.",
+        "loss": {
+          "class": "dice_loss"
+        },
+        "training_recipe": {
+          "optimizer": "AdamW",
+          "lr": 0.0003,
+          "grad_clip": 1.0
+        },
+        "module_seams": {
+          "backbone": "conv-stack",
+          "head": "conv-1x1",
+          "neck": null
+        },
+        "genome_changes": {},
+        "citations": []
+      },
+      "evaluate_py_sha256_expected": "9f2c1a0000000000000000000000000000000000000000000000000000000000",
+      "evaluate_py_sha256_actual": "9f2c1a0000000000000000000000000000000000000000000000000000000000",
+      "frozen_splits_clean": true,
+      "candidate_files": {
+        "model/backbone.py": "import torch.nn as nn\ndef build_backbone(cfg):\n    return nn.Sequential(nn.Conv2d(3, 64, 3, padding=1), nn.ReLU(),\n                         nn.Conv2d(64, 64, 3, padding=1), nn.ReLU())\n",
+        "model/head.py": "import torch.nn as nn\ndef build_head(cfg):\n    return nn.Conv2d(64, cfg.num_classes, kernel_size=1)\n",
+        "train/trainer.py": "import os, json, torch\nfrom torch.utils.data import DataLoader\nfrom model.backbone import build_backbone\nfrom model.head import build_head\n\ndef dice_loss(logits, target, eps=1e-7):\n    p = torch.sigmoid(logits)\n    inter = (p * target).sum()\n    denom = (p.sum() + target.sum()).clamp(min=eps)\n    return 1.0 - (2.0 * inter) / denom\n\ndef train(cfg):\n    tel = os.environ.get(\"EVOR_TELEMETRY_PATH\")\n    backbone, head = build_backbone(cfg), build_head(cfg)\n    opt = torch.optim.AdamW(list(backbone.parameters()) + list(head.parameters()), lr=cfg.lr)\n    loader = DataLoader(cfg.dataset, batch_size=cfg.batch_size, num_workers=4)\n    for step, (x, y) in enumerate(loader):\n        logits = head(backbone(x))\n        loss = dice_loss(logits, y)\n        loss.backward()\n        torch.nn.utils.clip_grad_norm_(backbone.parameters(), cfg.grad_clip)\n        opt.step(); opt.zero_grad()\n        with open(tel, \"a\") as fh:\n            fh.write(json.dumps({\"step\": step, \"node_id\": cfg.node_id, \"run_id\": cfg.run_id,\n                                 \"timestamp\": cfg.now(), \"train_loss\": float(loss)}) + \"\\n\")\n",
+        "genome.yaml": "lr: 0.0003\nbatch_size: 64\nepochs: 10\ngrad_clip: 1.0\noptimizer: adamw\n"
+      },
+      "expect": {
+        "verdict": "approved",
+        "checks.integrity_evaluate_py": "pass",
+        "checks.telemetry_append_wired": "pass",
+        "checks.numeric_stability": "pass",
+        "checks.structural_quality.model_seams": "pass",
+        "checks.structural_quality.overall": "pass"
+      },
+      "base_genome": "lr: 0.0003\nbatch_size: 64\nepochs: 10\ngrad_clip: 1.0\noptimizer: adamw\n"
+    },
+    {
+      "id": "hash-mismatch",
+      "gate": "integrity",
+      "note": "evaluate.py hash differs from the harness-supplied value",
+      "capability": {
+        "cpu_only": false,
+        "gpu_arch": "sm_86",
+        "supported_dtypes": [
+          "fp32",
+          "bf16"
+        ],
+        "available_vram_gb": 24
+      },
+      "proposal": {
+        "task_type": "segmentation",
+        "approach_family": "training",
+        "mutation_tier": "parametric",
+        "mutation_locus": {
+          "family": "training",
+          "path": "train/"
+        },
+        "idea": "Use a Dice objective so the small foreground class is not swamped by background.",
+        "loss": {
+          "class": "dice_loss"
+        },
+        "training_recipe": {
+          "optimizer": "AdamW",
+          "lr": 0.0003,
+          "grad_clip": 1.0
+        },
+        "module_seams": {
+          "backbone": "conv-stack",
+          "head": "conv-1x1",
+          "neck": null
+        },
+        "genome_changes": {},
+        "citations": []
+      },
+      "evaluate_py_sha256_expected": "9f2c1a0000000000000000000000000000000000000000000000000000000000",
+      "evaluate_py_sha256_actual": "44be071111111111111111111111111111111111111111111111111111111111",
+      "frozen_splits_clean": true,
+      "candidate_files": {
+        "model/backbone.py": "import torch.nn as nn\ndef build_backbone(cfg):\n    return nn.Sequential(nn.Conv2d(3, 64, 3, padding=1), nn.ReLU(),\n                         nn.Conv2d(64, 64, 3, padding=1), nn.ReLU())\n",
+        "model/head.py": "import torch.nn as nn\ndef build_head(cfg):\n    return nn.Conv2d(64, cfg.num_classes, kernel_size=1)\n",
+        "train/trainer.py": "import os, json, torch\nfrom torch.utils.data import DataLoader\nfrom model.backbone import build_backbone\nfrom model.head import build_head\n\ndef dice_loss(logits, target, eps=1e-7):\n    p = torch.sigmoid(logits)\n    inter = (p * target).sum()\n    denom = (p.sum() + target.sum()).clamp(min=eps)\n    return 1.0 - (2.0 * inter) / denom\n\ndef train(cfg):\n    tel = os.environ.get(\"EVOR_TELEMETRY_PATH\")\n    backbone, head = build_backbone(cfg), build_head(cfg)\n    opt = torch.optim.AdamW(list(backbone.parameters()) + list(head.parameters()), lr=cfg.lr)\n    loader = DataLoader(cfg.dataset, batch_size=cfg.batch_size, num_workers=4)\n    for step, (x, y) in enumerate(loader):\n        logits = head(backbone(x))\n        loss = dice_loss(logits, y)\n        loss.backward()\n        torch.nn.utils.clip_grad_norm_(backbone.parameters(), cfg.grad_clip)\n        opt.step(); opt.zero_grad()\n        with open(tel, \"a\") as fh:\n            fh.write(json.dumps({\"step\": step, \"node_id\": cfg.node_id, \"run_id\": cfg.run_id,\n                                 \"timestamp\": cfg.now(), \"train_loss\": float(loss)}) + \"\\n\")\n",
+        "genome.yaml": "lr: 0.0003\nbatch_size: 64\nepochs: 10\ngrad_clip: 1.0\noptimizer: adamw\n"
+      },
+      "expect": {
+        "verdict": "rejected",
+        "checks.integrity_evaluate_py": "fail",
+        "checks.telemetry_append_wired": "pass",
+        "checks.numeric_stability": "pass",
+        "checks.structural_quality.model_seams": "pass",
+        "checks.structural_quality.overall": "fail"
+      },
+      "base_genome": "lr: 0.0003\nbatch_size: 64\nepochs: 10\ngrad_clip: 1.0\noptimizer: adamw\n"
+    },
+    {
+      "id": "telemetry-env-only",
+      "gate": "telemetry",
+      "note": "the telemetry path is read at init but nothing is written in the loop",
+      "capability": {
+        "cpu_only": false,
+        "gpu_arch": "sm_86",
+        "supported_dtypes": [
+          "fp32",
+          "bf16"
+        ],
+        "available_vram_gb": 24
+      },
+      "proposal": {
+        "task_type": "segmentation",
+        "approach_family": "training",
+        "mutation_tier": "parametric",
+        "mutation_locus": {
+          "family": "training",
+          "path": "train/"
+        },
+        "idea": "Use a Dice objective so the small foreground class is not swamped by background.",
+        "loss": {
+          "class": "dice_loss"
+        },
+        "training_recipe": {
+          "optimizer": "AdamW",
+          "lr": 0.0003,
+          "grad_clip": 1.0
+        },
+        "module_seams": {
+          "backbone": "conv-stack",
+          "head": "conv-1x1",
+          "neck": null
+        },
+        "genome_changes": {},
+        "citations": []
+      },
+      "evaluate_py_sha256_expected": "9f2c1a0000000000000000000000000000000000000000000000000000000000",
+      "evaluate_py_sha256_actual": "9f2c1a0000000000000000000000000000000000000000000000000000000000",
+      "frozen_splits_clean": true,
+      "candidate_files": {
+        "model/backbone.py": "import torch.nn as nn\ndef build_backbone(cfg):\n    return nn.Sequential(nn.Conv2d(3, 64, 3, padding=1), nn.ReLU(),\n                         nn.Conv2d(64, 64, 3, padding=1), nn.ReLU())\n",
+        "model/head.py": "import torch.nn as nn\ndef build_head(cfg):\n    return nn.Conv2d(64, cfg.num_classes, kernel_size=1)\n",
+        "train/trainer.py": "import os, json, torch\nfrom torch.utils.data import DataLoader\nfrom model.backbone import build_backbone\nfrom model.head import build_head\n\ndef dice_loss(logits, target, eps=1e-7):\n    p = torch.sigmoid(logits)\n    inter = (p * target).sum()\n    denom = (p.sum() + target.sum()).clamp(min=eps)\n    return 1.0 - (2.0 * inter) / denom\n\ndef train(cfg):\n    tel = os.environ.get(\"EVOR_TELEMETRY_PATH\")\n    backbone, head = build_backbone(cfg), build_head(cfg)\n    opt = torch.optim.AdamW(list(backbone.parameters()) + list(head.parameters()), lr=cfg.lr)\n    loader = DataLoader(cfg.dataset, batch_size=cfg.batch_size, num_workers=4)\n    for step, (x, y) in enumerate(loader):\n        logits = head(backbone(x))\n        loss = dice_loss(logits, y)\n        loss.backward()\n        torch.nn.utils.clip_grad_norm_(backbone.parameters(), cfg.grad_clip)\n        opt.step(); opt.zero_grad()\n        # telemetry path resolved at init; nothing is written in the loop\n",
+        "genome.yaml": "lr: 0.0003\nbatch_size: 64\nepochs: 10\ngrad_clip: 1.0\noptimizer: adamw\n"
+      },
+      "expect": {
+        "verdict": "rejected",
+        "checks.integrity_evaluate_py": "pass",
+        "checks.telemetry_append_wired": "fail",
+        "checks.numeric_stability": "pass",
+        "checks.structural_quality.model_seams": "pass",
+        "checks.structural_quality.overall": "pass"
+      },
+      "base_genome": "lr: 0.0003\nbatch_size: 64\nepochs: 10\ngrad_clip: 1.0\noptimizer: adamw\n"
+    },
+    {
+      "id": "clamp-missing",
+      "gate": "clamp",
+      "note": "the Dice denominator can be zero and is unguarded",
+      "capability": {
+        "cpu_only": false,
+        "gpu_arch": "sm_86",
+        "supported_dtypes": [
+          "fp32",
+          "bf16"
+        ],
+        "available_vram_gb": 24
+      },
+      "proposal": {
+        "task_type": "segmentation",
+        "approach_family": "training",
+        "mutation_tier": "parametric",
+        "mutation_locus": {
+          "family": "training",
+          "path": "train/"
+        },
+        "idea": "Use a Dice objective so the small foreground class is not swamped by background.",
+        "loss": {
+          "class": "dice_loss"
+        },
+        "training_recipe": {
+          "optimizer": "AdamW",
+          "lr": 0.0003,
+          "grad_clip": 1.0
+        },
+        "module_seams": {
+          "backbone": "conv-stack",
+          "head": "conv-1x1",
+          "neck": null
+        },
+        "genome_changes": {},
+        "citations": []
+      },
+      "evaluate_py_sha256_expected": "9f2c1a0000000000000000000000000000000000000000000000000000000000",
+      "evaluate_py_sha256_actual": "9f2c1a0000000000000000000000000000000000000000000000000000000000",
+      "frozen_splits_clean": true,
+      "candidate_files": {
+        "model/backbone.py": "import torch.nn as nn\ndef build_backbone(cfg):\n    return nn.Sequential(nn.Conv2d(3, 64, 3, padding=1), nn.ReLU(),\n                         nn.Conv2d(64, 64, 3, padding=1), nn.ReLU())\n",
+        "model/head.py": "import torch.nn as nn\ndef build_head(cfg):\n    return nn.Conv2d(64, cfg.num_classes, kernel_size=1)\n",
+        "train/trainer.py": "import os, json, torch\nfrom torch.utils.data import DataLoader\nfrom model.backbone import build_backbone\nfrom model.head import build_head\n\ndef dice_loss(logits, target, eps=1e-7):\n    p = torch.sigmoid(logits)\n    inter = (p * target).sum()\n    denom = p.sum() + target.sum()\n    return 1.0 - (2.0 * inter) / denom\n\ndef train(cfg):\n    tel = os.environ.get(\"EVOR_TELEMETRY_PATH\")\n    backbone, head = build_backbone(cfg), build_head(cfg)\n    opt = torch.optim.AdamW(list(backbone.parameters()) + list(head.parameters()), lr=cfg.lr)\n    loader = DataLoader(cfg.dataset, batch_size=cfg.batch_size, num_workers=4)\n    for step, (x, y) in enumerate(loader):\n        logits = head(backbone(x))\n        loss = dice_loss(logits, y)\n        loss.backward()\n        torch.nn.utils.clip_grad_norm_(backbone.parameters(), cfg.grad_clip)\n        opt.step(); opt.zero_grad()\n        with open(tel, \"a\") as fh:\n            fh.write(json.dumps({\"step\": step, \"node_id\": cfg.node_id, \"run_id\": cfg.run_id,\n                                 \"timestamp\": cfg.now(), \"train_loss\": float(loss)}) + \"\\n\")\n",
+        "genome.yaml": "lr: 0.0003\nbatch_size: 64\nepochs: 10\ngrad_clip: 1.0\noptimizer: adamw\n"
+      },
+      "expect": {
+        "verdict": "rejected",
+        "checks.integrity_evaluate_py": "pass",
+        "checks.telemetry_append_wired": "pass",
+        "checks.numeric_stability": "fail",
+        "checks.structural_quality.model_seams": "pass",
+        "checks.structural_quality.overall": "pass"
+      },
+      "base_genome": "lr: 0.0003\nbatch_size: 64\nepochs: 10\ngrad_clip: 1.0\noptimizer: adamw\n"
+    },
+    {
+      "id": "clamp-output-only",
+      "gate": "clamp",
+      "note": "TRAP: the final loss is clamped but the singular denominator is not",
+      "capability": {
+        "cpu_only": false,
+        "gpu_arch": "sm_86",
+        "supported_dtypes": [
+          "fp32",
+          "bf16"
+        ],
+        "available_vram_gb": 24
+      },
+      "proposal": {
+        "task_type": "segmentation",
+        "approach_family": "training",
+        "mutation_tier": "parametric",
+        "mutation_locus": {
+          "family": "training",
+          "path": "train/"
+        },
+        "idea": "Use a Dice objective so the small foreground class is not swamped by background.",
+        "loss": {
+          "class": "dice_loss"
+        },
+        "training_recipe": {
+          "optimizer": "AdamW",
+          "lr": 0.0003,
+          "grad_clip": 1.0
+        },
+        "module_seams": {
+          "backbone": "conv-stack",
+          "head": "conv-1x1",
+          "neck": null
+        },
+        "genome_changes": {},
+        "citations": []
+      },
+      "evaluate_py_sha256_expected": "9f2c1a0000000000000000000000000000000000000000000000000000000000",
+      "evaluate_py_sha256_actual": "9f2c1a0000000000000000000000000000000000000000000000000000000000",
+      "frozen_splits_clean": true,
+      "candidate_files": {
+        "model/backbone.py": "import torch.nn as nn\ndef build_backbone(cfg):\n    return nn.Sequential(nn.Conv2d(3, 64, 3, padding=1), nn.ReLU(),\n                         nn.Conv2d(64, 64, 3, padding=1), nn.ReLU())\n",
+        "model/head.py": "import torch.nn as nn\ndef build_head(cfg):\n    return nn.Conv2d(64, cfg.num_classes, kernel_size=1)\n",
+        "train/trainer.py": "import os, json, torch\nfrom torch.utils.data import DataLoader\nfrom model.backbone import build_backbone\nfrom model.head import build_head\n\ndef dice_loss(logits, target, eps=1e-7):\n    p = torch.sigmoid(logits)\n    inter = (p * target).sum()\n    denom = p.sum() + target.sum()\n    return (1.0 - (2.0 * inter) / denom).clamp(min=eps)\n\ndef train(cfg):\n    tel = os.environ.get(\"EVOR_TELEMETRY_PATH\")\n    backbone, head = build_backbone(cfg), build_head(cfg)\n    opt = torch.optim.AdamW(list(backbone.parameters()) + list(head.parameters()), lr=cfg.lr)\n    loader = DataLoader(cfg.dataset, batch_size=cfg.batch_size, num_workers=4)\n    for step, (x, y) in enumerate(loader):\n        logits = head(backbone(x))\n        loss = dice_loss(logits, y)\n        loss.backward()\n        torch.nn.utils.clip_grad_norm_(backbone.parameters(), cfg.grad_clip)\n        opt.step(); opt.zero_grad()\n        with open(tel, \"a\") as fh:\n            fh.write(json.dumps({\"step\": step, \"node_id\": cfg.node_id, \"run_id\": cfg.run_id,\n                                 \"timestamp\": cfg.now(), \"train_loss\": float(loss)}) + \"\\n\")\n",
+        "genome.yaml": "lr: 0.0003\nbatch_size: 64\nepochs: 10\ngrad_clip: 1.0\noptimizer: adamw\n"
+      },
+      "expect": {
+        "verdict": "rejected",
+        "checks.integrity_evaluate_py": "pass",
+        "checks.telemetry_append_wired": "pass",
+        "checks.numeric_stability": "fail",
+        "checks.structural_quality.model_seams": "pass",
+        "checks.structural_quality.overall": "pass"
+      },
+      "base_genome": "lr: 0.0003\nbatch_size: 64\nepochs: 10\ngrad_clip: 1.0\noptimizer: adamw\n"
+    },
+    {
+      "id": "clamp-epsilon-too-large",
+      "gate": "clamp",
+      "note": "guarded, but eps=1e-3 exceeds the stated 1e-5 ceiling",
+      "capability": {
+        "cpu_only": false,
+        "gpu_arch": "sm_86",
+        "supported_dtypes": [
+          "fp32",
+          "bf16"
+        ],
+        "available_vram_gb": 24
+      },
+      "proposal": {
+        "task_type": "segmentation",
+        "approach_family": "training",
+        "mutation_tier": "parametric",
+        "mutation_locus": {
+          "family": "training",
+          "path": "train/"
+        },
+        "idea": "Use a Dice objective so the small foreground class is not swamped by background.",
+        "loss": {
+          "class": "dice_loss"
+        },
+        "training_recipe": {
+          "optimizer": "AdamW",
+          "lr": 0.0003,
+          "grad_clip": 1.0
+        },
+        "module_seams": {
+          "backbone": "conv-stack",
+          "head": "conv-1x1",
+          "neck": null
+        },
+        "genome_changes": {},
+        "citations": []
+      },
+      "evaluate_py_sha256_expected": "9f2c1a0000000000000000000000000000000000000000000000000000000000",
+      "evaluate_py_sha256_actual": "9f2c1a0000000000000000000000000000000000000000000000000000000000",
+      "frozen_splits_clean": true,
+      "candidate_files": {
+        "model/backbone.py": "import torch.nn as nn\ndef build_backbone(cfg):\n    return nn.Sequential(nn.Conv2d(3, 64, 3, padding=1), nn.ReLU(),\n                         nn.Conv2d(64, 64, 3, padding=1), nn.ReLU())\n",
+        "model/head.py": "import torch.nn as nn\ndef build_head(cfg):\n    return nn.Conv2d(64, cfg.num_classes, kernel_size=1)\n",
+        "train/trainer.py": "import os, json, torch\nfrom torch.utils.data import DataLoader\nfrom model.backbone import build_backbone\nfrom model.head import build_head\n\ndef dice_loss(logits, target, eps=1e-3):\n    p = torch.sigmoid(logits)\n    inter = (p * target).sum()\n    denom = (p.sum() + target.sum()).clamp(min=eps)\n    return 1.0 - (2.0 * inter) / denom\n\ndef train(cfg):\n    tel = os.environ.get(\"EVOR_TELEMETRY_PATH\")\n    backbone, head = build_backbone(cfg), build_head(cfg)\n    opt = torch.optim.AdamW(list(backbone.parameters()) + list(head.parameters()), lr=cfg.lr)\n    loader = DataLoader(cfg.dataset, batch_size=cfg.batch_size, num_workers=4)\n    for step, (x, y) in enumerate(loader):\n        logits = head(backbone(x))\n        loss = dice_loss(logits, y)\n        loss.backward()\n        torch.nn.utils.clip_grad_norm_(backbone.parameters(), cfg.grad_clip)\n        opt.step(); opt.zero_grad()\n        with open(tel, \"a\") as fh:\n            fh.write(json.dumps({\"step\": step, \"node_id\": cfg.node_id, \"run_id\": cfg.run_id,\n                                 \"timestamp\": cfg.now(), \"train_loss\": float(loss)}) + \"\\n\")\n",
+        "genome.yaml": "lr: 0.0003\nbatch_size: 64\nepochs: 10\ngrad_clip: 1.0\noptimizer: adamw\n"
+      },
+      "expect": {
+        "verdict": "rejected",
+        "checks.integrity_evaluate_py": "pass",
+        "checks.telemetry_append_wired": "pass",
+        "checks.numeric_stability": "fail",
+        "checks.structural_quality.model_seams": "pass",
+        "checks.structural_quality.overall": "pass"
+      },
+      "base_genome": "lr: 0.0003\nbatch_size: 64\nepochs: 10\ngrad_clip: 1.0\noptimizer: adamw\n"
+    },
+    {
+      "id": "style-noise-negative-control",
+      "gate": "style_nc",
+      "note": "NEGATIVE CONTROL: cramped spacing and poor names, but the file parses and behaves identically",
+      "capability": {
+        "cpu_only": false,
+        "gpu_arch": "sm_86",
+        "supported_dtypes": [
+          "fp32",
+          "bf16"
+        ],
+        "available_vram_gb": 24
+      },
+      "proposal": {
+        "task_type": "classification",
+        "approach_family": "training",
+        "mutation_tier": "parametric",
+        "mutation_locus": {
+          "family": "training",
+          "path": "train/"
+        },
+        "idea": "Train the pooled conv backbone with a linear classifier under cross-entropy.",
+        "loss": {
+          "class": "CrossEntropyLoss"
+        },
+        "training_recipe": {
+          "optimizer": "SGD",
+          "lr": 0.01,
+          "momentum": 0.9,
+          "grad_clip": 1.0
+        },
+        "module_seams": {
+          "backbone": "conv-stack",
+          "head": "linear",
+          "neck": null
+        },
+        "genome_changes": {},
+        "citations": []
+      },
+      "evaluate_py_sha256_expected": "9f2c1a0000000000000000000000000000000000000000000000000000000000",
+      "evaluate_py_sha256_actual": "9f2c1a0000000000000000000000000000000000000000000000000000000000",
+      "frozen_splits_clean": true,
+      "candidate_files": {
+        "model/backbone.py": "import torch.nn as nn\ndef build_backbone(cfg):\n    return nn.Sequential(nn.Conv2d(3, 64, 3, padding=1), nn.ReLU(),\n                         nn.AdaptiveAvgPool2d(1), nn.Flatten())\n",
+        "model/head.py": "import torch.nn as nn\ndef build_head(cfg):\n    return nn.Linear(64, cfg.num_classes)\n",
+        "train/trainer.py": "import os, json, torch\nfrom torch.utils.data import DataLoader\nfrom model.backbone import build_backbone\nfrom model.head import build_head\n\ndef train(cfg):\n    tel = os.environ.get(\"EVOR_TELEMETRY_PATH\")\n    backbone, head = build_backbone(cfg), build_head(cfg)\n    criterion = torch.nn.CrossEntropyLoss()\n    opt = torch.optim.SGD(list(backbone.parameters()) + list(head.parameters()),\n                          lr=cfg.lr, momentum=cfg.momentum)\n    loader = DataLoader(cfg.dataset, batch_size=cfg.batch_size, num_workers=4)\n    for step, (x, y) in enumerate(loader):\n        l0GITS=head(backbone( x ))\n        _tmp=l0GITS\n        loss=criterion(_tmp,y)\n        loss.backward()\n        torch.nn.utils.clip_grad_norm_(backbone.parameters(), cfg.grad_clip)\n        opt.step(); opt.zero_grad()\n        with open(tel, \"a\") as fh:\n            fh.write(json.dumps({\"step\": step, \"node_id\": cfg.node_id, \"run_id\": cfg.run_id,\n                                 \"timestamp\": cfg.now(), \"train_loss\": float(loss)}) + \"\\n\")\n",
+        "genome.yaml": "lr: 0.01\nbatch_size: 64\nepochs: 10\nmomentum: 0.9\ngrad_clip: 1.0\noptimizer: sgd\n"
+      },
+      "expect": {
+        "verdict": "approved",
+        "checks.integrity_evaluate_py": "pass",
+        "checks.telemetry_append_wired": "pass",
+        "checks.structural_quality.model_seams": "pass",
+        "checks.structural_quality.overall": "pass"
+      },
+      "base_genome": "lr: 0.01\nbatch_size: 64\nepochs: 10\nmomentum: 0.9\ngrad_clip: 1.0\noptimizer: sgd\n"
+    },
+    {
+      "id": "no-singular-loss",
+      "gate": "clamp_nc",
+      "note": "NEGATIVE CONTROL: cross-entropy has no singular operand, so there is nothing to clamp",
+      "capability": {
+        "cpu_only": false,
+        "gpu_arch": "sm_86",
+        "supported_dtypes": [
+          "fp32",
+          "bf16"
+        ],
+        "available_vram_gb": 24
+      },
+      "proposal": {
+        "task_type": "classification",
+        "approach_family": "training",
+        "mutation_tier": "parametric",
+        "mutation_locus": {
+          "family": "training",
+          "path": "train/"
+        },
+        "idea": "Train the pooled conv backbone with a linear classifier under cross-entropy.",
+        "loss": {
+          "class": "CrossEntropyLoss"
+        },
+        "training_recipe": {
+          "optimizer": "SGD",
+          "lr": 0.01,
+          "momentum": 0.9,
+          "grad_clip": 1.0
+        },
+        "module_seams": {
+          "backbone": "conv-stack",
+          "head": "linear",
+          "neck": null
+        },
+        "genome_changes": {},
+        "citations": []
+      },
+      "evaluate_py_sha256_expected": "9f2c1a0000000000000000000000000000000000000000000000000000000000",
+      "evaluate_py_sha256_actual": "9f2c1a0000000000000000000000000000000000000000000000000000000000",
+      "frozen_splits_clean": true,
+      "candidate_files": {
+        "model/backbone.py": "import torch.nn as nn\ndef build_backbone(cfg):\n    return nn.Sequential(nn.Conv2d(3, 64, 3, padding=1), nn.ReLU(),\n                         nn.AdaptiveAvgPool2d(1), nn.Flatten())\n",
+        "model/head.py": "import torch.nn as nn\ndef build_head(cfg):\n    return nn.Linear(64, cfg.num_classes)\n",
+        "train/trainer.py": "import os, json, torch\nfrom torch.utils.data import DataLoader\nfrom model.backbone import build_backbone\nfrom model.head import build_head\n\ndef train(cfg):\n    tel = os.environ.get(\"EVOR_TELEMETRY_PATH\")\n    backbone, head = build_backbone(cfg), build_head(cfg)\n    criterion = torch.nn.CrossEntropyLoss()\n    opt = torch.optim.SGD(list(backbone.parameters()) + list(head.parameters()),\n                          lr=cfg.lr, momentum=cfg.momentum)\n    loader = DataLoader(cfg.dataset, batch_size=cfg.batch_size, num_workers=4)\n    for step, (x, y) in enumerate(loader):\n        logits = head(backbone(x))\n        loss = criterion(logits, y)\n        loss.backward()\n        torch.nn.utils.clip_grad_norm_(backbone.parameters(), cfg.grad_clip)\n        opt.step(); opt.zero_grad()\n        with open(tel, \"a\") as fh:\n            fh.write(json.dumps({\"step\": step, \"node_id\": cfg.node_id, \"run_id\": cfg.run_id,\n                                 \"timestamp\": cfg.now(), \"train_loss\": float(loss)}) + \"\\n\")\n",
+        "genome.yaml": "lr: 0.01\nbatch_size: 64\nepochs: 10\nmomentum: 0.9\ngrad_clip: 1.0\noptimizer: sgd\n"
+      },
+      "expect": {
+        "verdict": "approved",
+        "checks.integrity_evaluate_py": "pass",
+        "checks.telemetry_append_wired": "pass",
+        "checks.structural_quality.model_seams": "pass",
+        "checks.structural_quality.overall": "pass"
+      },
+      "base_genome": "lr: 0.01\nbatch_size: 64\nepochs: 10\nmomentum: 0.9\ngrad_clip: 1.0\noptimizer: sgd\n"
+    },
+    {
+      "id": "missing-head",
+      "gate": "structure",
+      "note": "model/ has no head.py, so the seam set is incomplete",
+      "capability": {
+        "cpu_only": false,
+        "gpu_arch": "sm_86",
+        "supported_dtypes": [
+          "fp32",
+          "bf16"
+        ],
+        "available_vram_gb": 24
+      },
+      "proposal": {
+        "task_type": "segmentation",
+        "approach_family": "training",
+        "mutation_tier": "parametric",
+        "mutation_locus": {
+          "family": "training",
+          "path": "train/"
+        },
+        "idea": "Use a Dice objective so the small foreground class is not swamped by background.",
+        "loss": {
+          "class": "dice_loss"
+        },
+        "training_recipe": {
+          "optimizer": "AdamW",
+          "lr": 0.0003,
+          "grad_clip": 1.0
+        },
+        "module_seams": {
+          "backbone": "conv-stack",
+          "head": "conv-1x1",
+          "neck": null
+        },
+        "genome_changes": {},
+        "citations": []
+      },
+      "evaluate_py_sha256_expected": "9f2c1a0000000000000000000000000000000000000000000000000000000000",
+      "evaluate_py_sha256_actual": "9f2c1a0000000000000000000000000000000000000000000000000000000000",
+      "frozen_splits_clean": true,
+      "candidate_files": {
+        "model/backbone.py": "import torch.nn as nn\ndef build_backbone(cfg):\n    return nn.Sequential(nn.Conv2d(3, 64, 3, padding=1), nn.ReLU(),\n                         nn.Conv2d(64, 64, 3, padding=1), nn.ReLU())\n",
+        "train/trainer.py": "import os, json, torch\nfrom torch.utils.data import DataLoader\nfrom model.backbone import build_backbone\nfrom model.head import build_head\n\ndef dice_loss(logits, target, eps=1e-7):\n    p = torch.sigmoid(logits)\n    inter = (p * target).sum()\n    denom = (p.sum() + target.sum()).clamp(min=eps)\n    return 1.0 - (2.0 * inter) / denom\n\ndef train(cfg):\n    tel = os.environ.get(\"EVOR_TELEMETRY_PATH\")\n    backbone, head = build_backbone(cfg), build_head(cfg)\n    opt = torch.optim.AdamW(list(backbone.parameters()) + list(head.parameters()), lr=cfg.lr)\n    loader = DataLoader(cfg.dataset, batch_size=cfg.batch_size, num_workers=4)\n    for step, (x, y) in enumerate(loader):\n        logits = head(backbone(x))\n        loss = dice_loss(logits, y)\n        loss.backward()\n        torch.nn.utils.clip_grad_norm_(backbone.parameters(), cfg.grad_clip)\n        opt.step(); opt.zero_grad()\n        with open(tel, \"a\") as fh:\n            fh.write(json.dumps({\"step\": step, \"node_id\": cfg.node_id, \"run_id\": cfg.run_id,\n                                 \"timestamp\": cfg.now(), \"train_loss\": float(loss)}) + \"\\n\")\n",
+        "genome.yaml": "lr: 0.0003\nbatch_size: 64\nepochs: 10\ngrad_clip: 1.0\noptimizer: adamw\n"
+      },
+      "expect": {
+        "verdict": "rejected",
+        "checks.integrity_evaluate_py": "pass",
+        "checks.telemetry_append_wired": "pass",
+        "checks.numeric_stability": "pass",
+        "checks.structural_quality.model_seams": "fail",
+        "checks.structural_quality.overall": "fail"
+      },
+      "base_genome": "lr: 0.0003\nbatch_size: 64\nepochs: 10\ngrad_clip: 1.0\noptimizer: adamw\n"
+    },
+    {
+      "id": "neck-contradiction",
+      "gate": "structure",
+      "note": "the proposal says neck is null, yet neck.py was written",
+      "capability": {
+        "cpu_only": false,
+        "gpu_arch": "sm_86",
+        "supported_dtypes": [
+          "fp32",
+          "bf16"
+        ],
+        "available_vram_gb": 24
+      },
+      "proposal": {
+        "task_type": "segmentation",
+        "approach_family": "training",
+        "mutation_tier": "parametric",
+        "mutation_locus": {
+          "family": "training",
+          "path": "train/"
+        },
+        "idea": "Use a Dice objective so the small foreground class is not swamped by background.",
+        "loss": {
+          "class": "dice_loss"
+        },
+        "training_recipe": {
+          "optimizer": "AdamW",
+          "lr": 0.0003,
+          "grad_clip": 1.0
+        },
+        "module_seams": {
+          "backbone": "conv-stack",
+          "head": "conv-1x1",
+          "neck": null
+        },
+        "genome_changes": {},
+        "citations": []
+      },
+      "evaluate_py_sha256_expected": "9f2c1a0000000000000000000000000000000000000000000000000000000000",
+      "evaluate_py_sha256_actual": "9f2c1a0000000000000000000000000000000000000000000000000000000000",
+      "frozen_splits_clean": true,
+      "candidate_files": {
+        "model/backbone.py": "import torch.nn as nn\ndef build_backbone(cfg):\n    return nn.Sequential(nn.Conv2d(3, 64, 3, padding=1), nn.ReLU(),\n                         nn.Conv2d(64, 64, 3, padding=1), nn.ReLU())\n",
+        "model/head.py": "import torch.nn as nn\ndef build_head(cfg):\n    return nn.Conv2d(64, cfg.num_classes, kernel_size=1)\n",
+        "train/trainer.py": "import os, json, torch\nfrom torch.utils.data import DataLoader\nfrom model.backbone import build_backbone\nfrom model.head import build_head\n\ndef dice_loss(logits, target, eps=1e-7):\n    p = torch.sigmoid(logits)\n    inter = (p * target).sum()\n    denom = (p.sum() + target.sum()).clamp(min=eps)\n    return 1.0 - (2.0 * inter) / denom\n\ndef train(cfg):\n    tel = os.environ.get(\"EVOR_TELEMETRY_PATH\")\n    backbone, head = build_backbone(cfg), build_head(cfg)\n    opt = torch.optim.AdamW(list(backbone.parameters()) + list(head.parameters()), lr=cfg.lr)\n    loader = DataLoader(cfg.dataset, batch_size=cfg.batch_size, num_workers=4)\n    for step, (x, y) in enumerate(loader):\n        logits = head(backbone(x))\n        loss = dice_loss(logits, y)\n        loss.backward()\n        torch.nn.utils.clip_grad_norm_(backbone.parameters(), cfg.grad_clip)\n        opt.step(); opt.zero_grad()\n        with open(tel, \"a\") as fh:\n            fh.write(json.dumps({\"step\": step, \"node_id\": cfg.node_id, \"run_id\": cfg.run_id,\n                                 \"timestamp\": cfg.now(), \"train_loss\": float(loss)}) + \"\\n\")\n",
+        "genome.yaml": "lr: 0.0003\nbatch_size: 64\nepochs: 10\ngrad_clip: 1.0\noptimizer: adamw\n",
+        "model/neck.py": "import torch.nn as nn\ndef build_neck(cfg):\n    return nn.MultiheadAttention(64, 4, batch_first=True)\n"
+      },
+      "expect": {
+        "verdict": "rejected",
+        "checks.integrity_evaluate_py": "pass",
+        "checks.telemetry_append_wired": "pass",
+        "checks.numeric_stability": "pass",
+        "checks.structural_quality.model_seams": "fail",
+        "checks.structural_quality.overall": "fail"
+      },
+      "base_genome": "lr: 0.0003\nbatch_size: 64\nepochs: 10\ngrad_clip: 1.0\noptimizer: adamw\n"
+    }
+  ]
+}

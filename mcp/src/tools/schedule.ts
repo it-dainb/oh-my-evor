@@ -82,7 +82,7 @@ export function registerScheduleTools(server: McpServer): void {
           content: [
             {
               type: "text" as const,
-              text: JSON.stringify({ error: result.error ?? "schedule failed" }),
+              text: JSON.stringify({ ok: false, error: result.error ?? "schedule failed" }),
             },
           ],
         };

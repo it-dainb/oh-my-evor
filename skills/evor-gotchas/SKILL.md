@@ -2,7 +2,6 @@
 name: evor-gotchas
 description: Inspect accumulated Gotchas (failures + hardware limits) and the hardware capability profile
 argument-hint: "[--kind K] [--scope S] [--min-confidence C] [--evor-root DIR] [--run-dir DIR]"
-level: 2
 skills: [oh-my-evor:evor-mcp]
 ---
 

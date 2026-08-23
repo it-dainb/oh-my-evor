@@ -20,6 +20,7 @@
 import { existsSync, readFileSync, appendFileSync, mkdirSync, readdirSync } from 'fs';
 import { join } from 'path';
 import { createHash } from 'node:crypto';
+import { resolveActiveRun } from './lib/active-run.mjs';
 
 // ── Kill switches ─────────────────────────────────────────────────────────────
 if (process.env.DISABLE_EVOR) process.exit(0);
@@ -28,20 +29,15 @@ const skipHooks = (process.env.EVOR_SKIP_HOOKS ?? '').split(',').map(s => s.trim
 if (skipHooks.includes('post-tool-use-failure')) process.exit(0);
 
 // ── Active run guard ──────────────────────────────────────────────────────────
-const activeRunId = process.env.EVOR_ACTIVE_RUN_ID ?? '';
+const { runId: activeRunId, missionId: activeMissionId } = resolveActiveRun();
 if (!activeRunId) process.exit(0);
 
 const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT ?? process.cwd();
 const evorRoot = process.env.EVOR_ROOT ?? join(pluginRoot, '.evor');
 
-// Resolve mission_id from env or disk (mirrors post-tool-use.mjs pattern)
-let missionId = process.env.EVOR_MISSION_ID ?? '';
-if (!missionId) {
-  try {
-    const ar = JSON.parse(readFileSync(join(evorRoot, 'active-run.json'), 'utf8'));
-    if (ar?.run_id === activeRunId && ar?.mission_id) missionId = String(ar.mission_id);
-  } catch { /* no/invalid active-run.json */ }
-}
+// env -> active-run.json is exactly what resolveActiveRun() does; the runs/ scan
+// below is the extra step it does not cover.
+let missionId = activeMissionId;
 if (!missionId) {
   try {
     for (const entry of readdirSync(join(evorRoot, 'runs'), { withFileTypes: true })) {

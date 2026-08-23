@@ -31,8 +31,18 @@ if [ -n "${CLAUDE_CODE_OAUTH_TOKEN:-}" ]; then
 elif [ -n "${ANTHROPIC_API_KEY:-}" ]; then
   RUN_ARGS+=(-e "ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}")
   echo "▶ real-Claude layer ENABLED via API key"
+elif [ -f "$HOME/.claude/.credentials.json" ]; then
+  # Subscription credentials, mounted read-only. ci/run-checks.mjs already treats
+  # this file as an auth source; without the mount the live layer silently
+  # degraded to SKIP on any machine that had not exported a token, which is the
+  # usual case for an interactive subscription login.
+  #
+  # Read-only, and only this one file — the container gets the credential it
+  # needs to call the API and nothing else from ~/.claude.
+  RUN_ARGS+=(-v "$HOME/.claude/.credentials.json:/root/.claude/.credentials.json:ro")
+  echo "▶ real-Claude layer ENABLED via mounted SUBSCRIPTION credentials (~/.claude/.credentials.json, read-only)"
 else
-  echo "▶ real-Claude layer disabled (no CLAUDE_CODE_OAUTH_TOKEN / ANTHROPIC_API_KEY) — deterministic checks only"
+  echo "▶ real-Claude layer disabled (no CLAUDE_CODE_OAUTH_TOKEN / ANTHROPIC_API_KEY / ~/.claude/.credentials.json) — deterministic checks only"
 fi
 
 echo "▶ running isolated tests ..."

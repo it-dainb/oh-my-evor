@@ -34,6 +34,7 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync, statSync } from 'fs';
 import { join } from 'path';
 import { randomBytes } from 'crypto';
+import { resolveActiveRun } from './lib/active-run.mjs';
 
 // ── Kill switches ─────────────────────────────────────────────────────────────
 // DISABLE_EVOR: truthy value disables the entire evor hook layer.
@@ -44,22 +45,25 @@ const skipHooks = (process.env.EVOR_SKIP_HOOKS ?? '').split(',').map(s => s.trim
 if (skipHooks.includes('stop')) process.exit(0);
 
 // ── Active run guard ──────────────────────────────────────────────────────────
-const activeRunId = process.env.EVOR_ACTIVE_RUN_ID ?? '';
+const { runId: activeRunId, missionId } = resolveActiveRun();
 if (!activeRunId) process.exit(0);
 
 // ── §17D: Read stop_hook_active from STDIN payload (NOT from env) ─────────────
 // stop_hook_active=true means the model is trying to stop again while we already
 // blocked it. Track block count; release after ≥2 blocks (don't fight the user).
 let stopHookActive = false;
+/** Kept for the incomplete-tick guard at the end of the file. */
+let payloadForContinuation = {};
 try {
   const rawStdin = readFileSync(0, 'utf8');
   const stopPayload = JSON.parse(rawStdin || '{}');
+  payloadForContinuation = stopPayload;
   stopHookActive = !!stopPayload?.stop_hook_active;
 } catch { /* fail-open — missing STDIN is normal in tests */ }
 
 const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT ?? process.cwd();
 const evorRoot = process.env.EVOR_ROOT ?? join(pluginRoot, '.evor');
-const missionId = process.env.EVOR_MISSION_ID ?? '';
+// missionId comes from resolveActiveRun() above.
 
 const runDir = missionId
   ? join(evorRoot, 'runs', missionId, activeRunId)
@@ -343,6 +347,50 @@ try {
 } catch (err) {
   // FAIL-OPEN: unexpected error in drift-guard must never crash-block the session
   process.stderr.write(`[evor:stop] drift-guard internal error (fail-open): ${err.message}\n`);
+}
+
+// ── Incomplete-tick guard ─────────────────────────────────────────────────────
+// The orchestrator's failure mode is not doing too much, it is stopping too early.
+// Measured twice: main spawns evor-tick, the tick reports failure, main resumes it
+// in the BACKGROUND and then ends its turn — which ends the whole `-p` session with
+// zero tree nodes. The existing continuation guard cannot catch this, because it
+// keys on pending_node_ids and a tick that dies before recording a node leaves that
+// list empty.
+//
+// Prose does not fix this. Main was told "spawn evor-tick, record the outcome,
+// decide continue/stop" and did precisely that; nothing in the sentence says the
+// waiting is its job. So the invariant is enforced here instead: a tick that has
+// started and not reached step 9 means the loop is still owed work.
+//
+// Subagents are exempt — only the orchestrator owns tick completion.
+try {
+  // stopPayload/tickStatePath above are block-scoped; re-derive rather than reuse.
+  const isSubagent = Boolean(payloadForContinuation?.agent_type ?? payloadForContinuation?.agent_id);
+  if (!isSubagent) {
+    const tsPathC = join(runDir, 'tick-state.json');
+    const ts = existsSync(tsPathC) ? JSON.parse(readFileSync(tsPathC, 'utf8')) : null;
+    const started = typeof ts?.tick === 'number' && ts.tick > 0;
+    const step = typeof ts?.current_step === 'number' ? ts.current_step : 0;
+    // step >= 9 alone means complete, matching the existing drift check ("current_step
+    // < 9 while running"). Also requiring step_status === "done" would block runs whose
+    // tick-state omits that field — a false-stop, which is the failure mode this repo
+    // has already had to fix once.
+    const finished = step >= 9;
+
+    if (started && !finished) {
+      blockStop(
+        `[EVOR CONTINUATION] Tick ${ts.tick} is at step ${step} (${ts?.step_status ?? 'unknown'}) — not complete.\n` +
+          `Ending your turn now ends the mission with this tick unfinished.\n\n` +
+          `If you spawned or resumed an agent in the background, WAIT for it: call TaskOutput ` +
+          `with block:true on its task id, or Monitor the artifact it owes. If the tick failed ` +
+          `outright, spawn Task(subagent_type="oh-my-evor:evor-tick") again for this tick — the ` +
+          `tick is not done until it reports an outcome and a node is recorded.\n`
+      );
+    }
+  }
+} catch (err) {
+  // FAIL-OPEN — a missing or corrupt tick-state must never trap the session.
+  process.stderr.write(`[evor:stop] continuation guard internal error (fail-open): ${err.message}\n`);
 }
 
 process.exit(0);

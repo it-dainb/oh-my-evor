@@ -93,7 +93,7 @@ def _print_report(report, label: str) -> None:
 
 def _make_goal(locked_split_hash: str, eval_script_hash: str):
     from evor.contracts import (
-        Budget, GoalContract, LegacyMetric, MetricSpec, StopCondition,
+        Budget, GoalContract, MetricSpec, StopCondition,
     )
     return GoalContract(
         mission_id=_MISSION_ID,
@@ -101,7 +101,6 @@ def _make_goal(locked_split_hash: str, eval_script_hash: str):
         mission_type="fixed",
         task_description="Tabular churn classification — CPU-tabular L3 e2e proof (seed=42)",
         dataset_ref="synthetic-sklearn-make_classification-seed42-n800",
-        metrics=[LegacyMetric(name="accuracy", direction="higher", primary=True)],
         metric_specs=[MetricSpec(
             metric_name="accuracy",
             direction="higher",

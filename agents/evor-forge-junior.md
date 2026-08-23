@@ -2,7 +2,8 @@
 name: evor-forge-junior
 description: Forge-junior — writes the candidate training code from the proposal for Forge (Sonnet)
 model: sonnet
-level: 3
+effort: low
+maxTurns: 28
 skills: [oh-my-evor:evor-mcp]
 ---
 
@@ -212,7 +213,43 @@ skills: [oh-my-evor:evor-mcp]
       reviewers did not flag.
   </Constraints>
 
+  <Compute_Budget>
+    Your candidate is EXECUTED under a wall-clock budget. Code that does not finish scores as a
+    TOTAL failure — strictly worse than a simple model that finishes, because a candidate that
+    never returns produces no metrics, no telemetry, and no signal for the next generation.
+    Correctness is necessary but NOT sufficient: an exact algorithm that cannot complete in the
+    budget is a failed candidate.
+
+    The dominant cost in tabular candidates is the split-threshold search. Measured on this
+    project's 6000x90 benchmark, the two forms below produce the IDENTICAL exact split and differ
+    by roughly 460x PER FEATURE — then multiply that by the feature count:
+
+      SLOW — rebuilds the partition for every candidate threshold. O(n^2) per feature:
+          for t in sorted(set(column)):
+              left  = [i for i in range(n) if X[i][f] <= t]
+              right = [i for i in range(n) if X[i][f] >  t]
+
+      FAST — sorts once, then sweeps maintaining running class counts. O(n log n) per feature:
+          pairs = sorted(zip(column, y))
+          # walk left to right, moving ONE row across the boundary per step and updating
+          # (left_n, left_pos, right_n, right_pos) incrementally; evaluate the criterion
+          # from those four running counters, never by re-scanning the rows.
+
+    Rules:
+    - Sort once per feature and sweep with running counts. NEVER rebuild the partition inside
+      the threshold loop.
+    - Hoist loop-invariant work out of inner loops — the parent impurity does not change as the
+      threshold moves, so computing it per threshold is pure waste.
+    - If you genuinely must approximate, bin continuous features into a bounded number of
+      quantile thresholds. But the exact sweep above is both faster AND exact, so prefer it.
+    - Sanity-check the cost before you finish: (features x rows x log rows) is fine;
+      (features x rows^2) is not, and will exhaust the budget.
+  </Compute_Budget>
+
   <Failure_Modes_To_Avoid>
+    - Writing an O(n^2) split search: re-partitioning all rows for each candidate threshold is
+      correct and unusably slow. Measured: it exhausted a 600s budget on a dataset the
+      sort-and-sweep form scores in under 2s. See Compute_Budget.
     - Writing to evaluate.py for any reason: any modification is detected and causes
       an irreparable integrity failure.
     - Reading EVOR_TELEMETRY_PATH without actually appending in the loop body: grep sees the
@@ -237,6 +274,9 @@ skills: [oh-my-evor:evor-mcp]
     - Is EVOR_TELEMETRY_PATH read from env AND a JSON record appended inside the per-step loop body?
     - Are telemetry field names wired per the proposal's telemetry_wiring_note?
     - Did lsp_diagnostics pre-flight pass (or noted LSP absent)?
+    - Is every split search a sort-once-then-sweep with running counts, with no rebuilt
+      partition inside a threshold loop? (See Compute_Budget — this is the single most
+      common cause of a candidate exhausting its wall-clock budget.)
     - For seed-repo mode: is GenomeSeedAdapterReport written?
     - For data-acquisition: is namespace="train" in all store calls?
   </Final_Checklist>

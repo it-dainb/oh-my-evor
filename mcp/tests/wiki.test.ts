@@ -452,6 +452,37 @@ describe("wikiGetRelevant IDF cache", () => {
     expect(_wikiCacheStats.hits).toBe(1);
   });
 
+  it("a write and a read inside the same millisecond still sees the write", () => {
+    /**
+     * The cache keyed on mtimeMs alone and the design note claimed "a write via
+     * pruneAndWrite (tmp->rename) always produces a fresh mtime". It does not.
+     * Measured on this host, two immediate writes to one file produced IDENTICAL
+     * mtime_ns — so wikiAdd followed by wikiGetRelevant served the pre-write
+     * corpus and silently dropped the lesson just written.
+     *
+     * That is a data-loss path, not a cache-efficiency detail: Sage writes a
+     * finding and Mutagen queries the wiki in the same tick, so the reader can
+     * miss exactly what the writer just produced, with no error raised anywhere.
+     *
+     * This test writes twice back-to-back with no delay, which is the condition
+     * that broke it. The fix is a generation counter bumped on write, so
+     * invalidation no longer depends on clock resolution.
+     */
+    const runId = "run-cache-samems";
+    _resetWikiCache();
+    wikiAdd(runId, makeEntry({ observation: "alpha unique-token-aaa" }), "test-mission");
+    wikiGetRelevant("unique-token-aaa", 5); // warm the cache
+
+    // No sleep: this is deliberately within one millisecond of the write above.
+    wikiAdd(runId, makeEntry({ observation: "beta unique-token-bbb" }), "test-mission");
+    const hits = wikiGetRelevant("unique-token-bbb", 5);
+
+    expect(
+      JSON.stringify(hits),
+      "the just-written lesson must be visible to the very next query",
+    ).toContain("unique-token-bbb");
+  });
+
   it("returns correct results from cached corpus", () => {
     const runId = "run-cache-003";
     const target = makeEntry({

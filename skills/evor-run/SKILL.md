@@ -2,7 +2,6 @@
 name: evor-run
 description: Load and validate the mission contract, set active run state, and invoke the Evor tick loop
 argument-hint: "[mission-id or run-id]"
-level: 3
 skills: [oh-my-evor:evor-mcp]
 ---
 

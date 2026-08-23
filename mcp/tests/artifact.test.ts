@@ -78,6 +78,32 @@ function minimalProposal(): Record<string, unknown> {
   };
 }
 
+function minimalSelectorVerdict(): Record<string, unknown> {
+  return {
+    reviews: [
+      {
+        proposal_id: "p1",
+        approach_family: "algo",
+        critic_review: {
+          h001_one_hypothesis: "pass",
+          h002_family_streak: "pass",
+          h003_intra_tick_diversity: "pass",
+          h004_parent_diversity: "pass",
+          integrity_risk: "pass",
+          instrumentation_check: "pass",
+          schema_valid: "pass",
+          acquisition_contamination: null,
+          gotcha_avoidance: "pass",
+          verdict: "approved",
+        },
+        selected: true,
+        selection_note: "best fit for this tick",
+      },
+    ],
+    winner: "p1",
+  };
+}
+
 function pythonEnv(): Record<string, string> {
   const existing = process.env.PYTHONPATH;
   return {
@@ -94,13 +120,13 @@ describe("writeArtifact — path resolution", () => {
   it("writes selector artifact to canonical path", () => {
     const runId = "run-art-001";
     ensureRunDirs(runId, "test-mission");
-    const result = writeArtifact(runId, 1, "selector", { verdict: "approved" });
+    const result = writeArtifact(runId, 1, "selector", minimalSelectorVerdict());
     expect(result.ok).toBe(true);
     const paths = resolveRunPaths(runId);
     const target = join(paths.runDir, "ticks", "1", "selector", "verdict.json");
     expect(existsSync(target)).toBe(true);
     const written = JSON.parse(readFileSync(target, "utf8"));
-    expect(written.verdict).toBe("approved");
+    expect(written.winner).toBe("p1");
   });
 
   it("writes probe artifact to canonical path", () => {
@@ -137,18 +163,6 @@ describe("writeArtifact — pass-through agents", () => {
   // We skip them when the Python bridge is unavailable to keep CI fast.
   const hasHarness = existsSync(join(HARNESS_DIR, "evor", "artifacts.py"));
 
-  it.skipIf(!hasHarness)("selector passes through without validation error", () => {
-    const runId = "run-art-pt-001";
-    ensureRunDirs(runId, "test-mission");
-    const result = writeArtifact(
-      runId, 1, "selector",
-      { approved: ["p1"], rejected: ["p2"] },
-      undefined, false,
-      process.env.EVOR_MISSION_ID,
-    );
-    expect(result.ok).toBe(true);
-  });
-
   it.skipIf(!hasHarness)("forge-architect passes through", () => {
     const runId = "run-art-pt-002";
     ensureRunDirs(runId, "test-mission");
@@ -184,6 +198,23 @@ describe("writeArtifact — validation via bridge", () => {
     expect(result.ok).toBe(false);
     expect(result.error).toBeTruthy();
   });
+
+  it.skipIf(!hasHarness)("valid selector verdict passes", () => {
+    const runId = "run-art-val-003";
+    ensureRunDirs(runId, "test-mission");
+    const result = writeArtifact(runId, 1, "selector", minimalSelectorVerdict());
+    expect(result.ok).toBe(true);
+    expect(result.error).toBeUndefined();
+  });
+
+  it.skipIf(!hasHarness)("selector verdict with renamed container is rejected", () => {
+    const runId = "run-art-val-004";
+    ensureRunDirs(runId, "test-mission");
+    // Real drift shape: "per_proposal_reviews" instead of "reviews".
+    const result = writeArtifact(runId, 1, "selector", { per_proposal_reviews: [] });
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain("reviews");
+  });
 });
 
 // ── readArtifact ─────────────────────────────────────────────────────────────
@@ -214,10 +245,10 @@ describe("readArtifact — found", () => {
   it.skipIf(!hasHarness)("reads back payload written by writeArtifact", () => {
     const runId = "run-read-003";
     ensureRunDirs(runId, "test-mission");
-    writeArtifact(runId, 1, "selector", { verdict: "approved" });
+    writeArtifact(runId, 1, "selector", minimalSelectorVerdict());
     const result = readArtifact(runId, 1, "selector");
     expect(result.ok).toBe(true);
-    expect((result.payload as Record<string, unknown>)?.verdict).toBe("approved");
+    expect((result.payload as Record<string, unknown>)?.winner).toBe("p1");
     expect(result.path).toBeTruthy();
   });
 
@@ -292,7 +323,7 @@ describe("artifact_bridge.py (subprocess)", () => {
 
   it.skipIf(!hasHarness)("selector artifact roundtrip succeeds", () => {
     const tmpFile = join(tmpRoot, "payload.json");
-    writeFileSync(tmpFile, JSON.stringify({ verdict: "approved" }), "utf8");
+    writeFileSync(tmpFile, JSON.stringify(minimalSelectorVerdict()), "utf8");
     const runDir = join(tmpRoot, "runs", "run-bridge-art-001");
     mkdirSync(runDir, { recursive: true });
 

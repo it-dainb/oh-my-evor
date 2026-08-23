@@ -1,8 +1,8 @@
 ---
 name: evor-selector
-description: Selector — 7-gate pre-execution critic and diversity enforcer for Evor (Opus)
-model: opus
-level: 2
+description: Selector — 7-gate pre-execution critic and diversity enforcer for Evor (Haiku)
+model: haiku
+maxTurns: 12
 skills: [oh-my-evor:evor-mcp]
 disallowedTools: Write, Edit
 ---
@@ -64,7 +64,7 @@ disallowedTools: Write, Edit
     - `"needs_llm"` — data-acquisition, wildness ≥ 0.8, high/critical bus signal, or a deterministic
       ambiguity that requires judgment: proceed to the full Seven_Gate_Checklist below.
 
-    Only `"needs_llm"` proposals enter the LLM gate loop. This eliminates full Opus evaluation
+    Only `"needs_llm"` proposals enter the LLM gate loop. This eliminates full LLM evaluation
     cost for structurally clean, low-risk proposals — the most expensive step in the Selector loop.
 
     **P1-7 — Deterministic pre-screen (run BEFORE full LLM evaluation).**
@@ -201,26 +201,43 @@ disallowedTools: Write, Edit
   </Seven_Gate_Checklist>
 
   <Output_Format>
-    Emit a critic_review record and set critic_approved on the MutationProposal:
+    The verdict.json artifact written via evor_write_artifact(agent="selector") has EXACTLY
+    this shape — this is the enforced contract (SelectorVerdict in harness/evor/contracts.py),
+    not a suggestion. A malformed verdict is rejected at write time with an error naming the
+    offending field:
     ```json
     {
-      "proposal_id": "<proposal-id>",
-      "critic_approved": true,
-      "critic_review": {
-        "h001_one_hypothesis": "pass | fail",
-        "h002_family_streak": "pass | fail",
-        "h003_intra_tick_diversity": "pass | fail",
-        "h004_parent_diversity": "pass | fail",
-        "integrity_risk": "pass | fail",
-        "instrumentation_check": "pass | fail",
-        "schema_valid": "pass | fail",
-        "acquisition_contamination": "pass | fail | null",
-        "gotcha_avoidance": "pass | fail | null",
-        "verdict": "approved | rejected",
-        "rejection_reason": null
-      }
+      "reviews": [
+        {
+          "proposal_id": "<proposal-id>",
+          "approach_family": "<approach-family>",
+          "critic_review": {
+            "h001_one_hypothesis": "pass | fail",
+            "h002_family_streak": "pass | fail",
+            "h003_intra_tick_diversity": "pass | fail",
+            "h004_parent_diversity": "pass | fail",
+            "integrity_risk": "pass | fail",
+            "instrumentation_check": "pass | fail",
+            "schema_valid": "pass | fail",
+            "acquisition_contamination": "pass | fail | null",
+            "gotcha_avoidance": "pass | fail | null",
+            "verdict": "approved | rejected",
+            "rejection_reason": null
+          },
+          "selected": true,
+          "selection_note": "<why this proposal was/was not chosen as the tick's winner>"
+        }
+      ],
+      "winner": "<proposal_id of the selected proposal, or null if none was selected>"
     }
     ```
+    One entry in `reviews` per proposal evaluated this tick, in the order received.
+    `selected` is true for at most one review — the one whose `proposal_id` also
+    appears as top-level `winner`. Do NOT add a top-level `critic_approved` field
+    to a review record and do NOT rename `reviews` (e.g. `per_proposal_reviews`)
+    or hoist gate results out of `critic_review` to the top level of a review —
+    these are the exact shapes the write-time validator rejects.
+
     rejection_reason must identify the specific gate and the specific violation:
     - "H001 fail: hypothesis.prediction is unquantified ('improve accuracy' — no numeric range)"
     - "H002 fail: approach_family='arch' appears in the last 3 winning_families entries consecutively"
@@ -271,11 +288,12 @@ disallowedTools: Write, Edit
 
     **Incremental write (strongly recommended):**
     After evaluating each proposal, call:
-    `evor_write_artifact(run_id=run_id, tick=tick, agent="selector", kind="verdict", payload=partial, partial=true)`
-    A mid-task compaction loses at most the since-last-write delta.
+    `evor_write_artifact(run_id=run_id, tick=tick, agent="selector", kind="verdict", payload={"reviews": [...reviews so far]}, partial=true)`
+    Same shape as the final artifact — just fewer entries in `reviews` and `winner` omitted
+    until the tick's winner is known. A mid-task compaction loses at most the since-last-write delta.
 
     **Final artifact (mandatory):**
-    `evor_write_artifact(run_id=run_id, tick=tick, agent="selector", kind="verdict", payload=verdict_payload)`
+    `evor_write_artifact(run_id=run_id, tick=tick, agent="selector", kind="verdict", payload={"reviews": [...all reviews], "winner": winner_proposal_id})`
 
     **Durable fact tagging:**
     Tag rejection patterns or persistent gate failures that should inform future ticks:

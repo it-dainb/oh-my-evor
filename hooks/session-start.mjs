@@ -60,7 +60,7 @@ function buildEvorRestore(rDir, rId, mId) {
   if (objective && objective !== header) lines.push(`Objective: ${objective}`);
   const bestStr = scoreStr + (nodeStr ? ` (${nodeStr})` : '');
   lines.push(`Tick ${currentTick} step ${currentStep} | Best: ${bestStr}`);
-  lines.push(`Call evor_state_read to check position; prioritise the user's newest request.`);
+  lines.push(`Spawn evor-tick to resume the loop; prioritise the user's newest request.`);
 
   return `<evor-restore>\n${lines.join('\n')}\n</evor-restore>`;
 }
@@ -303,7 +303,7 @@ const output = {
     EVOR_MISSION_ID: missionId,
     EVOR_RUN_DIR: runDir,
   },
-  message: `[EVOR CONTEXT] Active mission in progress — call evor_state_read to check current position.`,
+  message: `[EVOR CONTEXT] Active mission in progress — spawn evor-tick to resume the loop.`,
 };
 
 // Prime session with recent wiki lessons (graceful — skip if evor.wiki not installed yet)
@@ -314,7 +314,22 @@ if (missionId) {
     { encoding: 'utf8', timeout: 4000 }
   );
   if (wiki.status === 0 && wiki.stdout?.trim()) {
-    output.message += `\n\nRecent wiki lessons:\n${wiki.stdout.trim()}`;
+    // Budgeted, like pre-compact.mjs's RESTORE_LIMIT. `--limit 5` bounds the
+    // NUMBER of lessons, never their size, so five long lessons injected
+    // arbitrarily much — and a 100-200 tick mission accumulates lessons, so the
+    // injection grew with mission age. That is the same compounding shape as the
+    // tree-read leak, arriving through a different door.
+    //
+    // Truncation is announced rather than silent: a quietly cut list is
+    // indistinguishable from "there were no more lessons", which hides the budget
+    // from the reader (P5, fail loud).
+    const WIKI_INJECT_LIMIT = 2000;
+    const body = wiki.stdout.trim();
+    const injected =
+      body.length > WIKI_INJECT_LIMIT
+        ? `${body.slice(0, WIKI_INJECT_LIMIT)}\n… [truncated at ${WIKI_INJECT_LIMIT} chars — call evor_wiki_query for the full set]`
+        : body;
+    output.message += `\n\nRecent wiki lessons:\n${injected}`;
   }
 }
 
@@ -327,10 +342,25 @@ if (restoreBlock) {
 
 // ── Compact Law primer (≤4 lines) — every session with an active run ─────────
 // Keeps the core contract visible without repeating the full SubagentStart block.
+// Main-facing only. This used to restate subagent-start's COMMON_HEADER in
+// different words — including a DIFFERENT hot-path tool list, so an agent's
+// guidance depended on which hook fired. Worse, it recommended evor_state_read,
+// which §3b.0 now denies to main: the primer was pointing the orchestrator at
+// forbidden tools, costing a denial round-trip every session and teaching the
+// behaviour the boundary exists to remove.
+//
+// The subagent protocol (READ-FIRST, artifact reads) is correct for subagents and
+// stays in subagent-start.mjs, which is the one place it belongs. Main gets its
+// own, genuinely different, job.
 const LAW_PRIMER =
   `[EVOR LAW] Use evor_* MCP tools to change evor state — never write .evor/ directly.\n` +
-  `[READ-FIRST] Read the upstream artifact (evor_read_artifact) before acting on it.\n` +
-  `[TOOLS] Hot-path tools: evor_record_node, evor_record_eval, evor_run_start, evor_state_read.`;
+  `[ROLE] You orchestrate the mission: spawn evor-tick for each tick, record the outcome, ` +
+  `decide continue/stop. The tick's detail — artifacts, tree, run state — lives inside the ` +
+  `boundary and returns to you as a status line plus pointers.\n` +
+  `[WAIT] A tick is not done when you have spawned it — it is done when it reports an ` +
+  `outcome. If you resume or spawn anything in the background, block on TaskOutput or ` +
+  `Monitor until it returns. Ending your turn while a tick is in flight ends the mission.\n` +
+  `[TOOLS] Hot-path: evor-tick spawn, evor_check_stop, evor_check_plateau, evor_write_handoff.`;
 output.message += `\n\n${LAW_PRIMER}`;
 
 // ── Next-action hint: resume at the right step ────────────────────────────────
@@ -344,16 +374,15 @@ try {
   const tick = ts?.tick ?? rs?.tick_count ?? 0;
   const step = ts?.current_step ?? 0;
 
-  let nextAction = '';
-  if (step === 0 || step >= 9) {
-    nextAction = `Tick ${tick + (step >= 9 ? 1 : 0)}: start with evor_state_read + evor_tree_read(frontier), then spawn evor-sage.`;
-  } else if (step < 3) {
-    nextAction = `Tick ${tick} step ${step}: Sage/research phase — check evor_read_artifact(agent="sage") for existing findings.`;
-  } else if (step < 6) {
-    nextAction = `Tick ${tick} step ${step}: Selector/Forge phase — evor_read_artifact(agent="mutagen") then spawn evor-selector if verdict missing.`;
-  } else {
-    nextAction = `Tick ${tick} step ${step}: Evaluation phase — evor_record_eval → evor_integrity_check → evor_state_write.`;
-  }
+  // Main's next action is always the same shape, because main only ever does one
+  // thing: run the next tick through the boundary. Naming the step tells it where
+  // the tick resumes; it does NOT license main to read the artifacts behind that
+  // step — those reads are denied for main and belong inside evor-tick.
+  const nextTick = step >= 9 || step === 0 ? tick + (step >= 9 ? 1 : 0) : tick;
+  const resume = step > 0 && step < 9 ? ` (resumes at step ${step})` : '';
+  const nextAction =
+    `Tick ${nextTick}${resume}: spawn evor-tick. When it returns, record the outcome, ` +
+    `then evor_check_stop / evor_check_plateau to decide continue or stop.`;
 
   if (nextAction) {
     output.message += `\n\n[NEXT] ${nextAction}`;

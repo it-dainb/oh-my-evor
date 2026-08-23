@@ -2,7 +2,6 @@
 name: evor
 description: Main 9-step Evor tick loop with meta-evolution, doom-loop detection, and parallel candidate scheduling
 argument-hint: "[run-id]"
-level: 4
 skills: [oh-my-evor:evor-mcp]
 ---
 
@@ -119,17 +118,22 @@ guard/spec to contract intent (Step above) is NOT it.
 | Agent | Model | Role |
 |---|---|---|
 | Evor (orchestrator) | opus | Tick coordination, meta-evolution decisions, doom-loop intervention |
-| Sage | opus | Research LEAD: decompose intent, fan out to Sage-junior, aggregate + quorum |
-| Sage-junior | sonnet | Single-angle deep citation research (spawned only by Sage) |
-| Mutagen | opus | Mutation proposal generation (creative, unbounded ideation) |
-| Probe | opus | Telemetry EDA, hypothesis verdict, benchmark-upgrade proposals |
+| Sage | sonnet | Research LEAD: decompose intent, fan out to Sage-junior, aggregate + quorum |
+| Sage-junior | haiku | Single-angle deep citation research (spawned only by Sage) |
+| Mutagen | sonnet | Mutation proposal generation (creative, unbounded ideation) |
+| Probe | sonnet | Telemetry EDA, hypothesis verdict, benchmark-upgrade proposals |
 | Forge | opus | Implementation LEAD: orchestrates its dev team (does not write code itself) |
-| Forge-architect | opus | Designs the candidate implementation (spawned only by Forge) |
+| Forge-architect | sonnet | Designs the candidate implementation (spawned only by Forge) |
 | Forge-junior | sonnet | Writes the candidate training code (spawned only by Forge) |
-| Forge-critic | opus | Pre-run code review + integrity/structure check (spawned only by Forge) |
-| Forge-analyst | opus | Post-run telemetry analysis + failure diagnosis (spawned only by Forge) |
-| Selector | opus | 6-gate pre-execution critique (sharper borderline-gate judgment) |
+| Forge-critic | sonnet | Pre-run code review + integrity/structure check (spawned only by Forge) |
+| Forge-analyst | sonnet | Post-run telemetry analysis + failure diagnosis (spawned only by Forge) |
+| Selector | sonnet | 6-gate pre-execution critique (sharper borderline-gate judgment) |
+| Acquirer | haiku | Scoped data acquisition, validation, de-duplication (spawned by Forge/Sage) |
 | Quick lookups | haiku | Wiki queries, state reads, schema checks |
+
+Tiering rule: **opus** for the orchestrator and for Forge (it arbitrates the atomic-review
+loop); **sonnet** for leads and for any role that renders a verdict or handles escalation;
+**haiku** only for single-angle, well-scoped work with no verification duty.
 </Model_Routing>
 
 <Parallel_Execution>
@@ -142,6 +146,26 @@ If the env var is unavailable, fall back to sequential candidate execution (conc
 </Parallel_Execution>
 
 <Steps>
+
+## Step -1 — Who runs this loop (execution boundary)
+
+This skill is loaded by two different roles. Read this before Step 0 and act on your own role.
+
+**If you are the mission orchestrator** (invoked via `/evor-run`, no `agent_type`): you do NOT
+run Steps 0-9 yourself. For each tick, spawn the boundary and await its status:
+
+`Task(subagent_type="oh-my-evor:evor-tick", description="Tick <n>", prompt="Run dir: <run_dir>. Tick: <n>. Execute exactly one tick end to end, then return a compact status.")`
+
+Then record the returned status, decide continue / stop / meta-evolve, and spawn the next tick.
+Keep nothing else. Do not read artifacts, tree, or state that the boundary already read — if
+you need detail, it is behind an `evor_read_artifact` pointer the boundary returned.
+
+**If you ARE `evor-tick`**: Steps 0-9 below are yours. Run them, then return the status.
+
+**Why:** measured on a real tick, the orchestrator ran 47 turns and ended at 144,644 tokens,
+recurring ~75,261 per tick — reaching the 1M window near tick 12 against a 100-200 tick target.
+Delegation was already fully enforced (orchestrator leaf calls 152 -> 1); the growth is the
+loop's own bookkeeping. The boundary exists so that per-tick context dies with the tick.
 
 ## Step 0 — Run Startup (once, before the first tick)
 
@@ -171,27 +195,54 @@ Spawn Mutagen and Sage as REAL sub-agents. Do NOT write proposals or citations y
 
 1. `Task(subagent_type="oh-my-evor:evor-mutagen", description="Tick <n> proposals", prompt="Run dir: <run_dir>. Tick: <n>. Parent node(s): <ids>. Wildness: <w>. Generate N=<concurrency> proposals and write ticks/<n>/mutagen/proposals.json per your write-as-you-go contract.")`.
    - **POST-CONDITION:** call `evor_read_artifact({ run_id, tick: n, agent: "mutagen" })`. If it returns `{error:"not found"}`, re-spawn Mutagen with a corrective note. Never fabricate the artifact.
-2. Write Mutagen's `investigation_queries[]` to the tick handoff via `evor_write_handoff({ run_id, tick: n, data: { to: "sage", investigation_queries: [...] } })`.
+2. **Every tick routes Mutagen's queries to Sage. This step is unconditional — including
+   tick 1.** `evor_write_handoff` serves two different jobs: routing WITHIN this tick
+   (Mutagen → Sage, which is what you are doing here) and carrying state to the NEXT tick.
+   On tick 1 there is no inbound handoff to read, and that is not a reason to skip the
+   within-tick route. Measured: two runs spawned Sage in every tick that began by reading an
+   inbound handoff, and in no tick 1 — the loop went Mutagen → Selector with Sage never
+   considered, and tick 1 is precisely the tick where nothing is in the wiki yet.
+
+   Write Mutagen's `investigation_queries[]` to the tick handoff via `evor_write_handoff({ run_id, tick: n, data: { to: "sage", investigation_queries: [...] } })`.
+
+   - **POST-CONDITION (applies to every tick, whatever the gate below decided):** call
+     `evor_read_artifact({ run_id, tick: n, agent: "sage" })`. If it returns
+     `{error:"not found"}`, Sage did not run — spawn it before advancing to Selector.
+     Do not proceed to step 3 with no Sage artifact for this tick.
 
    **P1-8 — Conditional Sage gate (wiki+gotcha first; Sage only when needed):**
    Before spawning Sage, call `evor_wiki_query` and `evor_gotcha_query` for each angle in
    `investigation_queries[]`. Classify each query as wiki-resolved, gotcha-resolved, or unresolved.
 
-   **Skip Sage entirely** (and mark all queries resolved from wiki/gotcha) when ALL of the
-   following hold:
+   **Narrow Sage to its self-directed angle only** (and mark Mutagen's queries resolved from
+   wiki/gotcha) when ALL of the following hold:
    - All investigation_queries are wiki-resolved (wiki returned a confirmed lesson for each angle)
    - The proposal's approach_family is a known recipe already run this mission (not new to the run)
    - wildness < 0.7 (parametric / familiar territory; low surprise risk)
    - approach_family != "data-acquisition" (no sourcing due diligence needed)
 
-   **Spawn Sage** when ANY of the following is true:
+   **Spawn Sage at FULL scope** when ANY of the following is true (otherwise it still runs,
+   narrowed to the self-directed angle — Sage is never skipped outright):
    - One or more investigation_queries are NOT wiki-resolved after the wiki+gotcha check
    - approach_family is new to this run (first tick using this family in this mission)
    - wildness >= 0.7 (structural or high-exploration proposal; external grounding adds value)
    - approach_family == "data-acquisition" (license sourcing requires Sage's Tier-1 search)
 
+   **Why the narrow path is not a skip.** Every condition above is a CONVERGENCE signal:
+   the wiki already answers everything Mutagen thought to ask, the family has been tried,
+   wildness is low. Skipping Sage there switches off the only channel that can widen the
+   hypothesis space at exactly the moment the search is settling into familiar ground.
+   Mutagen can only ask about what it already suspects, and Sage only ever answered
+   Mutagen — so a mission that stops asking new questions stops receiving new ideas, and
+   nothing in the loop notices. Measured: Sage ran in 1 of 3 ticks of a real run, all at
+   wildness 0.3-0.55, and produced zero self-directed findings because it was never given
+   the chance. The narrow path costs one junior instead of N and keeps the channel alive.
+
    When spawning Sage (narrowed scope): pass the UNRESOLVED angles only; wiki-resolved angles
    are already handled. Include the wiki hit IDs in the spawn prompt so Sage skips them.
+   When there are NO unresolved angles, still spawn Sage for its self-directed angle alone
+   (`Sage_Fan_Out_Protocol` Step 1b) — it must answer a question nobody asked, not re-answer
+   one the wiki already covered.
 
    `Task(subagent_type="oh-my-evor:evor-sage", description="Tick <n> grounding", prompt="Run dir: <run_dir>. Tick: <n>. Read the tick handoff via evor_read_handoff and answer the UNRESOLVED investigation_queries (wiki-resolved angle IDs already handled: [<ids>]). Write ticks/<n>/sage/findings.json.")`.
    - **POST-CONDITION:** call `evor_read_artifact({ run_id, tick: n, agent: "sage" })`. If it returns `{error:"not found"}`, re-spawn Sage.

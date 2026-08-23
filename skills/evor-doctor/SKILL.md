@@ -2,7 +2,6 @@
 name: evor-doctor
 description: Check environment health and .evor integrity; auto-repair obvious issues
 argument-hint: "[run-dir] [--repair]"
-level: 2
 skills: [oh-my-evor:evor-mcp]
 ---
 

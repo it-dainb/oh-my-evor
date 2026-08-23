@@ -3,8 +3,7 @@
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": "*",
-        "if": "Write|Edit|Bash|Task|Agent|mcp__plugin_oh-my-evor_evor__*",
+        "matcher": "^(Write|Edit|Bash|Task|Agent|mcp__plugin_oh-my-evor_evor__.*)$",
         "hooks": [
           {
             "type": "command",
@@ -100,7 +99,7 @@
     ],
     "SubagentStop": [
       {
-        "matcher": "^oh-my-evor:evor-(sage|mutagen|probe|forge|selector|acquirer)$",
+        "matcher": "*",
         "hooks": [
           {
             "type": "command",

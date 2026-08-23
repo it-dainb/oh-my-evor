@@ -185,6 +185,48 @@ describe("treeRead — subtree filter", () => {
   });
 });
 
+// ── A1: NamedTreeNode exposes fitness for selection ─────────────────────────
+
+describe("treeRead — A1 metrics/fitness exposure", () => {
+  it("exposes the node's metrics and fitness_value for a passed node", () => {
+    const runId = "run-a1-001";
+    const id = randomUUID();
+    writeTree(runId, {
+      [id]: {
+        ...makeNode(id, [], 0),
+        name: "scored-01",
+        integrity_status: "passed",
+        metrics: { accuracy: 0.91875 },
+        fitness_value: 0.91875,
+      },
+    }, "test-mission");
+
+    const nodes = treeRead(runId);
+    expect(nodes).toHaveLength(1);
+    expect(nodes[0].metrics).toEqual({ accuracy: 0.91875 });
+    expect(nodes[0].fitness_value).toBe(0.91875);
+  });
+
+  it("a failed-integrity node never exposes metrics/fitness_value (not selectable)", () => {
+    const runId = "run-a1-002";
+    const id = randomUUID();
+    writeTree(runId, {
+      [id]: {
+        ...makeNode(id, [], 0),
+        name: "cheated-01",
+        integrity_status: "failed",
+        metrics: { accuracy: 0.99 },
+        fitness_value: 0.99,
+      },
+    }, "test-mission");
+
+    const nodes = treeRead(runId);
+    expect(nodes).toHaveLength(1);
+    expect(nodes[0].metrics).toBeUndefined();
+    expect(nodes[0].fitness_value).toBeUndefined();
+  });
+});
+
 // ── treeSelect — error handling ──────────────────────────────────────────────
 
 describe("treeSelect — subprocess error handling", () => {

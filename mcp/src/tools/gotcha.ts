@@ -286,7 +286,7 @@ export function registerGotchaTools(server: McpServer): void {
       });
       if (!result.ok) {
         return {
-          content: [{ type: "text" as const, text: JSON.stringify({ error: result.error }) }],
+          content: [{ type: "text" as const, text: JSON.stringify({ ok: false, error: result.error }) }],
         };
       }
       return {
@@ -349,7 +349,7 @@ export function registerGotchaTools(server: McpServer): void {
       });
       if (!result.ok) {
         return {
-          content: [{ type: "text" as const, text: JSON.stringify({ error: result.error }) }],
+          content: [{ type: "text" as const, text: JSON.stringify({ ok: false, error: result.error }) }],
         };
       }
       return {
@@ -398,14 +398,20 @@ export function registerGotchaTools(server: McpServer): void {
       });
       if (!result.ok) {
         return {
-          content: [{ type: "text" as const, text: JSON.stringify({ error: result.error }) }],
+          content: [{ type: "text" as const, text: JSON.stringify({ ok: false, error: result.error }) }],
         };
       }
       return {
         content: [
           {
             type: "text" as const,
-            text: JSON.stringify({ ok: true, acquisition_id: acquisition_id ?? null }),
+            text: JSON.stringify({
+              ok: true,
+              // The server-computed content-addressed handle. Previously omitted, so a
+              // caller that supplied no acquisition_id got back no handle whatsoever.
+              content_ref: result.content_ref ?? null,
+              acquisition_id: acquisition_id ?? null,
+            }),
           },
         ],
       };

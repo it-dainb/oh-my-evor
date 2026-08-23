@@ -34,7 +34,7 @@ function ok(data: unknown) {
 }
 
 function err(msg: string) {
-  return { content: [{ type: "text" as const, text: JSON.stringify({ error: msg }) }] };
+  return { content: [{ type: "text" as const, text: JSON.stringify({ ok: false, error: msg }) }] };
 }
 
 // ── Core functions (exported for tests) ──────────────────────────────────────

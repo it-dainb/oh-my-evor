@@ -1,0 +1,645 @@
+{
+  "role": "evor-acquirer",
+  "agent_file": "agents/evor-acquirer.md",
+  "arms": [
+    {
+      "model": "haiku",
+      "effort": "medium",
+      "label": "current"
+    },
+    {
+      "model": "sonnet",
+      "effort": "medium",
+      "label": "main (pre-retier)"
+    }
+  ],
+  "contract": {
+    "heading": "Acquisition Provenance",
+    "mode": "json",
+    "fields": [
+      {
+        "path": "acquisition_provenance.target",
+        "kind": "enum",
+        "values": [
+          "enrich-train",
+          "harden-test"
+        ]
+      },
+      {
+        "path": "acquisition_provenance.namespace_used",
+        "kind": "enum",
+        "values": [
+          "train",
+          "eval"
+        ]
+      },
+      {
+        "path": "acquisition_provenance.forbidden_split",
+        "kind": "enum",
+        "values": [
+          "train",
+          "test"
+        ]
+      },
+      {
+        "path": "acquisition_provenance.dropped_for_format",
+        "kind": "int"
+      },
+      {
+        "path": "acquisition_provenance.item_count_valid",
+        "kind": "int"
+      },
+      {
+        "path": "acquisition_provenance.dropped_for_collision",
+        "kind": "int"
+      },
+      {
+        "path": "acquisition_provenance.item_count_integrated",
+        "kind": "int"
+      },
+      {
+        "path": "acquisition_provenance.eval_version_after",
+        "kind": "int"
+      },
+      {
+        "path": "acquisition_provenance.license_noted",
+        "kind": "present"
+      },
+      {
+        "path": "signals_emitted",
+        "kind": "set",
+        "values": [
+          "data-acquired",
+          "leakage-blocked",
+          "license-gate",
+          "data-contamination-detected"
+        ]
+      },
+      {
+        "path": "acquisition_provenance.halt_reason",
+        "kind": "present"
+      }
+    ],
+    "verdict_note": "evor-acquirer.md: namespace and forbidden_split are both determined by `target` and point in OPPOSITE directions (enrich-train writes namespace=train and is de-duped against the test split). dropped_for_format merges format_errors and validation_dropped; item_count_valid = fetched - dropped_for_format; item_count_integrated = valid - dropped_for_collision. eval_version is incremented by the tool for harden-test only. The four signal kinds are independent and each fires on its own condition; collision_rate is over item_count_fetched."
+  },
+  "cases": [
+    {
+      "id": "enrich-train-clean",
+      "gate": "direction",
+      "note": "the baseline shape: enrich-train writes to namespace=train while de-duping against the TEST split, and eval_version does not move because the eval split was not touched.",
+      "spawn": {
+        "caller": "forge",
+        "target": "enrich-train",
+        "source": "owner/street-signs-extra"
+      },
+      "goal_contract": {
+        "modality": "image",
+        "label_space": [
+          "stop",
+          "yield",
+          "speed-limit"
+        ],
+        "train_split": "data/train",
+        "test_split": "data/test",
+        "eval_version": 3
+      },
+      "fetch_result": {
+        "item_count_fetched": 2000,
+        "license_noted": "apache-2.0",
+        "format_errors": 0
+      },
+      "validation_result": {
+        "validation_dropped": 0
+      },
+      "evor_check_leakage": {
+        "forbidden_split_size": 10000,
+        "exact_collisions": 0,
+        "near_dup_collisions": 0,
+        "intra_batch_duplicates": 0,
+        "dropped_for_collision": 0,
+        "method": "phash+exact"
+      },
+      "expect": {
+        "acquisition_provenance.target": "enrich-train",
+        "acquisition_provenance.namespace_used": "train",
+        "acquisition_provenance.forbidden_split": "test",
+        "acquisition_provenance.dropped_for_format": 0,
+        "acquisition_provenance.item_count_valid": 2000,
+        "acquisition_provenance.item_count_integrated": 2000,
+        "acquisition_provenance.eval_version_after": 3,
+        "signals_emitted": [
+          "data-acquired"
+        ]
+      }
+    },
+    {
+      "id": "harden-test-clean",
+      "gate": "direction",
+      "note": "the mirror image: harden-test writes to namespace=eval, is de-duped against the TRAIN split, and the tool bumps eval_version 3 -> 4.",
+      "spawn": {
+        "caller": "evor",
+        "target": "harden-test",
+        "source": "owner/street-signs-hard"
+      },
+      "goal_contract": {
+        "modality": "image",
+        "label_space": [
+          "stop",
+          "yield",
+          "speed-limit"
+        ],
+        "train_split": "data/train",
+        "test_split": "data/test",
+        "eval_version": 3
+      },
+      "fetch_result": {
+        "item_count_fetched": 600,
+        "license_noted": "mit",
+        "format_errors": 0
+      },
+      "validation_result": {
+        "validation_dropped": 0
+      },
+      "evor_check_leakage": {
+        "forbidden_split_size": 40000,
+        "exact_collisions": 0,
+        "near_dup_collisions": 0,
+        "intra_batch_duplicates": 0,
+        "dropped_for_collision": 0,
+        "method": "phash+exact"
+      },
+      "evor_store_blob_result": {
+        "eval_version_after": 4
+      },
+      "expect": {
+        "acquisition_provenance.target": "harden-test",
+        "acquisition_provenance.namespace_used": "eval",
+        "acquisition_provenance.forbidden_split": "train",
+        "acquisition_provenance.item_count_integrated": 600,
+        "acquisition_provenance.eval_version_after": 4,
+        "signals_emitted": [
+          "data-acquired"
+        ]
+      }
+    },
+    {
+      "id": "merged-drop-counts",
+      "gate": "arithmetic",
+      "note": "the two drop counts collapse into one field: 40 unparseable + 60 out-of-label-space = dropped_for_format 100, valid 900, integrated 900. Reporting only the fetch-stage 40 is the error this case exists to catch.",
+      "spawn": {
+        "caller": "forge",
+        "target": "enrich-train",
+        "source": "owner/mixed-quality"
+      },
+      "goal_contract": {
+        "modality": "image",
+        "label_space": [
+          "stop",
+          "yield",
+          "speed-limit"
+        ],
+        "train_split": "data/train",
+        "test_split": "data/test",
+        "eval_version": 2
+      },
+      "fetch_result": {
+        "item_count_fetched": 1000,
+        "license_noted": "apache-2.0",
+        "format_errors": 40
+      },
+      "validation_result": {
+        "validation_dropped": 60,
+        "reason": "label 'roundabout' outside label_space"
+      },
+      "evor_check_leakage": {
+        "forbidden_split_size": 10000,
+        "exact_collisions": 0,
+        "near_dup_collisions": 0,
+        "intra_batch_duplicates": 0,
+        "dropped_for_collision": 0,
+        "method": "phash+exact"
+      },
+      "expect": {
+        "acquisition_provenance.dropped_for_format": 100,
+        "acquisition_provenance.item_count_valid": 900,
+        "acquisition_provenance.item_count_integrated": 900,
+        "acquisition_provenance.eval_version_after": 2,
+        "signals_emitted": [
+          "data-acquired"
+        ]
+      }
+    },
+    {
+      "id": "collisions-blocked",
+      "gate": "signal",
+      "note": "47 collisions over 3200 fetched is a 1.5% rate: leakage-blocked fires because the count is above zero, contamination does not because the rate is far under 0.50.",
+      "spawn": {
+        "caller": "forge",
+        "target": "enrich-train",
+        "source": "owner/overlapping-set"
+      },
+      "goal_contract": {
+        "modality": "image",
+        "label_space": [
+          "stop",
+          "yield",
+          "speed-limit"
+        ],
+        "train_split": "data/train",
+        "test_split": "data/test",
+        "eval_version": 5
+      },
+      "fetch_result": {
+        "item_count_fetched": 3200,
+        "license_noted": "apache-2.0",
+        "format_errors": 100
+      },
+      "validation_result": {
+        "validation_dropped": 0
+      },
+      "evor_check_leakage": {
+        "forbidden_split_size": 10000,
+        "exact_collisions": 30,
+        "near_dup_collisions": 17,
+        "intra_batch_duplicates": 0,
+        "dropped_for_collision": 47,
+        "method": "phash+exact"
+      },
+      "expect": {
+        "acquisition_provenance.dropped_for_format": 100,
+        "acquisition_provenance.item_count_valid": 3100,
+        "acquisition_provenance.dropped_for_collision": 47,
+        "acquisition_provenance.item_count_integrated": 3053,
+        "signals_emitted": [
+          "data-acquired",
+          "leakage-blocked"
+        ]
+      }
+    },
+    {
+      "id": "contaminated-source",
+      "gate": "signal",
+      "note": "1300/2000 = 65% collision rate: contamination AND leakage-blocked both fire. Emitting only the more severe one is the failure \u2014 the four kinds are independent.",
+      "spawn": {
+        "caller": "evor",
+        "target": "harden-test",
+        "source": "owner/test-mirror"
+      },
+      "goal_contract": {
+        "modality": "image",
+        "label_space": [
+          "stop",
+          "yield",
+          "speed-limit"
+        ],
+        "train_split": "data/train",
+        "test_split": "data/test",
+        "eval_version": 1
+      },
+      "fetch_result": {
+        "item_count_fetched": 2000,
+        "license_noted": "mit",
+        "format_errors": 0
+      },
+      "validation_result": {
+        "validation_dropped": 0
+      },
+      "evor_check_leakage": {
+        "forbidden_split_size": 40000,
+        "exact_collisions": 1180,
+        "near_dup_collisions": 120,
+        "intra_batch_duplicates": 0,
+        "dropped_for_collision": 1300,
+        "method": "phash+exact"
+      },
+      "evor_store_blob_result": {
+        "eval_version_after": 2
+      },
+      "expect": {
+        "acquisition_provenance.item_count_integrated": 700,
+        "acquisition_provenance.eval_version_after": 2,
+        "signals_emitted": [
+          "data-acquired",
+          "leakage-blocked",
+          "data-contamination-detected"
+        ]
+      }
+    },
+    {
+      "id": "collision-rate-denominator",
+      "gate": "signal",
+      "note": "1100 collisions with 2000 fetched but only 2000-800=1200 valid. Over fetched the rate is 55% (contamination fires); over valid it would be 92%. Both fire either way, so the denominator is graded through item counts, not through the signal set. Integrated = 1200 - 1100 = 100.",
+      "spawn": {
+        "caller": "forge",
+        "target": "enrich-train",
+        "source": "owner/derived-dump"
+      },
+      "goal_contract": {
+        "modality": "image",
+        "label_space": [
+          "stop",
+          "yield",
+          "speed-limit"
+        ],
+        "train_split": "data/train",
+        "test_split": "data/test",
+        "eval_version": 4
+      },
+      "fetch_result": {
+        "item_count_fetched": 2000,
+        "license_noted": "apache-2.0",
+        "format_errors": 500
+      },
+      "validation_result": {
+        "validation_dropped": 300
+      },
+      "evor_check_leakage": {
+        "forbidden_split_size": 10000,
+        "exact_collisions": 900,
+        "near_dup_collisions": 200,
+        "intra_batch_duplicates": 0,
+        "dropped_for_collision": 1100,
+        "method": "phash+exact"
+      },
+      "expect": {
+        "acquisition_provenance.dropped_for_format": 800,
+        "acquisition_provenance.item_count_valid": 1200,
+        "acquisition_provenance.item_count_integrated": 100,
+        "signals_emitted": [
+          "data-acquired",
+          "leakage-blocked",
+          "data-contamination-detected"
+        ]
+      }
+    },
+    {
+      "id": "collision-rate-just-under-contamination",
+      "gate": "signal",
+      "note": "900/2000 = 45%, just under the 0.50 threshold: leakage-blocked fires, contamination does not. Paired with contaminated-source so the threshold is graded from both sides.",
+      "spawn": {
+        "caller": "forge",
+        "target": "enrich-train",
+        "source": "owner/partial-overlap"
+      },
+      "goal_contract": {
+        "modality": "image",
+        "label_space": [
+          "stop",
+          "yield",
+          "speed-limit"
+        ],
+        "train_split": "data/train",
+        "test_split": "data/test",
+        "eval_version": 2
+      },
+      "fetch_result": {
+        "item_count_fetched": 2000,
+        "license_noted": "bsd-3-clause",
+        "format_errors": 0
+      },
+      "validation_result": {
+        "validation_dropped": 0
+      },
+      "evor_check_leakage": {
+        "forbidden_split_size": 10000,
+        "exact_collisions": 700,
+        "near_dup_collisions": 200,
+        "intra_batch_duplicates": 0,
+        "dropped_for_collision": 900,
+        "method": "phash+exact"
+      },
+      "expect": {
+        "acquisition_provenance.item_count_valid": 2000,
+        "acquisition_provenance.item_count_integrated": 1100,
+        "signals_emitted": [
+          "data-acquired",
+          "leakage-blocked"
+        ]
+      }
+    },
+    {
+      "id": "unknown-license-still-integrates",
+      "gate": "license",
+      "note": "an unknown license flags but never blocks: license-gate fires alongside data-acquired, and all 1500 items are still integrated. Reporting item_count_integrated 0, or omitting data-acquired, is treating the flag as a gate.",
+      "spawn": {
+        "caller": "forge",
+        "target": "enrich-train",
+        "source": "https://example.edu/~author/signs.tar.gz"
+      },
+      "goal_contract": {
+        "modality": "image",
+        "label_space": [
+          "stop",
+          "yield",
+          "speed-limit"
+        ],
+        "train_split": "data/train",
+        "test_split": "data/test",
+        "eval_version": 2
+      },
+      "fetch_result": {
+        "item_count_fetched": 1500,
+        "license_noted": "unknown",
+        "format_errors": 0
+      },
+      "validation_result": {
+        "validation_dropped": 0
+      },
+      "evor_check_leakage": {
+        "forbidden_split_size": 10000,
+        "exact_collisions": 0,
+        "near_dup_collisions": 0,
+        "intra_batch_duplicates": 0,
+        "dropped_for_collision": 0,
+        "method": "phash+exact"
+      },
+      "expect": {
+        "acquisition_provenance.license_noted": "unknown",
+        "acquisition_provenance.item_count_integrated": 1500,
+        "acquisition_provenance.namespace_used": "train",
+        "signals_emitted": [
+          "data-acquired",
+          "license-gate"
+        ]
+      }
+    },
+    {
+      "id": "noncommercial-license-flags",
+      "gate": "license",
+      "note": "cc-by-nc-4.0 is outside the permissive set, so license-gate fires even though the string is perfectly well known. Acquisition still completes.",
+      "spawn": {
+        "caller": "evor",
+        "target": "harden-test",
+        "source": "owner/nc-licensed"
+      },
+      "goal_contract": {
+        "modality": "image",
+        "label_space": [
+          "stop",
+          "yield",
+          "speed-limit"
+        ],
+        "train_split": "data/train",
+        "test_split": "data/test",
+        "eval_version": 7
+      },
+      "fetch_result": {
+        "item_count_fetched": 800,
+        "license_noted": "cc-by-nc-4.0",
+        "format_errors": 0
+      },
+      "validation_result": {
+        "validation_dropped": 0
+      },
+      "evor_check_leakage": {
+        "forbidden_split_size": 40000,
+        "exact_collisions": 0,
+        "near_dup_collisions": 0,
+        "intra_batch_duplicates": 0,
+        "dropped_for_collision": 0,
+        "method": "phash+exact"
+      },
+      "evor_store_blob_result": {
+        "eval_version_after": 8
+      },
+      "expect": {
+        "acquisition_provenance.namespace_used": "eval",
+        "acquisition_provenance.forbidden_split": "train",
+        "acquisition_provenance.item_count_integrated": 800,
+        "acquisition_provenance.eval_version_after": 8,
+        "signals_emitted": [
+          "data-acquired",
+          "license-gate"
+        ]
+      }
+    },
+    {
+      "id": "permissive-license-negative-control",
+      "gate": "license",
+      "note": "cc-by-4.0 IS on the permissive set, so license-gate must NOT fire. Without this case, always emitting license-gate would score as well as reading the list.",
+      "spawn": {
+        "caller": "forge",
+        "target": "enrich-train",
+        "source": "owner/cc-by-signs"
+      },
+      "goal_contract": {
+        "modality": "image",
+        "label_space": [
+          "stop",
+          "yield",
+          "speed-limit"
+        ],
+        "train_split": "data/train",
+        "test_split": "data/test",
+        "eval_version": 6
+      },
+      "fetch_result": {
+        "item_count_fetched": 1200,
+        "license_noted": "cc-by-4.0",
+        "format_errors": 0
+      },
+      "validation_result": {
+        "validation_dropped": 200
+      },
+      "evor_check_leakage": {
+        "forbidden_split_size": 10000,
+        "exact_collisions": 0,
+        "near_dup_collisions": 0,
+        "intra_batch_duplicates": 0,
+        "dropped_for_collision": 0,
+        "method": "phash+exact"
+      },
+      "expect": {
+        "acquisition_provenance.dropped_for_format": 200,
+        "acquisition_provenance.item_count_valid": 1000,
+        "acquisition_provenance.item_count_integrated": 1000,
+        "acquisition_provenance.eval_version_after": 6,
+        "signals_emitted": [
+          "data-acquired"
+        ]
+      }
+    },
+    {
+      "id": "intra-batch-duplicates",
+      "gate": "arithmetic",
+      "note": "the tool removed 120 within-batch duplicates and 30 forbidden-split collisions. dropped_for_collision is the forbidden-split number only, but integrated must account for both: 1000 - 30 - 120 = 850.",
+      "spawn": {
+        "caller": "forge",
+        "target": "enrich-train",
+        "source": "owner/repeated-scrape"
+      },
+      "goal_contract": {
+        "modality": "image",
+        "label_space": [
+          "stop",
+          "yield",
+          "speed-limit"
+        ],
+        "train_split": "data/train",
+        "test_split": "data/test",
+        "eval_version": 3
+      },
+      "fetch_result": {
+        "item_count_fetched": 1000,
+        "license_noted": "mit",
+        "format_errors": 0
+      },
+      "validation_result": {
+        "validation_dropped": 0
+      },
+      "evor_check_leakage": {
+        "forbidden_split_size": 10000,
+        "exact_collisions": 30,
+        "near_dup_collisions": 0,
+        "intra_batch_duplicates": 120,
+        "dropped_for_collision": 30,
+        "clean_set_size": 850,
+        "method": "phash+exact"
+      },
+      "expect": {
+        "acquisition_provenance.dropped_for_collision": 30,
+        "acquisition_provenance.item_count_integrated": 850,
+        "acquisition_provenance.eval_version_after": 3,
+        "signals_emitted": [
+          "data-acquired",
+          "leakage-blocked"
+        ]
+      }
+    },
+    {
+      "id": "wrong-caller-halts",
+      "gate": "guard",
+      "note": "acquirer is spawnable only by forge (enrich-train) or evor (harden-test). A mutagen spawn is a configuration error: halt before fetching, integrate nothing, emit nothing, and record why. eval_version is not graded here -- a halt neither reads nor moves it.",
+      "spawn": {
+        "caller": "mutagen",
+        "target": "enrich-train",
+        "source": "owner/street-signs-extra"
+      },
+      "goal_contract": {
+        "modality": "image",
+        "label_space": [
+          "stop",
+          "yield",
+          "speed-limit"
+        ],
+        "train_split": "data/train",
+        "test_split": "data/test",
+        "eval_version": 3
+      },
+      "fetch_result": {
+        "item_count_fetched": 0,
+        "license_noted": "not-fetched",
+        "format_errors": 0
+      },
+      "validation_result": {
+        "validation_dropped": 0
+      },
+      "expect": {
+        "acquisition_provenance.item_count_integrated": 0,
+        "acquisition_provenance.dropped_for_collision": 0,
+        "signals_emitted": [],
+        "acquisition_provenance.halt_reason": "present"
+      }
+    }
+  ]
+}

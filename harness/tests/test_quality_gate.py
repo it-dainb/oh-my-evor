@@ -20,6 +20,8 @@ import hashlib
 import json
 from pathlib import Path
 
+import importlib.util
+
 import pytest
 
 from evor.quality_gate import ForgeStructureGate, ProbeEDAGate, QualityReport
@@ -46,6 +48,19 @@ def _gate(locked_hash: str | None = None) -> ForgeStructureGate:
 # ─────────────────────────────────────────────────────────────────────────────
 
 
+
+# The quality gate runs a real forward pass, so these classes need torch. The
+# slim CI image (ci/docker/Dockerfile) deliberately ships without it; torch lives
+# in the ML image (ci/docker/Dockerfile.ml). Without this guard the slim image
+# reported 13 hard failures for an absence that is by design, which buries any
+# real regression in noise. On the host and in the ML image these still run.
+_requires_torch = pytest.mark.skipif(
+    importlib.util.find_spec("torch") is None,
+    reason="quality gate performs a real forward pass — needs torch (ML image only)",
+)
+
+
+@_requires_torch
 class TestGoldenFixturePasses:
     """Golden candidate must pass every sub-check."""
 
@@ -108,6 +123,7 @@ class TestGoldenFixturePasses:
 # ─────────────────────────────────────────────────────────────────────────────
 
 
+@_requires_torch
 class TestBrokenMonolithic:
     """Monolithic model — no backbone.py / head.py seam files."""
 
@@ -150,6 +166,7 @@ class TestBrokenMonolithic:
 # ─────────────────────────────────────────────────────────────────────────────
 
 
+@_requires_torch
 class TestBrokenNoDataloader:
     """train/ contains optimizer + loss but no DataLoader import."""
 
@@ -227,6 +244,7 @@ class TestBrokenForwardCrash:
 # ─────────────────────────────────────────────────────────────────────────────
 
 
+@_requires_torch
 class TestBrokenEvalTampered:
     """evaluate.py content differs from the locked reference hash."""
 
@@ -266,6 +284,7 @@ class TestBrokenEvalTampered:
 # ─────────────────────────────────────────────────────────────────────────────
 
 
+@_requires_torch
 class TestBrokenNoTelemetry:
     """train/ has no TelemetryCallback or evor.telemetry import."""
 
@@ -538,6 +557,7 @@ if __name__ == "__main__":
 # ─────────────────────────────────────────────────────────────────────────────
 
 
+@_requires_torch
 class TestIntegrityGateStructureOk:
     """Verify ForgeStructureGate is invoked from IntegrityGate when candidate_dir is passed."""
 
@@ -716,6 +736,7 @@ class TestIntegrityGateStructureOk:
 # ─────────────────────────────────────────────────────────────────────────────
 
 
+@_requires_torch
 class TestGoldenEmbeddingFixturePasses:
     """Golden embedding candidate (model_family: embedding) must pass every sub-check.
 

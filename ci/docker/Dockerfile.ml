@@ -22,7 +22,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Real Claude Code CLI + the official Agent SDK (best path for scripted agentic tests)
-RUN npm install -g @anthropic-ai/claude-code@2.1.193 @anthropic-ai/claude-agent-sdk
+RUN npm install -g @anthropic-ai/claude-code@2.1.220 @anthropic-ai/claude-agent-sdk@0.3.220
+
+# Runtime limits — declared, never inherited. The spawn-depth default has moved
+# twice in released Claude Code (on in 2.1.172, off in 2.1.217, back at 3 in
+# 2.1.219), and a silent flip to 1 would not error: it would make every lead
+# spawn fail at runtime, mid-mission. Kept identical to .claude/settings.json;
+# mcp/tests/runtime-limits.test.ts asserts the two agree.
+ENV CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH=4
+ENV CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS=8
+ENV CLAUDE_CODE_MAX_SUBAGENTS_PER_SESSION=2000
 
 WORKDIR /plugin
 COPY . /plugin

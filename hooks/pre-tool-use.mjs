@@ -29,6 +29,7 @@
  */
 
 import { readFileSync } from 'fs';
+import { resolveActiveRun } from './lib/active-run.mjs';
 
 // ── Kill switches ─────────────────────────────────────────────────────────────
 if (process.env.DISABLE_EVOR) process.exit(0);
@@ -36,7 +37,7 @@ const skipHooks = (process.env.EVOR_SKIP_HOOKS ?? '').split(',').map(s => s.trim
 if (skipHooks.includes('pre-tool-use')) process.exit(0);
 
 // ── Active run guard — governor only applies during an active evor run ─────────
-const _activeRunId = process.env.EVOR_ACTIVE_RUN_ID ?? '';
+const _activeRunId = resolveActiveRun().runId;
 if (!_activeRunId) process.exit(0);
 
 let input;
@@ -82,6 +83,30 @@ try {
 
   // ── Spawn-hierarchy gate — child agents may be spawned ONLY by their parent ──
   const spawnType = String(ti?.subagent_type ?? '').replace(/^oh-my-evor:/, '');
+
+  // ── §0.3: an evor spawn must never carry `name` ─────────────────────────────
+  // Passing `name` turns the spawn into an in-process teammate. The teammate then
+  // presents under that name rather than its subagent_type, so every matcher in
+  // hooks.json (`^oh-my-evor:evor-.*`) misses it, and it inherits the session
+  // model instead of its own `model:` frontmatter. In run 29d17abc this alone
+  // silenced SubagentStart (3/10), SubagentStop (0/10) and this governor (0
+  // denials), and put all 10 agents on sonnet regardless of tier.
+  //
+  // Nothing in this repo passes `name` — the orchestrator invented forge-t1 /
+  // sage-t1 at runtime, which is exactly why the rule has to be enforced rather
+  // than written down.
+  // Scoped to evor agents: only they have frontmatter tiers and hook matchers to
+  // lose. A run may legitimately spawn a non-evor agent as a named teammate.
+  if ((tool === 'Task' || tool === 'Agent') && /^evor-/.test(spawnType) && String(ti?.name ?? '')) {
+    deny(
+      `[EVOR GOVERNOR] Spawn oh-my-evor:${spawnType} WITHOUT the \`name\` parameter (got ` +
+        `name="${String(ti.name)}"). Passing \`name\` makes it an in-process teammate: the hook ` +
+        `matchers stop matching it and it inherits the session model instead of its own \`model:\` ` +
+        `frontmatter, so both enforcement and model tiering are silently lost. Re-issue the same ` +
+        `call with \`name\` dropped — subagent_type alone identifies the agent.`
+    );
+  }
+
   if ((tool === 'Task' || tool === 'Agent') && spawnType) {
     const PARENT = {
       'evor-sage-junior': 'evor-sage',
@@ -99,11 +124,18 @@ try {
       );
     }
 
-    // evor-acquirer is dual-parent: Forge (enrich-train) OR main Evor (harden-test).
-    if (spawnType === 'evor-acquirer' && !(isMain || agentType === 'evor-forge')) {
+    // evor-acquirer is multi-parent: Forge (enrich-train), main Evor, or evor-tick
+    // (harden-test). evor-tick was added for Phase 3a: it runs the orchestrator's
+    // own 9-step loop one level down, so the harden-test acquisition path moves
+    // behind the boundary with it. Without this the gate would deny the boundary a
+    // spawn it inherited verbatim from main — and only at runtime, mid-tick.
+    if (
+      spawnType === 'evor-acquirer' &&
+      !(isMain || agentType === 'evor-forge' || agentType === 'evor-tick')
+    ) {
       deny(
-        `[EVOR GOVERNOR] evor-acquirer may be spawned only by Forge (enrich-train) or Evor ` +
-          `(harden-test). ${agentType || 'this agent'} must not spawn it.`
+        `[EVOR GOVERNOR] evor-acquirer may be spawned only by Forge (enrich-train), Evor, or ` +
+          `evor-tick (harden-test). ${agentType || 'this agent'} must not spawn it.`
       );
     }
   }
@@ -166,6 +198,9 @@ try {
           `nodes/<id>/results.json + telemetry, then you call evor_record_node / evor_record_eval.`
       );
     }
+    // The broad orchestrator-only rule runs AFTER the .evor write-guard below —
+    // see §1.3 there. Denying here would shadow the more specific guard and
+    // report the wrong rule as the cause.
   } else if (agentType !== 'evor-forge-junior') {
     // Only evor-forge-junior authors/runs candidate CODE. Everyone else — including the
     // Forge LEAD (an orchestrator of its dev team) and the architect/critic/analyst —
@@ -275,6 +310,112 @@ try {
     // Fail-open — guard error must never block legitimate work
   }
 
+// ── §1.3: orchestrator-only, enforced for ALL shell and file work ─────────────
+// The isMain rules above are shape-specific: they fire on training-looking Bash
+// and on .py / artifact-path writes. Ordinary exploration — git, ls, cat, grep,
+// find — matched neither, which is how run 29d17abc put 120 Bash, 18 Write and
+// 14 Edit calls into the orchestrator's own context. Main's context x turns was
+// 57.6% of that run's cost, so this is the delegation rule that actually carries
+// AC2, not a stylistic preference.
+//
+// Placed after the .evor write-guard deliberately: that guard is unconditional
+// and applies to every role, so when both would fire the caller should be told
+// about the stricter, more specific rule.
+//
+// The reason string matters as much as the denial — `permissionDecisionReason`
+// is shown to the model, so a denial redirects rather than stalls (PM3). It is
+// also the only decision that survives `bypassPermissions`, which the failed run
+// used throughout. Escape hatch: EVOR_SKIP_HOOKS=pre-tool-use.
+try {
+  const toolNameO = input?.tool_name ?? '';
+  const isMainO = !(input?.agent_type ?? '');
+  if (isMainO && (toolNameO === 'Bash' || toolNameO === 'Write' || toolNameO === 'Edit')) {
+    const tiO = input?.tool_input ?? {};
+
+    // Every file in commands/ dispatches with
+    //   cat "${EVOR_PLUGIN_ROOT:-$CLAUDE_PLUGIN_ROOT}/skills/<name>/SKILL.md"
+    // so a blanket Bash denial would block /evor-run and /evor-resume during an
+    // active run — the orchestrator denying its own dispatch (PM3). Loading a
+    // skill definition is dispatch, not leaf work.
+    //
+    // Anchored and whole-command: `cat <one plugin SKILL.md path>` and nothing
+    // else. No `&&`, `;`, `|` or redirection, so the exemption cannot be used to
+    // smuggle work past the gate, and the path must sit under a plugin-root
+    // variable rather than any directory that happens to be called `skills`.
+    const SKILL_DISPATCH_RE =
+      /^\s*cat\s+"?\$\{?(?:EVOR_PLUGIN_ROOT|CLAUDE_PLUGIN_ROOT)[^"]*\/skills\/[\w-]+\/SKILL\.md"?\s*$/;
+    if (toolNameO === 'Bash' && SKILL_DISPATCH_RE.test(String(tiO?.command ?? ''))) {
+      process.exit(0);
+    }
+
+    const target = toolNameO === 'Bash'
+      ? `\`${String(tiO?.command ?? '').slice(0, 80)}\``
+      : String(tiO?.file_path ?? '');
+    deny(
+      `[EVOR GOVERNOR] Evor is orchestrator-only: it spawns agents and records results, and does ` +
+        `not run ${toolNameO} itself (${target}). Delegate this to the agent that owns it — ` +
+        `Task(subagent_type="oh-my-evor:evor-probe") to inspect run state or logs, "…evor-forge" for ` +
+        `code and training, "…evor-sage" for evidence. Read run state through the evor_* MCP tools ` +
+        `rather than the shell.`
+    );
+  }
+} catch {
+  // Fail-open — a governor error must never block legitimate work.
+}
+
+// ── §3b.0: boundary enforcement — main may not absorb per-tick detail ────────
+// Measured in Phase 3a.2: shipping `evor-tick` as PROSE (a Step -1 instruction in
+// skills/evor/SKILL.md) cut main's context slope 54% but left main running 50
+// turns/tick. It spawned the boundary AND kept doing the loop — 45
+// evor_read_artifact, 28 evor_state_read, 11 evor_tree_read, plus direct lead
+// spawns. Recurring growth fell only 31% against a target ~15x, and cost per tick
+// ROSE $14.93 -> $18.59: the mission funded both the hop and the duplicated work.
+//
+// That is this plan's own P2 — structural enforcement over prose. Every other
+// rule here is a deny because prose already failed once; AC2 went 152 -> 1
+// precisely because it was a deny. So is this.
+//
+// evor_tree_read is the one that compounds: the tree grows with node count, so
+// leaving it in main makes per-tick cost RISE across ticks — moving the context
+// wall rather than removing it.
+try {
+  const toolNameB = input?.tool_name ?? '';
+  const isMainB = !(input?.agent_type ?? '');
+  if (isMainB) {
+    const BOUNDARY_ABSORBED = new Set([
+      'mcp__plugin_oh-my-evor_evor__evor_read_artifact',
+      'mcp__plugin_oh-my-evor_evor__evor_tree_read',
+      'mcp__plugin_oh-my-evor_evor__evor_state_read',
+    ]);
+    if (BOUNDARY_ABSORBED.has(toolNameB)) {
+      deny(
+        `[EVOR GOVERNOR] ${toolNameB.replace('mcp__plugin_oh-my-evor_evor__', '')} belongs inside the ` +
+          `tick boundary, not in the mission orchestrator. Spawn ` +
+          `Task(subagent_type="oh-my-evor:evor-tick") for the tick; it reads artifacts, tree and ` +
+          `state on your behalf and returns a status line plus pointers. If you need detail after ` +
+          `the fact, it is behind a pointer the boundary already returned.`
+      );
+    }
+
+    // Leads belong to the boundary too — main spawning them directly is the same
+    // leak by another route (it pulls their results into main's context).
+    const LEADS = new Set([
+      'evor-sage', 'evor-mutagen', 'evor-probe', 'evor-forge', 'evor-selector',
+    ]);
+    const spawnB = String(input?.tool_input?.subagent_type ?? '').replace(/^oh-my-evor:/, '');
+    if ((toolNameB === 'Task' || toolNameB === 'Agent') && LEADS.has(spawnB)) {
+      deny(
+        `[EVOR GOVERNOR] ${spawnB} is spawned by the tick boundary, not by the mission ` +
+          `orchestrator. Spawn Task(subagent_type="oh-my-evor:evor-tick") and let it fan out — ` +
+          `spawning leads directly pulls their results into your own context, which is exactly ` +
+          `what the boundary exists to prevent.`
+      );
+    }
+  }
+} catch {
+  // Fail-open — a governor error must never block legitimate work.
+}
+
 // ── §15C: Agent-kind spoofing guard (always-on when run is active) ────────────
 // Prevents one role from writing into another role's artifact slot.
 // Orchestrator (no agent_type) may write handoff kinds.
@@ -284,14 +425,23 @@ try {
   const agentTypeS = (input?.agent_type ?? '').replace(/^oh-my-evor:/, '');
   const callerIsMain = !agentTypeS;
 
-  if (
-    (toolNameS === 'mcp__plugin_oh-my-evor_evor__write_artifact' ||
-     toolNameS === 'mcp__plugin_oh-my-evor_evor__read_artifact') &&
-    tiS?.agent
-  ) {
+  // Suffix match, not exact. This guard previously compared against
+  // `mcp__plugin_oh-my-evor_evor__write_artifact`, but the wire name is
+  // `mcp__plugin_oh-my-evor_evor__evor_write_artifact` — the MCP server namespace
+  // (`..._evor__`) plus the tool's own name (`evor_write_artifact`), so `evor_`
+  // appears twice. The condition therefore never matched and the guard had never
+  // fired: any role could write into any other role's artifact slot, which is a
+  // direct self-approval vector — the exact P3 failure the review gates exist to
+  // stop. Same silent-inertness class as the un-propagated EVOR_ACTIVE_RUN_ID.
+  // Matching on the suffix keeps this working if the namespace is ever renamed.
+  const isWriteToolS = /(^|_)evor_write_artifact$/.test(toolNameS);
+  const isReadToolS = /(^|_)evor_read_artifact$/.test(toolNameS);
+  const isArtifactTool = isWriteToolS || isReadToolS;
+
+  if (isArtifactTool && tiS?.agent) {
     const claimedAgent = String(tiS.agent);
 
-    // Map caller role → allowed agent values for artifact writes/reads
+    // Map caller role → allowed agent values for artifact writes/reads (own slot only).
     const AGENT_ROLE_MAP = {
       'evor-sage':             new Set(['sage']),
       'evor-sage-junior':      new Set(['sage-junior']),
@@ -306,12 +456,82 @@ try {
       'evor-acquirer':         new Set(['acquirer']),
     };
 
+    // READ-only grants onto a specific upstream slot — never extends to writes.
+    // Each entry is backed by an explicit read call in that role's own agent
+    // prompt (agents/evor-*.md), not a blanket allow:
+    //   - forge-junior reads the proposal (evor-forge.md:89) and, on a
+    //     critic-rejected re-attempt, the critic's verdict (evor-forge.md:157).
+    //   - forge-critic reads the proposal to run Check 1 — correctness vs
+    //     proposal (evor-forge.md:123, evor-forge-critic.md Final_Checklist).
+    // Read-only grants for upstream slots a role is INSTRUCTED to read. Each one
+    // is justified by the spawn prompt the system itself issues in
+    // agents/evor-forge.md — denying them means the orchestration tells an agent
+    // to do something the governor then blocks, which is how 28 of one run's 44
+    // EVOR GUARD denials were generated. Agents responded by reading files off
+    // disk and relaying findings through SendMessage, putting artifact content
+    // back into context — the exact thing the boundary exists to prevent.
+    // Two structural rules, not a list of exceptions. Enumerating exceptions is
+    // what made the first pass of this too narrow: it was harvested from
+    // evor-forge.md alone, shipped, and a measured run still logged 46 denials —
+    // 26 of them evor-sage unable to read its OWN sage-junior findings, which is
+    // the "Sage grounding skipped" failure.
+    //
+    //   1. A LEAD READS ITS JUNIORS. An agent that spawns sub-agents has to
+    //      aggregate what they produce; that is the entire reason it spawned them.
+    //   2. A STAGE READS UPSTREAM STAGES. The 9-step loop is a pipeline —
+    //      sage -> mutagen -> selector -> forge -> probe. Each stage's input is the
+    //      previous stage's artifact.
+    //
+    // Still READ-only, still per (role -> specific slot), and still never a
+    // blanket allow: nothing here lets a role read a slot that is neither its own
+    // junior's nor upstream of it.
+    const JUNIORS = {
+      'evor-sage':   ['sage-junior'],
+      'evor-forge':  ['forge-junior', 'forge-critic', 'forge-architect', 'forge-analyst'],
+    };
+    const PIPELINE = ['sage', 'mutagen', 'selector', 'forge', 'probe'];
+    const upstreamOf = (slot) => PIPELINE.slice(0, Math.max(0, PIPELINE.indexOf(slot)));
+
+    const READ_EXTRA_GRANTS = {};
+    for (const [role, own] of Object.entries(AGENT_ROLE_MAP)) {
+      const grants = new Set(JUNIORS[role] ?? []);
+      // A sub-agent inherits its lead's stage position: forge-critic reviews for
+      // forge, so it reads what forge reads.
+      const slot = [...own][0];
+      const stage = slot.replace(/-(junior|critic|architect|analyst)$/, '');
+      for (const s of upstreamOf(stage)) grants.add(s);
+      // Sibling verdicts go ONLY to the implementer, which has to act on them.
+      // Reviewers deliberately do not read each other: three independent reviews
+      // that can see each other's verdicts are one anchored review wearing three
+      // hats, and this system's whole job is evaluating candidates honestly.
+      if (slot.endsWith('-junior')) for (const sib of JUNIORS[`evor-${stage}`] ?? []) grants.add(sib);
+      grants.delete([...own][0]);
+      if (grants.size) READ_EXTRA_GRANTS[role] = grants;
+    }
+
+    // FEEDBACK EDGE — the one place the pipeline legitimately runs backwards.
+    //
+    // Probe analyses tick N's telemetry and explains WHY a candidate behaved as it
+    // did. Mutagen proposes tick N+1. Across ticks that is not backwards, it is the
+    // loop closing: it is the only channel carrying causal explanation rather than
+    // bare outcome. Without it Probe's analysis reaches Mutagen only if someone
+    // distils it into a gotcha, which means only FAILURES survive the trip and the
+    // dreamer is fed exclusively on what not to do.
+    READ_EXTRA_GRANTS['evor-mutagen'] = new Set([...(READ_EXTRA_GRANTS['evor-mutagen'] ?? []), 'probe']);
+    // evor-tick is deliberately absent from AGENT_ROLE_MAP, so this guard skips it
+    // entirely: the tick boundary reads every stage's artifact by design — that is
+    // the context the orchestrator is denied and evor-tick absorbs on its behalf.
+
     if (!callerIsMain) {
       const allowed = AGENT_ROLE_MAP[agentTypeS];
-      if (allowed && !allowed.has(claimedAgent)) {
-        deny(
-          `[EVOR GUARD] This artifact slot is not accessible from your role. Use the correct evor_* tool for your role.`
-        );
+      if (allowed) {
+        const extra = isReadToolS ? READ_EXTRA_GRANTS[agentTypeS] : undefined;
+        const permitted = allowed.has(claimedAgent) || (extra && extra.has(claimedAgent));
+        if (!permitted) {
+          deny(
+            `[EVOR GUARD] This artifact slot is not accessible from your role. Use the correct evor_* tool for your role.`
+          );
+        }
       }
     }
   }

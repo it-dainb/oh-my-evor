@@ -1,0 +1,884 @@
+{
+  "role": "evor-sage",
+  "agent_file": "agents/evor-sage.md",
+  "arms": [
+    {
+      "model": "sonnet",
+      "effort": "medium",
+      "label": "current"
+    },
+    {
+      "model": "opus",
+      "effort": "medium",
+      "label": "main (pre-retier)"
+    }
+  ],
+  "contract": {
+    "heading": "Sage Aggregation",
+    "mode": "json",
+    "fields": [
+      {
+        "path": "findings",
+        "kind": "count"
+      },
+      {
+        "path": "findings[].trust_level",
+        "kind": "every",
+        "values": [
+          "authoritative",
+          "indicative"
+        ]
+      },
+      {
+        "path": "findings[].quorum_met",
+        "kind": "every",
+        "values": [
+          "true",
+          "false"
+        ]
+      },
+      {
+        "path": "findings[].confidence",
+        "kind": "every",
+        "values": [
+          "high",
+          "medium",
+          "low"
+        ]
+      },
+      {
+        "path": "angles_wiki_resolved",
+        "kind": "set"
+      },
+      {
+        "path": "angles_junior_spawned",
+        "kind": "set"
+      },
+      {
+        "path": "fallback_used",
+        "kind": "bool"
+      }
+    ]
+  },
+  "cases": [
+    {
+      "id": "cross-junior-quorum",
+      "gate": "quorum",
+      "note": "two juniors each hold ONE source for the same metric; distinct papers 0.4% apart, so aggregation must recognise cross-junior quorum",
+      "investigation_query": "What top-1 accuracy does RandAugment reach on ImageNet with a ResNet-50?",
+      "angles_available": [
+        "randaugment-imagenet-a",
+        "randaugment-imagenet-b"
+      ],
+      "wiki_query_results": [],
+      "junior_artifacts": [
+        {
+          "angle": "randaugment-imagenet-a",
+          "status": "complete",
+          "findings": [
+            {
+              "title": "RandAugment on ResNet-50",
+              "source_url": "https://arxiv.org/abs/1909.13719",
+              "sources": [
+                "https://arxiv.org/abs/1909.13719"
+              ],
+              "finding": "RandAugment on ResNet-50 reaches 77.6 top-1 accuracy on ImageNet.",
+              "evidence": "top-1 accuracy=77.6 on the ImageNet-1k val split, 224px single-crop evaluation, from the results table.",
+              "confidence": "medium",
+              "trust_level": "indicative",
+              "sota_bar": {
+                "metric": "top-1 accuracy",
+                "value": 77.6,
+                "dataset": "ImageNet"
+              },
+              "applicable_families": [
+                "training"
+              ],
+              "quorum_met": false
+            }
+          ]
+        },
+        {
+          "angle": "randaugment-imagenet-b",
+          "status": "complete",
+          "findings": [
+            {
+              "title": "RandAugment on ResNet-50",
+              "source_url": "https://www.semanticscholar.org/paper/b1e2b4f0c9a1",
+              "sources": [
+                "https://www.semanticscholar.org/paper/b1e2b4f0c9a1"
+              ],
+              "finding": "RandAugment on ResNet-50 reaches 77.3 top-1 accuracy on ImageNet.",
+              "evidence": "Independent reproduction in a separate NeurIPS paper, run on the same ImageNet-1k val split under the same 224px single-crop protocol; top-1=77.3.",
+              "confidence": "medium",
+              "trust_level": "indicative",
+              "sota_bar": {
+                "metric": "top-1 accuracy",
+                "value": 77.3,
+                "dataset": "ImageNet"
+              },
+              "applicable_families": [
+                "training"
+              ],
+              "quorum_met": false
+            }
+          ]
+        }
+      ],
+      "expect": {
+        "findings": {
+          "min": 1
+        },
+        "findings[].quorum_met": true,
+        "findings[].trust_level": "authoritative",
+        "angles_junior_spawned": [
+          "randaugment-imagenet-a",
+          "randaugment-imagenet-b"
+        ],
+        "findings[].confidence": "high"
+      }
+    },
+    {
+      "id": "mirrored-source-trap",
+      "gate": "mirrored",
+      "note": "TRAP: two URLs, but the S2 record and the arXiv preprint are the SAME paper, so this is ONE source and quorum is not met",
+      "investigation_query": "What top-1 accuracy does RandAugment reach on ImageNet with a ResNet-50?",
+      "angles_available": [
+        "randaugment-imagenet"
+      ],
+      "wiki_query_results": [],
+      "junior_artifacts": [
+        {
+          "angle": "randaugment-imagenet",
+          "status": "complete",
+          "findings": [
+            {
+              "title": "RandAugment on ResNet-50",
+              "source_url": "https://arxiv.org/abs/1909.13719",
+              "sources": [
+                "https://arxiv.org/abs/1909.13719",
+                "https://www.semanticscholar.org/paper/randaugment-practical-automated"
+              ],
+              "finding": "RandAugment on ResNet-50 reaches 77.6 top-1 accuracy on ImageNet.",
+              "evidence": "top-1=77.6 on ImageNet. The Semantic Scholar record is the published version of the same arXiv preprint (identical title, authors and abstract).",
+              "confidence": "medium",
+              "trust_level": "indicative",
+              "sota_bar": {
+                "metric": "top-1 accuracy",
+                "value": 77.6,
+                "dataset": "ImageNet"
+              },
+              "applicable_families": [
+                "training"
+              ],
+              "quorum_met": false
+            }
+          ]
+        }
+      ],
+      "expect": {
+        "findings": {
+          "min": 1
+        },
+        "findings[].quorum_met": false,
+        "findings[].trust_level": "indicative",
+        "findings[].confidence": "medium"
+      }
+    },
+    {
+      "id": "divergence-too-wide",
+      "gate": "divergence",
+      "note": "two distinct sources disagree by 17.8%, far outside the 5% band",
+      "investigation_query": "What mIoU does SegFormer-B0 reach on ADE20K?",
+      "angles_available": [
+        "segformer-ade20k-a",
+        "segformer-ade20k-b"
+      ],
+      "wiki_query_results": [],
+      "junior_artifacts": [
+        {
+          "angle": "segformer-ade20k-a",
+          "status": "complete",
+          "findings": [
+            {
+              "title": "SegFormer-B0 on ADE20K",
+              "source_url": "https://arxiv.org/abs/2105.15203",
+              "sources": [
+                "https://arxiv.org/abs/2105.15203"
+              ],
+              "finding": "SegFormer-B0 on ADE20K reaches 37.4 mIoU on ADE20K.",
+              "evidence": "mIoU=37.4 on ADE20K, reported in the results table.",
+              "confidence": "medium",
+              "trust_level": "indicative",
+              "sota_bar": {
+                "metric": "mIoU",
+                "value": 37.4,
+                "dataset": "ADE20K"
+              },
+              "applicable_families": [
+                "training"
+              ],
+              "quorum_met": false
+            }
+          ]
+        },
+        {
+          "angle": "segformer-ade20k-b",
+          "status": "complete",
+          "findings": [
+            {
+              "title": "SegFormer-B0 on ADE20K",
+              "source_url": "https://www.semanticscholar.org/paper/9c1de55aa77b",
+              "sources": [
+                "https://www.semanticscholar.org/paper/9c1de55aa77b"
+              ],
+              "finding": "SegFormer-B0 on ADE20K reaches 30.8 mIoU on ADE20K.",
+              "evidence": "A separate survey reports mIoU=30.8 for SegFormer-B0 on ADE20K under single-scale evaluation.",
+              "confidence": "medium",
+              "trust_level": "indicative",
+              "sota_bar": {
+                "metric": "mIoU",
+                "value": 30.8,
+                "dataset": "ADE20K"
+              },
+              "applicable_families": [
+                "training"
+              ],
+              "quorum_met": false
+            }
+          ]
+        }
+      ],
+      "expect": {
+        "findings": {
+          "min": 1
+        },
+        "findings[].quorum_met": false,
+        "findings[].trust_level": "indicative",
+        "findings[].confidence": "low"
+      }
+    },
+    {
+      "id": "divergence-inside-band-incomparable",
+      "gate": "divergence",
+      "note": "80.0 vs 76.2 is 4.75% -- INSIDE the 5% band -- but the second number is from a shorter 90-epoch schedule, so the two are not the same measurement. SotaVerifier_Protocol step 2b runs before the arithmetic. Answering from the 5% test alone gives authoritative/high.",
+      "investigation_query": "What top-1 accuracy does ConvNeXt-T reach on ImageNet-1k?",
+      "angles_available": [
+        "convnext-t-a",
+        "convnext-t-b"
+      ],
+      "wiki_query_results": [],
+      "junior_artifacts": [
+        {
+          "angle": "convnext-t-a",
+          "status": "complete",
+          "findings": [
+            {
+              "title": "ConvNeXt-T on ImageNet-1k",
+              "source_url": "https://arxiv.org/abs/2201.03545",
+              "sources": [
+                "https://arxiv.org/abs/2201.03545"
+              ],
+              "finding": "ConvNeXt-T on ImageNet-1k reaches 80.0 top-1 accuracy on ImageNet-1k.",
+              "evidence": "top-1 accuracy=80.0 on ImageNet-1k, reported in the results table.",
+              "confidence": "medium",
+              "trust_level": "indicative",
+              "sota_bar": {
+                "metric": "top-1 accuracy",
+                "value": 80.0,
+                "dataset": "ImageNet-1k"
+              },
+              "applicable_families": [
+                "training"
+              ],
+              "quorum_met": false
+            }
+          ]
+        },
+        {
+          "angle": "convnext-t-b",
+          "status": "complete",
+          "findings": [
+            {
+              "title": "ConvNeXt-T on ImageNet-1k",
+              "source_url": "https://www.semanticscholar.org/paper/3f7ac21be004",
+              "sources": [
+                "https://www.semanticscholar.org/paper/3f7ac21be004"
+              ],
+              "finding": "ConvNeXt-T on ImageNet-1k reaches 76.2 top-1 accuracy on ImageNet-1k.",
+              "evidence": "An independent benchmarking study reports top-1=76.2 for ConvNeXt-T under a shorter 90-epoch schedule.",
+              "confidence": "medium",
+              "trust_level": "indicative",
+              "sota_bar": {
+                "metric": "top-1 accuracy",
+                "value": 76.2,
+                "dataset": "ImageNet-1k"
+              },
+              "applicable_families": [
+                "training"
+              ],
+              "quorum_met": false
+            }
+          ]
+        }
+      ],
+      "expect": {
+        "findings": {
+          "min": 1
+        },
+        "findings[].quorum_met": "false",
+        "findings[].trust_level": "indicative",
+        "findings[].confidence": "low"
+      }
+    },
+    {
+      "id": "divergence-just-inside-comparable",
+      "gate": "quorum",
+      "note": "80.0 vs 76.2 is 4.75%, inside the band, and both numbers come from the same 300-epoch schedule on the same val split under the same eval protocol, so the gate passes and the arithmetic decides",
+      "investigation_query": "What top-1 does ConvNeXt-T reach on ImageNet-1k?",
+      "angles_available": [
+        "convnext-t-top1"
+      ],
+      "wiki_query_results": [],
+      "junior_artifacts": [
+        {
+          "angle": "convnext-t-top1",
+          "status": "complete",
+          "findings": [
+            {
+              "title": "ConvNeXt-T on ImageNet-1k",
+              "source_url": "https://arxiv.org/abs/2201.03545",
+              "sources": [
+                "https://arxiv.org/abs/2201.03545"
+              ],
+              "finding": "ConvNeXt-T on ImageNet-1k reaches 80.0 top-1 accuracy on ImageNet-1k.",
+              "evidence": "top-1=80.0 on the ImageNet-1k val split, 300-epoch schedule, 224px single-crop evaluation.",
+              "confidence": "medium",
+              "trust_level": "indicative",
+              "sota_bar": {
+                "metric": "top-1 accuracy",
+                "value": 80.0,
+                "dataset": "ImageNet-1k"
+              },
+              "applicable_families": [
+                "arch"
+              ],
+              "quorum_met": false
+            },
+            {
+              "title": "ConvNeXt-T reproduction",
+              "source_url": "https://openreview.net/forum?id=convnext-repro",
+              "sources": [
+                "https://openreview.net/forum?id=convnext-repro"
+              ],
+              "finding": "ConvNeXt-T reproduction reaches 76.2 top-1 accuracy on ImageNet-1k.",
+              "evidence": "An independent study re-runs the same 300-epoch schedule on the ImageNet-1k val split with the same 224px single-crop evaluation and measures top-1=76.2.",
+              "confidence": "medium",
+              "trust_level": "indicative",
+              "sota_bar": {
+                "metric": "top-1 accuracy",
+                "value": 76.2,
+                "dataset": "ImageNet-1k"
+              },
+              "applicable_families": [
+                "arch"
+              ],
+              "quorum_met": false
+            }
+          ]
+        }
+      ],
+      "expect": {
+        "findings": {
+          "min": 1
+        },
+        "findings[].quorum_met": true,
+        "findings[].trust_level": "authoritative",
+        "findings[].confidence": "high"
+      }
+    },
+    {
+      "id": "divergence-just-outside",
+      "gate": "divergence",
+      "note": "BOUNDARY: 80.0 vs 75.5 is 5.63% relative divergence, just outside the 5% quorum band",
+      "investigation_query": "What top-1 accuracy does Swin-T reach on ImageNet-1k?",
+      "angles_available": [
+        "swin-t-a",
+        "swin-t-b"
+      ],
+      "wiki_query_results": [],
+      "junior_artifacts": [
+        {
+          "angle": "swin-t-a",
+          "status": "complete",
+          "findings": [
+            {
+              "title": "Swin-T on ImageNet-1k",
+              "source_url": "https://arxiv.org/abs/2103.14030",
+              "sources": [
+                "https://arxiv.org/abs/2103.14030"
+              ],
+              "finding": "Swin-T on ImageNet-1k reaches 80.0 top-1 accuracy on ImageNet-1k.",
+              "evidence": "top-1 accuracy=80.0 on ImageNet-1k, reported in the results table.",
+              "confidence": "medium",
+              "trust_level": "indicative",
+              "sota_bar": {
+                "metric": "top-1 accuracy",
+                "value": 80.0,
+                "dataset": "ImageNet-1k"
+              },
+              "applicable_families": [
+                "training"
+              ],
+              "quorum_met": false
+            }
+          ]
+        },
+        {
+          "angle": "swin-t-b",
+          "status": "complete",
+          "findings": [
+            {
+              "title": "Swin-T on ImageNet-1k",
+              "source_url": "https://www.semanticscholar.org/paper/ee0a3d4b19c7",
+              "sources": [
+                "https://www.semanticscholar.org/paper/ee0a3d4b19c7"
+              ],
+              "finding": "Swin-T on ImageNet-1k reaches 75.5 top-1 accuracy on ImageNet-1k.",
+              "evidence": "A distinct reproduction study reports top-1=75.5 for Swin-T on ImageNet-1k.",
+              "confidence": "medium",
+              "trust_level": "indicative",
+              "sota_bar": {
+                "metric": "top-1 accuracy",
+                "value": 75.5,
+                "dataset": "ImageNet-1k"
+              },
+              "applicable_families": [
+                "training"
+              ],
+              "quorum_met": false
+            }
+          ]
+        }
+      ],
+      "expect": {
+        "findings": {
+          "min": 1
+        },
+        "findings[].quorum_met": false,
+        "findings[].trust_level": "indicative",
+        "findings[].confidence": "low"
+      }
+    },
+    {
+      "id": "single-source",
+      "gate": "quorum",
+      "note": "only one junior returned evidence and it holds a single source, so quorum cannot be met",
+      "investigation_query": "What FID does EDM reach on CIFAR-10 unconditional generation?",
+      "angles_available": [
+        "edm-cifar10"
+      ],
+      "wiki_query_results": [],
+      "junior_artifacts": [
+        {
+          "angle": "edm-cifar10",
+          "status": "complete",
+          "findings": [
+            {
+              "title": "EDM on CIFAR-10",
+              "source_url": "https://arxiv.org/abs/2206.00364",
+              "sources": [
+                "https://arxiv.org/abs/2206.00364"
+              ],
+              "finding": "EDM on CIFAR-10 reaches 1.97 FID on CIFAR-10.",
+              "evidence": "FID=1.97 on CIFAR-10, reported in the results table.",
+              "confidence": "medium",
+              "trust_level": "indicative",
+              "sota_bar": {
+                "metric": "FID",
+                "value": 1.97,
+                "dataset": "CIFAR-10"
+              },
+              "applicable_families": [
+                "training"
+              ],
+              "quorum_met": false
+            }
+          ]
+        }
+      ],
+      "expect": {
+        "findings": {
+          "min": 1
+        },
+        "findings[].quorum_met": false,
+        "findings[].trust_level": "indicative",
+        "findings[].confidence": "medium"
+      }
+    },
+    {
+      "id": "wiki-hit-provenance",
+      "gate": "provenance",
+      "note": "the single angle is answered by a wiki hit, so no junior is spawned and provenance must record it as wiki-resolved",
+      "investigation_query": "Does label smoothing help when the classifier is already trained with mixup?",
+      "angles_available": [
+        "label-smoothing-with-mixup"
+      ],
+      "wiki_query_results": [
+        {
+          "lesson_id": "lesson-0142",
+          "angle": "label-smoothing-with-mixup",
+          "content": "Stacking label smoothing on top of mixup gave no measurable gain across four prior runs; mixup already provides the target-softening effect.",
+          "sources": [
+            "https://arxiv.org/abs/1710.09412",
+            "https://www.semanticscholar.org/paper/rethinking-inception-label-smoothing"
+          ]
+        }
+      ],
+      "junior_artifacts": [],
+      "expect": {
+        "findings": {
+          "min": 1
+        },
+        "angles_wiki_resolved": [
+          "label-smoothing-with-mixup"
+        ]
+      }
+    },
+    {
+      "id": "mixed-provenance",
+      "gate": "provenance",
+      "note": "three angles: one resolved from the wiki, two by juniors; both provenance lists must be recorded correctly",
+      "investigation_query": "How should we improve small-object detection on our aerial dataset?",
+      "angles_available": [
+        "tiling-strategy",
+        "anchor-scales",
+        "copy-paste-aug"
+      ],
+      "wiki_query_results": [
+        {
+          "lesson_id": "lesson-0207",
+          "angle": "copy-paste-aug",
+          "content": "Copy-paste augmentation was applied in run frontier-1ms and raised AP-small by 1.8 points.",
+          "sources": [
+            "https://arxiv.org/abs/2012.07177"
+          ]
+        }
+      ],
+      "junior_artifacts": [
+        {
+          "angle": "tiling-strategy",
+          "status": "complete",
+          "findings": [
+            {
+              "title": "SAHI sliced inference for small objects",
+              "source_url": "https://arxiv.org/abs/2202.06934",
+              "sources": [
+                "https://arxiv.org/abs/2202.06934"
+              ],
+              "finding": "SAHI sliced inference for small objects reaches 24.1 AP-small on VisDrone.",
+              "evidence": "AP-small=24.1 on VisDrone, reported in the results table.",
+              "confidence": "medium",
+              "trust_level": "indicative",
+              "sota_bar": {
+                "metric": "AP-small",
+                "value": 24.1,
+                "dataset": "VisDrone"
+              },
+              "applicable_families": [
+                "training"
+              ],
+              "quorum_met": false
+            }
+          ]
+        },
+        {
+          "angle": "anchor-scales",
+          "status": "complete",
+          "findings": [
+            {
+              "title": "Anchor rescaling for aerial detection",
+              "source_url": "https://www.semanticscholar.org/paper/0a3c9d81f6e2",
+              "sources": [
+                "https://www.semanticscholar.org/paper/0a3c9d81f6e2"
+              ],
+              "finding": "Anchor rescaling for aerial detection reaches 21.7 AP-small on VisDrone.",
+              "evidence": "AP-small=21.7 on VisDrone, reported in the results table.",
+              "confidence": "medium",
+              "trust_level": "indicative",
+              "sota_bar": {
+                "metric": "AP-small",
+                "value": 21.7,
+                "dataset": "VisDrone"
+              },
+              "applicable_families": [
+                "training"
+              ],
+              "quorum_met": false
+            }
+          ]
+        }
+      ],
+      "expect": {
+        "findings": {
+          "min": 2
+        },
+        "angles_wiki_resolved": [
+          "copy-paste-aug"
+        ],
+        "angles_junior_spawned": [
+          "tiling-strategy",
+          "anchor-scales"
+        ]
+      }
+    },
+    {
+      "id": "no-evidence-fallback",
+      "gate": "fallback",
+      "note": "both juniors exhausted their search paths and found nothing; findings must be empty and fallback_used set",
+      "investigation_query": "What is the published SOTA for defect segmentation on the internal 1ms wafer dataset?",
+      "angles_available": [
+        "wafer-1ms-sota-a",
+        "wafer-1ms-sota-b"
+      ],
+      "wiki_query_results": [],
+      "junior_artifacts": [
+        {
+          "angle": "wafer-1ms-sota-a",
+          "status": "complete",
+          "findings": [],
+          "search_log": "semantic-scholar: 0 results; arxiv: 0 results; Exa fallback: 0 relevant results. The dataset is internal and has no public literature."
+        },
+        {
+          "angle": "wafer-1ms-sota-b",
+          "status": "complete",
+          "findings": [],
+          "search_log": "semantic-scholar: 0 results; arxiv: 0 results; Consensus fallback: 0 relevant results."
+        }
+      ],
+      "expect": {
+        "findings": 0,
+        "fallback_used": true
+      }
+    },
+    {
+      "id": "ambiguous-low-confidence",
+      "gate": "confidence",
+      "note": "both juniors report the SAME technique and the SAME metric, so evor-sage.md:83 requires cross-junior quorum -- but the two measurements share neither dataset nor protocol, so the comparability gate (SotaVerifier_Protocol step 2b) fires before the arithmetic. The earlier version of this case used two DIFFERENT techniques, which made the ambiguity a property of the pair rather than of any one finding: keeping them as two separate single-source findings was a defensible read, and the case graded 'low' for a merge no rule required.",
+      "investigation_query": "Does test-time augmentation improve our segmentation mIoU?",
+      "angles_available": [
+        "tta-multiscale-segmentation-a",
+        "tta-multiscale-segmentation-b"
+      ],
+      "wiki_query_results": [],
+      "junior_artifacts": [
+        {
+          "angle": "tta-multiscale-segmentation-a",
+          "status": "complete",
+          "findings": [
+            {
+              "title": "Multi-scale TTA for segmentation",
+              "source_url": "https://arxiv.org/abs/1809.05027",
+              "sources": [
+                "https://arxiv.org/abs/1809.05027"
+              ],
+              "finding": "Multi-scale TTA for segmentation reaches 2.4 mIoU gain on Cityscapes.",
+              "evidence": "Reports +2.4 mIoU from multi-scale TTA at scales {0.75, 1.0, 1.25} on Cityscapes val, 1024x2048 input, ResNet-101 backbone. The single-scale baseline schedule is not stated.",
+              "confidence": "medium",
+              "trust_level": "indicative",
+              "sota_bar": {
+                "metric": "mIoU gain",
+                "value": 2.4,
+                "dataset": "Cityscapes"
+              },
+              "applicable_families": [
+                "training"
+              ],
+              "quorum_met": false
+            }
+          ]
+        },
+        {
+          "angle": "tta-multiscale-segmentation-b",
+          "status": "complete",
+          "findings": [
+            {
+              "title": "Multi-scale TTA for segmentation",
+              "source_url": "https://www.semanticscholar.org/paper/5b7e1c9a2d04",
+              "sources": [
+                "https://www.semanticscholar.org/paper/5b7e1c9a2d04"
+              ],
+              "finding": "Multi-scale TTA for segmentation reaches 2.3 mIoU gain on ADE20K.",
+              "evidence": "Reports +2.3 mIoU from multi-scale TTA on ADE20K val at 512x512 with a Swin-B backbone, scales unstated. Same technique and same metric as the Cityscapes number, and the two land within 5% of each other -- but different dataset, different input resolution, different backbone, and one of the two does not state its scale set.",
+              "confidence": "medium",
+              "trust_level": "indicative",
+              "sota_bar": {
+                "metric": "mIoU gain",
+                "value": 2.3,
+                "dataset": "ADE20K"
+              },
+              "applicable_families": [
+                "training"
+              ],
+              "quorum_met": false
+            }
+          ]
+        }
+      ],
+      "expect": {
+        "findings": {
+          "min": 1
+        },
+        "findings[].confidence": "low",
+        "findings[].trust_level": "indicative",
+        "findings[].quorum_met": "false"
+      }
+    },
+    {
+      "id": "single-source-second",
+      "gate": "quorum",
+      "note": "one peer-reviewed source and nothing to corroborate it: indicative at medium, never authoritative",
+      "investigation_query": "What AP does DETR reach on COCO?",
+      "angles_available": [
+        "detr-coco-ap"
+      ],
+      "wiki_query_results": [],
+      "junior_artifacts": [
+        {
+          "angle": "detr-coco-ap",
+          "status": "complete",
+          "findings": [
+            {
+              "title": "DETR on COCO",
+              "source_url": "https://arxiv.org/abs/2005.12872",
+              "sources": [
+                "https://arxiv.org/abs/2005.12872"
+              ],
+              "finding": "DETR on COCO reaches 42.0 box AP on COCO.",
+              "evidence": "box AP=42.0 on COCO val2017, reported in the results table. No second source was found.",
+              "confidence": "medium",
+              "trust_level": "indicative",
+              "sota_bar": {
+                "metric": "box AP",
+                "value": 42.0,
+                "dataset": "COCO"
+              },
+              "applicable_families": [
+                "arch"
+              ],
+              "quorum_met": false
+            }
+          ]
+        }
+      ],
+      "expect": {
+        "findings": {
+          "min": 1
+        },
+        "findings[].quorum_met": false,
+        "findings[].trust_level": "indicative",
+        "findings[].confidence": "medium"
+      }
+    },
+    {
+      "id": "quorum-across-three-juniors",
+      "gate": "quorum",
+      "note": "three juniors, three distinct papers, all stating the same dataset, split and eval protocol, all within 5%: quorum is met across juniors even though each junior held one source",
+      "investigation_query": "What mIoU does SegFormer-B2 reach on Cityscapes?",
+      "angles_available": [
+        "segformer-b2-a",
+        "segformer-b2-b",
+        "segformer-b2-c"
+      ],
+      "wiki_query_results": [],
+      "junior_artifacts": [
+        {
+          "angle": "segformer-b2-a",
+          "status": "complete",
+          "findings": [
+            {
+              "title": "SegFormer-B2 on Cityscapes",
+              "source_url": "https://arxiv.org/abs/2105.15203",
+              "sources": [
+                "https://arxiv.org/abs/2105.15203"
+              ],
+              "finding": "SegFormer-B2 on Cityscapes reaches 81.0 mIoU on Cityscapes.",
+              "evidence": "mIoU=81.0 on the Cityscapes val split, single-scale evaluation at 1024x1024, from the original results table.",
+              "confidence": "medium",
+              "trust_level": "indicative",
+              "sota_bar": {
+                "metric": "mIoU",
+                "value": 81.0,
+                "dataset": "Cityscapes"
+              },
+              "applicable_families": [
+                "arch"
+              ],
+              "quorum_met": false
+            }
+          ]
+        },
+        {
+          "angle": "segformer-b2-b",
+          "status": "complete",
+          "findings": [
+            {
+              "title": "SegFormer-B2 on Cityscapes",
+              "source_url": "https://aclanthology.org/2023.emnlp-main.900",
+              "sources": [
+                "https://aclanthology.org/2023.emnlp-main.900"
+              ],
+              "finding": "SegFormer-B2 on Cityscapes reaches 80.6 mIoU on Cityscapes.",
+              "evidence": "mIoU=80.6 on the Cityscapes val split, single-scale evaluation at 1024x1024, an independent reproduction.",
+              "confidence": "medium",
+              "trust_level": "indicative",
+              "sota_bar": {
+                "metric": "mIoU",
+                "value": 80.6,
+                "dataset": "Cityscapes"
+              },
+              "applicable_families": [
+                "arch"
+              ],
+              "quorum_met": false
+            }
+          ]
+        },
+        {
+          "angle": "segformer-b2-c",
+          "status": "complete",
+          "findings": [
+            {
+              "title": "SegFormer-B2 on Cityscapes",
+              "source_url": "https://openaccess.thecvf.com/content/CVPR2023/html/segformer-audit",
+              "sources": [
+                "https://openaccess.thecvf.com/content/CVPR2023/html/segformer-audit"
+              ],
+              "finding": "SegFormer-B2 on Cityscapes reaches 80.4 mIoU on Cityscapes.",
+              "evidence": "mIoU=80.4 on the Cityscapes val split, single-scale evaluation at 1024x1024, a third-party audit.",
+              "confidence": "medium",
+              "trust_level": "indicative",
+              "sota_bar": {
+                "metric": "mIoU",
+                "value": 80.4,
+                "dataset": "Cityscapes"
+              },
+              "applicable_families": [
+                "arch"
+              ],
+              "quorum_met": false
+            }
+          ]
+        }
+      ],
+      "expect": {
+        "findings": {
+          "min": 1
+        },
+        "findings[].quorum_met": true,
+        "findings[].trust_level": "authoritative",
+        "findings[].confidence": "high"
+      }
+    }
+  ]
+}

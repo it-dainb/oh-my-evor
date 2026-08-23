@@ -3,8 +3,9 @@
  * Unit tests for Class-C backing tools (Areas 1, 3, 4, 5, 6).
  *
  * Area 6 — meta_evolve_requested / meta_evolve_reason round-trips
- * Area 5 — evor_tree_read filters (status, integrity_status, min_score, approach_family)
+ * Area 5 — evor_tree_read filters (status, integrity_status, approach_family)
  *           + integrity_status in NamedTreeNode
+ * A6      — ucb1_score/min_score removed from agent-facing surface (always-empty field)
  * Area 1 — lockMission: refused on failing validation; succeeds on passing
  * Area 4 — checkStop: each stop type fires correctly; circuit-breaker overrides
  * Area 3 — prediction_bias_sample accumulates correct rolling avg_bias / n_samples
@@ -212,20 +213,40 @@ describe("Area 5 — evor_tree_read filters", () => {
     expect(nodes[0].name).toBe("match-01");
   });
 
-  it("filters by min_score; nodes lacking ucb1_score are excluded", () => {
+  it("NamedTreeNode never exposes a score/ucb1_score field, even when ucb1_score is set on the underlying node", () => {
     const runId = "run-a5-005";
     const highId = randomUUID();
     const lowId = randomUUID();
-    const noScoreId = randomUUID();
     writeTree(runId, {
       [highId]: makeNode(highId, [], 0, { name: "high-01", ucb1_score: 0.9 }),
       [lowId]: makeNode(lowId, [], 0, { name: "low-01", ucb1_score: 0.3 }),
-      [noScoreId]: makeNode(noScoreId, [], 0, { name: "noscore-01" }),
     }, "test-mission");
 
-    const nodes = treeRead(runId, undefined, undefined, "test-mission", { min_score: 0.5 });
-    expect(nodes).toHaveLength(1);
-    expect(nodes[0].name).toBe("high-01");
+    const nodes = treeRead(runId, undefined, undefined, "test-mission");
+    expect(nodes).toHaveLength(2);
+    for (const node of nodes) {
+      expect((node as unknown as Record<string, unknown>).score).toBeUndefined();
+      expect((node as unknown as Record<string, unknown>).ucb1_score).toBeUndefined();
+    }
+  });
+
+  it("filters on fitness_value work: a high-fitness node above threshold is returned, a low one is not", () => {
+    const runId = "run-a5-005b";
+    const highId = randomUUID();
+    const lowId = randomUUID();
+    writeTree(runId, {
+      [highId]: makeNode(highId, [], 0, {
+        name: "high-fit", status: "done", integrity_status: "passed", fitness_value: 0.9,
+      }),
+      [lowId]: makeNode(lowId, [], 0, {
+        name: "low-fit", status: "done", integrity_status: "passed", fitness_value: 0.3,
+      }),
+    }, "test-mission");
+
+    const nodes = treeRead(runId, undefined, undefined, "test-mission");
+    const above = nodes.filter((n) => (n.fitness_value ?? -Infinity) >= 0.5);
+    expect(above).toHaveLength(1);
+    expect(above[0].name).toBe("high-fit");
   });
 
   it("filters by approach_family", () => {

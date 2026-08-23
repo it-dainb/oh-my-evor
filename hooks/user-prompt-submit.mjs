@@ -24,6 +24,7 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync, renameSync } from '
 import { join } from 'path';
 import { createHash } from 'node:crypto';
 import { randomBytes } from 'crypto';
+import { resolveActiveRun } from './lib/active-run.mjs';
 
 // ── Kill switches ─────────────────────────────────────────────────────────────
 if (process.env.DISABLE_EVOR) process.exit(0);
@@ -100,10 +101,10 @@ try {
 } catch { /* throttle write failure is non-fatal */ }
 
 // ── Active run state (for resume hint) ───────────────────────────────────────
-const activeRunId = process.env.EVOR_ACTIVE_RUN_ID ?? '';
+const activeRunId = resolveActiveRun().runId;
 const runDir = (() => {
   if (!activeRunId) return null;
-  const mId = process.env.EVOR_MISSION_ID ?? '';
+  const mId = resolveActiveRun().missionId;
   return mId
     ? join(evorRoot, 'runs', mId, activeRunId)
     : join(evorRoot, 'runs', activeRunId);
