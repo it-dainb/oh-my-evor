@@ -66,44 +66,60 @@ sufficient and never was.
 forge-architect has no haiku row: its last measurement was 81/90 vs 89/90,
 CI [-16.9, -2.1], a **REGRESSION**. It ships on sonnet, which is where the
 opus→sonnet step left it, and that step is one of the four original claims now
-classed underpowered (see §5).
+classed underpowered (see §5). The S47 fix aimed at that regression is unmeasured
+and lives on v2.
 
-## 4. Verification status — read this before trusting §3
+## 4. Verification status — every adopted row
 
-`ci/role-eval.mjs` writes an `agent_sha256` into every report so a run can be
-tied to the file it measured. The check below is what that fingerprint plus git
-history actually supports:
+`ci/role-eval.mjs` writes an `agent_sha256` into each report. That hash covers
+the whole file, so adopting a retier (`model:` → haiku, dropping the inert
+`effort:`) invalidates the fingerprint of the very run that justified it — which
+is why a naive check reports every row stale. The meaningful comparison is the
+**prompt body**, since the harness overrides model and effort per arm anyway.
 
-| row | measured file vs shipped file | status |
+| row | measured at | body == shipped body |
 |---|---|---|
-| sage | frontmatter only (model:, effort:) | **VERIFIED** |
-| probe | frontmatter only | **VERIFIED** |
-| mutagen | frontmatter only | **VERIFIED** |
-| forge-critic | frontmatter only | **VERIFIED** |
-| sage-junior | unchanged since measurement | **VERIFIED** |
-| acquirer | file edited in the same commit that reported the run; mtimes cannot establish order | **UNVERIFIED** |
-| forge-analyst | S49 edited the file AFTER the measurement | **UNVERIFIED** |
-| forge-architect | S47 edited the file AFTER the measurement | **UNVERIFIED** |
+| acquirer | `6484bf4` | **YES** |
+| sage | `16e8643` | **YES** |
+| sage-junior | `3edc85c` | **YES** |
+| probe | `be19d23` | **YES** |
+| mutagen | `55cf923` | **YES** |
+| forge-critic | `d25faae` | **YES** |
+| forge-analyst | `412b223` | **YES** |
 
-The four VERIFIED-by-frontmatter rows are sound: the only post-measurement diff
-is `model:` and `effort:`, which the harness overrides per-arm anyway, so the
-prompt body those runs measured is the prompt body that ships.
+Every accuracy figure in §3 describes the file that ships.
 
-The three UNVERIFIED rows are the honest gap in v1:
+Two rows needed work to get there:
 
-- **forge-analyst ships on haiku on the strength of a measurement of the
-  previous revision of its file.** S49 changed only `oom-high-with-checkpointing`
-  handling — a case that was weak in BOTH arms (5/9 haiku, 6/9 sonnet), so the
-  expected effect is both arms up and the verdict unchanged. That is a
-  prediction, not a result.
-- **forge-architect's S47 fix is unmeasured.** The prior run was a regression
-  driven almost entirely by `wrong-loss-for-task` (haiku 1/9), whose cause was a
-  self-contradicting Dimension 3 redirect that S47 removed. Whether that lifts
-  it into non-inferior territory is unknown.
-- **acquirer** is the weakest of the three, because both arms scored 36/36: a
-  spec where nothing fails cannot resolve a small gap in either direction.
+**acquirer** was the hard one. Its agent file was edited in the *same commit*
+that reported its 36/36 run, so timestamps could not establish which revision
+the run loaded, and the four fields S35 added all appear in the spec contract —
+so finding them in the answers proved nothing. Two behavioural rules settled it,
+both stated only in the agent file and neither derivable from the spec, since
+the model never sees an expected value:
 
-Deferred to the next branch by decision, not by oversight.
+- `intra-batch-duplicates`: all 6/6 answered `item_count_integrated = 850`.
+  That is `1000 - 30 - 120`. The "subtract intra-batch duplicates too" clause is
+  a post-S35 addition; without it the arithmetic gives 970.
+- `merged-drop-counts`: all 6/6 answered `dropped_for_format = 100`, i.e.
+  `40 + 60`. The merge rule is also post-S35; reporting only the fetch-stage 40
+  is the error that case exists to catch.
+
+Six for six on each, in both arms. The post-S35 file was in the prompt.
+
+**forge-critic** draws its two arms from separate reports, which is weaker than
+a paired run. Both are still valid: no commit touched
+`agents/evor-forge-critic.md` between them (08:20 and 16:55 on 08-21 — the only
+same-day commit is the frontmatter-only retier at 21:13), the spec last changed
+at 08:06 before both, and both reports cover the same 10 cases. What is not
+controlled is run-to-run variation, so this row is the softest of the seven
+despite being verified on file identity.
+
+**S47 and S49 were reverted from this branch** rather than shipped unmeasured.
+Both were agent-file edits committed after the runs that measured those files,
+and their verification runs were killed. Neither fix is suspect — S49 targeted a
+case weak in both arms, S47 removed a self-contradicting redirect — but
+unmeasured is unmeasured. `evor/optimization-v2` carries both.
 
 ## 5. Claims that are NOT supported
 
