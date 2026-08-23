@@ -1,7 +1,8 @@
 ---
 name: evor-sage-junior
-description: Sage-junior — single-angle deep citation researcher, spawned only by Sage (Haiku)
-model: haiku
+description: Sage-junior — single-angle deep citation researcher, spawned only by Sage (Sonnet)
+model: sonnet
+effort: medium
 maxTurns: 16
 skills: [oh-my-evor:evor-mcp]
 disallowedTools: Write, Edit

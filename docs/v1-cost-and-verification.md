@@ -7,51 +7,59 @@ note at the end for why that distinction is not cosmetic.
 
 ## 1. Shipped tiers — all twelve agents
 
-| agent | main | this release | changed |
+Gate for shipping a tier change: **accuracy ≥95% absolute, difference CI clears
+−10pp, both arms from one paired run, material cost saving.** All four, or the
+role keeps its `main` tier.
+
+| agent | main | release | status |
 |---|---|---|---|
-| evor-selector | opus | **haiku** | yes |
-| evor-sage | opus | **haiku** | yes |
-| evor-probe | opus | **haiku** | yes |
-| evor-mutagen | opus | **haiku** | yes |
-| evor-forge-analyst | opus | **haiku** | yes |
-| evor-forge-critic | opus | **haiku** | yes |
-| evor-sage-junior | sonnet | **haiku** | yes |
-| evor-acquirer | sonnet | **haiku** | yes |
-| evor-forge-architect | opus | **sonnet** | yes |
-| evor-forge | opus | **sonnet** | yes |
-| evor-forge-junior | sonnet `effort: high` | sonnet **`effort: low`** | yes (effort) |
-| evor-tick | — (new agent) | sonnet | n/a |
+| evor-sage | opus | **haiku** | ships |
+| evor-mutagen | opus | **haiku** | ships |
+| evor-probe | opus | **haiku** | ships |
+| evor-acquirer | sonnet | **haiku** | ships |
+| evor-selector | opus | **haiku** | ships |
+| evor-forge-junior | sonnet | sonnet **`effort: low`** | ships |
+| evor-tick | — (new) | sonnet | ships, never benchmarked |
+| evor-forge-critic | opus | opus | reverted — arms unpaired |
+| evor-forge-analyst | opus | opus | reverted — 93.5% |
+| evor-sage-junior | sonnet | sonnet | reverted — 93.9% |
+| evor-forge-architect | opus | opus | reverted — 93.3%, CI −10.0pp |
+| evor-forge | opus | opus | reverted — 3-tick A/B only |
 
-Ten of eleven inherited agents moved down at least one tier; `evor-tick` is new
-on this branch and has never been benchmarked.
+**The reverts are frontmatter-only.** Every prompt-body fix ships on all twelve,
+including the five reverted roles: those fixes were verified on *both* arms and
+lift the expensive tier too. S46's floors fix took forge-analyst's sonnet arm as
+well as its haiku arm; reverting the tier does not undo that.
 
-## 2. Cost breakdown, billed
+Note the five reverted files now carry an explicit `effort:` that `main` left
+undeclared. `tests/agent-frontmatter.test.ts` requires it for any non-haiku
+model, so the declaration is the branch's, not `main`'s.
 
-One call of each role, at the tier it ran on `main` vs the tier it runs now:
+## 2. Cost breakdown, billed — what ships
 
 | role | from | to | $/call was | $/call now | saving |
 |---|---|---|---|---|---|
 | sage | opus | haiku | 0.1581 | 0.0327 | **79.3%** |
 | mutagen | opus | haiku | 0.2754 | 0.0774 | **71.9%** |
 | probe | opus | haiku | 0.1588 | 0.0493 | **69.0%** |
-| forge-critic | opus | haiku | 0.1142 | 0.0365 | **68.0%** |
-| sage-junior | sonnet | haiku | 0.1043 | 0.0358 | **65.7%** |
-| forge-analyst | opus | haiku | 0.1156 | 0.0422 | **63.5%** |
 | acquirer | sonnet | haiku | 0.0720 | 0.0294 | **59.2%** |
-| forge-architect | opus | sonnet | 0.1040 | 0.0618 | **40.6%** |
 | selector | sonnet | haiku | 0.0396 | 0.0307 | **22.5%** |
-| **total** | | | **1.1420** | **0.3958** | **65.3%** |
+| **total** | | | **0.7039** | **0.2195** | **68.8%** |
 
-Not in the table: `evor-forge` (measured as a 3-tick A/B, not per call — 17%
-cheaper) and `evor-forge-junior` (an effort change, 42.5% cheaper high→low).
-Selector's row covers only its measured sonnet→haiku leg; its opus→sonnet leg
-has no billed figure, so the total **understates** the real saving.
+`forge-junior` is an effort change, measured at 42.5% cheaper (low vs high) and
+not in the per-call table above. Selector's row covers only its measured
+sonnet→haiku leg; its opus→sonnet leg has no billed figure, so the total
+**understates** the real saving.
 
-**This is nine prices compared like for like. It is NOT a tick.** Roles are not
-invoked equally often — sage-junior fans out several per angle, forge-critic
-runs once per candidate, tick runs once — so the per-tick saving does not follow
-from this table and has not been measured. Anyone quoting a tick-level number
-from this document is quoting something that was never measured.
+**This is five prices compared like for like. It is NOT a tick.** Roles are not
+invoked equally often, so the per-tick saving does not follow from this table
+and has not been measured.
+
+Forgone by the four reverts that have per-call figures: **$0.2618 per call**
+(forge-critic $0.0777, forge-analyst $0.0734, sage-junior $0.0685,
+forge-architect $0.0422). `evor-forge` has no per-call figure, so the true total
+is higher. That is the price of the gate, and it is recoverable — see
+`docs/v2-backlog.md` P0/P1.
 
 ## 3. Accuracy evidence, per row
 

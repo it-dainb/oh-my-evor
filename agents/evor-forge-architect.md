@@ -1,7 +1,7 @@
 ---
 name: evor-forge-architect
-description: Forge-architect — reviews architectural soundness of the candidate implementation for Forge (Sonnet)
-model: sonnet
+description: Forge-architect — reviews architectural soundness of the candidate implementation for Forge (Opus)
+model: opus
 effort: medium
 disallowedTools: Write, Edit
 maxTurns: 10
