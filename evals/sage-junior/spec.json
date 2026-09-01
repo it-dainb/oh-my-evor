@@ -3,14 +3,14 @@
   "agent_file": "agents/evor-sage-junior.md",
   "arms": [
     {
-      "model": "haiku",
+      "model": "sonnet",
       "effort": "medium",
       "label": "current"
     },
     {
-      "model": "sonnet",
+      "model": "haiku",
       "effort": "medium",
-      "label": "main (pre-retier)"
+      "label": "haiku (candidate)"
     }
   ],
   "contract": {
@@ -70,7 +70,7 @@
           "title": "Revisiting Handwritten Text Recognition",
           "venue": "EMNLP 2023",
           "type": "paper",
-          "reported_metric": 94.0,
+          "reported_metric": 94,
           "excerpt": "Our reproduction of TrOCR-Large obtains 94.0% on the same IAM test split, using the authors' released preprocessing and 384x384 input."
         }
       ],
@@ -156,7 +156,7 @@
           "title": "A Fair Comparison of Sequence Recognisers",
           "venue": "WACV 2022",
           "type": "paper",
-          "reported_metric": 90.0,
+          "reported_metric": 90,
           "excerpt": "Under matched preprocessing the CRNN obtains 90.0%."
         }
       ],
@@ -190,7 +190,7 @@
           "title": "Re-running CRNN under the standard protocol",
           "venue": "WACV 2022",
           "type": "paper",
-          "reported_metric": 90.0,
+          "reported_metric": 90,
           "excerpt": "Re-running the same CRNN on the standard IAM test split, official preprocessing, 32px input height, we measure 90.0%."
         }
       ],
@@ -224,7 +224,7 @@
           "title": "Re-evaluating Attention OCR",
           "venue": "ICLR 2024 workshop",
           "type": "paper",
-          "reported_metric": 89.0,
+          "reported_metric": 89,
           "excerpt": "Under the standard IAM protocol we measure 89.0%."
         }
       ],

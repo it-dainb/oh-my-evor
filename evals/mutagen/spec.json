@@ -3,7 +3,7 @@
   "agent_file": "agents/evor-mutagen.md",
   "arms": [
     {
-      "model": "sonnet",
+      "model": "haiku",
       "effort": "medium",
       "label": "current"
     },

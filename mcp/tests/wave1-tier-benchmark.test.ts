@@ -229,10 +229,22 @@ describe("D — the eval specs measure the tier the role actually ships on", () 
 describe("D — the benchmark document describes the tiers that shipped", () => {
   const doc = readFileSync(resolve(REPO_ROOT, "docs/retier-benchmark-results.md"), "utf8");
 
-  /** Rows of the closing "Where the branch ends up" table: role | was | $ | now | $ | saving */
+  // ITEM 7.4 CHANGED THIS DOCUMENT'S SHAPE, DELIBERATELY.
+  //
+  // It was hand-maintained with no generator and was one of FOUR descriptions of
+  // which model each role ships on; RC7 measured corrected rows rotting within
+  // 26 hours. It is now GENERATED from `agents/*.md` frontmatter by
+  // `ci/generate-tier-doc.mjs`, so it cannot disagree with the build — it is read
+  // from the build.
+  //
+  // The old six-column table carried `was | $ | now | $ | saving`. Those cost
+  // columns were measurements, and reproducing them in a generated file would be
+  // asserting numbers no longer being measured — RC7's exact error. The
+  // generated table states what SHIPS, which is a fact about the frontmatter,
+  // and Phase 8 re-measures the rest. The parser follows.
   const adopted = [...doc.matchAll(
-    /^\|\s*`?([a-z][a-z-]*)`?\s*\|\s*(opus|sonnet|haiku)\s*\|\s*[\d.]+\s*\|\s*(opus|sonnet|haiku)\s*\|/gim,
-  )].map((m) => ({ role: `evor-${m[1]}`, now: m[3] }));
+    /^\|\s*`?([a-z][a-z-]*)`?\s*\|\s*(opus|sonnet|haiku)\s*\|/gim,
+  )].map((m) => ({ role: `evor-${m[1]}`, now: m[2] }));
 
   it("states a final tier for at least one role", () => {
     expect(adopted.length).toBeGreaterThan(0);

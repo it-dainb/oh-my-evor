@@ -461,7 +461,20 @@ export function canonicalTierLabel(tier) {
   return effortIsInert(model) ? `${model} (effort inert)` : `${model}-${effort}`;
 }
 
-export function buildReport({ role, tiers, records }) {
+export function buildReport({ role, tiers, records, mcpToolsAttached }) {
+  // ── Item 7.2: stamp the tool-availability basis of the run ────────────────
+  //
+  // THE META-FINDING. v1.2.0's tier claim rests on a corpus with ZERO tool_use
+  // blocks, in a system where every role's job is to call tools — and nothing in
+  // the report said so, which is why the numbers could be quoted for a claim
+  // about role capability. RC7: they were right about a narrower thing than they
+  // were quoted for.
+  //
+  // A future tier claim must not be makeable from a toolless corpus without that
+  // being visible in the artifact the claim is read from. `null` means the caller
+  // did not say, which is itself worth recording — it is not the same as false.
+  const mcp_tools_attached = mcpToolsAttached === undefined ? null : Boolean(mcpToolsAttached);
+
   const tierReports = tiers.map((tier) => {
     const tn = tierName(tier);
     const tierRecords = records.filter((r) => r.tier === tn);
@@ -529,6 +542,7 @@ export function buildReport({ role, tiers, records }) {
 
   return {
     role,
+    mcp_tools_attached,
     generated_at: new Date().toISOString(),
     pricing_basis: PRICING_NOTE,
     tiers: tierReports,

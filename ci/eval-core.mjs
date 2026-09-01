@@ -169,13 +169,52 @@ function jsonSkeletonValue(f) {
  */
 export const RESERVED_CASE_KEYS = new Set(['id', 'gate', 'note', 'expect']);
 
+/**
+ * Rewrite a role's tool-call instructions to point at inlined results.
+ *
+ * P-04 / item 7.1. Without this the assembled prompt says both "call
+ * `evor_wiki_query`" and "do not call any tool", and the model has to pick one.
+ * Which it picks is not a property of the role being measured.
+ *
+ * The rewrite is deliberately textual and conservative: it changes the
+ * IMPERATIVE into a REFERENCE and leaves everything else — including the tool
+ * name, so the prompt still says which result it means. A role whose prompt
+ * mentions a tool without ordering a call is untouched.
+ */
+export function neutraliseToolMandates(block) {
+  return String(block ?? '')
+    // "Call `evor_x`" / "call evor_x" -> "Use the inlined `evor_x` result"
+    .replace(/\b([Cc])alls?\s+`?(evor_[a-z_]+)`?/g,
+      (_m, c, tool) => `${c === 'C' ? 'U' : 'u'}se the inlined \`${tool}\` result from`)
+    // "evor_x(...)" -> "the inlined `evor_x` result"
+    // The bound is generous because these appear as multi-line fenced examples —
+    // `evor_signal_emit({\n  "run_id": …\n})` — and a tight limit silently left
+    // the longest, most explicit mandates in place.
+    .replace(/\b(evor_[a-z_]+)\s*\(([^)]{0,4000})\)/g,
+      (_m, tool) => `the inlined \`${tool}\` result`);
+}
+
 export function buildRolePrompt(agentPromptBlock, contract, caseObj) {
   const payload = {};
   for (const [k, v] of Object.entries(caseObj)) {
     if (!RESERVED_CASE_KEYS.has(k)) payload[k] = v;
   }
   return [
-    agentPromptBlock,
+    // P-04 (item 7.1). The agent's own prompt ORDERS tool calls —
+    // `evor_capability()`, "call `evor_wiki_query`" — and the harness then told
+    // it not to make any. Both instructions in one prompt, and the answer graded
+    // anyway: whatever those calls would have returned was scored from the
+    // inlined payload instead, so the arm measured the PROMPT, not the role.
+    //
+    // v1.2.0's whole tier claim rests on a corpus with zero tool_use blocks, in
+    // a system where every role's job is to call tools. RC7's finding is that
+    // the numbers were right about a narrower thing than they were quoted for.
+    //
+    // Two states are correct: attach the MCP server and grade the tool call
+    // (`--mcp-config`, see role-eval.mjs), or NEUTRALISE the mandate. This is
+    // the second — the mandates are rewritten to point at the inlined result, so
+    // the prompt no longer orders something it forbids.
+    neutraliseToolMandates(agentPromptBlock),
     '',
     '---',
     '',

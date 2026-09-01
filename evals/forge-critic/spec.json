@@ -3,14 +3,14 @@
   "agent_file": "agents/evor-forge-critic.md",
   "arms": [
     {
-      "model": "sonnet",
+      "model": "opus",
       "effort": "medium",
       "label": "current"
     },
     {
-      "model": "opus",
+      "model": "sonnet",
       "effort": "medium",
-      "label": "main (pre-retier)"
+      "label": "sonnet (candidate)"
     }
   ],
   "contract": {
@@ -97,7 +97,7 @@
         "training_recipe": {
           "optimizer": "AdamW",
           "lr": 0.0003,
-          "grad_clip": 1.0
+          "grad_clip": 1
         },
         "module_seams": {
           "backbone": "conv-stack",
@@ -154,7 +154,7 @@
         "training_recipe": {
           "optimizer": "AdamW",
           "lr": 0.0003,
-          "grad_clip": 1.0
+          "grad_clip": 1
         },
         "module_seams": {
           "backbone": "conv-stack",
@@ -211,7 +211,7 @@
         "training_recipe": {
           "optimizer": "AdamW",
           "lr": 0.0003,
-          "grad_clip": 1.0
+          "grad_clip": 1
         },
         "module_seams": {
           "backbone": "conv-stack",
@@ -268,7 +268,7 @@
         "training_recipe": {
           "optimizer": "AdamW",
           "lr": 0.0003,
-          "grad_clip": 1.0
+          "grad_clip": 1
         },
         "module_seams": {
           "backbone": "conv-stack",
@@ -325,7 +325,7 @@
         "training_recipe": {
           "optimizer": "AdamW",
           "lr": 0.0003,
-          "grad_clip": 1.0
+          "grad_clip": 1
         },
         "module_seams": {
           "backbone": "conv-stack",
@@ -382,7 +382,7 @@
         "training_recipe": {
           "optimizer": "AdamW",
           "lr": 0.0003,
-          "grad_clip": 1.0
+          "grad_clip": 1
         },
         "module_seams": {
           "backbone": "conv-stack",
@@ -440,7 +440,7 @@
           "optimizer": "SGD",
           "lr": 0.01,
           "momentum": 0.9,
-          "grad_clip": 1.0
+          "grad_clip": 1
         },
         "module_seams": {
           "backbone": "conv-stack",
@@ -497,7 +497,7 @@
           "optimizer": "SGD",
           "lr": 0.01,
           "momentum": 0.9,
-          "grad_clip": 1.0
+          "grad_clip": 1
         },
         "module_seams": {
           "backbone": "conv-stack",
@@ -553,7 +553,7 @@
         "training_recipe": {
           "optimizer": "AdamW",
           "lr": 0.0003,
-          "grad_clip": 1.0
+          "grad_clip": 1
         },
         "module_seams": {
           "backbone": "conv-stack",
@@ -609,7 +609,7 @@
         "training_recipe": {
           "optimizer": "AdamW",
           "lr": 0.0003,
-          "grad_clip": 1.0
+          "grad_clip": 1
         },
         "module_seams": {
           "backbone": "conv-stack",
