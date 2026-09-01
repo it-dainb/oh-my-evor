@@ -1626,3 +1626,57 @@ def is_tick_finished(current_step: int, step_status: str) -> bool:
 def is_run_active(status: Optional[str]) -> bool:
     """Is this run live — may a governance check still hold on its behalf?"""
     return status == "running"
+
+
+# ────────────────────────────────────────────────────────────────────────────
+# Concurrency semantics (plan item 1.9)
+#
+# These were never decided, so they were settled by whoever wrote last. O-09 is
+# the consequence: three missions in one workspace, overlapping in time, with no
+# statement anywhere about whether that was legal — so nothing could be called a
+# violation and nothing was.
+#
+# Decided here, in the model, rather than in a comment in one of the three
+# languages that read it:
+#
+#   TICKS OF ONE RUN DO NOT OVERLAP. A run has exactly one `tick-state.json`.
+#     The tick is the unit of the loop, and a second concurrent tick would have
+#     nowhere to record itself — the existing storage already assumes this and
+#     nothing enforced it.
+#
+#   RUNS OF ONE MISSION DO NOT OVERLAP. `active-run.json` is singular, and a
+#     mission's frontier is a single evolving object; two runs advancing it
+#     concurrently would each compute a frontier the other invalidates.
+#
+#   MISSIONS OF ONE CAMPAIGN DO NOT OVERLAP. r1 -> r2 -> r3 were sequential
+#     ATTEMPTS, which is what `MissionAttempt.ordinal` records. Two live attempts
+#     at one objective are two campaigns, not one.
+#
+#   SUB-AGENTS WITHIN A TICK DO OVERLAP, deliberately — that is the fan-out the
+#     whole design exists for. `Tick.pending_subagent_ids` is the plural, and it
+#     is the only plural here.
+#
+# ENFORCEMENT belongs to the writer (the MCP state path), not the readers. AF3's
+# risk 2: `stop.mjs` has five deliberate fail-open catches, so a guard evaluated
+# in a hook is a suggestion. Guards are enforced at the writer and advisory at
+# the readers; these predicates are what both sides ask.
+# ────────────────────────────────────────────────────────────────────────────
+
+#: Entities of which at most one may be live at a time, per parent.
+SINGLETON_PER_PARENT = {
+    "tick": "run",
+    "run": "mission",
+    "mission": "campaign",
+}
+
+#: The one deliberate plural.
+CONCURRENT_WITHIN_TICK = ("subagent",)
+
+
+def may_overlap(entity: str) -> bool:
+    """Is more than one live ``entity`` legal under its parent?
+
+    Ask this instead of assuming. The assumption went both ways in the field:
+    the tick loop assumed no, the mission layer allowed yes, and neither said so.
+    """
+    return entity not in SINGLETON_PER_PARENT

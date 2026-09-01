@@ -202,3 +202,41 @@ class TestAllThreeImplementationsAgree:
             "decides whether the loop continues; if they differ, one of them is "
             "wrong about the mission's state and neither reports it."
         )
+
+
+class TestConcurrencySemanticsAreDecided:
+    """§1.9 — the rule must exist, and must be the same rule in both languages.
+
+    These were never decided, so they were settled by whoever wrote last. O-09 is
+    the consequence: three missions in one workspace, overlapping in time, with
+    no statement anywhere about whether that was legal — so nothing could be
+    called a violation and nothing was.
+    """
+
+    def test_the_singletons_are_named(self):
+        from evor.contracts import SINGLETON_PER_PARENT
+
+        assert SINGLETON_PER_PARENT == {"tick": "run", "run": "mission", "mission": "campaign"}
+
+    def test_subagents_are_the_one_deliberate_plural(self):
+        from evor.contracts import may_overlap
+
+        assert may_overlap("subagent") is True, (
+            "fan-out within a tick is what the design exists for; a rule that "
+            "forbade it would be a rule against the system working"
+        )
+        for singleton in ("tick", "run", "mission"):
+            assert may_overlap(singleton) is False
+
+    def test_typescript_declares_the_same_rule(self):
+        src = CONTRACTS_TS.read_text()
+        m = re.search(r"export const SINGLETON_PER_PARENT: Record<string, string> = \{(.*?)\};", src, re.S)
+        assert m, "SINGLETON_PER_PARENT not found in contracts.ts"
+        ts_pairs = dict(re.findall(r"(\w+):\s*\"(\w+)\"", m.group(1)))
+
+        from evor.contracts import SINGLETON_PER_PARENT
+
+        assert ts_pairs == SINGLETON_PER_PARENT, (
+            "a concurrency rule that holds in one language is not a rule. Both "
+            "halves read the same files and either can write last."
+        )

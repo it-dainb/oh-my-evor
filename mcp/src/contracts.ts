@@ -953,6 +953,45 @@ export function isRunActive(run: Pick<Run, "status">): boolean {
 
 // ────────────────────────────────────────────────────────────────────────────
 
+// ────────────────────────────────────────────────────────────────────────────
+// Concurrency semantics (plan item 1.9)
+//
+// Never decided, therefore settled by whoever wrote last. O-09: three missions
+// in one workspace overlapping in time, with no statement anywhere about whether
+// that was legal — so nothing could be called a violation, and nothing was.
+//
+// Mirrors `SINGLETON_PER_PARENT` in harness/evor/contracts.py. Both halves must
+// change together; a concurrency rule that holds in one language is not a rule.
+// ────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Entities of which at most one may be live at a time, per parent.
+ *
+ *   tick    -> run       one `tick-state.json` per run; a second concurrent tick
+ *                        has nowhere to record itself
+ *   run     -> mission   `active-run.json` is singular, and two runs advancing
+ *                        one frontier each compute what the other invalidates
+ *   mission -> campaign  r1 -> r2 -> r3 were sequential ATTEMPTS; two live
+ *                        attempts at one objective are two campaigns
+ */
+export const SINGLETON_PER_PARENT: Record<string, string> = {
+  tick: "run",
+  run: "mission",
+  mission: "campaign",
+};
+
+/**
+ * The one deliberate plural: sub-agents within a tick overlap, because that
+ * fan-out is what the design exists for. `Tick.pending_subagent_ids` is plural
+ * for this reason and is the only plural here.
+ */
+export const CONCURRENT_WITHIN_TICK = ["subagent"] as const;
+
+/** Is more than one live `entity` legal under its parent? Ask; do not assume. */
+export function mayOverlap(entity: string): boolean {
+  return !(entity in SINGLETON_PER_PARENT);
+}
+
 export const ALL_SCHEMAS = {
   // Base 11 (+ Hypothesis)
   GoalContract: GoalContractSchema,

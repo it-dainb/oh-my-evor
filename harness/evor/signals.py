@@ -29,6 +29,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
 
+from .runlock import run_lock
 from evor.contracts import Signal
 
 _SEVERITY_ORDER = {"low": 0, "medium": 1, "high": 2, "critical": 3}
@@ -45,12 +46,60 @@ def _signal_id(kind: str, signature: str) -> str:
 
 
 def _atomic_write_jsonl(path: Path, lines: list[str]) -> None:
+    """Atomically write the bus, PRESERVING records this writer never saw.
+
+    Finding O-02, item 1.8. This is the commit point of a read-modify-write:
+    ``emit`` loads every signal, merges one, and writes the whole list back. Any
+    record another writer committed between that load and this write was silently
+    erased — the file is rewritten wholesale, so a lost update leaves no trace at
+    all, in a bus whose entire purpose is to not lose signals.
+
+    The run lock excludes the other PROCESS that writes this file. It cannot
+    exclude what reaches the file by another route: an appender, a re-entrant
+    call, a writer that does not take the lock. So the union happens HERE, at the
+    moment of commit, where the window is empty rather than merely narrow:
+    re-read the file, keep every signature the caller is not writing, then
+    replace. Records the caller IS writing win — it has just merged them.
+
+    Bus-only by construction (``gotchas.py`` has its own writer). A generic
+    atomic writer would not merge; this one is named for its file.
+    """
     path.parent.mkdir(parents=True, exist_ok=True)
+
+    incoming: dict[str, str] = {}
+    order: list[str] = []
+    for line in lines:
+        try:
+            sig = json.loads(line).get("signature")
+        except (ValueError, AttributeError):
+            sig = None
+        key = sig if sig is not None else f"__unkeyed__{len(order)}"
+        if key not in incoming:
+            order.append(key)
+        incoming[key] = line
+
+    if path.exists():
+        try:
+            for raw in path.read_text().splitlines():
+                raw = raw.strip()
+                if not raw:
+                    continue
+                try:
+                    sig = json.loads(raw).get("signature")
+                except (ValueError, AttributeError):
+                    continue
+                if sig is not None and sig not in incoming:
+                    incoming[sig] = raw
+                    order.append(sig)
+        except OSError:
+            # Unreadable bus — writing what we have beats refusing to write.
+            pass
+
     fd, tmp = tempfile.mkstemp(dir=path.parent, suffix=".tmp")
     try:
         with os.fdopen(fd, "w") as fh:
-            for line in lines:
-                fh.write(line + "\n")
+            for key in order:
+                fh.write(incoming[key] + "\n")
         os.replace(tmp, path)
     except Exception:
         try:
@@ -84,11 +133,26 @@ class SignalBus:
 
     # ── Emit ────────────────────────────────────────────────────────────────────
     def emit(self, signal: Signal) -> Signal:
-        """Persist or aggregate a signal. Dedup key = signature.
+        """Persist or aggregate a signal, under the shared run lock (item 1.8).
 
-        Repeat emits: increment occurrences, bump last_seen, raise confidence,
-        and take the MAX severity seen (a signal that recurs harder escalates).
+        The body is a read-modify-write: load every signal, merge this one by
+        signature, rewrite the file. Two concurrent emits lose one — and there
+        genuinely are two writers, in two languages: the Python drain called from
+        `subagent-stop.mjs` and the MCP server's own signal tools, which already
+        take `<run_dir>/.tree.lock` through `withRunLock`. Taking the same lock
+        here is what makes that mutual.
+
+        `signals.jsonl` is one of exactly two files this release locks. The
+        ownership rule is in `runlock.py`: a lock exists only where a second
+        writer genuinely survives in another process. Twelve pairwise retrofits
+        were considered and cut — a lock around a single-writer file buys nothing
+        and adds a stale-lock failure mode.
         """
+        with run_lock(self._run_dir):
+            return self._emit_locked(signal)
+
+    def _emit_locked(self, signal: Signal) -> Signal:
+        """The critical section of :meth:`emit`. Never call without the lock."""
         existing = _load(self._path)
         idx: Optional[int] = None
         for i, s in enumerate(existing):
@@ -139,6 +203,10 @@ class SignalBus:
             )
             existing.append(final)
 
+        # The commit point unions with whatever is on disk (see
+        # `_atomic_write_jsonl`), so a record another writer added inside this
+        # read-modify-write window survives. One mechanism, at the moment where
+        # the window is empty rather than merely narrow.
         _atomic_write_jsonl(self._path, [s.model_dump_json() for s in existing])
         return final
 

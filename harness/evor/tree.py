@@ -43,6 +43,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Literal
 
+from evor.runlock import run_lock
 from evor.contracts import (
     ApproachFamily,
     CriticReview,
@@ -277,6 +278,24 @@ class TreeEngine:
         if self._run_dir is None:
             return
         tree_path = Path(self._run_dir) / "tree.json"
+
+        # Item 1.8. Re-reading fresh (below) narrows the race but cannot close
+        # it: this is a read-modify-write, and the MCP server's `upsertNode` does
+        # the same thing to the same file from another process. That side already
+        # takes `<run_dir>/.tree.lock` via `withRunLock` in mcp/src/lock.ts —
+        # Python took nothing, so the mutual exclusion was mutual only among
+        # TypeScript callers. RC3: the lock was "a TypeScript implementation
+        # detail rather than a property of the on-disk format".
+        with run_lock(self._run_dir):
+            self._rewrite_visit_counts(tree_path, node_ids)
+
+    def _rewrite_visit_counts(self, tree_path: Path, node_ids: set[str]) -> None:
+        """The critical section of :meth:`_persist_visit_increments`.
+
+        Split out so the lock scope is exactly the read-modify-write and nothing
+        else — a lock held wider than its invariant is how the 2 s acquisition
+        deadline starts firing under normal load.
+        """
         if tree_path.exists():
             with open(tree_path) as fh:
                 tree_data = json.load(fh)
