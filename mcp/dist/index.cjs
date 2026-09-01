@@ -21995,7 +21995,17 @@ function registerIntegrityTools(server) {
 function defaultRunState(runId) {
   return {
     run_id: runId,
-    status: "running",
+    // 1.4. This was `"running"` — a run whose state file had never been written,
+    // or had been corrupted, reported itself as LIVE. That is A6: absence of state
+    // read as liveness, and it is the sharper form of the invariant 3.2 asserts.
+    //
+    // `"initialized"` is what `init_run.py:178` already seeds, so a run with no
+    // recorded state and a run at the start of its life now describe themselves
+    // the same way, which is true. It is not `"failed"` because nothing failed,
+    // and it is not absent because `validate.py` requires the field until 1.9b
+    // retires it — leaving it out here would turn a read default into a hard
+    // validation failure two items early.
+    status: "initialized",
     tick_count: 0,
     best_score: null,
     frontier_ids: [],
@@ -22007,7 +22017,11 @@ function readRunState(runStatePath, runId) {
   if (!(0, import_fs5.existsSync)(runStatePath)) return defaultRunState(runId);
   try {
     return JSON.parse((0, import_fs5.readFileSync)(runStatePath, "utf8"));
-  } catch {
+  } catch (err3) {
+    process.stderr.write(
+      `[evor] run-state unreadable at ${runStatePath}: ${String(err3)} \u2014 treating as uninitialized
+`
+    );
     return defaultRunState(runId);
   }
 }

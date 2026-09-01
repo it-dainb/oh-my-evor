@@ -65,7 +65,12 @@ describe("stateRead", () => {
   it("returns fresh default state when run-state.json absent", () => {
     const state = stateRead("run-sr-001", "test-mission");
     expect(state.run_id).toBe("run-sr-001");
-    expect(state.status).toBe("running");
+    // 1.4: was `.toBe("running")`. That assertion encoded the A6 defect — a run
+    // whose state file has never been written is not live, and three fail-open
+    // stop-hook gates key on this exact value. Strengthened rather than relaxed:
+    // it now pins the correct answer AND rules out the old one.
+    expect(state.status).toBe("initialized");
+    expect(state.status).not.toBe("running");
     expect(state.tick_count).toBe(0);
     expect(Array.isArray(state.pending_node_ids)).toBe(true);
   });
@@ -102,7 +107,11 @@ describe("stateRead", () => {
 
     const state = stateRead(runId);
     expect(state.run_id).toBe(runId);
-    expect(state.status).toBe("running");
+    // 1.4: was `.toBe("running")`. A truncated write made the run look live by the
+    // same literal as the missing-file branch — the same defect reached by a route
+    // nobody was watching. Fixing one branch and not the other would have left it open.
+    expect(state.status).toBe("initialized");
+    expect(state.status).not.toBe("running");
   });
 });
 

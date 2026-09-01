@@ -33,7 +33,17 @@ import { resolveNodeRef, assignUniqueName, deriveName } from "./node-ref.js";
 export function defaultRunState(runId: string): Record<string, unknown> {
   return {
     run_id: runId,
-    status: "running",
+    // 1.4. This was `"running"` — a run whose state file had never been written,
+    // or had been corrupted, reported itself as LIVE. That is A6: absence of state
+    // read as liveness, and it is the sharper form of the invariant 3.2 asserts.
+    //
+    // `"initialized"` is what `init_run.py:178` already seeds, so a run with no
+    // recorded state and a run at the start of its life now describe themselves
+    // the same way, which is true. It is not `"failed"` because nothing failed,
+    // and it is not absent because `validate.py` requires the field until 1.9b
+    // retires it — leaving it out here would turn a read default into a hard
+    // validation failure two items early.
+    status: "initialized",
     tick_count: 0,
     best_score: null,
     frontier_ids: [],
@@ -63,7 +73,15 @@ export function readRunState(runStatePath: string, runId: string): Record<string
   if (!existsSync(runStatePath)) return defaultRunState(runId);
   try {
     return JSON.parse(readFileSync(runStatePath, "utf8"));
-  } catch {
+  } catch (err) {
+    // A corrupt state file is not a fresh run, and it is worth saying so. The old
+    // code returned `status: "running"` here too, so a truncated write made the
+    // run look live — the same defect as the missing-file branch, arriving by a
+    // route nobody was watching. Defaulting stays (a governor must not crash a
+    // session) but it no longer defaults toward liveness, and no longer silently.
+    process.stderr.write(
+      `[evor] run-state unreadable at ${runStatePath}: ${String(err)} — treating as uninitialized\n`,
+    );
     return defaultRunState(runId);
   }
 }
