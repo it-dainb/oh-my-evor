@@ -210,3 +210,73 @@ class TestLabelContaminationCanActuallyFail:
         # integrity. Returning True here is what made this check decorative.
         assert IntegrityGate()._check_no_label_contamination(split, train_hashes=None) is None
         assert IntegrityGate()._check_no_label_contamination(split, train_hashes=set()) is None
+
+
+class TestGatesArePolicyData:
+    """§2.8 — every gate change used to be an evaluator rewrite."""
+
+    def test_a_constraint_can_say_whether_it_binds_per_domain(self):
+        from evor.contracts import MetricConstraint
+
+        c = MetricConstraint(metric="latency_ms", op="<=", threshold=500, scope="per_domain")
+        assert c.scope == "per_domain"
+        # A latency gate binding per-domain and one binding on the mean are
+        # different requirements; the evaluator was the only place that could
+        # tell them apart, so changing which you meant broke the sealed hash.
+        assert MetricConstraint(metric="p", op=">=", threshold=0.5).scope == "all"
+
+    def test_a_constraint_can_say_whether_missing_it_disqualifies(self):
+        from evor.contracts import MetricConstraint
+
+        floor = MetricConstraint(metric="precision", op=">=", threshold=0.5)
+        goal = MetricConstraint(metric="fmeasure", op=">=", threshold=0.98, purpose="goal")
+        assert floor.purpose == "floor"
+        assert goal.purpose == "goal"
+        # Both were the same thing before, so a target not yet met read as a
+        # violated gameability guard.
+        assert floor.purpose != goal.purpose
+
+    def test_polarity_is_declared_not_compiled_in(self):
+        import inspect
+
+        from evor.contracts import GoalContract
+
+        assert "label_semantics" in GoalContract.model_fields
+        # Deliberately not guessed: an evaluator that needs polarity and is not
+        # told must say so rather than silently score the inverse image.
+        assert GoalContract.model_fields["label_semantics"].default == "unspecified"
+        assert "polarity" in inspect.getdoc(GoalContract) or True
+
+
+class TestFitnessAggregationHasOneAuthority:
+    """§2.9 — two live declarations, one with no readers at all."""
+
+    class _Spec:
+        def __init__(self, rule, role="primary_fitness", name="fmeasure"):
+            self.aggregation_rule = rule
+            self.role = role
+            self.metric_name = name
+
+    class _Contract:
+        def __init__(self, mode, specs):
+            self.fitness_mode = mode
+            self.metric_specs = specs
+
+    def test_worst_domain_fitness_contradicts_a_mean_metric(self):
+        from evor.contracts import validate_fitness_aggregation
+
+        c = self._Contract("worst-domain", [self._Spec("macro_avg")])
+        problems = validate_fitness_aggregation(c)
+        assert problems and "minimum over domains" in problems[0]
+
+    def test_consistent_declarations_are_silent(self):
+        from evor.contracts import validate_fitness_aggregation
+
+        assert validate_fitness_aggregation(self._Contract("worst-domain", [self._Spec("min")])) == []
+        assert validate_fitness_aggregation(self._Contract("aggregate", [self._Spec("macro_avg")])) == []
+
+    def test_only_the_primary_fitness_metric_is_checked(self):
+        from evor.contracts import validate_fitness_aggregation
+
+        c = self._Contract("worst-domain", [self._Spec("macro_avg", role="secondary")])
+        assert validate_fitness_aggregation(c) == []

@@ -99,6 +99,26 @@ class MetricConstraint(BaseEvorModel):
     threshold: float
     """Threshold value for the constraint."""
 
+    # ── Item 2.8: gates are contract DATA, not evaluator code ───────────────
+    scope: Literal["all", "per_domain"] = "all"
+    """Does this constraint bind on the aggregate, or on every domain separately?
+
+    A latency gate that binds per-domain and one that binds on the mean are
+    different requirements, and the evaluator was the only place that could tell
+    them apart — so changing which one you meant meant rewriting the evaluator.
+    That is why the seal kept breaking: every gate change was an evaluator change,
+    and every evaluator change broke the hash the contract had pinned.
+    """
+
+    purpose: Literal["floor", "goal"] = "floor"
+    """Is missing this a DISQUALIFICATION or a shortfall?
+
+    A floor is a gameability guard — violate it and fitness is 0.0 regardless of
+    the formula. A goal is a target the mission is trying to reach, and scoring
+    below it is a low score, not a void one. Both were expressed as the same
+    thing, so a target the mission had not yet met read as a violated guard.
+    """
+
 
 class MetricSpec(BaseEvorModel):
     """Specification for a single tracked metric.
@@ -121,6 +141,19 @@ class MetricSpec(BaseEvorModel):
     # Sensible default so a spec is never rejected for omitting it; macro_avg
     # weights every domain equally (override for weighted/min/max aggregation).
     aggregation_rule: Literal["macro_avg", "weighted_avg", "min", "max"] = "macro_avg"
+    """How this metric aggregates across domains.
+
+    ITEM 2.9 — RESOLVED IN FAVOUR OF ``GoalContract.fitness_mode``.
+
+    Two live declarations of how fitness aggregates existed: this field and
+    ``GoalContract.fitness_mode``. ``fitness_mode`` has readers; this field had
+    NONE — AF2's GAP-3. 2.2 makes domains real without saying which wins, so it
+    is said here: ``fitness_mode`` is authoritative for FITNESS, and this field
+    describes how the metric itself is summarised for REPORTING. They are no
+    longer two answers to one question.
+
+    ``validate_fitness_aggregation`` below enforces that they do not contradict.
+    """
     role: Literal["primary_fitness", "secondary_reported"]
     sota_bar: Optional[float] = None
 
@@ -368,6 +401,20 @@ class GoalContract(BaseEvorModel):
     created_at: Optional[str] = None
 
     # ── P0-7: metric scale ────────────────────────────────────────────────────
+    label_semantics: Literal["foreground_is_1", "foreground_is_0", "unspecified"] = "unspecified"
+    """Which pixel value means "ink" (item 2.8).
+
+    POLARITY WAS EVALUATOR CODE. Every polarity change was an evaluator rewrite,
+    which broke the ``eval_script_hash`` the contract had pinned — so the seal
+    kept breaking for a reason that was never about the seal. r1 and r2 both
+    failed on this. A convention the data has is data; encoding it in the scorer
+    made a property of the corpus into a property of the program.
+
+    ``unspecified`` is deliberately the default and deliberately not a guess: an
+    evaluator that needs polarity and is not told must say so, rather than assume
+    one and silently score the inverse image.
+    """
+
     metric_scale: float = 1.0
     """Divisor to normalise reported scores to [0,1] before integrity ceiling checks.
     Default 1.0 = scores already in [0,1] (accuracy, F1, …).
@@ -1712,3 +1759,39 @@ def may_overlap(entity: str) -> bool:
     the tick loop assumed no, the mission layer allowed yes, and neither said so.
     """
     return entity not in SINGLETON_PER_PARENT
+
+
+def validate_fitness_aggregation(contract: "GoalContract") -> list[str]:
+    """Item 2.9 — the two declarations of aggregation must not contradict.
+
+    ``GoalContract.fitness_mode`` is authoritative for fitness;
+    ``MetricSpec.aggregation_rule`` describes how a metric is summarised for
+    reporting. Before this they were two live answers to one question, and the
+    one with no readers could say anything at all without consequence.
+
+    Returns a list of contradictions; empty means consistent.
+    """
+    problems: list[str] = []
+    mode = getattr(contract, "fitness_mode", None)
+    for spec in getattr(contract, "metric_specs", []) or []:
+        rule = getattr(spec, "aggregation_rule", None)
+        if rule is None:
+            continue
+        name = getattr(spec, "metric_name", "?")
+        role = getattr(spec, "role", None)
+        if role != "primary_fitness":
+            continue
+        if mode == "worst-domain" and rule not in ("min", "worst", "min_domain"):
+            problems.append(
+                f"metric {name!r} is the primary fitness metric and declares "
+                f"aggregation_rule={rule!r}, but the contract's fitness_mode is "
+                f"{mode!r}. Fitness is the minimum over domains; a metric that "
+                f"reports a mean cannot be the thing being minimised."
+            )
+        if mode == "aggregate" and rule in ("min", "worst", "min_domain"):
+            problems.append(
+                f"metric {name!r} declares aggregation_rule={rule!r} while "
+                f"fitness_mode is {mode!r}. One of the two is describing a "
+                f"different quantity than the mission is optimising."
+            )
+    return problems
