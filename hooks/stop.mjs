@@ -35,6 +35,7 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync, statSync } from 'fs
 import { join } from 'path';
 import { randomBytes } from 'crypto';
 import { resolveActiveRun } from './lib/active-run.mjs';
+import { isRunLive } from './lib/run-status.mjs';
 
 // ── Kill switches ─────────────────────────────────────────────────────────────
 // DISABLE_EVOR: truthy value disables the entire evor hook layer.
@@ -252,7 +253,7 @@ try {
     try {
       const tickState = JSON.parse(readFileSync(tickStatePath, 'utf8'));
       const currentStep = typeof tickState?.current_step === 'number' ? tickState.current_step : 9;
-      const missionRunning = runState?.status === 'running';
+      const missionRunning = isRunLive(runState);
       if (missionRunning && currentStep < 9) {
         debtReasons.push(
           `tick-state.json shows current_step=${currentStep} (< 9) while run status is "running" ` +
@@ -268,7 +269,7 @@ try {
   // tree nodes are absent. This is the enforcement teeth behind the SKILL's
   // Orchestrator_Contract: a tick that leaves no proposals/verdict/node on disk was
   // done inline and must be redone via real Task spawns.
-  if (runState?.status === 'running') {
+  if (isRunLive(runState)) {
     let curTick = null;
     const tsPath = join(runDir, 'tick-state.json');
     if (existsSync(tsPath)) {
@@ -315,7 +316,7 @@ try {
   // If the orchestrator writes pending_subagent_ids[] to tick-state.json when spawning
   // Task sub-agents, the stop hook blocks until they complete.
   // If the field is absent (old tick-state format) this guard is a no-op (fail-open).
-  if (runState?.status === 'running') {
+  if (isRunLive(runState)) {
     try {
       const tsPathE = join(runDir, 'tick-state.json');
       if (existsSync(tsPathE)) {

@@ -21992,30 +21992,23 @@ function registerIntegrityTools(server) {
 }
 
 // src/tools/record.ts
+function defaultRunState(runId) {
+  return {
+    run_id: runId,
+    status: "running",
+    tick_count: 0,
+    best_score: null,
+    frontier_ids: [],
+    current_eval_version: "v1",
+    pending_node_ids: []
+  };
+}
 function readRunState(runStatePath, runId) {
-  if (!(0, import_fs5.existsSync)(runStatePath)) {
-    return {
-      run_id: runId,
-      status: "running",
-      tick_count: 0,
-      best_score: null,
-      frontier_ids: [],
-      current_eval_version: "v1",
-      pending_node_ids: []
-    };
-  }
+  if (!(0, import_fs5.existsSync)(runStatePath)) return defaultRunState(runId);
   try {
     return JSON.parse((0, import_fs5.readFileSync)(runStatePath, "utf8"));
   } catch {
-    return {
-      run_id: runId,
-      status: "running",
-      tick_count: 0,
-      best_score: null,
-      frontier_ids: [],
-      current_eval_version: "v1",
-      pending_node_ids: []
-    };
+    return defaultRunState(runId);
   }
 }
 function writeRunState(runStatePath, state) {

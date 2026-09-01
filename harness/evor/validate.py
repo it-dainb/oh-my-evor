@@ -18,6 +18,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Optional
 
+from .run_status import REQUIRED_RUN_STATE_FIELDS
+
 # ─── Trivially-gameable metric names (rule-registry fast pre-check) ───────────
 # These metrics reach 1.0 (or 0.0) via degenerate all-positive / all-negative
 # predictions, making them trivially optimisable WITHOUT learning anything:
@@ -688,7 +690,7 @@ def _check_run_state(run_dir: Path) -> list[CheckResult]:
         ))
         return checks
 
-    required = ("status", "tick_count", "frontier_ids")
+    required = REQUIRED_RUN_STATE_FIELDS
     missing = [f for f in required if f not in data]
     if missing:
         checks.append(CheckResult(
