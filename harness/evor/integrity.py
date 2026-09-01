@@ -145,6 +145,9 @@ class IntegrityGate:
         frozen_test: FrozenSplit,
         provenance_path: Path | None,
         run_dir: Path | None = None,
+        # Check 3 (item 2.11): sha256 of every training sample, when the caller
+        # has them. Absent means the check reports "not evaluated", never "clean".
+        train_hashes: set[str] | None = None,
         # Acquisition-gate inputs (checks 11–13)
         acquired_samples: list[bytes] | None = None,
         acquisition_provenance: AcquisitionProvenance | None = None,
@@ -184,15 +187,20 @@ class IntegrityGate:
         # ── Checks 2–3: short-circuited if check-1 failed (R-7a) ─────────
         if split_hash_match:
             no_test_leakage = self._check_no_test_leakage(frozen_test)
-            no_label_contamination = self._check_no_label_contamination(frozen_test)
+            no_label_contamination = self._check_no_label_contamination(
+                frozen_test, train_hashes=train_hashes
+            )
             if not no_test_leakage:
                 failures.append(
                     "no_test_leakage: test indices or content-hashes found in training data"
                 )
-            if not no_label_contamination:
+            if no_label_contamination is False:
                 failures.append(
                     "no_label_contamination: test sample sha256 hashes overlap with training data"
                 )
+            # `None` means NOT EVALUATED — no training hashes were supplied. It is
+            # not a failure, and deliberately not a pass either: the report carries
+            # None so a reader can tell "clean" from "never looked".
         else:
             # Cannot meaningfully evaluate leakage on a corrupted split
             no_test_leakage = False
@@ -407,14 +415,30 @@ class IntegrityGate:
         # Any duplicates within the frozen test split indicate corruption
         return len(hashes) == len(set(hashes))
 
-    def _check_no_label_contamination(self, frozen_test: FrozenSplit) -> bool:
-        """Check 3: sha256(test_sample_i) ∉ {sha256(train_sample_j)} over 100 pairs.
+    def _check_no_label_contamination(
+        self, frozen_test: FrozenSplit, train_hashes: set[str] | None = None
+    ) -> bool:
+        """Check 3: sha256(test_sample_i) not in {sha256(train_sample_j)}.
 
-        Production: requires access to training data (GPU/data-gated).
-        Returns True by default when training data is not available for cross-check;
-        the frozen-split hash chain (checks 1, 7) provides the primary tamper guard.
+        Item 2.11. This was ``return True`` — three lines of docstring and an
+        unconditional pass. It could not fail for any input, which means it was
+        not a check; it was the SHAPE of one, and `integrity.py:200` reports its
+        verdict beside four checks that can. A gate that always passes is
+        indistinguishable from a gate that is working, which is the same class of
+        defect as the un-fired spoofing guard and the disarmed stop gates.
+
+        It still cannot cross-check what it is not given. The difference is that
+        it now says so: with no training hashes it returns ``None``, which the
+        caller records as *not evaluated* rather than as *passed*. That
+        distinction is the whole of `record.ts:162` — "absence of a failure
+        verdict is not evidence of integrity."
+
+        Returns True (clean), False (contaminated), or None (not evaluated).
         """
-        return True
+        if not train_hashes:
+            return None  # type: ignore[return-value]
+        overlap = set(frozen_test.per_sample_hashes.values()) & set(train_hashes)
+        return not overlap
 
     def _check_telemetry_sane(self, telemetry_path: Path) -> bool:
         """Check 5: parse telemetry.jsonl; validate loss + optional grad_norm.

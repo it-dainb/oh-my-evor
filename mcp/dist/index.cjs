@@ -24564,6 +24564,7 @@ function patchGoalContract(runDir, patch) {
   }
 }
 function registerComputeTools(server) {
+  const MIN_PLAUSIBLE_TEST_ITEMS = 10;
   server.tool(
     "evor_run_start",
     "Launch candidate node as a detached background job. Returns {status, job_id} instantly \u2014 poll progress with evor_run_status.",
@@ -24785,6 +24786,11 @@ function registerComputeTools(server) {
         if (testCount === 0 && valCount === 0) {
           return err2(
             "no data items were found to freeze at the given location \u2014 nothing was captured. The location should directly contain the individual data files (not sub-folders). Point it at the folder that holds the files themselves and try again."
+          );
+        }
+        if (testCount > 0 && testCount < MIN_PLAUSIBLE_TEST_ITEMS) {
+          return err2(
+            `the freeze captured only ${testCount} test item(s) (and ${valCount} val). That is below the ${MIN_PLAUSIBLE_TEST_ITEMS}-item floor for a usable eval set, and it is the signature of freezing a corpus's metadata files rather than its samples \u2014 a directory holding dataset_card.yaml, manifest.json and test.txt yields exactly this shape. Check that --dataset-path points at the samples, or declare the split in _freeze_anchor/eval_manifest_<split>.json.`
           );
         }
         return ok2({ ok: true, ...clean });

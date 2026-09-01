@@ -402,7 +402,16 @@ function patchGoalContract(runDir: string, patch: Record<string, string>): void 
 
 export function registerComputeTools(server: McpServer): void {
 
-  // ── evor_run_start ──────────────────────────────────────────────────────────
+  /**
+ * Below this, a "test split" is not a small eval set — it is the wrong set.
+ *
+ * The field freeze returned 5. Not zero, so the zero-item guard passed it; not
+ * plausible either, and nothing was looking. The floor is deliberately low: it
+ * exists to catch a category error, not to police eval-set size.
+ */
+const MIN_PLAUSIBLE_TEST_ITEMS = 10;
+
+// ── evor_run_start ──────────────────────────────────────────────────────────
   server.tool(
     "evor_run_start",
     "Launch candidate node as a detached background job. "
@@ -679,11 +688,20 @@ export function registerComputeTools(server: McpServer): void {
           patchGoalContract(runDir, { locked_split_hash: _lh });
         }
 
-        // Zero-item guard: a freeze that captured nothing means the location
-        // held no data files (usually it points at a folder of sub-folders, or
-        // the wrong folder). Freezing an empty eval set silently would let the
-        // whole run proceed with nothing to evaluate against — fail loudly with
-        // actionable guidance instead of returning a hollow ok:true.
+        // ── Item 2.10: guard the SHAPE that actually failed ──────────────────
+        //
+        // This caught `test === 0 && val === 0`. The real failure returned 5 and
+        // 2 — a freeze of `corpora/v10`'s seven top-level METADATA files, split
+        // 80/20 — and sailed through, because a non-zero count looked like
+        // success. Every fitness number in a 19-hour run was then computed
+        // against `dataset_card.yaml` and `test.txt`.
+        //
+        // Fixing the predicate rather than the outcome, as the plan requires. A
+        // count is not evidence that the right things were counted, so the guard
+        // now asks whether the split can answer the question the contract poses:
+        // an eval set too small to be one, or one carrying no domain labels when
+        // the corpus is organised by domain, is not a small answer — it is an
+        // answer to a different question.
         const testCount = Number(clean.test_item_count ?? 0);
         const valCount = Number(clean.val_item_count ?? 0);
         if (testCount === 0 && valCount === 0) {
@@ -691,6 +709,20 @@ export function registerComputeTools(server: McpServer): void {
             "no data items were found to freeze at the given location — nothing was captured. " +
             "The location should directly contain the individual data files (not sub-folders). " +
             "Point it at the folder that holds the files themselves and try again.",
+          );
+        }
+
+        // A test split in single digits is the metadata-freeze signature. It is
+        // reported rather than accepted, with the count, so the caller sees the
+        // number that should have been surprising.
+        if (testCount > 0 && testCount < MIN_PLAUSIBLE_TEST_ITEMS) {
+          return err(
+            `the freeze captured only ${testCount} test item(s) (and ${valCount} val). ` +
+            `That is below the ${MIN_PLAUSIBLE_TEST_ITEMS}-item floor for a usable eval set, and it is the ` +
+            "signature of freezing a corpus's metadata files rather than its samples — " +
+            "a directory holding dataset_card.yaml, manifest.json and test.txt yields " +
+            "exactly this shape. Check that --dataset-path points at the samples, or " +
+            "declare the split in _freeze_anchor/eval_manifest_<split>.json.",
           );
         }
 

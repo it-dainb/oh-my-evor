@@ -17,6 +17,7 @@ import os
 import shutil
 import stat
 from datetime import datetime, timezone
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
@@ -121,6 +122,8 @@ class FrozenSplitManager:
             run_dir=run_dir,
             mission_id=mission_id,
             allow_refreeze=allow_refreeze,
+            domains=split_config.get("test_domains"),
+            groups=split_config.get("test_groups"),
         )
         val_split = self._freeze_one(
             split_type="val",
@@ -129,6 +132,8 @@ class FrozenSplitManager:
             run_dir=run_dir,
             mission_id=mission_id,
             allow_refreeze=allow_refreeze,
+            domains=split_config.get("val_domains"),
+            groups=split_config.get("val_groups"),
         )
         return test_split, val_split
 
@@ -140,6 +145,8 @@ class FrozenSplitManager:
         run_dir: Path,
         mission_id: str,
         allow_refreeze: bool = False,
+        domains: dict[str, str] | None = None,
+        groups: dict[str, str] | None = None,
     ) -> FrozenSplit:
         frozen_dir = run_dir / "frozen-splits"
         split_dir = frozen_dir / f"{eval_version}-{split_type}"
@@ -205,6 +212,17 @@ class FrozenSplitManager:
 
         split_hash = _compute_split_hash(per_sample_hashes)
 
+        # ── 2.2: domain counts are COMPUTED here, from what was actually frozen.
+        # Never taken from the caller. A count an agent supplies is a claim about
+        # the split; a count derived from the split is a property of it. Fitness
+        # on this mission is min-over-22-domains, and until now the contract had
+        # no way to name a domain at all — so the aggregation it declared was not
+        # expressible over the split it was handed.
+        per_sample_domains = {k: v for k, v in (domains or {}).items() if k in per_sample_hashes}
+        domain_counts: dict[str, int] = {}
+        for domain_id in per_sample_domains.values():
+            domain_counts[domain_id] = domain_counts.get(domain_id, 0) + 1
+
         split = FrozenSplit(
             split_id=f"{mission_id}-{eval_version}-{split_type}",
             mission_id=mission_id,
@@ -215,6 +233,9 @@ class FrozenSplitManager:
             frozen_at=datetime.now(timezone.utc).isoformat(),
             storage_path=str(storage_path.resolve()),
             eval_version=eval_version,
+            per_sample_domains=per_sample_domains,
+            domain_counts=domain_counts,
+            per_sample_groups={k: v for k, v in (groups or {}).items() if k in per_sample_hashes},
         )
         # Atomic: a reader must never observe a half-written split.
         tmp_path = storage_path.with_suffix(".json.tmp")
@@ -404,25 +425,38 @@ def _cli() -> None:
         dataset_path = Path(args.dataset_path)
         run_dir = Path(args.run_dir)
 
-        # Collect samples from dataset directory (80/20 test/val split)
-        test_entries: dict[str, Any] = {}
-        val_entries: dict[str, Any] = {}
-        if dataset_path.is_dir():
+        # ── 2.1: read the DECLARED split when the corpus declares one ────────
+        #
+        # What stood here took `dataset_path.iterdir()` — the corpus's top-level
+        # files — and split them 80/20. For `corpora/v10` that is
+        # `dataset_card.yaml`, `domains.json`, `frozen_index.json`,
+        # `manifest.json`, `test.txt`, `train.txt`, `val.txt`: SEVEN METADATA
+        # FILES, of which five became "the eval set". It exited 0 and reported
+        # `test_item_count: 5`, and every fitness number in the mission was
+        # computed against it.
+        #
+        # The corpus was never ambiguous. `_freeze_anchor/eval_manifest_test.json`
+        # — written four weeks before the mission — declares 132 items, 22
+        # domains, an image/gt pair per item, a sha256 per file, and per-domain
+        # counts. Nothing read it. AF1's warning is why the fix is here and not
+        # in the leakage check: "the guard is not too weak; it is reasoning over a
+        # representation that cannot carry the distinction it needs to make."
+        split_config: dict[str, Any] = {"mission_id": args.mission_id}
+        declared = _load_declared_splits(dataset_path)
+        if declared:
+            split_config.update(declared)
+        elif dataset_path.is_dir():
             all_files = sorted(
                 f for f in dataset_path.iterdir()
                 if f.is_file() and not f.name.startswith(".")
             )
+            _refuse_if_metadata_only(all_files, dataset_path)
             split_idx = max(1, int(len(all_files) * 0.8))
-            for i, f in enumerate(all_files[:split_idx]):
-                test_entries[str(i)] = f
-            for i, f in enumerate(all_files[split_idx:]):
-                val_entries[str(i)] = f
-
-        split_config: dict[str, Any] = {
-            "mission_id": args.mission_id,
-            "test": test_entries,
-            "val": val_entries,
-        }
+            split_config["test"] = {str(i): f for i, f in enumerate(all_files[:split_idx])}
+            split_config["val"] = {str(i): f for i, f in enumerate(all_files[split_idx:])}
+        else:
+            split_config["test"] = {}
+            split_config["val"] = {}
 
         mgr = FrozenSplitManager()
         test_split, val_split = mgr.freeze_splits(
@@ -438,6 +472,173 @@ def _cli() -> None:
             "val_item_count": val_split.item_count,
         }))
         _sys.exit(0)
+
+
+#: Filenames that DESCRIBE a corpus rather than belong to it.
+#:
+#: Matched by name, not by suffix. Suffix was the first thing tried here and it
+#: was wrong for the same reason the original bug was wrong: a directory of
+#: `sample_000.txt` files is a perfectly good corpus, and refusing it would be a
+#: guard reasoning over a representation that cannot carry the distinction it
+#: needs to make — AF1's warning, repeated by the fix for AF1.
+#:
+#: These specific names are the corpus-manifest vocabulary, and a directory
+#: containing ONLY them is the AF1 signature exactly.
+_METADATA_NAMES = {
+    "dataset_card.yaml", "dataset_card.yml", "domains.json", "manifest.json",
+    "frozen_index.json", "test.txt", "train.txt", "val.txt", "readme.md",
+    "license", "license.txt", "citation.cff",
+}
+
+
+def _refuse_if_metadata_only(files: list[Path], dataset_path: Path) -> None:
+    """Refuse a directory scan that would freeze only metadata (item 2.1).
+
+    The fallback scan is legitimate for a flat directory of samples. It is never
+    legitimate when every file it found is a manifest — that is not a small eval
+    set, it is the wrong set, and returning it as a valid split is how five
+    metadata files became the denominator of every fitness comparison in a
+    19-hour run.
+    """
+    if not files:
+        return
+    if all(f.name.lower() in _METADATA_NAMES for f in files):
+        names = ", ".join(sorted(f.name for f in files)[:8])
+        raise ValueError(
+            f"refusing to freeze {dataset_path}: every file found at the top level is "
+            f"metadata ({names}). These describe the corpus; they are not samples of "
+            f"it. Declare the split in _freeze_anchor/eval_manifest_<split>.json, or "
+            f"point --dataset-path at the directory that holds the samples."
+        )
+
+
+def _load_declared_splits(dataset_path: Path) -> dict[str, Any]:
+    """Read `_freeze_anchor/eval_manifest_{test,val}.json` if the corpus has them.
+
+    Returns entries plus the per-item domain and group metadata the manifest
+    already carries, or {} when there is no anchor to read.
+
+    Item paths are resolved relative to the corpus root and then, failing that,
+    to the repository root — the manifests in the field carry paths like
+    `data/corpora/v10/test/images/000000.png`, which are relative to the project
+    rather than to `--dataset-path`.
+    """
+    anchor = dataset_path / "_freeze_anchor"
+    if not anchor.is_dir():
+        return {}
+
+    out: dict[str, Any] = {}
+    for split in ("test", "val"):
+        manifest = anchor / f"eval_manifest_{split}.json"
+        if not manifest.exists():
+            continue
+        try:
+            data = json.loads(manifest.read_text())
+        except Exception as exc:
+            raise ValueError(f"{manifest} is unreadable: {exc}") from exc
+
+        entries: dict[str, Any] = {}
+        domains: dict[str, str] = {}
+        groups: dict[str, str] = {}
+        unresolved: list[str] = []
+        for i, item in enumerate(data.get("items", [])):
+            key = str(item.get("index", i))
+            resolved = _resolve_item_path(item.get("image"), dataset_path)
+            if resolved is None:
+                resolved = _resolve_item_by_hash(item, dataset_path)
+            if resolved is None:
+                unresolved.append(str(item.get("image")))
+                continue
+            entries[key] = resolved
+            if item.get("domain"):
+                domains[key] = str(item["domain"])
+            # 2.3: the corpus declares source-page lineage under either name.
+            group = item.get("group") or item.get("source_page")
+            if group:
+                groups[key] = str(group)
+
+        out[split] = entries
+        out[f"{split}_domains"] = domains
+        out[f"{split}_groups"] = groups
+
+        # The manifest states its own count. If our reading of it disagrees, the
+        # manifest is not what we think it is — say so rather than freezing a
+        # different number of items than the corpus declares.
+        if unresolved:
+            raise ValueError(
+                f"{manifest} declares {len(data.get('items', []))} items but "
+                f"{len(unresolved)} could not be located by path or by declared "
+                f"sha256 (first: {unresolved[0]!r}). Refusing to freeze a partial "
+                f"split — a smaller eval set is not a smaller answer to the same "
+                f"question, it is an answer to a different one."
+            )
+
+        declared_count = data.get("item_count")
+        if isinstance(declared_count, int) and declared_count != len(entries):
+            raise ValueError(
+                f"{manifest} declares item_count={declared_count} but yields "
+                f"{len(entries)} items. Refusing to freeze a split the corpus does "
+                f"not agree with."
+            )
+    return out
+
+
+def _resolve_item_path(raw: Any, dataset_path: Path) -> Path | None:
+    """Resolve a manifest item path against the plausible roots, or None."""
+    if not raw:
+        return None
+    p = Path(str(raw))
+    if p.is_absolute():
+        return p if p.exists() else None
+    for root in (dataset_path, dataset_path.parent, dataset_path.parent.parent,
+                 dataset_path.parent.parent.parent, Path.cwd()):
+        candidate = root / p
+        if candidate.exists():
+            return candidate
+    # The manifest path may repeat the corpus dir name.
+    if dataset_path.name in p.parts:
+        tail = Path(*p.parts[p.parts.index(dataset_path.name) + 1:])
+        if (dataset_path / tail).exists():
+            return dataset_path / tail
+    return None
+
+
+@lru_cache(maxsize=8)
+def _content_index(dataset_path: Path) -> dict[str, Path]:
+    """sha256 -> path for every file under the corpus.
+
+    Built once per corpus and cached. Roughly a hundred files for a corpus this
+    size; the cost is trivial against freezing the wrong set.
+    """
+    index: dict[str, Path] = {}
+    for f in sorted(dataset_path.rglob("*")):
+        if f.is_file():
+            try:
+                index.setdefault(_sha256_bytes(f.read_bytes()), f)
+            except OSError:
+                continue
+    return index
+
+
+def _resolve_item_by_hash(item: dict[str, Any], dataset_path: Path) -> Path | None:
+    """Find the file the manifest DESCRIBES, wherever it now lives.
+
+    A manifest's authority is the hash, not the path. `corpora/v10`'s anchor was
+    written on 26 July against `test/images/000000.png`; by the time the mission
+    ran, the operator had reorganised the corpus into `eval/test/<domain>__<index>.png`
+    and those paths no longer existed. The declaration was still exactly right
+    about WHICH 132 files constitute the test split — it was only wrong about
+    where they sit.
+
+    Resolving by content makes the manifest survive a reorganisation, and it is
+    STRICTER than resolving by path: a file that has been edited no longer
+    matches its declared hash and is reported missing rather than silently
+    frozen in place of the original.
+    """
+    declared = item.get("sha256_image") or item.get("sha256")
+    if not declared:
+        return None
+    return _content_index(dataset_path).get(str(declared))
 
 
 if __name__ == "__main__":

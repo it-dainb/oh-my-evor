@@ -721,7 +721,15 @@ class IntegrityChecks(BaseEvorModel):
     no_test_leakage: bool
     near_dup_leakage: bool
     data_provenance_valid: bool
-    no_label_contamination: bool
+    no_label_contamination: Optional[bool] = None
+    """True = clean, False = contaminated, None = NOT EVALUATED (item 2.11).
+
+    It was ``bool`` and the check behind it was ``return True`` — so the only
+    value it ever carried was a pass the check could not have withheld. Making
+    "not evaluated" representable is the point: ``record.ts:162`` — "absence of a
+    failure verdict is not evidence of integrity" — cannot be expressed by a type
+    with no way to say *I did not look*.
+    """
     no_eval_shift: bool
     eval_version_consistent: bool
     telemetry_sane: bool
@@ -941,6 +949,30 @@ class FrozenSplit(BaseEvorModel):
     frozen_at: str
     storage_path: str
     eval_version: str
+
+    # ── Item 2.2: domains attach to DATA ────────────────────────────────────
+    # Fitness on this mission is min-over-22-domains and the contract could not
+    # name a domain, so the aggregation it declared was not expressible over the
+    # split it was given. `eval_manifest_test.json` — written four weeks before
+    # the mission — already carried a domain per item; nothing read it.
+    per_sample_domains: dict[str, str] = Field(default_factory=dict)
+    """domain_id keyed by the same sample index as ``per_sample_hashes``."""
+
+    domain_counts: dict[str, int] = Field(default_factory=dict)
+    """Samples per domain, COMPUTED AT FREEZE from the items actually frozen.
+
+    Server-computed, never supplied. A count an agent asserts is a claim about
+    the split; a count derived from the split is a property of it — the
+    ``record.ts:162`` pattern ("absence of a failure verdict is not evidence of
+    integrity") applied to coverage.
+    """
+
+    # ── Item 2.3: per-item source-page lineage ──────────────────────────────
+    # A group key, so a leakage check can ask whether the same SOURCE PAGE
+    # appears in train and test. Mask-sha is not a substitute: it collides within
+    # a split legitimately (132 test items, 128 unique masks). Empty when the
+    # corpus does not declare one — 9.1 is gated on it being populated.
+    per_sample_groups: dict[str, str] = Field(default_factory=dict)
 
 
 # ────────────────────────────────────────────────────────────────────────────
