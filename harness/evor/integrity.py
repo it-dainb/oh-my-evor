@@ -42,6 +42,7 @@ from evor.contracts import (
     IntegrityReport,
     TreeNode,
 )
+from evor.node_identity import resolve_node_artifact
 from evor.freeze import DataProvenanceTracker, FrozenSplitManager
 
 if TYPE_CHECKING:
@@ -211,7 +212,19 @@ class IntegrityGate:
             )
 
         # ── Check 5: telemetry_sane ───────────────────────────────────────
-        telemetry_sane = self._check_telemetry_sane(telemetry_path)
+        # O-01 (item 1.5): the trainer writes `nodes/<slug>/telemetry.jsonl` and
+        # this gate is handed `nodes/<uuid>/telemetry.jsonl`. Neither writer was
+        # wrong; nothing owned the mapping, so the reader guessed — and a guess
+        # that resolves to a non-existent path fails silently in the direction of
+        # "the candidate is bad". `iir-scan-binnet-02` was failed this way with
+        # 12,000 well-formed telemetry records on disk, and that false negative
+        # stood as the run's final verdict.
+        #
+        # `resolve_node_artifact` returns only paths that EXIST, so it can rescue
+        # a misfiled artifact and can never manufacture one: when telemetry is
+        # genuinely absent it returns None and the check fails exactly as before.
+        resolved_telemetry = resolve_node_artifact(telemetry_path, node)
+        telemetry_sane = self._check_telemetry_sane(resolved_telemetry or telemetry_path)
         if not telemetry_sane:
             failures.append(
                 "telemetry_sane: telemetry fails sanity (NaN/Inf loss, constant loss, "
