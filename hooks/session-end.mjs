@@ -55,9 +55,21 @@ try {
   }
 
   // Atomic write: update status to "paused"
+  //
+  // `paused_from` is what makes this edge reversible (plan item 0.7). Without it
+  // the transition is one-way: session-start has no way to know whether a paused
+  // mission was `locked` or `running` before, so it cannot restore it — and
+  // `stop.mjs` exits 0 on `paused`, which means one session ending silences the
+  // entire drift guard for the rest of the mission's life. That was performed in
+  // this repo and never reversed.
+  //
+  // `paused_by` is equally load-bearing on the way back: only a pause this hook
+  // wrote is resumed automatically. An operator who pauses a mission deliberately
+  // has made a decision, and a hook must not undo it on the next session.
   const updated = {
     ...missionState,
     status: 'paused',
+    paused_from: currentStatus || 'locked',
     paused_at: new Date().toISOString(),
     paused_by: 'session-end-hook',
   };
@@ -66,8 +78,9 @@ try {
   const tmp = missionStatePath + '.tmp.' + randomBytes(4).toString('hex');
   writeFileSync(tmp, JSON.stringify(updated, null, 2), 'utf8');
   renameSync(tmp, missionStatePath);
-} catch {
+} catch (err) {
   // Fail-open — session end must never be delayed by a failed hook
+  try { process.stderr.write(`[EVOR] session-end: ${err}\n`); } catch { /* stderr gone */ }
 }
 
 process.exit(0);

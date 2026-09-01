@@ -292,6 +292,43 @@ if (!runId) {
   clearEnvAndExit('active-run.json missing run_id — clearing session env');
 }
 
+// ── §0.7: the `paused → prior` recovery edge ─────────────────────────────────
+// session-end writes `status: "paused"` when a session ends with an active run.
+// Nothing wrote it back. `stop.mjs` exits 0 on `paused`, so a single session
+// ending disabled the drift guard permanently — the mission stayed technically
+// alive and completely ungoverned. The state machine had an edge in and no edge
+// out, which is why this is a live bug rather than a redesign item.
+//
+// Restored only when THIS pair of hooks made the transition (`paused_by ===
+// 'session-end-hook'`) and only to the state recorded in `paused_from`. An
+// operator pause is a decision; a hook must not reverse it. A pause written
+// before `paused_from` existed carries no origin, so it is left alone rather
+// than guessed at.
+function resumeIfHookPaused(dir) {
+  try {
+    const msPath = join(dir, 'mission-state.json');
+    if (!existsSync(msPath)) return;
+    const ms = JSON.parse(readFileSync(msPath, 'utf8'));
+    if (String(ms?.status ?? '') !== 'paused') return;
+    if (ms?.paused_by !== 'session-end-hook') return;
+    const from = String(ms?.paused_from ?? '');
+    if (!['locked', 'running'].includes(from)) return;
+    const updated = {
+      ...ms,
+      status: from,
+      resumed_at: new Date().toISOString(),
+      resumed_by: 'session-start-hook',
+      resumed_from_pause_at: ms?.paused_at ?? null,
+    };
+    delete updated.paused_from;
+    writeFileSync(msPath, JSON.stringify(updated, null, 2), 'utf8');
+    process.stderr.write(`[EVOR] mission resumed: paused -> ${from}\n`);
+  } catch (err) {
+    // Fail-open — a session must start even if the edge cannot be drawn.
+    try { process.stderr.write(`[EVOR] session-start resume failed: ${err}\n`); } catch { /* stderr gone */ }
+  }
+}
+
 const runDir = missionId
   ? join(evorRoot, 'runs', missionId, runId)
   : join(evorRoot, 'runs', runId);
@@ -335,6 +372,8 @@ if (missionId) {
 
 // Inject <evor-restore> block so a fresh session re-hydrates from disk.
 // (PostCompact handles the re-inject after context compaction — this covers new sessions only.)
+resumeIfHookPaused(runDir);
+
 const restoreBlock = buildEvorRestore(runDir, runId, missionId);
 if (restoreBlock) {
   output.message += `\n\n${restoreBlock}`;
