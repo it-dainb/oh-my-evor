@@ -21565,6 +21565,88 @@ var SignalSchema = external_exports.object({
   first_seen: ISODate,
   last_seen: ISODate
 });
+var RunStatusSchema = external_exports.enum([
+  "initialized",
+  "running",
+  "paused",
+  "completed",
+  "failed"
+]);
+var MissionStatusSchema = external_exports.enum([
+  "draft",
+  "locked",
+  "running",
+  "paused",
+  "completed",
+  "failed",
+  "superseded"
+]);
+var StepStatusSchema = external_exports.enum(["pending", "running", "done", "failed"]);
+var TICK_FINAL_STEP = 9;
+var CampaignSchema = external_exports.object({
+  campaign_id: external_exports.string(),
+  objective: external_exports.string(),
+  created_at: ISODate,
+  /** Attempt ids in the order they were made. */
+  attempt_ids: external_exports.array(external_exports.string()),
+  status: MissionStatusSchema
+});
+var MissionAttemptSchema = external_exports.object({
+  attempt_id: external_exports.string(),
+  campaign_id: external_exports.string(),
+  mission_id: external_exports.string(),
+  /** 1-based; r3 is attempt 3. */
+  ordinal: external_exports.number().int().positive(),
+  started_at: ISODate,
+  ended_at: ISODate.nullable().default(null),
+  /**
+   * Why this attempt ended, recorded WHEN it ended. K-08's supersession reason
+   * was reconstructed afterwards by a human editing JSON in vim, because there
+   * was no field to write it into at the time.
+   */
+  outcome_reason: external_exports.string().nullable().default(null),
+  supersedes_attempt_id: external_exports.string().nullable().default(null)
+});
+var MissionSchema = external_exports.object({
+  mission_id: external_exports.string(),
+  campaign_id: external_exports.string().nullable().default(null),
+  status: MissionStatusSchema,
+  created_at: ISODate,
+  updated_at: ISODate,
+  /** Set when status is `paused` — the origin the pause is walked back to (0.7). */
+  paused_from: MissionStatusSchema.nullable().default(null),
+  paused_at: ISODate.nullable().default(null),
+  paused_by: external_exports.string().nullable().default(null)
+});
+var RunSchema = external_exports.object({
+  run_id: external_exports.string(),
+  mission_id: external_exports.string(),
+  status: RunStatusSchema,
+  tick_count: external_exports.number().int().min(0),
+  frontier_ids: external_exports.array(external_exports.string()),
+  best_score: external_exports.number().nullable().default(null),
+  current_eval_version: external_exports.string().default("v1"),
+  pending_node_ids: external_exports.array(external_exports.string()).default([]),
+  /**
+   * The validated state root, established once at lock time (1.3). Every hook
+   * re-derived this independently from `CLAUDE_PLUGIN_ROOT ?? process.cwd()`,
+   * and when both were wrong all 14 of them read a different project's `.evor/`
+   * for 19 hours without one noticing (Q-01).
+   */
+  state_root: external_exports.string().nullable().default(null),
+  started_at: ISODate.nullable().default(null),
+  ended_at: ISODate.nullable().default(null)
+});
+var TickSchema = external_exports.object({
+  tick: external_exports.number().int().min(0),
+  run_id: external_exports.string(),
+  current_step: external_exports.number().int().min(0).max(TICK_FINAL_STEP),
+  step_status: StepStatusSchema,
+  pending_subagent_ids: external_exports.array(external_exports.string()).default([]),
+  /** Set while the tick waits on something it does not own (2b.3). */
+  blocked: external_exports.object({ on: external_exports.string(), since: ISODate }).nullable().default(null),
+  started_at: ISODate.nullable().default(null)
+});
 
 // src/tree-store.ts
 var import_fs3 = require("fs");

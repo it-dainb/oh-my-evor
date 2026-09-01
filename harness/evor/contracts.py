@@ -1472,3 +1472,157 @@ ALL_MODELS: dict[str, type[BaseModel]] = {
     "BaselineCandidate": BaselineCandidate,
     "StartingPointReport": StartingPointReport,
 }
+
+
+# ────────────────────────────────────────────────────────────────────────────
+# Lifecycle domain model (plan item 1.1)
+#
+# AF6: 58 contract models and not one of them was a Mission, a Run or a Tick.
+# The three things this system actually IS had no type — they lived as untyped
+# keys in JSON blobs written by a merge-patch that accepted anything.
+#
+# Field names and enum members match mcp/src/contracts.ts exactly. They are the
+# same entities read from two languages, and a divergence here is a divergence
+# nobody would see until a run behaved differently depending on which side wrote
+# last.
+# ────────────────────────────────────────────────────────────────────────────
+
+#: The 9-step tick loop. One definition of where the end is.
+TICK_FINAL_STEP = 9
+
+RunStatus = Literal["initialized", "running", "paused", "completed", "failed"]
+"""A run's lifecycle.
+
+``initialized`` is what a run reports before it has recorded anything, including
+when its state file is missing or unreadable (1.4). There is deliberately no
+member meaning "probably running": absence is not liveness.
+"""
+
+MissionStatus = Literal[
+    "draft", "locked", "running", "paused", "completed", "failed", "superseded"
+]
+"""A mission's lifecycle.
+
+``locked`` is included because the mission genuinely occupies that state for the
+whole of an active run. What the MCP patch schema withholds is the ability to
+*patch* into it, which is an ownership rule rather than a claim the state does
+not exist — conflating the two left ``locked`` undescribable.
+"""
+
+StepStatus = Literal["pending", "running", "done", "failed"]
+"""A tick's step lifecycle. Distinct from run status; the two were often confused."""
+
+
+class Campaign(BaseEvorModel):
+    """One goal pursued across attempts.
+
+    r1 -> r2 -> r3 were three attempts at a single objective and the model had no
+    word for that, so each looked like an unrelated mission that happened to
+    share a name. Every question worth asking about the field run is a question
+    about a campaign.
+    """
+
+    model_config = ConfigDict(strict=True, exclude_none=True)
+
+    campaign_id: str
+    objective: str
+    created_at: str
+    attempt_ids: list[str] = Field(default_factory=list)
+    status: MissionStatus
+
+
+class MissionAttempt(BaseEvorModel):
+    """One attempt at a campaign's objective — what r1, r2 and r3 each were."""
+
+    model_config = ConfigDict(strict=True, exclude_none=True)
+
+    attempt_id: str
+    campaign_id: str
+    mission_id: str
+    ordinal: int
+    """1-based; r3 is attempt 3."""
+    started_at: str
+    ended_at: Optional[str] = None
+    outcome_reason: Optional[str] = None
+    """Why this attempt ended, recorded WHEN it ended.
+
+    K-08's supersession reason was reconstructed afterwards by a human editing
+    JSON in vim, because there was no field to write it into at the time.
+    """
+    supersedes_attempt_id: Optional[str] = None
+
+
+class Mission(BaseEvorModel):
+    model_config = ConfigDict(strict=True, exclude_none=True)
+
+    mission_id: str
+    campaign_id: Optional[str] = None
+    status: MissionStatus
+    created_at: str
+    updated_at: str
+    paused_from: Optional[MissionStatus] = None
+    """Set when status is ``paused`` — the origin the pause is walked back to (0.7)."""
+    paused_at: Optional[str] = None
+    paused_by: Optional[str] = None
+
+
+class Run(BaseEvorModel):
+    model_config = ConfigDict(strict=True, exclude_none=True)
+
+    run_id: str
+    mission_id: str
+    status: RunStatus
+    tick_count: int = 0
+    frontier_ids: list[str] = Field(default_factory=list)
+    best_score: Optional[float] = None
+    current_eval_version: str = "v1"
+    pending_node_ids: list[str] = Field(default_factory=list)
+    state_root: Optional[str] = None
+    """The validated state root, established once at lock time (1.3).
+
+    Every hook re-derived this independently from ``CLAUDE_PLUGIN_ROOT or
+    cwd``, and when both were wrong all 14 read a different project's ``.evor/``
+    for 19 hours without one noticing (Q-01).
+    """
+    started_at: Optional[str] = None
+    ended_at: Optional[str] = None
+
+
+class Tick(BaseEvorModel):
+    model_config = ConfigDict(strict=True, exclude_none=True)
+
+    tick: int = Field(ge=0)
+    run_id: str
+    current_step: int = Field(default=0, ge=0, le=TICK_FINAL_STEP)
+    """Bounded, to match ``TickSchema.current_step`` in contracts.ts.
+
+    Without the bound the two languages disagreed about what a valid tick is —
+    the TypeScript side rejected step 10 and the Python side accepted it, so the
+    same object was valid or invalid depending on which half validated it.
+    """
+    step_status: StepStatus = "pending"
+    pending_subagent_ids: list[str] = Field(default_factory=list)
+    blocked_on: Optional[str] = None
+    """Set while the tick waits on something it does not own (2b.3)."""
+    blocked_since: Optional[str] = None
+    started_at: Optional[str] = None
+
+
+def is_tick_finished(current_step: int, step_status: str) -> bool:
+    """Is this tick finished? (Plan item 1.2.)
+
+    ONE definition. The predicate was re-derived in five places across three
+    languages: ``stop.mjs:379`` had ``finished = step >= 9`` while
+    ``tree.py:894`` defaulted the other way, and you cannot tune your way out of
+    two disagreeing defaults.
+
+    Reaching the last step is not finishing it. The final r3 tick sat at step 9
+    with ``step_status="running"`` and a failed integrity verdict, and
+    ``step >= 9`` alone called that done.
+    """
+    return current_step >= TICK_FINAL_STEP and step_status == "done"
+
+
+def is_run_active(status: Optional[str]) -> bool:
+    """Is this run live — may a governance check still hold on its behalf?"""
+    return status == "running"
