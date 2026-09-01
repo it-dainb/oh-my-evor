@@ -22527,18 +22527,24 @@ var import_fs6 = require("fs");
 var import_path7 = require("path");
 
 // src/tool-result.ts
-function wrap(payload) {
-  return { content: [{ type: "text", text: JSON.stringify(payload) }] };
+function wrap(payload, isError = false) {
+  const result = { content: [{ type: "text", text: JSON.stringify(payload) }] };
+  if (isError) result.isError = true;
+  return result;
 }
 function ok(data) {
   if (data === void 0 || data === null) return wrap({ ok: true });
   if (typeof data === "object" && !Array.isArray(data)) {
-    return wrap({ ok: true, ...data });
+    const payload = data;
+    if (payload.ok === false) {
+      return wrap(payload, true);
+    }
+    return wrap({ ok: true, ...payload });
   }
   return wrap({ ok: true, data });
 }
 function err(message) {
-  return wrap({ ok: false, error: message });
+  return wrap({ ok: false, error: message }, true);
 }
 
 // src/tools/wiki.ts
