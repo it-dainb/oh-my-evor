@@ -66,6 +66,9 @@ try {
  */
 let pendingNameStrip = null;
 
+/** §4.3: constraints to graft onto a generic child's prompt, applied last. */
+let pendingPromptInherit = null;
+
 function deny(reason, meta = {}) {
   logDecision({ verdict: 'deny', reason, ...meta });
   // Item 4.8: a denial is evidence that an agent wants something it cannot have
@@ -260,6 +263,42 @@ try {
   }
 
 
+  // ── §4.3: a generic spawn inherits its spawner's constraints ──────────────
+  //
+  // `PARENT` and every role rule key on `evor-*`. A `general-purpose` sub-agent
+  // matches none of them, so an identical prompt re-issued under that type was
+  // ungoverned — and that became the standing pattern: one agent reported
+  // "BLOCKED on authoring … I did not route around it", and 51 seconds later the
+  // orchestrator re-issued the same edit as `subagent_type: "claude"` and it
+  // succeeded, four more times after that.
+  //
+  // The path rules already apply to every agent type (H-01, closed by §0.2/0.3),
+  // so the WRITE route is shut. What remains is the role rules — research gates,
+  // artifact slots — which a generic child genuinely escapes because nothing
+  // tells it what its parent could not do.
+  //
+  // So tell it. `updatedInput` prepends the spawner's constraints to the child's
+  // prompt, which is the only channel a hook has into an agent that does not
+  // exist yet. This is inheritance by construction rather than by matcher, and
+  // it does not pretend to be enforcement: it is `additionalContext` doing the
+  // job prose in an agent file was doing badly.
+  const GENERIC_SPAWNS = new Set(['claude', 'general-purpose', 'workspace-scout', 'Explore', 'Plan']);
+  if ((tool === 'Task' || tool === 'Agent') && GENERIC_SPAWNS.has(String(ti?.subagent_type ?? '')) && agentType) {
+    const inherited = [
+      `You were spawned by \`${agentType}\`, and you inherit its constraints.`,
+      `You may not write to the plugin install, to \`.evor/runs/**\` state artifacts, or to the enforcement layer.`,
+      agentType === 'evor-mutagen'
+        ? `You may not gather evidence: no web search, no citation lookup. That is Sage's job.`
+        : null,
+      /^evor-(?!forge-junior)/.test(agentType)
+        ? `You may not author \`.py\` candidate code or run training; only evor-forge-junior does that.`
+        : null,
+      `If you cannot proceed within these, say so and stop — do not route around them.`,
+    ].filter(Boolean).join(' ');
+
+    pendingPromptInherit = { inherited, spawnType: String(ti.subagent_type), parent: agentType };
+  }
+
   if ((tool === 'Task' || tool === 'Agent') && spawnType) {
     const PARENT = {
       'evor-sage-junior': 'evor-sage',
@@ -290,6 +329,27 @@ try {
         `[EVOR GOVERNOR] evor-acquirer may be spawned only by Forge (enrich-train), Evor, or ` +
           `evor-tick (harden-test). ${agentType || 'this agent'} must not spawn it.`
       );
+    }
+  }
+
+  // ── §4.7: read-only exploration for evor-tick ─────────────────────────────
+  //
+  // evor-tick is denied Bash, so when it needed to find a file it spawned a
+  // `general-purpose` agent to run `find` — a whole sub-agent, its own context
+  // and its own turn, to list a directory. That is a denial producing a more
+  // expensive version of the same act, which is Lane J's backfire pattern, and
+  // it also put an ungoverned generic agent into the tree (see 4.3).
+  //
+  // Read-only shell touches nothing. It is allowed here explicitly, and narrowly:
+  // an anchored allowlist of inspection commands, no redirection, no `&&`, no
+  // pipes into anything that writes. Everything else still falls through to the
+  // rules below, and §0.2's path gate still decides any command that writes.
+  if (agentType === 'evor-tick' && tool === 'Bash') {
+    const READ_ONLY_SHELL =
+      /^\s*(ls|find|stat|file|wc|head|tail|cat|grep|rg|realpath|basename|dirname|du|df|pwd|echo)\b[^;&|><`$]*$/;
+    if (READ_ONLY_SHELL.test(cmd)) {
+      logDecision({ verdict: 'allow', rule: 'tick-read-only-shell', tool, agentType, target: cmd.slice(0, 120) });
+      process.exit(0);
     }
   }
 
@@ -767,6 +827,28 @@ try {
 // Reached only if no rule above denied or asked. Emitting earlier would let a
 // repair short-circuit the guards, which is how a fix becomes a bypass.
 try {
+  if (pendingPromptInherit && !pendingNameStrip) {
+    const ti2 = input?.tool_input ?? {};
+    logDecision({
+      verdict: 'allow',
+      rule: 'generic-spawn-inherits',
+      spawnType: pendingPromptInherit.spawnType,
+      parent: pendingPromptInherit.parent,
+    });
+    process.stdout.write(
+      JSON.stringify({
+        hookSpecificOutput: {
+          hookEventName: 'PreToolUse',
+          updatedInput: {
+            ...ti2,
+            prompt: `${pendingPromptInherit.inherited}\n\n${String(ti2.prompt ?? '')}`,
+          },
+        },
+      }) + '\n'
+    );
+    process.exit(0);
+  }
+
   if (pendingNameStrip) {
     const { name: _dropped, ...withoutName } = input?.tool_input ?? {};
     logDecision({

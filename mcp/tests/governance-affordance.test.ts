@@ -172,3 +172,69 @@ describe("§4.9 — the two irreversible decisions ask, rather than deny or allo
     expect(hook.permissionDecision).not.toBe("ask");
   });
 });
+
+describe("§4.7 — read-only exploration is not a reason to spawn an agent", () => {
+  const tick = (command: string) =>
+    call({ tool_name: "Bash", agent_type: "oh-my-evor:evor-tick", tool_input: { command } });
+
+  for (const cmd of ["find . -name '*.json'", "ls -la nodes/", "wc -l tree.json", "grep -rn TODO src/"]) {
+    it(`allows evor-tick: ${cmd}`, () => {
+      // Denied Bash, evor-tick spawned a whole general-purpose agent to run
+      // `find` — a denial producing a more expensive version of the same act,
+      // and an ungoverned generic agent in the tree as a side effect.
+      expect(tick(cmd).hook.permissionDecision).not.toBe("deny");
+    });
+  }
+
+  it("does not become a write channel", () => {
+    // The allowlist is anchored and excludes redirection, `&&`, pipes and
+    // substitution, so it cannot be used to smuggle a write past §0.2.
+    for (const cmd of ["cat x > /etc/passwd", "ls && rm -rf nodes", "echo hi | tee out.json"]) {
+      const d = tick(cmd).hook.permissionDecision;
+      expect(d === "deny" || d === undefined).toBe(true);
+    }
+  });
+});
+
+describe("§4.3 — a generic spawn inherits its spawner's constraints", () => {
+  it("grafts the constraints onto the child's prompt", () => {
+    // One agent reported "BLOCKED on authoring … I did not route around it", and
+    // 51 seconds later the orchestrator re-issued the identical edit as
+    // `subagent_type: "claude"` and it succeeded — four more times after that.
+    const { hook } = call({
+      tool_name: "Task",
+      agent_type: "oh-my-evor:evor-mutagen",
+      tool_input: { subagent_type: "general-purpose", prompt: "go find the frontier" },
+    });
+    expect(hook.updatedInput).toBeDefined();
+    expect(hook.updatedInput.prompt).toMatch(/inherit its constraints/i);
+    expect(hook.updatedInput.prompt).toMatch(/go find the frontier/);
+  });
+
+  it("the inherited text is specific to the spawner", () => {
+    const asMutagen = call({
+      tool_name: "Task",
+      agent_type: "oh-my-evor:evor-mutagen",
+      tool_input: { subagent_type: "claude", prompt: "x" },
+    }).hook.updatedInput.prompt;
+    // Mutagen never researches; a child of Mutagen must not either.
+    expect(asMutagen).toMatch(/may not gather evidence/i);
+  });
+
+  it("an evor-to-evor spawn is not rewritten — those already have rules", () => {
+    const { hook } = call({
+      tool_name: "Task",
+      agent_type: "oh-my-evor:evor-tick",
+      tool_input: { subagent_type: "oh-my-evor:evor-sage", prompt: "x" },
+    });
+    expect(hook.updatedInput).toBeUndefined();
+  });
+
+  it("a top-level generic spawn is untouched — there is no parent to inherit from", () => {
+    const { hook } = call({
+      tool_name: "Task",
+      tool_input: { subagent_type: "general-purpose", prompt: "x" },
+    });
+    expect(hook.updatedInput).toBeUndefined();
+  });
+});
