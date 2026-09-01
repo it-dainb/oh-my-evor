@@ -1,0 +1,149 @@
+{
+  "$comment": [
+    "The lifecycle transition table — plan item 3.1. THE FORMAT IS THE AUTHORITY.",
+    "",
+    "AF3 §4.3, following RC3: 'the lock became a TypeScript implementation detail",
+    "rather than a property of the on-disk format. There was never one owner of the",
+    "on-disk format - only of the schemas.' Three languages read this state (Python",
+    "harness, TS MCP server, JS hooks), and hooks/session-end.mjs is a confirmed",
+    "third-language writer of mission-state.json. An FSM implemented in Python is",
+    "invisible to stop.mjs, which is the component whose wrong predicate caused",
+    "C-02 - implementing it in one language and letting the others re-derive is the",
+    ".tree.lock mistake verbatim.",
+    "",
+    "So the table is DATA, versioned and diffable, and each language ships a small",
+    "reader over it. Deliberately not python-statemachine: class syntax that",
+    "stop.mjs and state.ts cannot read structurally recreates RC3.",
+    "",
+    "ENFORCEMENT is the MCP write path only (single writer). Hooks are READERS -",
+    "they ask 'is this state terminal / stale?' rather than hard-coding it. AF3",
+    "risk 2: stop.mjs has five deliberate fail-open catches, so a guard evaluated",
+    "in a hook is a suggestion. Guards are enforced at the writer, advisory at the",
+    "readers, and saying so here is what keeps the two from drifting.",
+    "",
+    "max_dwell_s is item 3.3. It gives the system the predicate it never had -",
+    "'is this still alive?' becomes now - entered_at > max_dwell_s, computable by",
+    "any reader in any language from the file alone, with no event. null means a",
+    "state may be occupied indefinitely."
+  ],
+  "version": 1,
+  "machines": {
+    "mission": {
+      "initial": "draft",
+      "terminal": ["completed", "failed", "superseded"],
+      "states": {
+        "draft": {
+          "max_dwell_s": null,
+          "on": {
+            "lock": { "to": "locked", "guard": "contract_validated" },
+            "abandon": { "to": "failed" }
+          }
+        },
+        "locked": {
+          "max_dwell_s": null,
+          "on": {
+            "start_run": { "to": "running" },
+            "pause": { "to": "paused" },
+            "abandon": { "to": "failed" },
+            "supersede": { "to": "superseded" }
+          }
+        },
+        "running": {
+          "max_dwell_s": 86400,
+          "on": {
+            "pause": { "to": "paused" },
+            "complete": { "to": "completed" },
+            "fail": { "to": "failed" },
+            "supersede": { "to": "superseded" },
+            "run_ended": { "to": "locked" }
+          }
+        },
+        "paused": {
+          "$comment": [
+            "Item 0.7 lives here. `paused` had an edge in and no edge out, and",
+            "stop.mjs exits 0 on it - so ONE session ending disabled the drift",
+            "guard for the rest of the mission's life. The mission stayed",
+            "technically alive and completely ungoverned. Both resume edges are",
+            "asserted in mcp/tests/pause-recovery-edge.test.ts; if Phase 3 rebuilt",
+            "the machine without them the Phase 0 fix would be silently dropped."
+          ],
+          "max_dwell_s": null,
+          "on": {
+            "resume_locked": { "to": "locked" },
+            "resume_running": { "to": "running" },
+            "complete": { "to": "completed" },
+            "fail": { "to": "failed" },
+            "supersede": { "to": "superseded" }
+          }
+        },
+        "completed": { "max_dwell_s": null, "on": {} },
+        "failed": { "max_dwell_s": null, "on": {} },
+        "superseded": { "max_dwell_s": null, "on": {} }
+      }
+    },
+    "run": {
+      "initial": "initialized",
+      "terminal": ["completed", "failed"],
+      "states": {
+        "initialized": {
+          "$comment": "1.4: what a run reports before it has recorded anything, including when its state file is missing or unreadable. There is deliberately no state meaning 'probably running'.",
+          "max_dwell_s": 3600,
+          "on": {
+            "start": { "to": "running" },
+            "fail": { "to": "failed" }
+          }
+        },
+        "running": {
+          "max_dwell_s": 21600,
+          "on": {
+            "pause": { "to": "paused" },
+            "complete": { "to": "completed" },
+            "fail": { "to": "failed" }
+          }
+        },
+        "paused": {
+          "max_dwell_s": null,
+          "on": {
+            "resume": { "to": "running" },
+            "complete": { "to": "completed" },
+            "fail": { "to": "failed" }
+          }
+        },
+        "completed": { "max_dwell_s": null, "on": {} },
+        "failed": { "max_dwell_s": null, "on": {} }
+      }
+    },
+    "tick": {
+      "initial": "pending",
+      "terminal": ["done", "failed"],
+      "states": {
+        "pending": {
+          "max_dwell_s": 1800,
+          "on": {
+            "start": { "to": "running" },
+            "fail": { "to": "failed" }
+          }
+        },
+        "running": {
+          "$comment": "K-09: the final r3 tick sat here, at step 9, for hours. max_dwell_s is what makes that observable from the file alone.",
+          "max_dwell_s": 7200,
+          "on": {
+            "block": { "to": "blocked" },
+            "finish": { "to": "done", "guard": "integrity_not_failed" },
+            "fail": { "to": "failed" }
+          }
+        },
+        "blocked": {
+          "$comment": "Item 2b.3. Naming the wait is ours; blocking is a host affordance. A tick waiting on something it does not own was previously indistinguishable from one making progress.",
+          "max_dwell_s": 3600,
+          "on": {
+            "unblock": { "to": "running" },
+            "fail": { "to": "failed" }
+          }
+        },
+        "done": { "max_dwell_s": null, "on": {} },
+        "failed": { "max_dwell_s": null, "on": {} }
+      }
+    }
+  }
+}

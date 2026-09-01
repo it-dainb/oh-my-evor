@@ -8,13 +8,14 @@
  * evor_check_stop        — server-side stop verdict by StopCondition type (Area 4)
  */
 
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "fs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "fs";
 import { join } from "path";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { GoalContractSchema, StrategyStateSchema } from "../contracts.js";
 import { resolveRunPaths, ensureRunDirs, getActiveRunPath, getEvorRoot } from "../run-store.js";
 import { readRunState, writeRunState } from "./record.js";
+import { assertReachable, initialState } from "../fsm.js";
 import { callPythonModule } from "../subprocess-bridge.js";
 
 // ── Tick-state schema (spec §15B) ──────────────────────────────────────────
@@ -63,6 +64,14 @@ export const RunStatePatchSchema = z.object({
     .describe(
       "Mission lifecycle state (draft, locked, running, paused, completed, failed). " +
       "If set, patches the mission's status (gate: draft→locked requires contract validation).",
+    ),
+  reason: z
+    .string()
+    .optional()
+    .describe(
+      "Why this transition is being made. Recorded in transitions.jsonl at the moment " +
+      "of the write, never backfilled. K-08's supersession reason had to be reconstructed " +
+      "afterwards by a human editing JSON in vim, because nothing captured it when it happened.",
     ),
   active_run: z
     .object({
@@ -153,6 +162,24 @@ export function stateRead(runId: string, missionId?: string): Record<string, unk
 }
 
 /**
+ * Append one transition to `<runDir>/transitions.jsonl` — the audit layer of 3.1.
+ *
+ * Best-effort: an unwritable audit log must not fail the write it describes. The
+ * log is evidence, not a gate, and turning it into one would make the state
+ * machine less available than the thing it governs.
+ */
+function appendTransition(runDir: string, record: Record<string, unknown>): void {
+  try {
+    appendFileSync(
+      join(runDir, "transitions.jsonl"),
+      JSON.stringify({ at: new Date().toISOString(), ...record }) + "\n",
+    );
+  } catch {
+    // best-effort by design — see above
+  }
+}
+
+/**
  * Merge patch fields into run-state.json.
  *
  * Extended side-effects (each conditional):
@@ -172,6 +199,9 @@ export function stateWrite(
   const {
     strategy: strategyDelta,
     mission_status: missionStatus,
+    // Destructured so the reason lands in transitions.jsonl and NOT in
+    // run-state.json — it explains one edge, it is not run state.
+    reason: patchReason,
     active_run: activeRun,
     tick_state: tickState,
     prediction_bias_sample: biasSample,
@@ -236,11 +266,40 @@ export function stateWrite(
         // corrupt mission-state.json — start fresh
       }
     }
+    // ── 3.1: ENFORCEMENT. The MCP write path is the single writer, and this
+    // is where an illegal edge is refused. Readers (hooks) interpret the same
+    // table but never police it: `stop.mjs` has five deliberate fail-open
+    // catches, so a guard evaluated there is a suggestion, and AF3 risk 2 is
+    // that not saying so lets the two drift.
+    //
+    // Before this, a writer set `status` to whatever it liked. Three status
+    // fields disagreed in the field simultaneously (O-05) and nothing reported
+    // it, because there was nothing to disagree WITH — no table said which
+    // values were reachable from which.
+    const from = String(ms.status ?? initialState("mission"));
+    assertReachable("mission", from, missionStatus);
+
     ms.status = missionStatus;
     ms.updated_at = new Date().toISOString();
+    // 3.3: every state carries when it was entered, so "is this still alive?"
+    // becomes arithmetic any reader in any language can do from the file alone.
+    // That one field is what makes C-01, K-09 and C-03 observable at all.
+    ms.entered_at = ms.updated_at;
     const msTmp = `${missionStatePath}.tmp`;
     writeFileSync(msTmp, JSON.stringify(ms, null, 2), "utf8");
     renameSync(msTmp, missionStatePath);
+
+    // 3.1 audit: append-only, with a CONTEMPORANEOUS reason. K-08's supersession
+    // reason had to be reconstructed afterwards by a human editing JSON in vim,
+    // because nothing recorded why a transition happened when it happened.
+    appendTransition(paths.runDir, {
+      entity: "mission",
+      entity_id: missionId ?? String(ms.mission_id ?? ""),
+      from,
+      to: missionStatus,
+      actor: "evor_state_write",
+      reason: typeof patchReason === "string" ? patchReason : null,
+    });
   }
 
   // If active_run is provided, write <evor_root>/active-run.json atomically.
