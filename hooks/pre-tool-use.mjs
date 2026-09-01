@@ -32,7 +32,7 @@ import { readFileSync } from 'fs';
 import { resolveActiveRun } from './lib/active-run.mjs';
 import { resolveWriteTargets } from './lib/write-targets.mjs';
 import { classifyWriteTarget, selfPatchAllowed } from './lib/protected-paths.mjs';
-import { logDecision, logError, logSkip } from './lib/audit.mjs';
+import { emitDenialSignal, logDecision, logError, logSkip } from './lib/audit.mjs';
 
 // ── Kill switches ─────────────────────────────────────────────────────────────
 if (process.env.DISABLE_EVOR) process.exit(0);
@@ -60,8 +60,24 @@ try {
   process.exit(0); // fail-open
 }
 
+/**
+ * A repair the governor wants to apply IF nothing denies first (item 4.4).
+ * Applied at the very end, after every deny rule has had its chance.
+ */
+let pendingNameStrip = null;
+
 function deny(reason, meta = {}) {
   logDecision({ verdict: 'deny', reason, ...meta });
+  // Item 4.8: a denial is evidence that an agent wants something it cannot have
+  // — either a rule that is wrong or an affordance that is missing. The field
+  // run's top rule fired 82 times and produced no data at all.
+  emitDenialSignal({
+    rule: meta.rule,
+    tool: meta.tool ?? input?.tool_name,
+    target: meta.target,
+    agentType: input?.agent_type,
+    reason,
+  });
   process.stdout.write(
     JSON.stringify({
       hookSpecificOutput: {
@@ -72,6 +88,50 @@ function deny(reason, meta = {}) {
     }) + '\n'
   );
   process.exit(0);
+}
+
+// ── §4.9: `ask` for the two genuinely irreversible decisions ────────────────
+//
+// AF5 gap 4. `deny` is wrong for these and so is `allow`. A refreeze replaces
+// the denominator of every fitness comparison already recorded, and raising a
+// sealed threshold changes what "passing" meant retroactively — both are
+// decisions a human should make, and neither is one the governor can make well.
+//
+// Note `ask` fails CLOSED headless, so under an unattended run it degrades to
+// deny. For exactly these two that is the safe direction: an unattended mission
+// that cannot ask should not refreeze.
+try {
+  const toolNameA = input?.tool_name ?? '';
+  const tiA = input?.tool_input ?? {};
+  const argsText = JSON.stringify(tiA ?? {});
+
+  const wantsRefreeze = /"allow_refreeze"\s*:\s*true/.test(argsText) || /--allow-refreeze\b/.test(String(tiA?.command ?? ''));
+  const wantsThresholdChange =
+    /(^|_)evor_seal_eval_script$/.test(toolNameA) === false &&
+    /"(target_value|baseline_value|threshold)"\s*:/.test(argsText) &&
+    /(^|_)evor_(update_contract|state_write)$/.test(toolNameA);
+
+  if (wantsRefreeze || wantsThresholdChange) {
+    const what = wantsRefreeze
+      ? 'Re-freezing replaces the denominator of every fitness comparison already recorded in this run.'
+      : 'Changing a sealed threshold changes what "passing" meant for every candidate already scored.';
+    logDecision({ verdict: 'ask', rule: wantsRefreeze ? 'refreeze' : 'sealed-threshold', tool: toolNameA });
+    process.stdout.write(
+      JSON.stringify({
+        hookSpecificOutput: {
+          hookEventName: 'PreToolUse',
+          permissionDecision: 'ask',
+          permissionDecisionReason:
+            `[EVOR GOVERNOR] ${what} This is a decision for the operator, not for the ` +
+            `governor and not for the agent that benefits from it. Approve only if ` +
+            `replacing the comparison basis is intended.`,
+        },
+      }) + '\n'
+    );
+    process.exit(0);
+  }
+} catch (err) {
+  logError('irreversible-ask', err);  // fail-open, but recorded
 }
 
 // ── §0.2/0.3: path-resolution gate — decide on the resolved target, not the text ──
@@ -181,14 +241,24 @@ try {
   // Scoped to evor agents: only they have frontmatter tiers and hook matchers to
   // lose. A run may legitimately spawn a non-evor agent as a named teammate.
   if ((tool === 'Task' || tool === 'Agent') && /^evor-/.test(spawnType) && String(ti?.name ?? '')) {
-    deny(
-      `[EVOR GOVERNOR] Spawn oh-my-evor:${spawnType} WITHOUT the \`name\` parameter (got ` +
-        `name="${String(ti.name)}"). Passing \`name\` makes it an in-process teammate: the hook ` +
-        `matchers stop matching it and it inherits the session model instead of its own \`model:\` ` +
-        `frontmatter, so both enforcement and model tiering are silently lost. Re-issue the same ` +
-        `call with \`name\` dropped — subagent_type alone identifies the agent.`
-    );
+    // ── Item 4.4: this was a DENY, and it was the most-fired rule in the field
+    // run — 19 of 26 spawn denials. It collides with `SendMessage` addressing:
+    // an agent that wants to be addressable passes `name`, which is a reasonable
+    // thing to want, and got refused 19 times for it.
+    //
+    // The rule's REASON is still right — `name` makes the spawn an in-process
+    // teammate, which costs it its model tier (hook matchers were the other half
+    // and are fixed by K-13's `*`). But denying was the wrong instrument: it
+    // blocked the work instead of fixing the call. AF5 §0: the allow/deny binary
+    // is not an upstream constraint, and `updatedInput` is what this case is for.
+    //
+    // RECORDED HERE, EMITTED AT THE END. Emitting and exiting here would skip
+    // every deny rule below — which briefly made `name` a way for main to spawn
+    // a lead directly, past the §3b.0 boundary guard. A repair must not become a
+    // bypass, so the strip is applied only once nothing else has objected.
+    pendingNameStrip = { spawnType, name: String(ti.name) };
   }
+
 
   if ((tool === 'Task' || tool === 'Agent') && spawnType) {
     const PARENT = {
@@ -598,6 +668,26 @@ try {
       // that can see each other's verdicts are one anchored review wearing three
       // hats, and this system's whole job is evaluating candidates honestly.
       if (slot.endsWith('-junior')) for (const sib of JUNIORS[`evor-${stage}`] ?? []) grants.add(sib);
+
+      //   3. A REVIEWER READS WHAT IT REVIEWS. (Item 4.5.)
+      //
+      // The two rules above give a reviewer every UPSTREAM stage but not the
+      // artifact it was spawned to review: `evor-forge-critic` could read sage,
+      // mutagen and selector, and not `forge-junior`'s code or `forge`'s report.
+      // The stage names are `forge`; the slots are `forge-junior`,
+      // `forge-critic`, and the grant was computed over the former.
+      //
+      // Five of seven blocked reads in the field were then satisfied by `cat`
+      // off disk — which is worse than allowing them, because the content ends
+      // up in context ANYWAY, without passing the artifact tool, and the denial
+      // has bought nothing but a detour. Reviewers still do not read EACH OTHER:
+      // three independent reviews that can see each other's verdicts are one
+      // anchored review wearing three hats.
+      if (/-(critic|architect|analyst)$/.test(slot)) {
+        grants.add(stage);                     // the lead's own report
+        grants.add(`${stage}-junior`);         // the thing under review
+      }
+
       grants.delete([...own][0]);
       if (grants.size) READ_EXTRA_GRANTS[role] = grants;
     }
@@ -671,6 +761,39 @@ try {
   }
 } catch (err) {
   logError('updated-input-injection', err);  // fail-open, but recorded
+}
+
+// ── Item 4.4 (continued): apply the recorded repair, last ───────────────────
+// Reached only if no rule above denied or asked. Emitting earlier would let a
+// repair short-circuit the guards, which is how a fix becomes a bypass.
+try {
+  if (pendingNameStrip) {
+    const { name: _dropped, ...withoutName } = input?.tool_input ?? {};
+    logDecision({
+      verdict: 'allow',
+      rule: 'spawn-name-stripped',
+      spawnType: pendingNameStrip.spawnType,
+      strippedName: pendingNameStrip.name,
+      note: 'name removed so the agent keeps its own model tier; spawn allowed',
+    });
+    process.stdout.write(
+      JSON.stringify({
+        hookSpecificOutput: {
+          hookEventName: 'PreToolUse',
+          updatedInput: withoutName,
+          systemMessage:
+            `[EVOR GOVERNOR] Dropped \`name="${pendingNameStrip.name}"\` from the ` +
+            `oh-my-evor:${pendingNameStrip.spawnType} spawn. Passing \`name\` makes it ` +
+            `an in-process teammate, so it inherits the session model instead of its ` +
+            `own \`model:\` frontmatter — silently losing its tier. The spawn ` +
+            `proceeded without it; address the agent by its subagent_type.`,
+        },
+      }) + '\n'
+    );
+    process.exit(0);
+  }
+} catch (err) {
+  logError('spawn-name-strip', err);  // fail-open, but recorded
 }
 
 process.exit(0);

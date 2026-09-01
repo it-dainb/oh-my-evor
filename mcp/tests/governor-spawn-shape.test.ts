@@ -42,6 +42,8 @@ function callGovernor(payload: Record<string, unknown>) {
     return {
       decision: parsed?.hookSpecificOutput?.permissionDecision,
       reason: parsed?.hookSpecificOutput?.permissionDecisionReason,
+      updatedInput: parsed?.hookSpecificOutput?.updatedInput,
+      systemMessage: parsed?.hookSpecificOutput?.systemMessage,
     };
   } finally {
     rmSync(dir, { recursive: true, force: true });
@@ -49,25 +51,57 @@ function callGovernor(payload: Record<string, unknown>) {
 }
 
 describe("governor — spawns must not become teammates", () => {
+  // ITEM 4.4 CHANGED THE INSTRUMENT, NOT THE RULE.
+  //
+  // These three cases asserted `deny`. Denying was measured: 19 of 26 spawn
+  // denials in the field run were this rule, the most-fired of any, and it
+  // collides with `SendMessage` addressing — wanting to be addressable is a
+  // reasonable thing to want. The orchestrator did not comply, it retried.
+  //
+  // The GUARANTEE this file exists for is unchanged and is now stronger: a spawn
+  // still never becomes a teammate, because `name` is REMOVED rather than the
+  // call refused. `updatedInput` does that; AF5 §0 records that it was available
+  // all along and unused. Each case now spawns from `evor-tick` so the name rule
+  // is what is exercised — spawning a lead from main is denied by the §3b.0
+  // boundary guard, which would make these pass for the wrong reason.
   for (const tool of ["Task", "Agent"]) {
-    it(`denies ${tool} that passes \`name\` for an evor agent`, () => {
+    it(`strips \`name\` from ${tool} rather than refusing the spawn`, () => {
       const d = callGovernor({
         tool_name: tool,
+        agent_type: "oh-my-evor:evor-tick",
         tool_input: { subagent_type: "oh-my-evor:evor-sage", name: "sage-t1", prompt: "…" },
       });
-      expect(d.decision).toBe("deny");
-      expect(d.reason).toMatch(/name/i);
+      expect(d.decision).not.toBe("deny");
+      expect(d.updatedInput, "the spawn must proceed, without the parameter").toBeDefined();
+      expect("name" in (d.updatedInput ?? {})).toBe(false);
+      expect(d.updatedInput.subagent_type).toBe("oh-my-evor:evor-sage");
     });
   }
 
   it("explains the consequence, not just the rule", () => {
     const d = callGovernor({
       tool_name: "Agent",
+      agent_type: "oh-my-evor:evor-tick",
       tool_input: { subagent_type: "oh-my-evor:evor-forge", name: "forge-t1", prompt: "…" },
     });
-    // PM3: a denial the model cannot act on stalls the run. The reason has to say
-    // what to do instead — drop the parameter — not merely that it was rejected.
-    expect(d.reason).toMatch(/drop|remove|omit|without/i);
+    // PM3: a decision the model cannot act on stalls the run. It now does not
+    // have to act at all — the call was repaired — but it is still told what
+    // happened and why, so the next spawn is written correctly.
+    expect(d.systemMessage).toMatch(/name/i);
+    expect(d.systemMessage).toMatch(/drop|remove|omit|without/i);
+    expect(d.systemMessage).toMatch(/model|tier|frontmatter/i);
+  });
+
+  it("a spawn that is denied for another reason stays denied", () => {
+    // The repair must not become a bypass: main spawning a lead is a §3b.0
+    // violation whatever `name` says, so the strip is applied only after every
+    // deny rule has had its chance.
+    const d = callGovernor({
+      tool_name: "Task",
+      tool_input: { subagent_type: "oh-my-evor:evor-forge", name: "forge-t1", prompt: "…" },
+    });
+    expect(d.decision).toBe("deny");
+    expect(d.updatedInput).toBeUndefined();
   });
 
   it("allows the same spawn once `name` is gone", () => {
