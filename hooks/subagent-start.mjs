@@ -23,6 +23,7 @@
 
 import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
+import { resolveEvorRoot } from './lib/active-run.mjs';
 
 // ── Kill switches ─────────────────────────────────────────────────────────────
 if (process.env.DISABLE_EVOR) process.exit(0);
@@ -129,7 +130,8 @@ let baseContext = addendum
 let contextBlock = '';
 try {
   const pluginRootSA = process.env.CLAUDE_PLUGIN_ROOT ?? process.cwd();
-  const evorRootSA = process.env.EVOR_ROOT ?? join(pluginRootSA, '.evor');
+  // 1.3: shared resolver, never re-derived. See resolveEvorRoot for Q-01.
+  const evorRootSA = resolveEvorRoot();
 
   const activeRunPath = join(evorRootSA, 'active-run.json');
   if (existsSync(activeRunPath)) {

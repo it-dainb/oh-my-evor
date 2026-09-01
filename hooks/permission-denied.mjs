@@ -22,7 +22,7 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync, renameSync } from '
 import { join } from 'path';
 import { createHash } from 'node:crypto';
 import { randomBytes } from 'crypto';
-import { resolveActiveRun } from './lib/active-run.mjs';
+import { resolveActiveRun, resolveEvorRoot } from './lib/active-run.mjs';
 
 // ── Kill switches ─────────────────────────────────────────────────────────────
 if (process.env.DISABLE_EVOR) process.exit(0);
@@ -49,7 +49,11 @@ if (!toolName) process.exit(0);
 
 // ── Throttle per (tool, reason_hash) — 10 min TTL ────────────────────────────
 const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT ?? process.cwd();
-const evorRoot = process.env.EVOR_ROOT ?? join(pluginRoot, '.evor');
+// 1.3: the evor root comes from the shared resolver, never re-derived here.
+// Eleven hooks each computed `EVOR_ROOT ?? join(CLAUDE_PLUGIN_ROOT ?? cwd, '.evor')`
+// for themselves, so fixing Q-01 in `resolveEvorRoot` alone would have reached
+// none of them — the plugin's own `.evor/` would still have won in every one.
+const evorRoot = resolveEvorRoot();
 const throttlePath = join(evorRoot, 'perm-denied-throttle.json');
 const THROTTLE_MS = 10 * 60 * 1000; // 10 minutes
 

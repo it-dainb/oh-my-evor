@@ -21,6 +21,7 @@
 
 import { existsSync, readFileSync, readdirSync } from 'fs';
 import { join } from 'path';
+import { resolveEvorRoot } from './lib/active-run.mjs';
 
 // ── Kill switches ─────────────────────────────────────────────────────────────
 if (process.env.DISABLE_EVOR) process.exit(0);
@@ -30,7 +31,11 @@ if (skipHooks.includes('post-compact')) process.exit(0);
 
 // ── Resolve active run ────────────────────────────────────────────────────────
 const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT ?? process.cwd();
-const evorRoot = process.env.EVOR_ROOT ?? join(pluginRoot, '.evor');
+// 1.3: the evor root comes from the shared resolver, never re-derived here.
+// Eleven hooks each computed `EVOR_ROOT ?? join(CLAUDE_PLUGIN_ROOT ?? cwd, '.evor')`
+// for themselves, so fixing Q-01 in `resolveEvorRoot` alone would have reached
+// none of them — the plugin's own `.evor/` would still have won in every one.
+const evorRoot = resolveEvorRoot();
 
 let activeRunId = process.env.EVOR_ACTIVE_RUN_ID ?? '';
 let missionId = process.env.EVOR_MISSION_ID ?? '';

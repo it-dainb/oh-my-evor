@@ -34,7 +34,7 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync, statSync } from 'fs';
 import { join } from 'path';
 import { randomBytes } from 'crypto';
-import { resolveActiveRun } from './lib/active-run.mjs';
+import { resolveActiveRun, resolveEvorRoot } from './lib/active-run.mjs';
 import { isRunLive, isTickFinished } from './lib/run-status.mjs';
 
 // ── Kill switches ─────────────────────────────────────────────────────────────
@@ -63,7 +63,11 @@ try {
 } catch { /* fail-open — missing STDIN is normal in tests */ }
 
 const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT ?? process.cwd();
-const evorRoot = process.env.EVOR_ROOT ?? join(pluginRoot, '.evor');
+// 1.3: the evor root comes from the shared resolver, never re-derived here.
+// Eleven hooks each computed `EVOR_ROOT ?? join(CLAUDE_PLUGIN_ROOT ?? cwd, '.evor')`
+// for themselves, so fixing Q-01 in `resolveEvorRoot` alone would have reached
+// none of them — the plugin's own `.evor/` would still have won in every one.
+const evorRoot = resolveEvorRoot();
 // missionId comes from resolveActiveRun() above.
 
 const runDir = missionId

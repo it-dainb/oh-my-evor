@@ -21,6 +21,7 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync, statSy
 import { join, dirname, delimiter } from 'path';
 import { spawnSync } from 'child_process';
 import { fileURLToPath } from 'url';
+import { resolveEvorRoot } from './lib/active-run.mjs';
 
 /**
  * Build an <evor-restore> summary from on-disk state files.
@@ -211,7 +212,11 @@ if (skipHooks.includes('session-start')) process.exit(0);
 const pluginRoot =
   process.env.CLAUDE_PLUGIN_ROOT
   ?? dirname(dirname(fileURLToPath(import.meta.url)));
-const evorRoot = process.env.EVOR_ROOT ?? join(pluginRoot, '.evor');
+// 1.3: the evor root comes from the shared resolver, never re-derived here.
+// Eleven hooks each computed `EVOR_ROOT ?? join(CLAUDE_PLUGIN_ROOT ?? cwd, '.evor')`
+// for themselves, so fixing Q-01 in `resolveEvorRoot` alone would have reached
+// none of them — the plugin's own `.evor/` would still have won in every one.
+const evorRoot = resolveEvorRoot();
 const activeRunFile = join(evorRoot, 'active-run.json');
 
 // Bundled-harness env — exported so `python -m evor …` anywhere in this session
