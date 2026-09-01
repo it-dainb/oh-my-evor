@@ -30,11 +30,22 @@
 
 import { readFileSync } from 'fs';
 import { resolveActiveRun } from './lib/active-run.mjs';
+import { resolveWriteTargets } from './lib/write-targets.mjs';
+import { classifyWriteTarget, selfPatchAllowed } from './lib/protected-paths.mjs';
+import { logDecision, logError, logSkip } from './lib/audit.mjs';
 
 // ── Kill switches ─────────────────────────────────────────────────────────────
 if (process.env.DISABLE_EVOR) process.exit(0);
 const skipHooks = (process.env.EVOR_SKIP_HOOKS ?? '').split(',').map(s => s.trim());
-if (skipHooks.includes('pre-tool-use')) process.exit(0);
+if (skipHooks.includes('pre-tool-use')) {
+  // K-14: fail-open is the right policy; silence is not. This switch disables the
+  // entire enforcement surface, and until now it was recorded nowhere — a run
+  // could be ungoverned end to end with nothing in the trace to say so.
+  // Announcing must not itself become a failure, so logSkip never throws and the
+  // exit code stays 0.
+  logSkip('EVOR_SKIP_HOOKS=pre-tool-use');
+  process.exit(0);
+}
 
 // ── Active run guard — governor only applies during an active evor run ─────────
 const _activeRunId = resolveActiveRun().runId;
@@ -44,11 +55,13 @@ let input;
 try {
   const raw = readFileSync(0, 'utf8');
   input = JSON.parse(raw || '{}');
-} catch {
+} catch (err) {
+  logError('parse-input', err);
   process.exit(0); // fail-open
 }
 
-function deny(reason) {
+function deny(reason, meta = {}) {
+  logDecision({ verdict: 'deny', reason, ...meta });
   process.stdout.write(
     JSON.stringify({
       hookSpecificOutput: {
@@ -59,6 +72,56 @@ function deny(reason) {
     }) + '\n'
   );
   process.exit(0);
+}
+
+// ── §0.2/0.3: path-resolution gate — decide on the resolved target, not the text ──
+//
+// This runs FIRST and for EVERY caller, deliberately. H-01: a general-purpose
+// sub-agent reported "BLOCKED on authoring … I did not route around it", and 51
+// seconds later the orchestrator re-issued the identical edit as
+// `subagent_type: "claude"` and it succeeded — then did so four more times. A rule
+// keyed on who is asking is nullified by asking as someone else, so this one keys
+// on action + resolved path and returns the same verdict for every role.
+//
+// It also fixes the other half of the defect. The old matchers ran over command
+// TEXT, which made them simultaneously evadable (`E=py`, `"free" + "ze"`, a bare
+// `cd`) and wrong 66% of the time — 54 of 82 training denials were false positives
+// on commands that wrote nothing. Resolving first means a command with no write
+// intent produces no targets and is never a denial candidate, however many trigger
+// tokens it mentions. Denying more broadly would not have been a fix; Lane K
+// measured that broad textual denial trains evasion rather than compliance.
+try {
+  const toolNameP = input?.tool_name ?? '';
+  const { targets, writes } = resolveWriteTargets({
+    tool: toolNameP,
+    toolInput: input?.tool_input ?? {},
+    cwd: process.env.CLAUDE_PROJECT_DIR || process.cwd(),
+  });
+
+  if (writes) {
+    for (const target of targets) {
+      const verdict = classifyWriteTarget(target);
+      if (!verdict) continue;
+      if (verdict.zone === 'plugin' && selfPatchAllowed()) {
+        // The escape exists so a release can edit the plugin deliberately. It is
+        // logged rather than silent precisely because it is an escape: every use
+        // appears in the audit lane and is reviewed at the phase gate.
+        logDecision({
+          verdict: 'allow',
+          rule: 'self-patch-escape',
+          target,
+          note: 'EVOR_ALLOW_SELF_PATCH=1 — plugin write permitted and recorded',
+        });
+        continue;
+      }
+      deny(
+        `[EVOR GUARD] ${toolNameP} would write ${target}, and ${verdict.reason}`,
+        { rule: `path-zone:${verdict.zone}`, tool: toolNameP, target },
+      );
+    }
+  }
+} catch (err) {
+  logError('path-resolution-gate', err);  // fail-open, but recorded
 }
 
 try {
@@ -76,10 +139,30 @@ try {
     /\.py$/.test(filePath) ||
     /\/ticks\/[^/]+\/(mutagen|sage|selector|probe|forge)\//.test(filePath);
 
-  // Bash that runs training/model code (the guard blocks python -m evor outright).
+  // Bash that runs training/model code.
+  //
+  // NARROWED, not widened. The previous form was `python` AND any of
+  // (`.py`|`train`|`torch`|`.fit(`|`.pt`|torchvision) anywhere in the command text,
+  // which denied 54 of 82 times on commands that executed nothing: an env probe
+  // printing `torch.__version__`, a `py_compile` syntax check, a pytest run, a
+  // `print()` whose STRING mentions train.py. Lane K's finding is that broad
+  // textual denial does not produce compliance — it produces obfuscation, and the
+  // measured response was agents splitting path literals to get the same write
+  // through without a trail. So this now requires python to actually EXECUTE
+  // something: a `.py` script, or a `-m` module that is not one of the inspection
+  // tools. Mentions inside quotes are stripped before the test, because a string
+  // that talks about training is not training.
+  const cmdUnquoted = cmd.replace(/'[^']*'|"[^"]*"/g, ' ');
+  const INSPECTION_MODULES = /^-m\s+(py_compile|pytest|unittest|pip|venv|json\.tool|site|http\.server)\b/;
+  const pyInvocation = cmdUnquoted.match(/\bpython[0-9.]*\s+(.*)$/);
   const runsTraining =
-    /\bpython[0-9.]*\b/.test(cmd) &&
-    /(\.py\b|\btick\.py\b|\btrain\b|\btorch\b|\.fit\(|\.pt\b|torchvision)/.test(cmd);
+    !!pyInvocation &&
+    !INSPECTION_MODULES.test(pyInvocation[1].trim()) &&
+    // `-m evor…` is deliberately NOT here: `python -m evor run` is a CLI
+    // invocation, not training, and it is owned by the EVOR GUARD rule below,
+    // which names the right replacement tool (evor_run_start + Monitor). Claiming
+    // it here would make this rule fire first and report the wrong cause.
+    /(\S+\.py\b|-m\s+\S*train\S*)/.test(pyInvocation[1]);
 
   // ── Spawn-hierarchy gate — child agents may be spawned ONLY by their parent ──
   const spawnType = String(ti?.subagent_type ?? '').replace(/^oh-my-evor:/, '');
@@ -224,8 +307,11 @@ try {
       );
     }
   }
-} catch {
-  // Fail-open — a governor error must never block legitimate work.
+} catch (err) {
+  // Fail-open — a governor error must never block legitimate work, but a caught
+  // exception must leave a trace or an inert guard is indistinguishable from a
+  // permissive one (K-14).
+  logError('role-rules', err);
 }
 
 // ── §3 / §15C: .evor write-guard (unconditional during active run) ──
@@ -239,14 +325,15 @@ try {
     // Allowed markers: .env, .deps-ok, .uv-ok, .workspace-class, hook-state, cache files
     const ALLOW_MARKERS_RE  = /[/\\]\.evor[/\\]\.[^/\\]+$|[/\\]\.evor[/\\][^/\\]+-throttle\.json$|[/\\]\.evor[/\\]perm-denied-throttle\.json$|[/\\]\.evor[/\\]user-prompt-throttle\.json$/;
 
-    // §15C: Bash write-pattern scanner
-    const BASH_WRITE_RE = /(?:>|>>|tee\s)\s*['"]?[^'";\s]*\.evor\/(?:runs|[^/]+\.json)/;
-    const BASH_WRITE_FUNCS_RE = /(?:write_text|open\([^)]*\.evor[^)]*['"w]|json\.dump[^)]*\.evor)/;
-    const BASH_CP_MV_RE = /\b(?:cp|mv|shutil\.(?:copy|move|copyfile|copytree))\b[^;#\n]*\.evor[/\\](?:runs|[^/\s]+\.json)/;
     // §15C: python -m evor block (python, python3, python3.x etc.) — any invocation
     const BASH_PYTHON_EVOR_RE = /python[0-9.]*\s+-m\s+evor(\b|\.)/;
     // §15C: import evor / from evor... block
     const BASH_IMPORT_EVOR_RE = /\b(import\s+evor|from\s+evor[\s.])/;
+    // Only when python is actually invoked. Without this the rule fires on any
+    // command that MENTIONS the import — `grep -rn "import evor" harness/` reads
+    // and writes nothing, and denying it is a false positive of exactly the kind
+    // that made agents split path literals rather than comply.
+    const BASH_RUNS_PYTHON_RE = /(^|[;&|]|\s)python[0-9.]*(\s|$)/;
 
     const toolNameG = input?.tool_name ?? '';
     const tiG = input?.tool_input ?? {};
@@ -291,23 +378,23 @@ try {
         );
       }
 
-      if (BASH_IMPORT_EVOR_RE.test(cmdG)) {
+      if (BASH_IMPORT_EVOR_RE.test(cmdG) && BASH_RUNS_PYTHON_RE.test(cmdG)) {
         deny(
           `[EVOR GUARD] This operation is not permitted. Use the appropriate evor_* MCP tool instead.`
         );
       }
 
-      if (
-        (BASH_WRITE_RE.test(cmdG) || BASH_WRITE_FUNCS_RE.test(cmdG) || BASH_CP_MV_RE.test(cmdG)) &&
-        !/\.evor[/\\]worktrees[/\\]/.test(cmdG)
-      ) {
-        deny(
-          `[EVOR GUARD] This operation is not permitted. Use the appropriate evor_* MCP tool instead.`
-        );
-      }
+      // The Bash write-scanner that stood here is retired by §0.2. It matched on
+      // command TEXT — it required the literal `.evor` inside the redirect or the
+      // `open()` call — so `cd .evor/runs && python3 - <<EOF … open("mission-state.json","w")`
+      // slipped past it and rewrote two missions' state 14 hours after the fact,
+      // while benign commands that merely mentioned a path were denied. The
+      // path-resolution gate above decides the same question on the resolved
+      // absolute target, through `cd` and variable expansion, which is both
+      // stricter where it matters and quieter where it does not.
     }
-  } catch {
-    // Fail-open — guard error must never block legitimate work
+  } catch (err) {
+    logError('evor-write-guard', err);  // fail-open, but recorded
   }
 
 // ── §1.3: orchestrator-only, enforced for ALL shell and file work ─────────────
@@ -359,8 +446,11 @@ try {
         `rather than the shell.`
     );
   }
-} catch {
-  // Fail-open — a governor error must never block legitimate work.
+} catch (err) {
+  // Fail-open — a governor error must never block legitimate work, but a caught
+  // exception must leave a trace or an inert guard is indistinguishable from a
+  // permissive one (K-14).
+  logError('role-rules', err);
 }
 
 // ── §3b.0: boundary enforcement — main may not absorb per-tick detail ────────
@@ -412,8 +502,11 @@ try {
       );
     }
   }
-} catch {
-  // Fail-open — a governor error must never block legitimate work.
+} catch (err) {
+  // Fail-open — a governor error must never block legitimate work, but a caught
+  // exception must leave a trace or an inert guard is indistinguishable from a
+  // permissive one (K-14).
+  logError('role-rules', err);
 }
 
 // ── §15C: Agent-kind spoofing guard (always-on when run is active) ────────────
@@ -535,8 +628,8 @@ try {
       }
     }
   }
-} catch {
-  // Fail-open — spoofing guard must never crash the session
+} catch (err) {
+  logError('agent-kind-spoofing', err);  // fail-open, but recorded
 }
 
 // ── §17B: updatedInput — inject missing run_id/mission_id into evor_* calls ──
@@ -576,8 +669,8 @@ try {
       process.exit(0);
     }
   }
-} catch {
-  // Fail-open — updatedInput injection errors must never block calls
+} catch (err) {
+  logError('updated-input-injection', err);  // fail-open, but recorded
 }
 
 process.exit(0);
