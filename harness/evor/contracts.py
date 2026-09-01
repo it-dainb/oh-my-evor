@@ -703,8 +703,12 @@ class MutationProposal(BaseEvorModel):
     hypothesis: Hypothesis
     citations: list[str]
     wildness: float
-    critic_approved: bool
-    # Server-owned: evor_validate_proposals computes gate codes deterministically.
+    # `critic_approved` REMOVED (item 2b.2). The contract required the PROPOSER
+    # to assert the REVIEWER's verdict — a self-report standing in for a review —
+    # and nothing ever read it. `tree.py:410` hard-coded it to True on every
+    # proposal it built, so the field's only possible value was "approved".
+    # `agents/evor-selector.md:236` already told agents not to add it, which is
+    # the shape of a field nobody wanted and everybody had to carry.
     critic_review: Optional[CriticReview] = None
 
 

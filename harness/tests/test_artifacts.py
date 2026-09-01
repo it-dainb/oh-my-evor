@@ -116,7 +116,6 @@ def _minimal_proposal() -> dict:
         },
         "citations": [],
         "wildness": 0.3,
-        "critic_approved": True,
         "critic_review": {
             "h001_one_hypothesis": "pass",
             "h002_family_streak": "pass",
@@ -307,6 +306,10 @@ class TestSelectorVerdictContract:
                 {
                     "proposal_id": "p4",
                     "approach_family": "algo",
+                    # The stray field is the POINT of this case — it must be
+                    # rejected and named. 2b.2 removed `critic_approved` from the
+                    # contract, which makes this rejection structural rather than
+                    # a special case, so the test gets stronger, not weaker.
                     "critic_approved": True,
                     "critic_review": _minimal_critic_review("approved"),
                     "selected_for_forge": True,

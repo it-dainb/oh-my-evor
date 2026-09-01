@@ -407,7 +407,6 @@ class TreeEngine:
             hypothesis=hypothesis,
             citations=[],
             wildness=self._strategy.wildness,
-            critic_approved=True,
             critic_review=critic_review,
         )
 

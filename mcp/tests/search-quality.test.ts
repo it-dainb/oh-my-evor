@@ -309,6 +309,9 @@ describe("Selector's artifact has no enforced schema — the analyzer must survi
       per_proposal_reviews: [{ proposal_id: "p2", verdict: "approved" }, { proposal_id: "p3", verdict: "deferred" }],
     });
     w(join(multi, "ticks", "3", "selector", "verdict.json"), {
+      // `critic_approved` is one of the three shapes this case exists to read.
+      // 2b.2 removes it from the CONTRACT; the analyzer must still survive an
+      // artifact that carries it, which is the whole point of the case.
       reviews: [{ proposal_id: "p4", critic_approved: true }],
     });
   });

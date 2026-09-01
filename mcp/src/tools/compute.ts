@@ -402,16 +402,7 @@ function patchGoalContract(runDir: string, patch: Record<string, string>): void 
 
 export function registerComputeTools(server: McpServer): void {
 
-  /**
- * Below this, a "test split" is not a small eval set — it is the wrong set.
- *
- * The field freeze returned 5. Not zero, so the zero-item guard passed it; not
- * plausible either, and nothing was looking. The floor is deliberately low: it
- * exists to catch a category error, not to police eval-set size.
- */
-const MIN_PLAUSIBLE_TEST_ITEMS = 10;
-
-// ── evor_run_start ──────────────────────────────────────────────────────────
+  // ── evor_run_start ──────────────────────────────────────────────────────────
   server.tool(
     "evor_run_start",
     "Launch candidate node as a detached background job. "
@@ -712,19 +703,20 @@ const MIN_PLAUSIBLE_TEST_ITEMS = 10;
           );
         }
 
-        // A test split in single digits is the metadata-freeze signature. It is
-        // reported rather than accepted, with the count, so the caller sees the
-        // number that should have been surprising.
-        if (testCount > 0 && testCount < MIN_PLAUSIBLE_TEST_ITEMS) {
-          return err(
-            `the freeze captured only ${testCount} test item(s) (and ${valCount} val). ` +
-            `That is below the ${MIN_PLAUSIBLE_TEST_ITEMS}-item floor for a usable eval set, and it is the ` +
-            "signature of freezing a corpus's metadata files rather than its samples — " +
-            "a directory holding dataset_card.yaml, manifest.json and test.txt yields " +
-            "exactly this shape. Check that --dataset-path points at the samples, or " +
-            "declare the split in _freeze_anchor/eval_manifest_<split>.json.",
-          );
-        }
+        // NO ITEM-COUNT FLOOR HERE, and the reason is the finding itself.
+        //
+        // A floor was written and removed: it rejected `test=3, val=0`, which
+        // `compute.test.ts` asserts must be allowed, and it was right to. "Few
+        // items" is not the metadata-freeze signature — a genuinely small corpus
+        // is small. The signature is that the frozen files ARE the corpus's
+        // manifests, and only the freeze can see that, because only the freeze
+        // knows their names.
+        //
+        // So the refusal lives at `_refuse_if_metadata_only` in
+        // harness/evor/freeze.py, keyed on `dataset_card.yaml`, `manifest.json`,
+        // `test.txt` and friends. AF1's warning is exactly this: "the guard is
+        // not too weak; it is reasoning over a representation that cannot carry
+        // the distinction it needs to make." A count cannot carry it.
 
         return ok({ ok: true, ...clean });
       }

@@ -276,7 +276,9 @@ export const MutationProposalSchema = z.object({
   hypothesis: HypothesisSchema,
   citations: z.array(z.string()),
   wildness: z.number().min(0).max(1),
-  critic_approved: z.boolean(),
+  // `critic_approved` REMOVED (item 2b.2): the contract required the PROPOSER to
+  // assert the REVIEWER's verdict, and nothing read it. A self-report standing in
+  // for a review is the self-approval vector the review gates exist to prevent.
   // Server-owned: evor_validate_proposals computes gate codes deterministically.
   // Agent must NOT supply internal gate codes; the server populates critic_review.
   critic_review: z.object({

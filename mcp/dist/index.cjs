@@ -21194,7 +21194,9 @@ var MutationProposalSchema = external_exports.object({
   hypothesis: HypothesisSchema,
   citations: external_exports.array(external_exports.string()),
   wildness: external_exports.number().min(0).max(1),
-  critic_approved: external_exports.boolean(),
+  // `critic_approved` REMOVED (item 2b.2): the contract required the PROPOSER to
+  // assert the REVIEWER's verdict, and nothing read it. A self-report standing in
+  // for a review is the self-approval vector the review gates exist to prevent.
   // Server-owned: evor_validate_proposals computes gate codes deterministically.
   // Agent must NOT supply internal gate codes; the server populates critic_review.
   critic_review: external_exports.object({
@@ -24564,7 +24566,6 @@ function patchGoalContract(runDir, patch) {
   }
 }
 function registerComputeTools(server) {
-  const MIN_PLAUSIBLE_TEST_ITEMS = 10;
   server.tool(
     "evor_run_start",
     "Launch candidate node as a detached background job. Returns {status, job_id} instantly \u2014 poll progress with evor_run_status.",
@@ -24786,11 +24787,6 @@ function registerComputeTools(server) {
         if (testCount === 0 && valCount === 0) {
           return err2(
             "no data items were found to freeze at the given location \u2014 nothing was captured. The location should directly contain the individual data files (not sub-folders). Point it at the folder that holds the files themselves and try again."
-          );
-        }
-        if (testCount > 0 && testCount < MIN_PLAUSIBLE_TEST_ITEMS) {
-          return err2(
-            `the freeze captured only ${testCount} test item(s) (and ${valCount} val). That is below the ${MIN_PLAUSIBLE_TEST_ITEMS}-item floor for a usable eval set, and it is the signature of freezing a corpus's metadata files rather than its samples \u2014 a directory holding dataset_card.yaml, manifest.json and test.txt yields exactly this shape. Check that --dataset-path points at the samples, or declare the split in _freeze_anchor/eval_manifest_<split>.json.`
           );
         }
         return ok2({ ok: true, ...clean });
