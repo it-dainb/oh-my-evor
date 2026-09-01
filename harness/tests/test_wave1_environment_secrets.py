@@ -364,7 +364,6 @@ def _minimal_answers() -> dict:
         "mission_type": "fixed",
         "task_description": "Classify images into 10 categories",
         "dataset_ref": "/data/cifar10",
-        "metrics": [{"name": "accuracy", "direction": "higher", "primary": True}],
         "metric_specs": [
             {
                 "metric_name": "accuracy",

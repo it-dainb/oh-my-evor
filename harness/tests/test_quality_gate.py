@@ -601,7 +601,6 @@ class TestIntegrityGateStructureOk:
             mission_type="fixed",
             task_description="test",
             dataset_ref="/data/test",
-            metrics=[{"name": "accuracy", "direction": "higher", "primary": True}],
             metric_specs=[{
                 "metric_name": "accuracy",
                 "direction": "higher",

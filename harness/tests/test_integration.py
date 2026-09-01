@@ -599,8 +599,6 @@ class TestAngleRegistryIntegration:
             name=f"Source {sid}",
             retrieval_method="human_provided",
             trust_level="authoritative",
-            citation=f"Paper {sid}",
-            retrieved_at=_ISO,
         )
 
     def test_add_angle_then_score_above_sota(self, tmp_path: Path) -> None:
@@ -721,8 +719,6 @@ class TestEvaluatorAngleRegistryIntegration:
             name="Human eval source",
             retrieval_method="human_provided",
             trust_level="authoritative",
-            citation="Human eval paper",
-            retrieved_at=_ISO,
         )
         mgr.add_angle(
             angle_id="reasoning",
@@ -732,8 +728,6 @@ class TestEvaluatorAngleRegistryIntegration:
                 name="Second human eval",
                 retrieval_method="human_provided",
                 trust_level="authoritative",
-                citation="Second eval",
-                retrieved_at=_ISO,
             )],
             baseline_score=0.55,
             run_dir=run_dir,

@@ -45,7 +45,26 @@ class BaseEvorModel(BaseModel):
 
     The exclude_none default can still be overridden by passing
     ``model_dump(exclude_none=False)`` explicitly.
+
+    ``extra="forbid"`` (plan item 1.6) makes every unknown key loud. Pydantic v2
+    merges ``model_config`` across bases — a subclass that sets its own
+    ``ConfigDict`` without naming ``extra`` still inherits this — so one line here
+    reaches all 58 contract models, of which exactly two (``SelectorReview``,
+    ``SelectorVerdict``) had set it for themselves.
+
+    The default was ``ignore``: a key an agent supplied that the contract did not
+    know about was silently dropped, and the agent was told nothing. RC6's
+    prediction 3 is that this is how a contract and its callers drift without
+    either side learning it — the write succeeds, the field vanishes, and the
+    reader later sees an absence it cannot distinguish from "never sent". Round
+    -tripping through a model became lossy in a way no test could see.
+
+    This is the release's §2 pattern in miniature: the obligation to send only
+    known keys was stated in prose to the agent, and prose is an obligation the
+    system has decided not to have.
     """
+
+    model_config = ConfigDict(extra="forbid")
 
     def model_dump(self, *, exclude_none: bool = True, **kwargs) -> dict:  # type: ignore[override]
         return super().model_dump(exclude_none=exclude_none, **kwargs)

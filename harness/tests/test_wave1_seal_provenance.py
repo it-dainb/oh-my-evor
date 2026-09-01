@@ -121,7 +121,6 @@ def _make_goal(
         mission_type="fixed",
         task_description="Binarise degraded document images",
         dataset_ref="/data/corpora/v10",
-        metrics=[{"name": "fmeasure", "direction": "higher", "primary": True}],
         metric_specs=[{
             "metric_name": "fmeasure",
             "direction": "higher",

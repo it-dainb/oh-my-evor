@@ -53,7 +53,6 @@ def _minimal_run_dir(tmp_path: Path, *, mission_type: str = "fixed") -> Path:
         "mission_type": mission_type,
         "task_description": "Test task",
         "dataset_ref": "/data/test",
-        "metrics": [{"name": "accuracy", "direction": "higher", "primary": True}],
         "metric_specs": [
             {
                 "metric_name": "accuracy",

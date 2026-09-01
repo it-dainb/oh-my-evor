@@ -156,7 +156,6 @@ def _make_goal(
         mission_type="fixed",
         task_description="Test task",
         dataset_ref="/data/test",
-        metrics=[{"name": "accuracy", "direction": "higher", "primary": True}],
         metric_specs=[{
             "metric_name": "accuracy",
             "direction": "higher",

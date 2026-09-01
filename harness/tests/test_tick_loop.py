@@ -70,7 +70,6 @@ def _make_goal(locked_split_hash: str, eval_script_hash: str) -> GoalContract:
         mission_type="fixed",
         task_description="Tick-loop dry-run (GPU-free)",
         dataset_ref="/data/fake",
-        metrics=[{"name": "accuracy", "direction": "higher", "primary": True}],
         metric_specs=[{
             "metric_name": "accuracy",
             "direction": "higher",

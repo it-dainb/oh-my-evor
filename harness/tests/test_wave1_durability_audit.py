@@ -45,7 +45,6 @@ def _answers(mission_id: str) -> dict:
         "mission_type": "fixed",
         "task_description": "Binarise degraded palm-leaf manuscript images",
         "dataset_ref": "/data/dibco",
-        "metrics": [{"name": "fmeasure", "direction": "higher", "primary": True}],
         "metric_specs": [
             {
                 "metric_name": "fmeasure",
