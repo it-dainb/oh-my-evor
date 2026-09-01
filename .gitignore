@@ -28,7 +28,11 @@ refs/
 .omc/project-memory.json
 .omc/notepad.md
 
-# HF token (never commit)
+# secrets (never commit) — root .env, .evor/.env, and any nested .env
+.env
+**/.env
+.env.*
+!.env.example
 .evor/.env
 
 # bundled python MCP venvs (built at runtime, not source)
@@ -47,3 +51,6 @@ logs/
 
 # Local benchmark mission scratch (see ci/bench-tick.sh — normally runs in-container)
 .evor-bench/
+
+# machine-local Claude Code overrides
+.claude/settings.local.json

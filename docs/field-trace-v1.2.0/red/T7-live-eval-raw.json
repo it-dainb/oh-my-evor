@@ -1,0 +1,656 @@
+{
+  "generated_at": "2026-09-01T08:37:34.632Z",
+  "canonical_prefix": "mcp__plugin_oh-my-evor_evor__",
+  "repeats_per_role_per_arm": 5,
+  "roles": [
+    "evor-probe",
+    "evor-sage",
+    "evor-selector"
+  ],
+  "power_note": "at lane D's observed base rate of 3/17 haiku agents (0.176), P(zero malformed | n=15) = 0.054",
+  "by_arm": {
+    "haiku": {
+      "n_calls": 15,
+      "n_ok": 15,
+      "models": [
+        "claude-haiku-4-5"
+      ],
+      "calls_with_a_tool_call": 15,
+      "total_evor_tool_calls": 30,
+      "calls_with_a_malformed_name": 0,
+      "malformed_names": [],
+      "total_cost_usd": 0.4915083
+    },
+    "sonnet": {
+      "n_calls": 15,
+      "n_ok": 15,
+      "models": [
+        "claude-sonnet-5"
+      ],
+      "calls_with_a_tool_call": 15,
+      "total_evor_tool_calls": 33,
+      "calls_with_a_malformed_name": 0,
+      "malformed_names": [],
+      "total_cost_usd": 1.4953239
+    }
+  },
+  "records": [
+    {
+      "role": "evor-sage",
+      "arm": "sonnet",
+      "repeat": 0,
+      "ok": true,
+      "error": null,
+      "models": [
+        "claude-sonnet-5"
+      ],
+      "mcp_tools_attached": true,
+      "tool_names": [
+        "ToolSearch",
+        "mcp__plugin_oh-my-evor_evor__evor_wiki_query",
+        "mcp__plugin_oh-my-evor_evor__evor_capability"
+      ],
+      "malformed": [],
+      "evor_calls": 2,
+      "wall_ms": 19112,
+      "cost_usd": 0.21153899999999998
+    },
+    {
+      "role": "evor-selector",
+      "arm": "haiku",
+      "repeat": 0,
+      "ok": true,
+      "error": null,
+      "models": [
+        "claude-haiku-4-5"
+      ],
+      "mcp_tools_attached": true,
+      "tool_names": [
+        "ToolSearch",
+        "mcp__plugin_oh-my-evor_evor__evor_gotcha_query",
+        "mcp__plugin_oh-my-evor_evor__evor_gotcha_query"
+      ],
+      "malformed": [],
+      "evor_calls": 2,
+      "wall_ms": 19204,
+      "cost_usd": 0.0520937
+    },
+    {
+      "role": "evor-probe",
+      "arm": "sonnet",
+      "repeat": 0,
+      "ok": true,
+      "error": null,
+      "models": [
+        "claude-sonnet-5"
+      ],
+      "mcp_tools_attached": true,
+      "tool_names": [
+        "ToolSearch",
+        "mcp__plugin_oh-my-evor_evor__evor_capability",
+        "mcp__plugin_oh-my-evor_evor__evor_signal_emit"
+      ],
+      "malformed": [],
+      "evor_calls": 2,
+      "wall_ms": 21582,
+      "cost_usd": 0.2293494
+    },
+    {
+      "role": "evor-probe",
+      "arm": "haiku",
+      "repeat": 0,
+      "ok": true,
+      "error": null,
+      "models": [
+        "claude-haiku-4-5"
+      ],
+      "mcp_tools_attached": true,
+      "tool_names": [
+        "ToolSearch",
+        "Bash",
+        "Bash",
+        "Bash",
+        "mcp__plugin_oh-my-evor_evor__evor_capability",
+        "mcp__plugin_oh-my-evor_evor__evor_signal_emit"
+      ],
+      "malformed": [],
+      "evor_calls": 2,
+      "wall_ms": 33694,
+      "cost_usd": 0.0702281
+    },
+    {
+      "role": "evor-sage",
+      "arm": "haiku",
+      "repeat": 0,
+      "ok": true,
+      "error": null,
+      "models": [
+        "claude-haiku-4-5"
+      ],
+      "mcp_tools_attached": true,
+      "tool_names": [
+        "ToolSearch",
+        "Bash",
+        "Bash",
+        "mcp__plugin_oh-my-evor_evor__evor_wiki_query",
+        "mcp__plugin_oh-my-evor_evor__evor_capability"
+      ],
+      "malformed": [],
+      "evor_calls": 2,
+      "wall_ms": 34300,
+      "cost_usd": 0.065784
+    },
+    {
+      "role": "evor-selector",
+      "arm": "sonnet",
+      "repeat": 0,
+      "ok": true,
+      "error": null,
+      "models": [
+        "claude-sonnet-5"
+      ],
+      "mcp_tools_attached": true,
+      "tool_names": [
+        "ToolSearch",
+        "mcp__plugin_oh-my-evor_evor__evor_gotcha_query",
+        "mcp__plugin_oh-my-evor_evor__evor_gotcha_query",
+        "mcp__plugin_oh-my-evor_evor__evor_gotcha_query",
+        "mcp__plugin_oh-my-evor_evor__evor_gotcha_query"
+      ],
+      "malformed": [],
+      "evor_calls": 4,
+      "wall_ms": 21067,
+      "cost_usd": 0.1949541
+    },
+    {
+      "role": "evor-probe",
+      "arm": "haiku",
+      "repeat": 1,
+      "ok": true,
+      "error": null,
+      "models": [
+        "claude-haiku-4-5"
+      ],
+      "mcp_tools_attached": true,
+      "tool_names": [
+        "ToolSearch",
+        "mcp__plugin_oh-my-evor_evor__evor_capability",
+        "mcp__plugin_oh-my-evor_evor__evor_signal_emit"
+      ],
+      "malformed": [],
+      "evor_calls": 2,
+      "wall_ms": 21877,
+      "cost_usd": 0.019357600000000003
+    },
+    {
+      "role": "evor-probe",
+      "arm": "sonnet",
+      "repeat": 1,
+      "ok": true,
+      "error": null,
+      "models": [
+        "claude-sonnet-5"
+      ],
+      "mcp_tools_attached": true,
+      "tool_names": [
+        "ToolSearch",
+        "mcp__plugin_oh-my-evor_evor__evor_capability",
+        "mcp__plugin_oh-my-evor_evor__evor_signal_emit"
+      ],
+      "malformed": [],
+      "evor_calls": 2,
+      "wall_ms": 22340,
+      "cost_usd": 0.0824313
+    },
+    {
+      "role": "evor-sage",
+      "arm": "sonnet",
+      "repeat": 1,
+      "ok": true,
+      "error": null,
+      "models": [
+        "claude-sonnet-5"
+      ],
+      "mcp_tools_attached": true,
+      "tool_names": [
+        "ToolSearch",
+        "mcp__plugin_oh-my-evor_evor__evor_wiki_query",
+        "mcp__plugin_oh-my-evor_evor__evor_capability"
+      ],
+      "malformed": [],
+      "evor_calls": 2,
+      "wall_ms": 18129,
+      "cost_usd": 0.0613332
+    },
+    {
+      "role": "evor-selector",
+      "arm": "sonnet",
+      "repeat": 1,
+      "ok": true,
+      "error": null,
+      "models": [
+        "claude-sonnet-5"
+      ],
+      "mcp_tools_attached": true,
+      "tool_names": [
+        "ToolSearch",
+        "mcp__plugin_oh-my-evor_evor__evor_gotcha_query",
+        "mcp__plugin_oh-my-evor_evor__evor_gotcha_query"
+      ],
+      "malformed": [],
+      "evor_calls": 2,
+      "wall_ms": 15543,
+      "cost_usd": 0.0613221
+    },
+    {
+      "role": "evor-selector",
+      "arm": "haiku",
+      "repeat": 1,
+      "ok": true,
+      "error": null,
+      "models": [
+        "claude-haiku-4-5"
+      ],
+      "mcp_tools_attached": true,
+      "tool_names": [
+        "ToolSearch",
+        "mcp__plugin_oh-my-evor_evor__evor_gotcha_query",
+        "mcp__plugin_oh-my-evor_evor__evor_gotcha_query"
+      ],
+      "malformed": [],
+      "evor_calls": 2,
+      "wall_ms": 18597,
+      "cost_usd": 0.018166300000000003
+    },
+    {
+      "role": "evor-sage",
+      "arm": "haiku",
+      "repeat": 1,
+      "ok": true,
+      "error": null,
+      "models": [
+        "claude-haiku-4-5"
+      ],
+      "mcp_tools_attached": true,
+      "tool_names": [
+        "ToolSearch",
+        "ToolSearch",
+        "mcp__plugin_oh-my-evor_evor__evor_wiki_query",
+        "mcp__plugin_oh-my-evor_evor__evor_capability"
+      ],
+      "malformed": [],
+      "evor_calls": 2,
+      "wall_ms": 28619,
+      "cost_usd": 0.0331157
+    },
+    {
+      "role": "evor-probe",
+      "arm": "haiku",
+      "repeat": 2,
+      "ok": true,
+      "error": null,
+      "models": [
+        "claude-haiku-4-5"
+      ],
+      "mcp_tools_attached": true,
+      "tool_names": [
+        "ToolSearch",
+        "mcp__plugin_oh-my-evor_evor__evor_capability",
+        "mcp__plugin_oh-my-evor_evor__evor_signal_emit"
+      ],
+      "malformed": [],
+      "evor_calls": 2,
+      "wall_ms": 21628,
+      "cost_usd": 0.019853100000000002
+    },
+    {
+      "role": "evor-probe",
+      "arm": "sonnet",
+      "repeat": 2,
+      "ok": true,
+      "error": null,
+      "models": [
+        "claude-sonnet-5"
+      ],
+      "mcp_tools_attached": true,
+      "tool_names": [
+        "ToolSearch",
+        "mcp__plugin_oh-my-evor_evor__evor_capability",
+        "mcp__plugin_oh-my-evor_evor__evor_signal_emit"
+      ],
+      "malformed": [],
+      "evor_calls": 2,
+      "wall_ms": 24684,
+      "cost_usd": 0.08308589999999999
+    },
+    {
+      "role": "evor-sage",
+      "arm": "sonnet",
+      "repeat": 2,
+      "ok": true,
+      "error": null,
+      "models": [
+        "claude-sonnet-5"
+      ],
+      "mcp_tools_attached": true,
+      "tool_names": [
+        "ToolSearch",
+        "mcp__plugin_oh-my-evor_evor__evor_wiki_query",
+        "mcp__plugin_oh-my-evor_evor__evor_capability"
+      ],
+      "malformed": [],
+      "evor_calls": 2,
+      "wall_ms": 19065,
+      "cost_usd": 0.0614361
+    },
+    {
+      "role": "evor-selector",
+      "arm": "haiku",
+      "repeat": 2,
+      "ok": true,
+      "error": null,
+      "models": [
+        "claude-haiku-4-5"
+      ],
+      "mcp_tools_attached": true,
+      "tool_names": [
+        "ToolSearch",
+        "mcp__plugin_oh-my-evor_evor__evor_gotcha_query",
+        "mcp__plugin_oh-my-evor_evor__evor_gotcha_query"
+      ],
+      "malformed": [],
+      "evor_calls": 2,
+      "wall_ms": 18164,
+      "cost_usd": 0.0182996
+    },
+    {
+      "role": "evor-selector",
+      "arm": "sonnet",
+      "repeat": 2,
+      "ok": true,
+      "error": null,
+      "models": [
+        "claude-sonnet-5"
+      ],
+      "mcp_tools_attached": true,
+      "tool_names": [
+        "ToolSearch",
+        "mcp__plugin_oh-my-evor_evor__evor_gotcha_query",
+        "mcp__plugin_oh-my-evor_evor__evor_gotcha_query"
+      ],
+      "malformed": [],
+      "evor_calls": 2,
+      "wall_ms": 15863,
+      "cost_usd": 0.0622956
+    },
+    {
+      "role": "evor-sage",
+      "arm": "haiku",
+      "repeat": 2,
+      "ok": true,
+      "error": null,
+      "models": [
+        "claude-haiku-4-5"
+      ],
+      "mcp_tools_attached": true,
+      "tool_names": [
+        "ToolSearch",
+        "Bash",
+        "Bash",
+        "mcp__plugin_oh-my-evor_evor__evor_wiki_query",
+        "mcp__plugin_oh-my-evor_evor__evor_capability"
+      ],
+      "malformed": [],
+      "evor_calls": 2,
+      "wall_ms": 33333,
+      "cost_usd": 0.0301957
+    },
+    {
+      "role": "evor-sage",
+      "arm": "sonnet",
+      "repeat": 3,
+      "ok": true,
+      "error": null,
+      "models": [
+        "claude-sonnet-5"
+      ],
+      "mcp_tools_attached": true,
+      "tool_names": [
+        "ToolSearch",
+        "mcp__plugin_oh-my-evor_evor__evor_wiki_query",
+        "mcp__plugin_oh-my-evor_evor__evor_capability"
+      ],
+      "malformed": [],
+      "evor_calls": 2,
+      "wall_ms": 17921,
+      "cost_usd": 0.060405600000000004
+    },
+    {
+      "role": "evor-probe",
+      "arm": "sonnet",
+      "repeat": 3,
+      "ok": true,
+      "error": null,
+      "models": [
+        "claude-sonnet-5"
+      ],
+      "mcp_tools_attached": true,
+      "tool_names": [
+        "ToolSearch",
+        "mcp__plugin_oh-my-evor_evor__evor_capability",
+        "mcp__plugin_oh-my-evor_evor__evor_signal_emit",
+        "mcp__plugin_oh-my-evor_evor__evor_signal_emit"
+      ],
+      "malformed": [],
+      "evor_calls": 3,
+      "wall_ms": 24664,
+      "cost_usd": 0.10482330000000001
+    },
+    {
+      "role": "evor-probe",
+      "arm": "haiku",
+      "repeat": 3,
+      "ok": true,
+      "error": null,
+      "models": [
+        "claude-haiku-4-5"
+      ],
+      "mcp_tools_attached": true,
+      "tool_names": [
+        "ToolSearch",
+        "Bash",
+        "mcp__plugin_oh-my-evor_evor__evor_capability",
+        "mcp__plugin_oh-my-evor_evor__evor_signal_emit"
+      ],
+      "malformed": [],
+      "evor_calls": 2,
+      "wall_ms": 27041,
+      "cost_usd": 0.0246752
+    },
+    {
+      "role": "evor-selector",
+      "arm": "haiku",
+      "repeat": 3,
+      "ok": true,
+      "error": null,
+      "models": [
+        "claude-haiku-4-5"
+      ],
+      "mcp_tools_attached": true,
+      "tool_names": [
+        "ToolSearch",
+        "mcp__plugin_oh-my-evor_evor__evor_gotcha_query",
+        "mcp__plugin_oh-my-evor_evor__evor_gotcha_query"
+      ],
+      "malformed": [],
+      "evor_calls": 2,
+      "wall_ms": 20061,
+      "cost_usd": 0.0191858
+    },
+    {
+      "role": "evor-selector",
+      "arm": "sonnet",
+      "repeat": 3,
+      "ok": true,
+      "error": null,
+      "models": [
+        "claude-sonnet-5"
+      ],
+      "mcp_tools_attached": true,
+      "tool_names": [
+        "ToolSearch",
+        "mcp__plugin_oh-my-evor_evor__evor_gotcha_query",
+        "mcp__plugin_oh-my-evor_evor__evor_gotcha_query"
+      ],
+      "malformed": [],
+      "evor_calls": 2,
+      "wall_ms": 15626,
+      "cost_usd": 0.06279570000000001
+    },
+    {
+      "role": "evor-sage",
+      "arm": "haiku",
+      "repeat": 3,
+      "ok": true,
+      "error": null,
+      "models": [
+        "claude-haiku-4-5"
+      ],
+      "mcp_tools_attached": true,
+      "tool_names": [
+        "ToolSearch",
+        "ToolSearch",
+        "Bash",
+        "Bash",
+        "mcp__plugin_oh-my-evor_evor__evor_wiki_query",
+        "mcp__plugin_oh-my-evor_evor__evor_capability"
+      ],
+      "malformed": [],
+      "evor_calls": 2,
+      "wall_ms": 37711,
+      "cost_usd": 0.04528429999999999
+    },
+    {
+      "role": "evor-probe",
+      "arm": "sonnet",
+      "repeat": 4,
+      "ok": true,
+      "error": null,
+      "models": [
+        "claude-sonnet-5"
+      ],
+      "mcp_tools_attached": true,
+      "tool_names": [
+        "ToolSearch",
+        "mcp__plugin_oh-my-evor_evor__evor_capability",
+        "mcp__plugin_oh-my-evor_evor__evor_signal_emit"
+      ],
+      "malformed": [],
+      "evor_calls": 2,
+      "wall_ms": 22253,
+      "cost_usd": 0.0802467
+    },
+    {
+      "role": "evor-probe",
+      "arm": "haiku",
+      "repeat": 4,
+      "ok": true,
+      "error": null,
+      "models": [
+        "claude-haiku-4-5"
+      ],
+      "mcp_tools_attached": true,
+      "tool_names": [
+        "ToolSearch",
+        "Bash",
+        "Bash",
+        "mcp__plugin_oh-my-evor_evor__evor_capability",
+        "mcp__plugin_oh-my-evor_evor__evor_signal_emit"
+      ],
+      "malformed": [],
+      "evor_calls": 2,
+      "wall_ms": 29829,
+      "cost_usd": 0.026683
+    },
+    {
+      "role": "evor-sage",
+      "arm": "sonnet",
+      "repeat": 4,
+      "ok": true,
+      "error": null,
+      "models": [
+        "claude-sonnet-5"
+      ],
+      "mcp_tools_attached": true,
+      "tool_names": [
+        "ToolSearch",
+        "mcp__plugin_oh-my-evor_evor__evor_wiki_query",
+        "mcp__plugin_oh-my-evor_evor__evor_capability"
+      ],
+      "malformed": [],
+      "evor_calls": 2,
+      "wall_ms": 22270,
+      "cost_usd": 0.07682039999999998
+    },
+    {
+      "role": "evor-selector",
+      "arm": "haiku",
+      "repeat": 4,
+      "ok": true,
+      "error": null,
+      "models": [
+        "claude-haiku-4-5"
+      ],
+      "mcp_tools_attached": true,
+      "tool_names": [
+        "ToolSearch",
+        "mcp__plugin_oh-my-evor_evor__evor_gotcha_query",
+        "mcp__plugin_oh-my-evor_evor__evor_gotcha_query"
+      ],
+      "malformed": [],
+      "evor_calls": 2,
+      "wall_ms": 20445,
+      "cost_usd": 0.0193309
+    },
+    {
+      "role": "evor-selector",
+      "arm": "sonnet",
+      "repeat": 4,
+      "ok": true,
+      "error": null,
+      "models": [
+        "claude-sonnet-5"
+      ],
+      "mcp_tools_attached": true,
+      "tool_names": [
+        "ToolSearch",
+        "mcp__plugin_oh-my-evor_evor__evor_gotcha_query",
+        "mcp__plugin_oh-my-evor_evor__evor_gotcha_query"
+      ],
+      "malformed": [],
+      "evor_calls": 2,
+      "wall_ms": 16160,
+      "cost_usd": 0.0624855
+    },
+    {
+      "role": "evor-sage",
+      "arm": "haiku",
+      "repeat": 4,
+      "ok": true,
+      "error": null,
+      "models": [
+        "claude-haiku-4-5"
+      ],
+      "mcp_tools_attached": true,
+      "tool_names": [
+        "ToolSearch",
+        "mcp__plugin_oh-my-evor_evor__evor_wiki_query",
+        "mcp__plugin_oh-my-evor_evor__evor_capability"
+      ],
+      "malformed": [],
+      "evor_calls": 2,
+      "wall_ms": 41093,
+      "cost_usd": 0.029255299999999998
+    }
+  ]
+}
