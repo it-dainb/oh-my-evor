@@ -21297,6 +21297,19 @@ var LessonEntrySchema = external_exports.object({
   citations: external_exports.array(external_exports.string()),
   telemetry_evidence: external_exports.string().optional(),
   tags: external_exports.array(external_exports.string()),
+  // ── Item 5.3: a lesson refuted by measurement must be markable ──────────
+  //
+  // N-02. The r1 entry claiming a latency figure was falsified TWICE — measured
+  // at 81.4ms and 74.85ms — and was never retracted. It was then cited 23 times
+  // across the tree. Overwriting in place is not enough: the refutation needs a
+  // POINTER to the evidence, or the next reader cannot tell a stale claim from a
+  // live one, and the history of having believed it is lost.
+  superseded_by: external_exports.string().optional().describe(
+    "Node or lesson id whose measurement refutes this entry. Set => not a confirmed lesson."
+  ),
+  superseded_reason: external_exports.string().optional().describe(
+    "Why it was superseded, recorded when it was, not reconstructed afterwards."
+  ),
   // Server-owned: filled via now(); defaults to "" to keep stored type as string.
   created_at: ISODate.optional().default("")
 });
@@ -22787,10 +22800,21 @@ function loadCorpus(indexPath) {
   idfCache.set(indexPath, result);
   return result;
 }
-function wikiAdd(runId, entry, missionId) {
+function wikiAdd(runId, entry, missionId, opts) {
   const paths = resolveRunPaths(runId, missionId);
   const evorRoot = getEvorRoot();
   const wikiRoot = (0, import_path7.join)(evorRoot, "wiki");
+  let citation_status;
+  if (opts?.resolveCitation) {
+    citation_status = {};
+    for (const citation of entry.citations ?? []) {
+      try {
+        citation_status[citation] = opts.resolveCitation(citation);
+      } catch (err3) {
+        citation_status[citation] = { resolved: false, title: `resolver error: ${String(err3)}` };
+      }
+    }
+  }
   const rendered = renderLesson(entry);
   (0, import_fs6.mkdirSync)(wikiRoot, { recursive: true });
   (0, import_fs6.writeFileSync)((0, import_path7.join)(wikiRoot, `${entry.lesson_id}.md`), rendered, "utf8");
@@ -22799,7 +22823,7 @@ function wikiAdd(runId, entry, missionId) {
   const runWikiDir = (0, import_path7.join)(paths.runDir, "wiki");
   (0, import_fs6.mkdirSync)(runWikiDir, { recursive: true });
   (0, import_fs6.writeFileSync)((0, import_path7.join)(runWikiDir, `${entry.lesson_id}.md`), rendered, "utf8");
-  return { lessonId: entry.lesson_id, indexPath };
+  return { lessonId: entry.lesson_id, indexPath, citation_status };
 }
 function wikiQuery(query, opts) {
   const evorRoot = getEvorRoot();
@@ -22821,6 +22845,7 @@ function wikiQuery(query, opts) {
     }
     if (opts?.family && entry.approach_family !== opts.family) continue;
     if (opts?.confirmedOnly && entry.hypothesis_verdict !== "confirmed") continue;
+    if (opts?.confirmedOnly && entry.superseded_by) continue;
     if (keywords.length === 0) {
       scored.push({ hits: 0, createdAt: entry.created_at, entry });
       continue;
@@ -23420,6 +23445,10 @@ function registerStateTools(server) {
   );
 }
 
+// src/tools/cite.ts
+var import_fs10 = require("fs");
+var import_path11 = require("path");
+
 // src/active-run.ts
 var import_fs9 = require("fs");
 var import_path10 = require("path");
@@ -23438,12 +23467,35 @@ function resolveRunId(provided) {
 }
 
 // src/tools/cite.ts
+function appendPendingCitation(runId, ref, citation, missionId) {
+  try {
+    const paths = ensureRunDirs(runId, missionId);
+    const file = (0, import_path11.join)(paths.runDir, "pending-citations.json");
+    let store = {};
+    if ((0, import_fs10.existsSync)(file)) {
+      try {
+        store = JSON.parse((0, import_fs10.readFileSync)(file, "utf8"));
+      } catch {
+        store = {};
+      }
+    }
+    const existing = Array.isArray(store[ref]) ? store[ref] : [];
+    const citations = existing.includes(citation) ? existing : [...existing, citation];
+    store[ref] = citations;
+    const tmp = `${file}.tmp`;
+    (0, import_fs10.writeFileSync)(tmp, JSON.stringify(store, null, 2), "utf8");
+    (0, import_fs10.renameSync)(tmp, file);
+    return { ok: true, citations, pending: true };
+  } catch (err3) {
+    return { ok: false, error: `could not record a pending citation for '${ref}': ${String(err3)}` };
+  }
+}
 function addCitation(runId, nodeId, citation, missionId) {
   const resolvedId = resolveNodeRef(runId, nodeId, missionId);
   const nodes = readTree(runId, missionId);
   const node = nodes[resolvedId];
   if (!node) {
-    return { ok: false, error: `node '${nodeId}' not found in this run's tree \u2014 check the name with evor_tree_read.` };
+    return appendPendingCitation(runId, nodeId, citation, missionId);
   }
   if (node.citations.includes(citation)) {
     return { ok: true, citations: node.citations };
@@ -23484,13 +23536,13 @@ function registerCiteTools(server) {
 }
 
 // src/tools/telemetry.ts
-var import_fs10 = require("fs");
-var import_path11 = require("path");
+var import_fs11 = require("fs");
+var import_path12 = require("path");
 function telemetryIngest(runId, nodeId, records, missionId) {
   const paths = resolveRunPaths(runId, missionId);
-  const nodeDir = (0, import_path11.join)(paths.nodesDir, nodeId);
-  if (!(0, import_fs10.existsSync)(nodeDir)) {
-    (0, import_fs10.mkdirSync)(nodeDir, { recursive: true });
+  const nodeDir = (0, import_path12.join)(paths.nodesDir, nodeId);
+  if (!(0, import_fs11.existsSync)(nodeDir)) {
+    (0, import_fs11.mkdirSync)(nodeDir, { recursive: true });
   }
   const now = (/* @__PURE__ */ new Date()).toISOString();
   const filled = records.map((r) => ({
@@ -23499,9 +23551,9 @@ function telemetryIngest(runId, nodeId, records, missionId) {
     run_id: r.run_id || runId,
     timestamp: r.timestamp || now
   }));
-  const telemetryPath = (0, import_path11.join)(nodeDir, "telemetry.jsonl");
+  const telemetryPath = (0, import_path12.join)(nodeDir, "telemetry.jsonl");
   const lines = filled.map((r) => JSON.stringify(r)).join("\n") + "\n";
-  (0, import_fs10.appendFileSync)(telemetryPath, lines, "utf8");
+  (0, import_fs11.appendFileSync)(telemetryPath, lines, "utf8");
   return { telemetryPath, count: records.length };
 }
 function registerTelemetryTools(server) {
@@ -23530,8 +23582,8 @@ function registerTelemetryTools(server) {
 
 // src/tools/signals.ts
 var import_crypto2 = require("crypto");
-var import_fs11 = require("fs");
-var import_path12 = require("path");
+var import_fs12 = require("fs");
+var import_path13 = require("path");
 var SEVERITY_ORDER = {
   low: 0,
   medium: 1,
@@ -23546,9 +23598,9 @@ function signalId(kind, signature) {
   return `sig-${h}`;
 }
 function loadSignals(signalsPath) {
-  if (!(0, import_fs11.existsSync)(signalsPath)) return [];
+  if (!(0, import_fs12.existsSync)(signalsPath)) return [];
   const out = [];
-  for (const line of (0, import_fs11.readFileSync)(signalsPath, "utf8").split("\n")) {
+  for (const line of (0, import_fs12.readFileSync)(signalsPath, "utf8").split("\n")) {
     const t = line.trim();
     if (!t) continue;
     try {
@@ -23559,35 +23611,35 @@ function loadSignals(signalsPath) {
   return out;
 }
 function atomicWriteJsonl(signalsPath, records) {
-  const dir = (0, import_path12.dirname)(signalsPath);
-  if (!(0, import_fs11.existsSync)(dir)) (0, import_fs11.mkdirSync)(dir, { recursive: true });
+  const dir = (0, import_path13.dirname)(signalsPath);
+  if (!(0, import_fs12.existsSync)(dir)) (0, import_fs12.mkdirSync)(dir, { recursive: true });
   const tmpPath = `${signalsPath}.tmp`;
-  (0, import_fs11.writeFileSync)(tmpPath, records.map((r) => JSON.stringify(r)).join("\n") + "\n", "utf8");
-  (0, import_fs11.renameSync)(tmpPath, signalsPath);
+  (0, import_fs12.writeFileSync)(tmpPath, records.map((r) => JSON.stringify(r)).join("\n") + "\n", "utf8");
+  (0, import_fs12.renameSync)(tmpPath, signalsPath);
 }
 function drainSignalsInbox(runDir, runId, missionId) {
-  const inboxPath = (0, import_path12.join)(runDir, "signals-inbox.jsonl");
-  if (!(0, import_fs11.existsSync)(inboxPath)) return;
+  const inboxPath = (0, import_path13.join)(runDir, "signals-inbox.jsonl");
+  if (!(0, import_fs12.existsSync)(inboxPath)) return;
   const tmpPath = `${inboxPath}.drain-tmp`;
-  if ((0, import_fs11.existsSync)(tmpPath)) {
+  if ((0, import_fs12.existsSync)(tmpPath)) {
     try {
-      (0, import_fs11.unlinkSync)(tmpPath);
+      (0, import_fs12.unlinkSync)(tmpPath);
     } catch {
     }
   }
   try {
-    (0, import_fs11.renameSync)(inboxPath, tmpPath);
+    (0, import_fs12.renameSync)(inboxPath, tmpPath);
   } catch {
     return;
   }
   let lines;
   try {
-    lines = (0, import_fs11.readFileSync)(tmpPath, "utf8").split("\n");
+    lines = (0, import_fs12.readFileSync)(tmpPath, "utf8").split("\n");
   } catch {
     return;
   } finally {
     try {
-      (0, import_fs11.unlinkSync)(tmpPath);
+      (0, import_fs12.unlinkSync)(tmpPath);
     } catch {
     }
   }
@@ -23818,14 +23870,14 @@ function registerSignalTools(server) {
 }
 
 // src/tools/init.ts
-var import_fs12 = require("fs");
-var import_path13 = require("path");
+var import_fs13 = require("fs");
+var import_path14 = require("path");
 var import_os = require("os");
 var import_crypto3 = require("crypto");
 function initRun(answers, opts) {
-  const tmpFile = (0, import_path13.join)((0, import_os.tmpdir)(), `evor-init-answers-${(0, import_crypto3.randomUUID)()}.json`);
+  const tmpFile = (0, import_path14.join)((0, import_os.tmpdir)(), `evor-init-answers-${(0, import_crypto3.randomUUID)()}.json`);
   try {
-    (0, import_fs12.writeFileSync)(tmpFile, JSON.stringify(answers), "utf8");
+    (0, import_fs13.writeFileSync)(tmpFile, JSON.stringify(answers), "utf8");
     const args = ["init-run", "--answers", tmpFile];
     if (opts?.runId) args.push("--run-id", opts.runId);
     if (opts?.missionId) args.push("--mission-id", opts.missionId);
@@ -23840,7 +23892,7 @@ function initRun(answers, opts) {
     return result.data;
   } finally {
     try {
-      (0, import_fs12.unlinkSync)(tmpFile);
+      (0, import_fs13.unlinkSync)(tmpFile);
     } catch {
     }
   }
@@ -23885,8 +23937,8 @@ function registerInitTools(server) {
 }
 
 // src/tools/artifact.ts
-var import_fs13 = require("fs");
-var import_path14 = require("path");
+var import_fs14 = require("fs");
+var import_path15 = require("path");
 var import_os2 = require("os");
 var CONTRACT_VALIDATED_AGENTS = /* @__PURE__ */ new Set([
   "mutagen",
@@ -23912,9 +23964,9 @@ function writeArtifact(runId, tick, agent, payload, kind, partial2, missionId) {
   let tmpDir = null;
   let payloadFile = null;
   try {
-    tmpDir = (0, import_fs13.mkdtempSync)((0, import_path14.join)((0, import_os2.tmpdir)(), "evor-artifact-"));
-    payloadFile = (0, import_path14.join)(tmpDir, "payload.json");
-    (0, import_fs13.writeFileSync)(payloadFile, JSON.stringify(payload), "utf8");
+    tmpDir = (0, import_fs14.mkdtempSync)((0, import_path15.join)((0, import_os2.tmpdir)(), "evor-artifact-"));
+    payloadFile = (0, import_path15.join)(tmpDir, "payload.json");
+    (0, import_fs14.writeFileSync)(payloadFile, JSON.stringify(payload), "utf8");
   } catch (err3) {
     return {
       ok: false,
@@ -23938,11 +23990,11 @@ function writeArtifact(runId, tick, agent, payload, kind, partial2, missionId) {
     result = callBridge("artifact_bridge.py", bridgeArgs);
   } finally {
     try {
-      if (payloadFile) (0, import_fs13.unlinkSync)(payloadFile);
+      if (payloadFile) (0, import_fs14.unlinkSync)(payloadFile);
     } catch {
     }
     try {
-      if (tmpDir) (0, import_fs13.rmdirSync)(tmpDir);
+      if (tmpDir) (0, import_fs14.rmdirSync)(tmpDir);
     } catch {
     }
   }
@@ -24085,20 +24137,20 @@ function registerArtifactTools(server) {
 }
 
 // src/tools/lineage.ts
-var import_fs14 = require("fs");
-var import_path15 = require("path");
+var import_fs15 = require("fs");
+var import_path16 = require("path");
 var import_os3 = require("os");
 function storePatch(runId, nodeId, patchContent, missionId) {
   const paths = resolveRunPaths(runId, missionId);
-  const nodeDir = (0, import_path15.join)(paths.nodesDir, nodeId);
+  const nodeDir = (0, import_path16.join)(paths.nodesDir, nodeId);
   try {
-    if (!(0, import_fs14.existsSync)(nodeDir)) {
-      (0, import_fs14.mkdirSync)(nodeDir, { recursive: true });
+    if (!(0, import_fs15.existsSync)(nodeDir)) {
+      (0, import_fs15.mkdirSync)(nodeDir, { recursive: true });
     }
-    const patchPath = (0, import_path15.join)(nodeDir, "parent.patch");
+    const patchPath = (0, import_path16.join)(nodeDir, "parent.patch");
     const tmpPath = `${patchPath}.tmp`;
-    (0, import_fs14.writeFileSync)(tmpPath, patchContent, "utf8");
-    (0, import_fs14.renameSync)(tmpPath, patchPath);
+    (0, import_fs15.writeFileSync)(tmpPath, patchContent, "utf8");
+    (0, import_fs15.renameSync)(tmpPath, patchPath);
     return { ok: true, patchPath };
   } catch (err3) {
     return {
@@ -24112,9 +24164,9 @@ function writeHandoff(runId, tick, data, missionId) {
   let tmpDir = null;
   let payloadFile = null;
   try {
-    tmpDir = (0, import_fs14.mkdtempSync)((0, import_path15.join)((0, import_os3.tmpdir)(), "evor-handoff-"));
-    payloadFile = (0, import_path15.join)(tmpDir, "payload.json");
-    (0, import_fs14.writeFileSync)(payloadFile, JSON.stringify(data), "utf8");
+    tmpDir = (0, import_fs15.mkdtempSync)((0, import_path16.join)((0, import_os3.tmpdir)(), "evor-handoff-"));
+    payloadFile = (0, import_path16.join)(tmpDir, "payload.json");
+    (0, import_fs15.writeFileSync)(payloadFile, JSON.stringify(data), "utf8");
   } catch (err3) {
     return {
       ok: false,
@@ -24133,11 +24185,11 @@ function writeHandoff(runId, tick, data, missionId) {
     ]);
   } finally {
     try {
-      if (payloadFile) (0, import_fs14.unlinkSync)(payloadFile);
+      if (payloadFile) (0, import_fs15.unlinkSync)(payloadFile);
     } catch {
     }
     try {
-      if (tmpDir) (0, import_fs14.rmdirSync)(tmpDir);
+      if (tmpDir) (0, import_fs15.rmdirSync)(tmpDir);
     } catch {
     }
   }
@@ -24349,9 +24401,9 @@ function registerLineageTools(server) {
 }
 
 // src/tools/compute.ts
-var import_fs15 = require("fs");
+var import_fs16 = require("fs");
 var import_crypto4 = require("crypto");
-var import_path16 = require("path");
+var import_path17 = require("path");
 function ok2(data) {
   return { content: [{ type: "text", text: JSON.stringify(data) }] };
 }
@@ -24497,9 +24549,9 @@ function gotchasList(kind, scope, minConfidence, evorRoot, runDir) {
 }
 function lockEvaluate(runId, nodeRef, missionId) {
   const nodeId = resolveNodeRef(runId, nodeRef, missionId);
-  const worktree = (0, import_path16.join)(getEvorRoot(), "worktrees", nodeId);
-  const evalPath = (0, import_path16.join)(worktree, "evaluate.py");
-  if (!(0, import_fs15.existsSync)(evalPath)) {
+  const worktree = (0, import_path17.join)(getEvorRoot(), "worktrees", nodeId);
+  const evalPath = (0, import_path17.join)(worktree, "evaluate.py");
+  if (!(0, import_fs16.existsSync)(evalPath)) {
     return {
       ok: false,
       node_name: nodeRef,
@@ -24509,15 +24561,15 @@ function lockEvaluate(runId, nodeRef, missionId) {
   let contractHash = "";
   try {
     const { runDir } = resolveRunPaths(runId, missionId);
-    const contractPath = (0, import_path16.join)(runDir, "goal-contract.json");
-    if ((0, import_fs15.existsSync)(contractPath)) {
-      const contract = JSON.parse((0, import_fs15.readFileSync)(contractPath, "utf8"));
+    const contractPath = (0, import_path17.join)(runDir, "goal-contract.json");
+    if ((0, import_fs16.existsSync)(contractPath)) {
+      const contract = JSON.parse((0, import_fs16.readFileSync)(contractPath, "utf8"));
       contractHash = typeof contract.eval_script_hash === "string" ? contract.eval_script_hash : "";
     }
   } catch {
   }
   try {
-    const hash = (0, import_crypto4.createHash)("sha256").update((0, import_fs15.readFileSync)(evalPath)).digest("hex");
+    const hash = (0, import_crypto4.createHash)("sha256").update((0, import_fs16.readFileSync)(evalPath)).digest("hex");
     if (contractHash && contractHash !== hash) {
       return {
         ok: false,
@@ -24525,8 +24577,8 @@ function lockEvaluate(runId, nodeRef, missionId) {
         error: "this node's evaluate.py does not match the mission's locked evaluation script \u2014 it must be an exact copy of the canonical evaluator, not a modified or re-authored one"
       };
     }
-    (0, import_fs15.writeFileSync)((0, import_path16.join)(worktree, "evaluate.py.lock"), hash, "utf8");
-    (0, import_fs15.chmodSync)(evalPath, 292);
+    (0, import_fs16.writeFileSync)((0, import_path17.join)(worktree, "evaluate.py.lock"), hash, "utf8");
+    (0, import_fs16.chmodSync)(evalPath, 292);
     return { ok: true, node_name: nodeRef };
   } catch {
     return { ok: false, node_name: nodeRef, error: "could not lock evaluate.py" };
@@ -24534,11 +24586,11 @@ function lockEvaluate(runId, nodeRef, missionId) {
 }
 function verifyArtifacts(runId, nodeRef, missionId) {
   const nodeId = resolveNodeRef(runId, nodeRef, missionId);
-  const nodeDir = (0, import_path16.join)(resolveRunPaths(runId, missionId).runDir, "nodes", nodeId);
+  const nodeDir = (0, import_path17.join)(resolveRunPaths(runId, missionId).runDir, "nodes", nodeId);
   const present = (rel, minBytes) => {
     try {
-      const p = (0, import_path16.join)(nodeDir, rel);
-      return (0, import_fs15.existsSync)(p) && (0, import_fs15.statSync)(p).size > minBytes;
+      const p = (0, import_path17.join)(nodeDir, rel);
+      return (0, import_fs16.existsSync)(p) && (0, import_fs16.statSync)(p).size > minBytes;
     } catch {
       return false;
     }
@@ -24549,9 +24601,9 @@ function verifyArtifacts(runId, nodeRef, missionId) {
 }
 function patchGoalContract(runDir, patch) {
   const contractPath = `${runDir}/goal-contract.json`;
-  if (!(0, import_fs15.existsSync)(contractPath)) return;
+  if (!(0, import_fs16.existsSync)(contractPath)) return;
   try {
-    const contract = JSON.parse((0, import_fs15.readFileSync)(contractPath, "utf8"));
+    const contract = JSON.parse((0, import_fs16.readFileSync)(contractPath, "utf8"));
     let changed = false;
     for (const [k, v] of Object.entries(patch)) {
       if (v && contract[k] !== v) {
@@ -24560,7 +24612,7 @@ function patchGoalContract(runDir, patch) {
       }
     }
     if (changed) {
-      (0, import_fs15.writeFileSync)(contractPath, JSON.stringify(contract, null, 2), "utf8");
+      (0, import_fs16.writeFileSync)(contractPath, JSON.stringify(contract, null, 2), "utf8");
     }
   } catch {
   }
@@ -24590,9 +24642,9 @@ function registerComputeTools(server) {
         try {
           const arPath = getActiveRunPath();
           let existing = {};
-          if ((0, import_fs15.existsSync)(arPath)) {
+          if ((0, import_fs16.existsSync)(arPath)) {
             try {
-              existing = JSON.parse((0, import_fs15.readFileSync)(arPath, "utf8"));
+              existing = JSON.parse((0, import_fs16.readFileSync)(arPath, "utf8"));
             } catch {
             }
           }
@@ -24604,17 +24656,17 @@ function registerComputeTools(server) {
           };
           if (missionId && !ar.mission_id) ar.mission_id = missionId;
           const arTmp = `${arPath}.tmp`;
-          (0, import_fs15.writeFileSync)(arTmp, JSON.stringify(ar, null, 2), "utf8");
-          (0, import_fs15.renameSync)(arTmp, arPath);
+          (0, import_fs16.writeFileSync)(arTmp, JSON.stringify(ar, null, 2), "utf8");
+          (0, import_fs16.renameSync)(arTmp, arPath);
         } catch {
         }
       }
       try {
-        const msPath = (0, import_path16.join)(resolvedDir, "mission-state.json");
+        const msPath = (0, import_path17.join)(resolvedDir, "mission-state.json");
         let ms = {};
-        if ((0, import_fs15.existsSync)(msPath)) {
+        if ((0, import_fs16.existsSync)(msPath)) {
           try {
-            ms = JSON.parse((0, import_fs15.readFileSync)(msPath, "utf8"));
+            ms = JSON.parse((0, import_fs16.readFileSync)(msPath, "utf8"));
           } catch {
           }
         }
@@ -24624,10 +24676,10 @@ function registerComputeTools(server) {
           ms.updated_at = (/* @__PURE__ */ new Date()).toISOString();
           ms.entered_at = ms.updated_at;
           const msTmp = `${msPath}.tmp`;
-          (0, import_fs15.writeFileSync)(msTmp, JSON.stringify(ms, null, 2), "utf8");
-          (0, import_fs15.renameSync)(msTmp, msPath);
-          (0, import_fs15.appendFileSync)(
-            (0, import_path16.join)(resolvedDir, "transitions.jsonl"),
+          (0, import_fs16.writeFileSync)(msTmp, JSON.stringify(ms, null, 2), "utf8");
+          (0, import_fs16.renameSync)(msTmp, msPath);
+          (0, import_fs16.appendFileSync)(
+            (0, import_path17.join)(resolvedDir, "transitions.jsonl"),
             JSON.stringify({
               at: ms.updated_at,
               entity: "mission",
@@ -24662,8 +24714,8 @@ function registerComputeTools(server) {
       if (!resolvedJobId) {
         try {
           const arPath = getActiveRunPath();
-          if ((0, import_fs15.existsSync)(arPath)) {
-            const ar = JSON.parse((0, import_fs15.readFileSync)(arPath, "utf8"));
+          if ((0, import_fs16.existsSync)(arPath)) {
+            const ar = JSON.parse((0, import_fs16.readFileSync)(arPath, "utf8"));
             if (typeof ar.job_id === "string") resolvedJobId = ar.job_id;
           }
         } catch {
@@ -24699,7 +24751,7 @@ function registerComputeTools(server) {
         return err2(result.error ?? "evor capability failed");
       }
       try {
-        const cap = JSON.parse((0, import_fs15.readFileSync)((0, import_path16.join)(root, "capability.json"), "utf8"));
+        const cap = JSON.parse((0, import_fs16.readFileSync)((0, import_path17.join)(root, "capability.json"), "utf8"));
         return ok2(cap);
       } catch {
         return err2(
@@ -24809,8 +24861,8 @@ function registerComputeTools(server) {
       const result = initEvalSuite(mission_id, eval_version, task_description, runDir);
       if (!result.ok) return err2(result.error ?? "evor_init_eval_suite failed");
       const evalScriptPath = `${runDir}/eval-suites/${eval_version}.py`;
-      if ((0, import_fs15.existsSync)(evalScriptPath)) {
-        const hash = (0, import_crypto4.createHash)("sha256").update((0, import_fs15.readFileSync)(evalScriptPath)).digest("hex");
+      if ((0, import_fs16.existsSync)(evalScriptPath)) {
+        const hash = (0, import_crypto4.createHash)("sha256").update((0, import_fs16.readFileSync)(evalScriptPath)).digest("hex");
         patchGoalContract(runDir, { eval_script_hash: hash });
       }
       return ok2(result.data);
@@ -24828,12 +24880,12 @@ function registerComputeTools(server) {
       const resolvedMission = mission_id ?? process.env.EVOR_MISSION_ID;
       const { runDir } = resolveRunPaths(run_id, resolvedMission);
       const evalScriptPath = `${runDir}/eval-suites/${eval_version}.py`;
-      if (!(0, import_fs15.existsSync)(evalScriptPath)) {
+      if (!(0, import_fs16.existsSync)(evalScriptPath)) {
         return err2(
           "no evaluation script found for this version \u2014 write the canonical evaluator before sealing it, then try again."
         );
       }
-      const hash = (0, import_crypto4.createHash)("sha256").update((0, import_fs15.readFileSync)(evalScriptPath)).digest("hex");
+      const hash = (0, import_crypto4.createHash)("sha256").update((0, import_fs16.readFileSync)(evalScriptPath)).digest("hex");
       patchGoalContract(runDir, { eval_script_hash: hash });
       return ok2({ ok: true, eval_version });
     }
@@ -24903,7 +24955,7 @@ function registerComputeTools(server) {
       const { runDir } = resolveRunPaths(run_id, missionId);
       const resolvedCandidates = candidates.map((c) => {
         const nodeId = resolveNodeRef(run_id, c.node_name, missionId);
-        const worktree = (0, import_path16.join)(evorRoot, "worktrees", nodeId);
+        const worktree = (0, import_path17.join)(evorRoot, "worktrees", nodeId);
         return { node_id: nodeId, worktree, eval_version: c.eval_version };
       });
       const result = forgeDispatchBatch(run_id, resolvedCandidates, runDir, gpu_fraction);
@@ -24988,8 +25040,8 @@ function registerComputeTools(server) {
 }
 
 // src/tools/gotcha.ts
-var import_fs16 = require("fs");
-var import_path17 = require("path");
+var import_fs17 = require("fs");
+var import_path18 = require("path");
 var import_os4 = require("os");
 function gotchaQuery(params) {
   const evorRoot = params.evorRoot ?? getEvorRoot();
@@ -25029,9 +25081,9 @@ function gotchaAdd(params) {
   let tmpDir = null;
   let payloadFile = null;
   try {
-    tmpDir = (0, import_fs16.mkdtempSync)((0, import_path17.join)((0, import_os4.tmpdir)(), "evor-gotcha-"));
-    payloadFile = (0, import_path17.join)(tmpDir, "payload.json");
-    (0, import_fs16.writeFileSync)(
+    tmpDir = (0, import_fs17.mkdtempSync)((0, import_path18.join)((0, import_os4.tmpdir)(), "evor-gotcha-"));
+    payloadFile = (0, import_path18.join)(tmpDir, "payload.json");
+    (0, import_fs17.writeFileSync)(
       payloadFile,
       JSON.stringify({
         kind: params.kind,
@@ -25065,11 +25117,11 @@ function gotchaAdd(params) {
     result = callBridge("gotcha_bridge.py", bridgeArgs);
   } finally {
     try {
-      if (payloadFile) (0, import_fs16.unlinkSync)(payloadFile);
+      if (payloadFile) (0, import_fs17.unlinkSync)(payloadFile);
     } catch {
     }
     try {
-      if (tmpDir) (0, import_fs16.rmdirSync)(tmpDir);
+      if (tmpDir) (0, import_fs17.rmdirSync)(tmpDir);
     } catch {
     }
   }
@@ -25087,8 +25139,8 @@ function gotchaAdd(params) {
 }
 function storeBlob(params) {
   const runDir = resolveRunPaths(params.runId, params.missionId).runDir;
-  if (!(0, import_fs16.existsSync)(runDir)) {
-    (0, import_fs16.mkdirSync)(runDir, { recursive: true });
+  if (!(0, import_fs17.existsSync)(runDir)) {
+    (0, import_fs17.mkdirSync)(runDir, { recursive: true });
   }
   let srcPath = params.path;
   let tmpDir = null;
@@ -25098,9 +25150,9 @@ function storeBlob(params) {
       return { ok: false, error: "one of 'path' or 'content' is required" };
     }
     try {
-      tmpDir = (0, import_fs16.mkdtempSync)((0, import_path17.join)((0, import_os4.tmpdir)(), "evor-blob-"));
-      tmpFile = (0, import_path17.join)(tmpDir, "blob.bin");
-      (0, import_fs16.writeFileSync)(tmpFile, params.content, "utf8");
+      tmpDir = (0, import_fs17.mkdtempSync)((0, import_path18.join)((0, import_os4.tmpdir)(), "evor-blob-"));
+      tmpFile = (0, import_path18.join)(tmpDir, "blob.bin");
+      (0, import_fs17.writeFileSync)(tmpFile, params.content, "utf8");
       srcPath = tmpFile;
     } catch (err3) {
       return {
@@ -25123,11 +25175,11 @@ function storeBlob(params) {
     result = callBridge("store_blob_bridge.py", bridgeArgs);
   } finally {
     try {
-      if (tmpFile) (0, import_fs16.unlinkSync)(tmpFile);
+      if (tmpFile) (0, import_fs17.unlinkSync)(tmpFile);
     } catch {
     }
     try {
-      if (tmpDir) (0, import_fs16.rmdirSync)(tmpDir);
+      if (tmpDir) (0, import_fs17.rmdirSync)(tmpDir);
     } catch {
     }
   }

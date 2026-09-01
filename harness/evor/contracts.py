@@ -1264,6 +1264,52 @@ class GotchaEntry(BaseEvorModel):
     last_seen: str
     """ISO 8601 timestamp of most recent occurrence."""
 
+    # ── Item 5.2: a gotcha must be able to say it has been invalidated ──────
+    #
+    # Without a field for it the only two representations available were DELETE
+    # (which loses the history) and LEAVE STANDING (which is what happened). A
+    # gotcha encoding a latency gate that the r3 contract relaxed tenfold — 0.1s
+    # to 1s CPU, 10ms to 500ms GPU — stayed at confidence 1.0 and was handed
+    # verbatim to five r3 agents as current fact.
+    superseded_at: Optional[str] = None
+    """When this gotcha stopped being true. None = still standing."""
+    superseded_reason: Optional[str] = None
+    """WHY it stopped being true, recorded when it stopped, not reconstructed."""
+    superseded_by: Optional[str] = None
+    """Signature of the gotcha that replaces this one, when there is one."""
+
+    contradictions: list[str] = Field(default_factory=list)
+    """Evidence recorded AGAINST this gotcha.
+
+    ``add_gotcha`` halves the gap to 1.0 on every repeat, so confidence was
+    monotonically increasing: a fact measured to be wrong twice kept its 1.0.
+    r2 and r3 both recorded that kMAC/px is a poor predictor of measured
+    latency, and nothing moved.
+    """
+
+    @property
+    def is_superseded(self) -> bool:
+        return self.superseded_at is not None
+
+    @property
+    def is_unresolved(self) -> bool:
+        """Is this an open problem rather than a diagnosed one? (Item 5.2 / N-10.)
+
+        Confidence measures certainty of the DIAGNOSIS. An unresolved problem is
+        low-confidence precisely BECAUSE it needs attention, so a confidence
+        floor filters out exactly the entries most worth surfacing.
+        ``private-dataloader-test-leakage-iir-binnet-01`` sat at 0.5, every r3
+        query used a floor of 0.6 or 0.8, and a live test-leakage defect was
+        hidden from all five retrievals.
+        """
+        text = (self.resolution or "").strip().lower()
+        if not text:
+            return True
+        return any(
+            marker in text
+            for marker in ("not yet resolved", "unresolved", "unknown", "tbd", "todo", "under investigation")
+        )
+
 
 # Signal facet vocabularies — the ONLY closed sets in the signal system.
 # Signal `kind` stays free-text/open; facets are how lenses subscribe.
@@ -1347,6 +1393,37 @@ class CapabilityProfile(BaseEvorModel):
 # ────────────────────────────────────────────────────────────────────────────
 
 
+class CitationVerification(BaseEvorModel):
+    """What the server found when it resolved a finding's citations (item 5.4).
+
+    Written by the resolver, never by the emitting agent. The distinction is the
+    whole point: the only signal of citation integrity in the pipeline was a
+    junior asserting `urls_verified: true` about its own work, and 3 of 20
+    sampled citations were misattributed.
+    """
+
+    model_config = ConfigDict(strict=True, exclude_none=True)
+
+    resolved_at: str
+    """When the resolution ran."""
+    resolver: str
+    """What did the resolving, e.g. 'arxiv-api' — so a reader can judge it."""
+    resolved_titles: dict[str, str] = Field(default_factory=dict)
+    """url -> the title that URL actually resolves to.
+
+    This is what catches misattribution. A citation whose resolved title has
+    nothing to do with the claim it supports is visible here and nowhere else.
+    """
+    unresolved: list[str] = Field(default_factory=list)
+    """URLs the resolver could not reach. NOT the same as refuted."""
+    mismatches: list[str] = Field(default_factory=list)
+    """URLs whose resolved title contradicts the finding's own title."""
+
+    @property
+    def all_verified(self) -> bool:
+        return not self.unresolved and not self.mismatches
+
+
 class CitationBackedFinding(BaseEvorModel):
     """A single research finding backed by ≥1 citation, with an optional full
     implementation blueprint.
@@ -1377,6 +1454,25 @@ class CitationBackedFinding(BaseEvorModel):
     """Numeric SOTA threshold this finding implies, if applicable."""
     applicable_families: list[ApproachFamily]
     """Which ApproachFamily tags this finding applies to."""
+
+    # ── Item 5.4: verification is SERVER-FILLED, never agent-asserted ───────
+    #
+    # N-04. `evor-sage-junior.md` tells the junior to emit `"urls_verified":
+    # true` — about its own work, with nothing checking it. The field was not in
+    # this contract at all, so pydantic silently dropped it: the agent believed
+    # it had declared verification, the store recorded nothing, and the pipeline
+    # treated the finding exactly as it treated a checked one. Three of twenty
+    # sampled citations were misattributed; CBAM was cited to arXiv 2006.05595,
+    # which is "Fitted Q-Learning for Relational Domains".
+    #
+    # `extra="forbid"` (item 1.6) now REJECTS the self-assertion rather than
+    # swallowing it. This field is what replaces it: it is written by the
+    # resolver, and an agent that tries to supply it is refused for the same
+    # reason. `None` means not resolved yet — which is not the same as failed,
+    # and is deliberately distinguishable from both.
+    citation_verification: Optional["CitationVerification"] = None
+    """Server-filled record of what each cited URL actually resolved to."""
+
     quorum_met: bool
     """True iff >=2 independent sources with <=5% divergence confirmed the finding."""
     junior_sources: list[str] = Field(default_factory=list)

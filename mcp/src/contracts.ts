@@ -405,6 +405,19 @@ export const LessonEntrySchema = z.object({
   citations: z.array(z.string()),
   telemetry_evidence: z.string().optional(),
   tags: z.array(z.string()),
+  // ── Item 5.3: a lesson refuted by measurement must be markable ──────────
+  //
+  // N-02. The r1 entry claiming a latency figure was falsified TWICE — measured
+  // at 81.4ms and 74.85ms — and was never retracted. It was then cited 23 times
+  // across the tree. Overwriting in place is not enough: the refutation needs a
+  // POINTER to the evidence, or the next reader cannot tell a stale claim from a
+  // live one, and the history of having believed it is lost.
+  superseded_by: z.string().optional().describe(
+    "Node or lesson id whose measurement refutes this entry. Set => not a confirmed lesson.",
+  ),
+  superseded_reason: z.string().optional().describe(
+    "Why it was superseded, recorded when it was, not reconstructed afterwards.",
+  ),
   // Server-owned: filled via now(); defaults to "" to keep stored type as string.
   created_at: ISODate.optional().default(""),
 });

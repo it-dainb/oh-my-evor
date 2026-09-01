@@ -207,7 +207,15 @@ class GotchaStore:
                 continue
             if scope is not None and entry.scope != scope:
                 continue
-            if entry.confidence < min_confidence:
+            # ── N-10 (item 5.2): the floor does not apply to an OPEN problem.
+            #
+            # Confidence measures certainty of the DIAGNOSIS, so an unresolved
+            # gotcha is low-confidence precisely because it needs attention — and
+            # a floor therefore filters out exactly the entries most worth
+            # surfacing. `private-dataloader-test-leakage-iir-binnet-01` sat at
+            # 0.5; every r3 query used 0.6 or 0.8; a live test-leakage defect was
+            # hidden from all five retrievals.
+            if entry.confidence < min_confidence and not entry.is_unresolved:
                 continue
             if context_filter:
                 if not all(
@@ -218,6 +226,82 @@ class GotchaStore:
 
         results.sort(key=lambda e: (e.confidence, e.last_seen), reverse=True)
         return results
+
+    def supersede_gotcha(
+        self,
+        signature: str,
+        reason: str,
+        superseded_by: Optional[str] = None,
+        scope: Optional[str] = None,
+    ) -> int:
+        """Mark a gotcha as no longer true. Returns how many entries were marked.
+
+        Item 5.2. ``add_gotcha`` only ever ratchets occurrences and confidence
+        UP, so the store had no way to record that a fact had stopped being true.
+        The r3 contract relaxed the latency gate this encodes tenfold and nothing
+        could say so; five r3 agents were handed the retired gate as current.
+
+        The entry is MARKED, not deleted. Deleting loses the history — that this
+        was believed, and when it stopped being believed, is exactly what a later
+        reader needs to interpret decisions made while it stood.
+        """
+        return self._mutate(
+            signature,
+            scope,
+            lambda e: e.model_copy(update={
+                "superseded_at": _now_iso(),
+                "superseded_reason": reason,
+                "superseded_by": superseded_by,
+            }),
+        )
+
+    def record_contradiction(
+        self, signature: str, evidence: str, scope: Optional[str] = None
+    ) -> int:
+        """Record evidence AGAINST a gotcha and lower its confidence.
+
+        Item 5.2. Confidence was monotonically increasing — ``add_gotcha`` halves
+        the gap to 1.0 on every repeat — so a fact measured to be wrong twice kept
+        its 1.0. r2 and r3 both recorded that kMAC/px is a poor predictor of
+        measured latency, and nothing moved.
+
+        Symmetry with ``add_gotcha`` is deliberate: corroboration halves the gap
+        UP toward 1.0, so a contradiction halves the distance DOWN toward 0. One
+        contradiction does not erase a well-supported fact, and repeated ones
+        converge on disbelief.
+        """
+        return self._mutate(
+            signature,
+            scope,
+            lambda e: e.model_copy(update={
+                "contradictions": [*e.contradictions, evidence],
+                "confidence": round(e.confidence * 0.5, 4),
+                "last_seen": _now_iso(),
+            }),
+        )
+
+    def _mutate(self, signature: str, scope: Optional[str], fn) -> int:
+        """Rewrite matching entries in place across the scopes this store owns."""
+        touched = 0
+        paths = [self._global_path]
+        if self._mission_path is not None:
+            paths.append(self._mission_path)
+        for path in paths:
+            entries = _load_jsonl(path)
+            if not entries:
+                continue
+            updated = []
+            changed = False
+            for e in entries:
+                if e.signature == signature and (scope is None or e.scope == scope):
+                    updated.append(fn(e))
+                    changed = True
+                    touched += 1
+                else:
+                    updated.append(e)
+            if changed:
+                _atomic_write_jsonl(path, [e.model_dump_json() for e in updated])
+        return touched
 
     def matches_known_failure(
         self,
@@ -271,3 +355,35 @@ def make_gotcha(
         first_seen=now,
         last_seen=now,
     )
+
+#: Item 5.5 — what determines whether a fact travels is what KIND of fact it is.
+#:
+#: N-08: r1 wrote five mission-scoped gotchas that were invisible to r2 and r3,
+#: and THREE OF THE FIVE duplicate a global twin the same agent wrote minutes
+#: earlier. The scope choice was not carrying a distinction; it was whim, because
+#: scope was a free parameter with a silent default.
+#:
+#: A rule keyed on `kind` is deterministic and defensible:
+#:
+#:   hardware-constraint  GLOBAL — a property of the machine, true for every
+#:                        mission that runs on it
+#:   runtime-failure      GLOBAL — a property of the stack: a CUDA OOM or a
+#:                        broken wheel does not become untrue for the next goal
+#:   approach-deadend     MISSION — a property of THIS objective's search space.
+#:                        "Attention did not help here" is about here.
+_SCOPE_BY_KIND: dict[str, str] = {
+    "hardware-constraint": "global",
+    "runtime-failure": "global",
+    "approach-deadend": "mission",
+}
+
+
+def scope_for_gotcha(kind: str, signature: str = "") -> str:
+    """The scope a gotcha of this kind belongs in. Deterministic, not chosen.
+
+    ``signature`` is accepted and deliberately unused for the decision: it is the
+    part an agent writes freely, and letting it influence scope is how two
+    equivalent hardware constraints ended up in different stores four minutes
+    apart. It stays in the signature so callers can log what was scoped.
+    """
+    return _SCOPE_BY_KIND.get(kind, "global")
