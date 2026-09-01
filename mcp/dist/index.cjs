@@ -22990,7 +22990,7 @@ var RunStatePatchSchema = external_exports.object({
   }).optional().describe(
     "When present, compute bias=(predicted-actual)/(predicted+1e-9) and accumulate into prediction_bias_history (rolling avg_bias + n_samples) server-side. Must not be set together with a direct prediction_bias_history write."
   )
-});
+}).strict();
 function stateRead(runId, missionId) {
   const paths = resolveRunPaths(runId, missionId);
   const state = readRunState(paths.runStatePath, runId);

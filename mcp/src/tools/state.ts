@@ -112,7 +112,19 @@ export const RunStatePatchSchema = z.object({
       "into prediction_bias_history (rolling avg_bias + n_samples) server-side. " +
       "Must not be set together with a direct prediction_bias_history write.",
     ),
-});
+})
+  // 1.2 — the merge patch stops accepting arbitrary keys.
+  //
+  // A zod object STRIPS unknown keys by default, so `evor_state_write({bogus: 1})`
+  // returned success and wrote nothing: the agent was told the write happened and
+  // the field simply was not there afterwards. That is the same silent-drop defect
+  // 1.6 fixed on the Python contracts, reached through the other language, and it
+  // is worse here because run-state is the thing the whole governance layer reads.
+  //
+  // `.strict()` makes the rejection loud. It is the enforcement half of "one
+  // server-side writer per state variable": a writer that accepts any key is not
+  // an owner of anything.
+  .strict();
 
 // ── Core logic (exported for tests) ────────────────────────────────────────
 

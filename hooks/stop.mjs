@@ -35,7 +35,7 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync, statSync } from 'fs
 import { join } from 'path';
 import { randomBytes } from 'crypto';
 import { resolveActiveRun } from './lib/active-run.mjs';
-import { isRunLive } from './lib/run-status.mjs';
+import { isRunLive, isTickFinished } from './lib/run-status.mjs';
 
 // ── Kill switches ─────────────────────────────────────────────────────────────
 // DISABLE_EVOR: truthy value disables the entire evor hook layer.
@@ -372,11 +372,14 @@ try {
     const ts = existsSync(tsPathC) ? JSON.parse(readFileSync(tsPathC, 'utf8')) : null;
     const started = typeof ts?.tick === 'number' && ts.tick > 0;
     const step = typeof ts?.current_step === 'number' ? ts.current_step : 0;
-    // step >= 9 alone means complete, matching the existing drift check ("current_step
-    // < 9 while running"). Also requiring step_status === "done" would block runs whose
-    // tick-state omits that field — a false-stop, which is the failure mode this repo
-    // has already had to fix once.
-    const finished = step >= 9;
+    // 1.2: one owner for this predicate. The rule that used to live here —
+    // `step >= 9` alone — was correct about the false-stop hazard and wrong about
+    // step 9 itself: r3's final tick sat at step 9 with `step_status: "running"`
+    // and a failed integrity verdict, and this called it complete. `isTickFinished`
+    // keeps the absent-field permissiveness that motivated the original form and
+    // stops treating an EXPLICIT "still running" as done. See its docstring for
+    // why the two absences are read in opposite directions.
+    const finished = isTickFinished(ts);
 
     if (started && !finished) {
       blockStop(

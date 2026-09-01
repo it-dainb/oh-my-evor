@@ -46,3 +46,47 @@ export function readRunStatus(runState) {
 export function isRunLive(runState) {
   return readRunStatus(runState) === 'running';
 }
+
+/** The 9-step tick loop. One definition of where the end is. */
+export const TICK_FINAL_STEP = 9;
+
+/**
+ * Is this tick finished? (Plan item 1.2 — the ONE definition.)
+ *
+ * The predicate was re-derived in five places across three languages, and two of
+ * them disagreed in opposite directions: `stop.mjs:379` had `const finished =
+ * step >= 9` while `tree.py` defaulted the other way. You cannot tune your way
+ * out of two disagreeing defaults, so the plan cuts the tuning and gives the
+ * predicate an owner instead.
+ *
+ * Three rules, and each one is load-bearing:
+ *
+ *   1. Reaching the last step is not finishing it. The final r3 tick sat at step
+ *      9 with `step_status: "running"`, and `step >= 9` alone called that done —
+ *      so the mission ended on a tick that was still in flight.
+ *
+ *   2. A failed integrity verdict is not a finished tick. A tick whose gate said
+ *      "failed" produced no usable outcome; ending the turn there ends the
+ *      mission on a failure and records it as completion.
+ *
+ *   3. An ABSENT `step_status` still counts as finished. This is deliberate and
+ *      it is why the naive strengthening was reverted once already: requiring
+ *      `step_status === "done"` blocks any run whose tick-state omits the field,
+ *      and a false "not finished" traps the agent in a turn it cannot end. The
+ *      hook fails toward letting the user stop, so absence is read permissively
+ *      HERE while absence of run status is read conservatively in `isRunLive` —
+ *      opposite defaults, because the two absences have opposite consequences.
+ *
+ * @param {Record<string, unknown> | null | undefined} tickState parsed tick-state.json
+ * @returns {boolean}
+ */
+export function isTickFinished(tickState) {
+  const step = typeof tickState?.current_step === 'number' ? tickState.current_step : 0;
+  if (step < TICK_FINAL_STEP) return false;
+
+  if (String(tickState?.integrity_verdict ?? '') === 'failed') return false;
+
+  const stepStatus = tickState?.step_status;
+  if (stepStatus === undefined || stepStatus === null || stepStatus === '') return true;
+  return String(stepStatus) === 'done';
+}

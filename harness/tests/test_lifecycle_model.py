@@ -149,3 +149,56 @@ class TestRunAndTick:
     def test_step_beyond_the_final_step_is_rejected(self):
         with pytest.raises(Exception):
             Tick(tick=1, run_id="r1", current_step=10, step_status="done").model_dump()
+
+
+class TestAllThreeImplementationsAgree:
+    """`is_tick_finished` exists in Python, TypeScript and JavaScript.
+
+    Three copies of a predicate is how it came to be re-derived in five places in
+    the first place. The hooks copy carries two extra rules the typed contract
+    version does not need — an absent ``step_status`` counts as finished (the
+    deliberate false-stop guard) and a failed integrity verdict does not — so the
+    implementations are not identical by design. What must hold is that they
+    never DISAGREE on a case both can express.
+    """
+
+    CASES = [
+        # (current_step, step_status, expected)
+        (0, "pending", False),
+        (8, "done", False),
+        (9, "running", False),   # the exact final r3 tick
+        (9, "failed", False),
+        (9, "pending", False),
+        (9, "done", True),
+    ]
+
+    def test_python_and_javascript_agree(self, tmp_path):
+        import json
+        import subprocess
+
+        hooks_lib = Path(__file__).resolve().parents[2] / "hooks" / "lib" / "run-status.mjs"
+        script = (
+            f"import {{ isTickFinished }} from {hooks_lib.as_uri()!r};\n"
+            "const cases = JSON.parse(process.argv[2]);\n"
+            "console.log(JSON.stringify(cases.map("
+            "([s, st]) => isTickFinished({ current_step: s, step_status: st }))));\n"
+        )
+        f = tmp_path / "probe.mjs"
+        f.write_text(script)
+        payload = json.dumps([[c[0], c[1]] for c in self.CASES])
+        out = subprocess.run(
+            ["node", str(f), payload], capture_output=True, text=True, timeout=30
+        )
+        assert out.returncode == 0, out.stderr
+        js = json.loads(out.stdout)
+        py = [is_tick_finished(step, status) for step, status, _ in self.CASES]
+        expected = [e for _, _, e in self.CASES]
+
+        assert py == expected, "the Python predicate disagrees with the specification"
+        assert js == expected, "the JavaScript predicate disagrees with the specification"
+        assert py == js, (
+            "Python and JavaScript disagree about whether a tick is finished. "
+            "`stop.mjs` decides whether the agent may end its turn and the harness "
+            "decides whether the loop continues; if they differ, one of them is "
+            "wrong about the mission's state and neither reports it."
+        )
