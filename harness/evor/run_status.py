@@ -23,7 +23,12 @@ from typing import Any, Mapping, Optional
 #: from the rest because it is the one being retired; keeping it in a named
 #: constant means ``validate.py`` stops hard-coding the tuple and 1.9b edits one
 #: place instead of hunting for the literal.
-REQUIRED_RUN_STATE_FIELDS: tuple[str, ...] = ("status", "tick_count", "frontier_ids")
+REQUIRED_RUN_STATE_FIELDS: tuple[str, ...] = ("tick_count", "frontier_ids")
+#: ``status`` was here until 1.9b. AF3 §4.1: a new FSM must REPLACE a field,
+#: never accompany it — ``run-state.status`` duplicated the mission's and "was
+#: wrong in all three field runs", so mission state is now the single lifecycle
+#: state. Requiring the retired key would have failed every migrated tree at
+#: exactly the moment 1.10 rewrote them.
 
 
 def read_run_status(run_state: Optional[Mapping[str, Any]]) -> Optional[str]:

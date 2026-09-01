@@ -50,6 +50,25 @@ function runStop(tickState: unknown, payload: Record<string, unknown> = {}) {
   );
   writeFileSync(join(runDir, "mission-state.json"), JSON.stringify({ status: "running", tick: 1 }));
   if (tickState !== undefined) writeFileSync(join(runDir, "tick-state.json"), JSON.stringify(tickState));
+
+  // FIXTURE COMPLETION (item 1.9d, not an assertion change).
+  //
+  // These cases are about ONE thing: whether `finished` is decided correctly at
+  // step 9. They are not about the drift guard. The fixture used to omit the
+  // tick's artifacts and pass anyway, because the drift gates keyed on
+  // `run-state.status === "running"` and this fixture's run-state has no status
+  // at all — so those gates were silently inert and the omission never showed.
+  //
+  // 1.9c re-homes them onto mission liveness, which this fixture DOES declare, so
+  // they now evaluate. A tick that genuinely reached step 9 has spawned mutagen
+  // and selector and left their output on disk; supplying it keeps these cases
+  // measuring the predicate they name instead of depending on a disarmed guard.
+  // Each case's own tick-state is what still distinguishes blocked from allowed.
+  const tick = (tickState as { tick?: number } | undefined)?.tick ?? 1;
+  mkdirSync(join(runDir, "ticks", String(tick), "mutagen"), { recursive: true });
+  mkdirSync(join(runDir, "ticks", String(tick), "selector"), { recursive: true });
+  writeFileSync(join(runDir, "ticks", String(tick), "mutagen", "proposals.json"), JSON.stringify({ proposals: [] }));
+  writeFileSync(join(runDir, "ticks", String(tick), "selector", "verdict.json"), JSON.stringify({ approved: [] }));
   const r = spawnSync("node", [join(HOOKS, "stop.mjs")], {
     input: JSON.stringify({ stop_hook_active: false, ...payload }),
     encoding: "utf8",

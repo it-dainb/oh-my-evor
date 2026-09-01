@@ -82,6 +82,36 @@ try {
   const tmp = missionStatePath + '.tmp.' + randomBytes(4).toString('hex');
   writeFileSync(tmp, JSON.stringify(updated, null, 2), 'utf8');
   renameSync(tmp, missionStatePath);
+
+  // ── C-01: close the RUN RECORD too, not only the mission ──────────────────
+  //
+  // The field run's `active-run.json` still read `status: "running"` days after
+  // the operator killed the session. Every reader that asks "is a run active?"
+  // starts there, so a run record nobody closes makes the system permanently
+  // wrong about its own liveness — and, because nothing recorded WHEN it was
+  // closed, staleness was not even computable after the fact.
+  //
+  // `ended_at` is what makes 3.3's `is_stale` work on this file: the predicate
+  // is arithmetic over a timestamp, and without one there is nothing to subtract.
+  try {
+    const arPath = join(evorRoot, 'active-run.json');
+    if (existsSync(arPath)) {
+      const ar = JSON.parse(readFileSync(arPath, 'utf8'));
+      if (String(ar?.status ?? '') !== 'paused') {
+        const closed = {
+          ...ar,
+          status: 'paused',
+          ended_at: updated.paused_at,
+          ended_by: 'session-end-hook',
+        };
+        const arTmp = arPath + '.tmp.' + randomBytes(4).toString('hex');
+        writeFileSync(arTmp, JSON.stringify(closed, null, 2), 'utf8');
+        renameSync(arTmp, arPath);
+      }
+    }
+  } catch (err) {
+    try { process.stderr.write(`[EVOR] session-end: active-run close failed: ${err}\n`); } catch { /* stderr gone */ }
+  }
 } catch (err) {
   // Fail-open — session end must never be delayed by a failed hook
   try { process.stderr.write(`[EVOR] session-end: ${err}\n`); } catch { /* stderr gone */ }

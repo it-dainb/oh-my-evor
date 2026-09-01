@@ -15,7 +15,7 @@ import { z } from "zod";
 import { GoalContractSchema, StrategyStateSchema } from "../contracts.js";
 import { resolveRunPaths, ensureRunDirs, getActiveRunPath, getEvorRoot } from "../run-store.js";
 import { readRunState, writeRunState } from "./record.js";
-import { assertReachable, initialState } from "../fsm.js";
+import { assertReachable, initialState, isStale, maxDwellSeconds } from "../fsm.js";
 import { callPythonModule } from "../subprocess-bridge.js";
 
 // ── Tick-state schema (spec §15B) ──────────────────────────────────────────
@@ -155,6 +155,36 @@ export function stateRead(runId: string, missionId?: string): Record<string, unk
       state.tick_state = JSON.parse(readFileSync(tickStatePath, "utf8"));
     } catch {
       // corrupt tick-state.json — omit from response rather than crashing
+    }
+  }
+
+  // ── K-09 / C-03: report staleness (items 3.3, 3.4) ─────────────────────────
+  //
+  // The field run sat at ONE step for 8h16m and nothing anywhere was asking
+  // whether it was still alive. That was not a missing alarm, it was a missing
+  // PREDICATE: liveness required an event nobody emitted. With 3.3's dwell limits
+  // it is arithmetic over two fields, so any reader can compute it — and this is
+  // the reader every agent already calls.
+  //
+  // Reported, not enforced. `stateRead` answers questions; refusing to return
+  // state because it looks stale would make the system least observable exactly
+  // when observation matters most.
+  const tick = state.tick_state as Record<string, unknown> | undefined;
+  if (tick) {
+    const stepStatus = String(tick.step_status ?? "");
+    const enteredAt = (tick.entered_at ?? tick.updated_at ?? tick.started_at) as string | undefined;
+    if (stepStatus && enteredAt && isStale("tick", stepStatus, enteredAt)) {
+      state.stalled = true;
+      const limit = maxDwellSeconds("tick", stepStatus);
+      const ageS = Math.round((Date.now() - Date.parse(enteredAt)) / 1000);
+      // Name the step, because a stall report that does not say WHERE is not
+      // actionable — and "which step" is the first question anyone asks.
+      state.stall_reason =
+        `tick ${tick.tick ?? "?"} has been at step ${tick.current_step ?? "?"} ` +
+        `(step_status="${stepStatus}") for ${Math.round(ageS / 60)} min, past its ` +
+        `${limit}s limit for that state`;
+    } else {
+      state.stalled = false;
     }
   }
 

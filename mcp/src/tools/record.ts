@@ -33,17 +33,20 @@ import { resolveNodeRef, assignUniqueName, deriveName } from "./node-ref.js";
 export function defaultRunState(runId: string): Record<string, unknown> {
   return {
     run_id: runId,
-    // 1.4. This was `"running"` — a run whose state file had never been written,
-    // or had been corrupted, reported itself as LIVE. That is A6: absence of state
-    // read as liveness, and it is the sharper form of the invariant 3.2 asserts.
+    // 1.4 then 1.9b. This was `"running"` — a run whose state file had never
+    // been written, or had been corrupted, reported itself as LIVE. That is A6:
+    // absence of state read as liveness.
     //
-    // `"initialized"` is what `init_run.py:178` already seeds, so a run with no
-    // recorded state and a run at the start of its life now describe themselves
-    // the same way, which is true. It is not `"failed"` because nothing failed,
-    // and it is not absent because `validate.py` requires the field until 1.9b
-    // retires it — leaving it out here would turn a read default into a hard
-    // validation failure two items early.
-    status: "initialized",
+    // 1.4 made it `"initialized"`; 1.9b retires the field entirely. AF3 §4.1: a
+    // new FSM must REPLACE a field, never accompany it, and `run-state.status`
+    // duplicated the mission's — it "was wrong in all three field runs". Mission
+    // state is now the single lifecycle state, driven server-side by
+    // `evor_run_start` and read by the three stop-hook gates (1.9c).
+    //
+    // Keeping the key here is what would make it a fifth status field, which AF3
+    // names as the highest-probability failure mode of this whole redesign. The
+    // key is OMITTED rather than set undefined, so `"status" in state` is false
+    // and a reader cannot mistake "present but empty" for "declared".
     tick_count: 0,
     best_score: null,
     frontier_ids: [],

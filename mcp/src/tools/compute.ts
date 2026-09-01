@@ -18,7 +18,7 @@
  * evor_gotchas_list    — list accumulated gotchas (wraps `evor gotchas`)
  */
 
-import { chmodSync, existsSync, readFileSync, renameSync, statSync, writeFileSync } from "fs";
+import { appendFileSync, chmodSync, existsSync, readFileSync, renameSync, statSync, writeFileSync } from "fs";
 import { createHash } from "crypto";
 import { join } from "path";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -26,6 +26,7 @@ import { z } from "zod";
 import { resolveRunPaths, getEvorRoot, getActiveRunPath } from "../run-store.js";
 import { callPythonModule, type PyResult } from "../subprocess-bridge.js";
 import { resolveNodeRef } from "./node-ref.js";
+import { nextState } from "../fsm.js";
 
 // ── Shared helpers ────────────────────────────────────────────────────────────
 
@@ -446,6 +447,52 @@ export function registerComputeTools(server: McpServer): void {
         } catch {
           // fail-open — never block the caller on an active-run write error
         }
+      }
+
+      // ── 1.9c: the mission enters `running` HERE, server-side ──────────────
+      //
+      // `skills/evor-run/SKILL.md:80` already asked the orchestrator to call
+      // `evor_state_write({ mission_status: "running" })`. That is a prose
+      // obligation, and §2's whole thesis is that an obligation stated in prose
+      // to an agent is one the system has decided not to have — in the field it
+      // was not honoured, `mission-state` stayed `locked` for the entire run,
+      // and `stop.mjs`'s M-2 comment recorded that as though it were the design.
+      //
+      // It has to be true here rather than requested there, because the three
+      // stop-hook gates re-home onto mission liveness in this same phase. A
+      // governance check pointed at a field only a cooperating agent sets is not
+      // a check.
+      //
+      // Best-effort: launching the job succeeded, and failing the caller because
+      // a status write did not land would be worse than the stale status.
+      try {
+        const msPath = join(resolvedDir, "mission-state.json");
+        let ms: Record<string, unknown> = {};
+        if (existsSync(msPath)) {
+          try { ms = JSON.parse(readFileSync(msPath, "utf8")); } catch { /* start fresh */ }
+        }
+        const from = String(ms.status ?? "locked");
+        if (from !== "running" && nextState("mission", from, "start_run") === "running") {
+          ms.status = "running";
+          ms.updated_at = new Date().toISOString();
+          ms.entered_at = ms.updated_at;
+          const msTmp = `${msPath}.tmp`;
+          writeFileSync(msTmp, JSON.stringify(ms, null, 2), "utf8");
+          renameSync(msTmp, msPath);
+          appendFileSync(
+            join(resolvedDir, "transitions.jsonl"),
+            JSON.stringify({
+              at: ms.updated_at,
+              entity: "mission",
+              from,
+              to: "running",
+              actor: "evor_run_start",
+              reason: `job ${jobId ?? "?"} launched for node ${node_id}`,
+            }) + "\n",
+          );
+        }
+      } catch {
+        // fail-open — see above
       }
 
       // Return only the job handle the agent needs — strip internal paths.

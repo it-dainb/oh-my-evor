@@ -22077,17 +22077,20 @@ function registerIntegrityTools(server) {
 function defaultRunState(runId) {
   return {
     run_id: runId,
-    // 1.4. This was `"running"` — a run whose state file had never been written,
-    // or had been corrupted, reported itself as LIVE. That is A6: absence of state
-    // read as liveness, and it is the sharper form of the invariant 3.2 asserts.
+    // 1.4 then 1.9b. This was `"running"` — a run whose state file had never
+    // been written, or had been corrupted, reported itself as LIVE. That is A6:
+    // absence of state read as liveness.
     //
-    // `"initialized"` is what `init_run.py:178` already seeds, so a run with no
-    // recorded state and a run at the start of its life now describe themselves
-    // the same way, which is true. It is not `"failed"` because nothing failed,
-    // and it is not absent because `validate.py` requires the field until 1.9b
-    // retires it — leaving it out here would turn a read default into a hard
-    // validation failure two items early.
-    status: "initialized",
+    // 1.4 made it `"initialized"`; 1.9b retires the field entirely. AF3 §4.1: a
+    // new FSM must REPLACE a field, never accompany it, and `run-state.status`
+    // duplicated the mission's — it "was wrong in all three field runs". Mission
+    // state is now the single lifecycle state, driven server-side by
+    // `evor_run_start` and read by the three stop-hook gates (1.9c).
+    //
+    // Keeping the key here is what would make it a fifth status field, which AF3
+    // names as the highest-probability failure mode of this whole redesign. The
+    // key is OMITTED rather than set undefined, so `"status" in state` is false
+    // and a reader cannot mistake "present but empty" for "declared".
     tick_count: 0,
     best_score: null,
     frontier_ids: [],
@@ -22955,6 +22958,9 @@ function machine(entity) {
 function initialState(entity) {
   return machine(entity).initial;
 }
+function nextState(entity, state, event) {
+  return machine(entity).states[state]?.on?.[event]?.to;
+}
 function reachableFrom(entity, state) {
   return [...new Set(Object.values(machine(entity).states[state]?.on ?? {}).map((e) => e.to))].sort();
 }
@@ -22973,6 +22979,17 @@ function assertReachable(entity, from, to) {
       `${entity}: '${from}' -> '${to}' is not a legal transition. From '${from}' you may reach: ${allowed.join(", ") || "(terminal \u2014 nothing)"}`
     );
   }
+}
+function maxDwellSeconds(entity, state) {
+  const v = machine(entity).states[state]?.max_dwell_s;
+  return v === void 0 ? null : v;
+}
+function isStale(entity, state, enteredAt, now = Date.now()) {
+  const limit = maxDwellSeconds(entity, state);
+  if (limit === null || !enteredAt) return false;
+  const started = Date.parse(enteredAt);
+  if (Number.isNaN(started)) return false;
+  return (now - started) / 1e3 > limit;
 }
 
 // src/tools/state.ts
@@ -23043,6 +23060,19 @@ function stateRead(runId, missionId) {
     try {
       state.tick_state = JSON.parse((0, import_fs8.readFileSync)(tickStatePath, "utf8"));
     } catch {
+    }
+  }
+  const tick = state.tick_state;
+  if (tick) {
+    const stepStatus = String(tick.step_status ?? "");
+    const enteredAt = tick.entered_at ?? tick.updated_at ?? tick.started_at;
+    if (stepStatus && enteredAt && isStale("tick", stepStatus, enteredAt)) {
+      state.stalled = true;
+      const limit = maxDwellSeconds("tick", stepStatus);
+      const ageS = Math.round((Date.now() - Date.parse(enteredAt)) / 1e3);
+      state.stall_reason = `tick ${tick.tick ?? "?"} has been at step ${tick.current_step ?? "?"} (step_status="${stepStatus}") for ${Math.round(ageS / 60)} min, past its ${limit}s limit for that state`;
+    } else {
+      state.stalled = false;
     }
   }
   return state;
@@ -24576,6 +24606,37 @@ function registerComputeTools(server) {
           (0, import_fs15.renameSync)(arTmp, arPath);
         } catch {
         }
+      }
+      try {
+        const msPath = (0, import_path16.join)(resolvedDir, "mission-state.json");
+        let ms = {};
+        if ((0, import_fs15.existsSync)(msPath)) {
+          try {
+            ms = JSON.parse((0, import_fs15.readFileSync)(msPath, "utf8"));
+          } catch {
+          }
+        }
+        const from = String(ms.status ?? "locked");
+        if (from !== "running" && nextState("mission", from, "start_run") === "running") {
+          ms.status = "running";
+          ms.updated_at = (/* @__PURE__ */ new Date()).toISOString();
+          ms.entered_at = ms.updated_at;
+          const msTmp = `${msPath}.tmp`;
+          (0, import_fs15.writeFileSync)(msTmp, JSON.stringify(ms, null, 2), "utf8");
+          (0, import_fs15.renameSync)(msTmp, msPath);
+          (0, import_fs15.appendFileSync)(
+            (0, import_path16.join)(resolvedDir, "transitions.jsonl"),
+            JSON.stringify({
+              at: ms.updated_at,
+              entity: "mission",
+              from,
+              to: "running",
+              actor: "evor_run_start",
+              reason: `job ${jobId ?? "?"} launched for node ${node_id}`
+            }) + "\n"
+          );
+        }
+      } catch {
       }
       return ok2({ status: "started", job_id: jobId ?? null });
     }

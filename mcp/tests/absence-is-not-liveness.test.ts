@@ -31,7 +31,7 @@ describe("§1.4 / §3.2 — absence of state is never liveness", () => {
           "gates key on this value and the hook fails open, so a wrong answer here " +
           "disarms them silently rather than failing loudly.",
       ).toBe(false);
-      expect(readRunStatus(state)).not.toBe("running");
+      expect(readRunStatus(state)).toBeUndefined();  // 1.9b: no status at all
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
@@ -70,14 +70,27 @@ describe("§1.4 / §3.2 — absence of state is never liveness", () => {
 
   it("the default still carries every field validate.py requires", () => {
     const state = defaultRunState("r1");
-    for (const field of ["status", "tick_count", "frontier_ids"]) {
+    // 1.9b removed `status` from REQUIRED_RUN_STATE_FIELDS at the same time it
+    // removed it from this default, so the two still match. Between 1.4 and 1.9b
+    // this list included "status" — dropping it from the default first would have
+    // made every run fail `run_state_well_formed`.
+    for (const field of ["tick_count", "frontier_ids"]) {
       expect(
         state[field],
-        `validate.py:691 hard-fails run_state_well_formed when \`${field}\` is absent. ` +
-          "Dropping it from the read default would turn this change into a validation " +
-          "failure two items before 1.9b retires the field.",
+        `validate.py hard-fails run_state_well_formed when \`${field}\` is absent.`,
       ).toBeDefined();
     }
+  });
+
+  it("the default does NOT carry a run status — the field is retired (1.9b)", () => {
+    const state = defaultRunState("r1");
+    expect(
+      "status" in state,
+      "AF3 §4.1: a new FSM must REPLACE a field, never accompany it. Re-seeding " +
+        "`run-state.status` here is how it comes back as the fifth status field, " +
+        "which AF3 names as this redesign's likeliest failure mode.",
+    ).toBe(false);
+    expect(isRunLive(state)).toBe(false);
   });
 
   it("absence and liveness are separable questions", () => {

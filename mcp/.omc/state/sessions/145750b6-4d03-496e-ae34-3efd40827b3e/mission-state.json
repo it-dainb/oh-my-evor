@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-07-05T18:00:54.067Z",
+  "updatedAt": "2026-07-06T10:09:58.192Z",
   "missions": [
     {
       "id": "session:145750b6-4d03-496e-ae34-3efd40827b3e:none",
@@ -7,14 +7,14 @@
       "name": "none",
       "objective": "Session mission",
       "createdAt": "2026-07-04T16:28:37.858Z",
-      "updatedAt": "2026-07-05T18:00:54.067Z",
+      "updatedAt": "2026-07-06T10:09:58.192Z",
       "status": "running",
-      "workerCount": 2,
+      "workerCount": 8,
       "taskCounts": {
-        "total": 2,
+        "total": 8,
         "pending": 0,
         "blocked": 0,
-        "inProgress": 1,
+        "inProgress": 7,
         "completed": 1,
         "failed": 0
       },
@@ -27,7 +27,7 @@
           "currentStep": null,
           "latestUpdate": "completed",
           "completedSummary": null,
-          "updatedAt": "2026-07-05T18:00:54.067Z"
+          "updatedAt": "2026-07-06T09:03:08.229Z"
         },
         {
           "name": "forge-family:aforge-",
@@ -38,40 +38,92 @@
           "latestUpdate": null,
           "completedSummary": null,
           "updatedAt": "2026-07-04T16:29:06.345Z"
+        },
+        {
+          "name": "skill-pythonpath:askill-",
+          "role": "skill-pythonpath",
+          "ownership": "askill-pythonpath-f6a6fbd8fbc4a30b",
+          "status": "running",
+          "currentStep": null,
+          "latestUpdate": null,
+          "completedSummary": null,
+          "updatedAt": "2026-07-06T06:59:48.116Z"
+        },
+        {
+          "name": "p15-tools:ap15-to",
+          "role": "p15-tools",
+          "ownership": "ap15-tools-13346312e3047c9a",
+          "status": "running",
+          "currentStep": null,
+          "latestUpdate": null,
+          "completedSummary": null,
+          "updatedAt": "2026-07-06T08:53:50.241Z"
+        },
+        {
+          "name": "p2-agents-research:ap2-age",
+          "role": "p2-agents-research",
+          "ownership": "ap2-agents-research-051db938571bef7a",
+          "status": "running",
+          "currentStep": null,
+          "latestUpdate": null,
+          "completedSummary": null,
+          "updatedAt": "2026-07-06T09:04:44.665Z"
+        },
+        {
+          "name": "p2-agents-forge:ap2-age",
+          "role": "p2-agents-forge",
+          "ownership": "ap2-agents-forge-8f29d6373bff7385",
+          "status": "running",
+          "currentStep": null,
+          "latestUpdate": null,
+          "completedSummary": null,
+          "updatedAt": "2026-07-06T09:04:59.158Z"
+        },
+        {
+          "name": "p2-skills:ap2-ski",
+          "role": "p2-skills",
+          "ownership": "ap2-skills-4bb734c7268a527e",
+          "status": "running",
+          "currentStep": null,
+          "latestUpdate": null,
+          "completedSummary": null,
+          "updatedAt": "2026-07-06T09:05:28.762Z"
+        },
+        {
+          "name": "p2-hooks:ap2-hoo",
+          "role": "p2-hooks",
+          "ownership": "ap2-hooks-fe94756f9f16b537",
+          "status": "running",
+          "currentStep": null,
+          "latestUpdate": null,
+          "completedSummary": null,
+          "updatedAt": "2026-07-06T10:09:58.192Z"
         }
       ],
       "timeline": [
         {
-          "id": "session-start:asage-family-394e11fbbcf43582:2026-07-04T16:28:37.858Z",
-          "at": "2026-07-04T16:28:37.858Z",
+          "id": "session-start:ap2-agents-forge-8f29d6373bff7385:2026-07-06T09:04:59.158Z",
+          "at": "2026-07-06T09:04:59.158Z",
           "kind": "update",
-          "agent": "sage-family:asage-f",
-          "detail": "started sage-family:asage-f",
-          "sourceKey": "session-start:asage-family-394e11fbbcf43582"
+          "agent": "p2-agents-forge:ap2-age",
+          "detail": "started p2-agents-forge:ap2-age",
+          "sourceKey": "session-start:ap2-agents-forge-8f29d6373bff7385"
         },
         {
-          "id": "session-start:aforge-family-127eee612623ee77:2026-07-04T16:29:06.345Z",
-          "at": "2026-07-04T16:29:06.345Z",
+          "id": "session-start:ap2-skills-4bb734c7268a527e:2026-07-06T09:05:28.762Z",
+          "at": "2026-07-06T09:05:28.762Z",
           "kind": "update",
-          "agent": "forge-family:aforge-",
-          "detail": "started forge-family:aforge-",
-          "sourceKey": "session-start:aforge-family-127eee612623ee77"
+          "agent": "p2-skills:ap2-ski",
+          "detail": "started p2-skills:ap2-ski",
+          "sourceKey": "session-start:ap2-skills-4bb734c7268a527e"
         },
         {
-          "id": "session-stop:a4459df6d30537f32:2026-07-05T17:58:31.126Z",
-          "at": "2026-07-05T17:58:31.126Z",
-          "kind": "completion",
-          "agent": "sage-family:asage-f",
-          "detail": "completed",
-          "sourceKey": "session-stop:a4459df6d30537f32"
-        },
-        {
-          "id": "session-stop:a745126ac9c9b2652:2026-07-05T18:00:54.067Z",
-          "at": "2026-07-05T18:00:54.067Z",
-          "kind": "completion",
-          "agent": "sage-family:asage-f",
-          "detail": "completed",
-          "sourceKey": "session-stop:a745126ac9c9b2652"
+          "id": "session-start:ap2-hooks-fe94756f9f16b537:2026-07-06T10:09:58.192Z",
+          "at": "2026-07-06T10:09:58.192Z",
+          "kind": "update",
+          "agent": "p2-hooks:ap2-hoo",
+          "detail": "started p2-hooks:ap2-hoo",
+          "sourceKey": "session-start:ap2-hooks-fe94756f9f16b537"
         }
       ]
     }

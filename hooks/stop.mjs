@@ -35,7 +35,7 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync, statSync } from 'fs
 import { join } from 'path';
 import { randomBytes } from 'crypto';
 import { resolveActiveRun, resolveEvorRoot } from './lib/active-run.mjs';
-import { isRunLive, isTickFinished } from './lib/run-status.mjs';
+import { isMissionLive, isTickFinished } from './lib/run-status.mjs';
 
 // ── Kill switches ─────────────────────────────────────────────────────────────
 // DISABLE_EVOR: truthy value disables the entire evor hook layer.
@@ -158,6 +158,25 @@ try {
   process.exit(0);
 }
 
+// ── 1.9c: mission state, for the three debt gates below ──────────────────────
+// They used to ask `run-state.status === 'running'`. AF3 §4.1 retires that field
+// (it duplicated the mission's and was wrong in all three field runs), so
+// liveness is asked of the mission — which `evor_run_start` now drives into
+// `running` server-side rather than asking an agent to.
+//
+// A corrupt or absent mission-state leaves this undefined, and `isMissionLive`
+// falls back to the run file. Failing to READ the mission must not be the same
+// as the mission being dead: that would disarm three governance checks silently,
+// in the permissive direction, which is exactly the shape this release exists to
+// remove.
+let missionState;
+try {
+  const msPath = join(runDir, 'mission-state.json');
+  if (existsSync(msPath)) missionState = JSON.parse(readFileSync(msPath, 'utf8'));
+} catch (err) {
+  process.stderr.write(`[evor:stop] unreadable mission-state.json: ${err.message}\n`);
+}
+
 // ── Guard 1: continuation guard (existing M7a) ────────────────────────────────
 const pendingIds = Array.isArray(runState?.pending_node_ids) ? runState.pending_node_ids : [];
 if (pendingIds.length > 0) {
@@ -188,7 +207,23 @@ if (pendingIds.length > 0) {
 
 // ── Guard 2: evolution drift-guard (Phase 2) ──────────────────────────────────
 // Deterministic — no LLM calls.  FAIL-OPEN on any infrastructure error.
+//
+// SCOPED TO THE ORCHESTRATOR (item 1.9c). Its whole subject is main role-playing
+// the roster inline instead of spawning Task sub-agents — "a tick that leaves no
+// proposals/verdict/node on disk was done inline". A sub-agent ending its own
+// turn is not that, and blocking it is nonsense: the artifacts it is being asked
+// for are the ones it was spawned to produce.
+//
+// This guard was never scoped, and only LOOKED scoped because its gates keyed on
+// `run-state.status === "running"` — a field two whole test suites' fixtures did
+// not set, so the guard was inert and its unscoped-ness never showed. Re-homing
+// the gates onto mission liveness armed them and surfaced it immediately.
+// `stop-incomplete-tick.test.ts`'s "the guard is scoped to the orchestrator"
+// cases have asserted this all along; they were passing for the wrong reason.
 try {
+  const isSubagentDrift = Boolean(payloadForContinuation?.agent_type ?? payloadForContinuation?.agent_id);
+  if (isSubagentDrift) process.exit(0);
+
   const debtReasons = [];
 
   // (a+b) Check tree.json nodes for missing integrity verdicts or missing telemetry
@@ -255,15 +290,18 @@ try {
   const tickStatePath = join(runDir, 'tick-state.json');
   if (existsSync(tickStatePath)) {
     try {
-      const tickState = JSON.parse(readFileSync(tickStatePath, 'utf8'));
-      const currentStep = typeof tickState?.current_step === 'number' ? tickState.current_step : 9;
-      const missionRunning = isRunLive(runState);
-      if (missionRunning && currentStep < 9) {
-        debtReasons.push(
-          `tick-state.json shows current_step=${currentStep} (< 9) while run status is "running" ` +
-            `— tick ${tickState?.tick ?? '?'} appears mid-flight`
-        );
-      }
+      // (c) REMOVED (item 1.2). This reported "tick N appears mid-flight" — the
+      // same fact as Guard 3's continuation check, one guard earlier and with a
+      // strictly worse message: Guard 3 tells the agent HOW to wait (TaskOutput
+      // with block:true, or Monitor the artifact it owes), this only told it
+      // something was wrong. Two predicates over one condition, and the vaguer
+      // one won by ordering.
+      //
+      // It was invisible while the gate keyed on `run-state.status`, which the
+      // fixtures did not set. Arming the gates made the duplication fire, which
+      // is the same collapse §1.2 makes for `finished`: five re-derivations of
+      // one predicate reduced to a single owner. Guard 3 is that owner.
+      void tickStatePath;
     } catch (_) { /* fail-open on parse errors */ }
   }
 
@@ -273,7 +311,7 @@ try {
   // tree nodes are absent. This is the enforcement teeth behind the SKILL's
   // Orchestrator_Contract: a tick that leaves no proposals/verdict/node on disk was
   // done inline and must be redone via real Task spawns.
-  if (isRunLive(runState)) {
+  if (isMissionLive(missionState, runState)) {
     let curTick = null;
     const tsPath = join(runDir, 'tick-state.json');
     if (existsSync(tsPath)) {
@@ -320,7 +358,7 @@ try {
   // If the orchestrator writes pending_subagent_ids[] to tick-state.json when spawning
   // Task sub-agents, the stop hook blocks until they complete.
   // If the field is absent (old tick-state format) this guard is a no-op (fail-open).
-  if (isRunLive(runState)) {
+  if (isMissionLive(missionState, runState)) {
     try {
       const tsPathE = join(runDir, 'tick-state.json');
       if (existsSync(tsPathE)) {

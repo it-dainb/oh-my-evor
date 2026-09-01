@@ -174,8 +174,13 @@ def run_init_run(
     _atomic_write_json(gc_path, contract_data)
 
     # ── 2. run-state.json ─────────────────────────────────────────────────────
+    # No ``status`` (item 1.9b). AF3 §4.1: a new FSM must REPLACE a field, never
+    # accompany it. ``run-state.status`` duplicated ``mission-state.status`` and
+    # "was wrong in all three field runs"; the mission is now the single
+    # lifecycle state, driven server-side by ``evor_run_start`` and read by the
+    # three stop-hook gates. Seeding the key here would reintroduce the fifth
+    # status field AF3 names as this redesign's likeliest failure mode.
     _atomic_write_json(run_dir / "run-state.json", {
-        "status": "initialized",
         "tick_count": 0,
         "best_score": None,
         "frontier_ids": [],

@@ -27,7 +27,7 @@ evor-run is the launch skill for an Evor mission. It validates that a mission co
 
 If arguments were provided, treat them as mission-id or run-id. Otherwise:
 1. Call `evor_state_read` to check for a current active run.
-2. If found and run-state shows `status != "completed"`: offer to resume that run.
+2. If found and mission-state shows a non-terminal `status` (not `completed`, `failed` or `superseded`): offer to resume that run. **Read mission-state, not run-state** — `run-state.status` was retired in v1.2.1 (item 1.9b), so a condition on it is vacuously true for every run and would offer to resume runs that are finished.
 3. If not found: list available missions via `evor_state_read` and prompt the user to select one, or redirect to `/evor-setup`.
 
 ## Step 2 — Load and Validate Mission Contract
@@ -69,7 +69,7 @@ Call `evor_state_read` to check run state:
   ```
   Ask: "Resume from tick <tick_count + 1>? (yes/no)"
   → "no": allow the user to specify a different run or abort.
-- If `status = "completed"`: print "This run is already complete. Use /evor-report to view results or /evor-setup to start a new mission." and stop.
+- If **mission-state** `status` is terminal (`completed`, `failed` or `superseded`): print "This run is already complete. Use /evor-report to view results or /evor-setup to start a new mission." and stop. **Read mission-state, not run-state** — `run-state.status` was retired in v1.2.1 (item 1.9b), so this branch would never fire again if keyed on it.
 
 ## Step 4 — Set Active Run State
 

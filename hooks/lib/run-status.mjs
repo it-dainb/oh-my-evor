@@ -1,3 +1,5 @@
+import { isTerminal } from './fsm.mjs';
+
 /**
  * hooks/lib/run-status.mjs — the one place that says what a run's liveness means.
  *
@@ -89,4 +91,41 @@ export function isTickFinished(tickState) {
   const stepStatus = tickState?.step_status;
   if (stepStatus === undefined || stepStatus === null || stepStatus === '') return true;
   return String(stepStatus) === 'done';
+}
+
+/**
+ * Is this MISSION live — the question the three stop-hook gates actually ask.
+ *
+ * Item 1.9c. Those gates read `run-state.status === 'running'`. AF3 §4.1 retires
+ * that field because it duplicated the mission's and "was wrong in all three
+ * field runs", so the gates need somewhere else to point — and the mission's own
+ * state is where liveness belongs, now that `evor_run_start` drives the
+ * `locked -> running` edge server-side rather than asking an agent to.
+ *
+ * Both sources are consulted, deliberately, and this is NOT hedging:
+ *
+ *   - Mission state is authoritative. A mission in a terminal state is not live
+ *     no matter what any run file says.
+ *   - Run state remains a fallback for LEGACY trees written before 1.9b retired
+ *     the key. Reading only mission-state would silently disarm three governance
+ *     checks on every pre-existing run — the C5 regression the plan caught at
+ *     rev 3, arriving one phase later. New runs never write the key, so the
+ *     fallback is inert for them; it is load-bearing only until 1.10 has
+ *     migrated the three field trees, and is safe because it can only make a
+ *     guard fire, never suppress one.
+ *
+ * @param {Record<string, unknown> | null | undefined} missionState parsed mission-state.json
+ * @param {Record<string, unknown> | null | undefined} runState parsed run-state.json
+ * @returns {boolean}
+ */
+export function isMissionLive(missionState, runState) {
+  const missionStatus = missionState?.status;
+  if (missionStatus !== undefined && missionStatus !== null && missionStatus !== '') {
+    if (isTerminal('mission', String(missionStatus))) return false;
+    if (String(missionStatus) === 'paused') return false;
+    if (String(missionStatus) === 'running') return true;
+    // `locked` and `draft` are not live on their own — but a legacy run file may
+    // still be the only thing that knows a tick is in flight.
+  }
+  return isRunLive(runState);
 }

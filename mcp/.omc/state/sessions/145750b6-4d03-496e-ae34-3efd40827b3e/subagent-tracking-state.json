@@ -37,10 +37,75 @@
       "status": "completed",
       "completed_at": "2026-07-05T18:00:54.067Z",
       "duration_ms": 0
+    },
+    {
+      "agent_id": "a801534a60814a391",
+      "agent_type": "unknown",
+      "started_at": "2026-07-06T06:09:52.523Z",
+      "parent_mode": "none",
+      "status": "completed",
+      "completed_at": "2026-07-06T06:09:52.523Z",
+      "duration_ms": 0
+    },
+    {
+      "agent_id": "askill-pythonpath-f6a6fbd8fbc4a30b",
+      "agent_type": "skill-pythonpath",
+      "started_at": "2026-07-06T06:59:48.116Z",
+      "parent_mode": "none",
+      "status": "failed",
+      "completed_at": "2026-07-06T08:51:34.542Z",
+      "duration_ms": 6706426,
+      "output_summary": "Marked as stale during unmatched stop reconciliation - exceeded timeout"
+    },
+    {
+      "agent_id": "ap15-tools-13346312e3047c9a",
+      "agent_type": "p15-tools",
+      "started_at": "2026-07-06T08:53:50.241Z",
+      "parent_mode": "none",
+      "status": "completed",
+      "completed_at": "2026-07-06T08:54:12.605Z",
+      "duration_ms": 22364
+    },
+    {
+      "agent_id": "ap2-evormcp-skill-cfe7ad9aec86f0e7",
+      "agent_type": "p2-evormcp-skill",
+      "started_at": "2026-07-06T09:03:08.229Z",
+      "parent_mode": "none",
+      "status": "completed",
+      "completed_at": "2026-07-06T09:03:08.229Z",
+      "duration_ms": 0
+    },
+    {
+      "agent_id": "ap2-agents-research-051db938571bef7a",
+      "agent_type": "p2-agents-research",
+      "started_at": "2026-07-06T09:04:44.665Z",
+      "parent_mode": "none",
+      "status": "running"
+    },
+    {
+      "agent_id": "ap2-agents-forge-8f29d6373bff7385",
+      "agent_type": "p2-agents-forge",
+      "started_at": "2026-07-06T09:04:59.158Z",
+      "parent_mode": "none",
+      "status": "running"
+    },
+    {
+      "agent_id": "ap2-skills-4bb734c7268a527e",
+      "agent_type": "p2-skills",
+      "started_at": "2026-07-06T09:05:28.762Z",
+      "parent_mode": "none",
+      "status": "running"
+    },
+    {
+      "agent_id": "ap2-hooks-fe94756f9f16b537",
+      "agent_type": "p2-hooks",
+      "started_at": "2026-07-06T10:09:58.192Z",
+      "parent_mode": "none",
+      "status": "running"
     }
   ],
-  "total_spawned": 2,
-  "total_completed": 2,
-  "total_failed": 2,
-  "last_updated": "2026-07-05T18:00:54.170Z"
+  "total_spawned": 10,
+  "total_completed": 8,
+  "total_failed": 3,
+  "last_updated": "2026-07-06T10:09:58.420Z"
 }
