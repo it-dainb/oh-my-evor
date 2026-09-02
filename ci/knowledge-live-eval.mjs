@@ -252,7 +252,7 @@ export function buildSelectorTask() {
  *
  * @returns {{events: object[], result: object, model: string, cost_usd: number, wall_ms: number}}
  */
-export function runLive({ prompt, model, effort, maxTurns, timeoutMs, env, mcpConfigPath, allowedTools }) {
+export function runLive({ prompt, model, effort, maxTurns, timeoutMs, env, mcpConfigPath, allowedTools, tolerateError = false }) {
   const args = [
     '-p', prompt,
     '--model', model,
@@ -298,7 +298,14 @@ export function runLive({ prompt, model, effort, maxTurns, timeoutMs, env, mcpCo
 
   const result = events.find((e) => e.type === 'result');
   if (!result) throw new Error('live call produced no result event — the run did not complete');
-  if (result.is_error) {
+  // `tolerateError` is for callers that must INSPECT a failed run rather than
+  // abort on it. ci/bench-run.mjs needs this: a run that ends at the turn
+  // ceiling, or that accumulated permission denials, is VOID under §4.1 — a
+  // fact about the harness, not a wrong answer from the model. Throwing here
+  // would collapse that distinction into a generic harness error and lose the
+  // trace that proves which it was. Default stays throw: a live eval that
+  // degrades to a pass when the model is unreachable is worse than none.
+  if (result.is_error && !tolerateError) {
     throw new Error(`CLI reported an error: ${String(result.result ?? '').slice(0, 400)}`);
   }
 
