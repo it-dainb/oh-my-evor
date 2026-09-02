@@ -1,0 +1,5684 @@
+{
+ "item": "8.1",
+ "runs": [
+  {
+   "role": "evor-acquirer",
+   "fingerprint": {
+    "agent_file": "agents/evor-acquirer.md",
+    "agent_sha256": "aed6604c2077c949",
+    "spec_sha256": "e88bc86164846cca",
+    "repeats": 5
+   },
+   "records": [
+    {
+     "tier": "haiku-medium",
+     "case_id": "enrich-train-clean",
+     "status": "correct",
+     "cli_cost_usd": 0.052
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "enrich-train-clean",
+     "status": "correct",
+     "cli_cost_usd": 0.0109
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "enrich-train-clean",
+     "status": "correct",
+     "cli_cost_usd": 0.0114
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "enrich-train-clean",
+     "status": "correct",
+     "cli_cost_usd": 0.0111
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "enrich-train-clean",
+     "status": "correct",
+     "cli_cost_usd": 0.0109
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "harden-test-clean",
+     "status": "correct",
+     "cli_cost_usd": 0.037
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "harden-test-clean",
+     "status": "correct",
+     "cli_cost_usd": 0.0163
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "harden-test-clean",
+     "status": "correct",
+     "cli_cost_usd": 0.0145
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "harden-test-clean",
+     "status": "correct",
+     "cli_cost_usd": 0.0106
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "harden-test-clean",
+     "status": "correct",
+     "cli_cost_usd": 0.0121
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "merged-drop-counts",
+     "status": "correct",
+     "cli_cost_usd": 0.0487
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "merged-drop-counts",
+     "status": "correct",
+     "cli_cost_usd": 0.0142
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "merged-drop-counts",
+     "status": "correct",
+     "cli_cost_usd": 0.0097
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "merged-drop-counts",
+     "status": "correct",
+     "cli_cost_usd": 0.017
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "merged-drop-counts",
+     "status": "correct",
+     "cli_cost_usd": 0.0113
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "collisions-blocked",
+     "status": "correct",
+     "cli_cost_usd": 0.0402
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "collisions-blocked",
+     "status": "correct",
+     "cli_cost_usd": 0.0106
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "collisions-blocked",
+     "status": "correct",
+     "cli_cost_usd": 0.015
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "collisions-blocked",
+     "status": "correct",
+     "cli_cost_usd": 0.0167
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "collisions-blocked",
+     "status": "correct",
+     "cli_cost_usd": 0.0151
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "contaminated-source",
+     "status": "correct",
+     "cli_cost_usd": 0.0385
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "contaminated-source",
+     "status": "correct",
+     "cli_cost_usd": 0.0116
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "contaminated-source",
+     "status": "correct",
+     "cli_cost_usd": 0.0175
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "contaminated-source",
+     "status": "correct",
+     "cli_cost_usd": 0.011
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "contaminated-source",
+     "status": "correct",
+     "cli_cost_usd": 0.0097
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "collision-rate-denominator",
+     "status": "correct",
+     "cli_cost_usd": 0.043
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "collision-rate-denominator",
+     "status": "correct",
+     "cli_cost_usd": 0.0111
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "collision-rate-denominator",
+     "status": "correct",
+     "cli_cost_usd": 0.0121
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "collision-rate-denominator",
+     "status": "correct",
+     "cli_cost_usd": 0.0134
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "collision-rate-denominator",
+     "status": "correct",
+     "cli_cost_usd": 0.0168
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "collision-rate-just-under-contamination",
+     "status": "correct",
+     "cli_cost_usd": 0.0407
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "collision-rate-just-under-contamination",
+     "status": "correct",
+     "cli_cost_usd": 0.0136
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "collision-rate-just-under-contamination",
+     "status": "correct",
+     "cli_cost_usd": 0.0153
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "collision-rate-just-under-contamination",
+     "status": "correct",
+     "cli_cost_usd": 0.0129
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "collision-rate-just-under-contamination",
+     "status": "correct",
+     "cli_cost_usd": 0.0115
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "unknown-license-still-integrates",
+     "status": "correct",
+     "cli_cost_usd": 0.0472
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "unknown-license-still-integrates",
+     "status": "correct",
+     "cli_cost_usd": 0.0219
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "unknown-license-still-integrates",
+     "status": "correct",
+     "cli_cost_usd": 0.0139
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "unknown-license-still-integrates",
+     "status": "correct",
+     "cli_cost_usd": 0.014
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "unknown-license-still-integrates",
+     "status": "correct",
+     "cli_cost_usd": 0.0108
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "noncommercial-license-flags",
+     "status": "correct",
+     "cli_cost_usd": 0.042
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "noncommercial-license-flags",
+     "status": "correct",
+     "cli_cost_usd": 0.0099
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "noncommercial-license-flags",
+     "status": "correct",
+     "cli_cost_usd": 0.0157
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "noncommercial-license-flags",
+     "status": "correct",
+     "cli_cost_usd": 0.0143
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "noncommercial-license-flags",
+     "status": "correct",
+     "cli_cost_usd": 0.0118
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "permissive-license-negative-control",
+     "status": "correct",
+     "cli_cost_usd": 0.0393
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "permissive-license-negative-control",
+     "status": "correct",
+     "cli_cost_usd": 0.0117
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "permissive-license-negative-control",
+     "status": "correct",
+     "cli_cost_usd": 0.0131
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "permissive-license-negative-control",
+     "status": "correct",
+     "cli_cost_usd": 0.014
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "permissive-license-negative-control",
+     "status": "correct",
+     "cli_cost_usd": 0.0103
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "intra-batch-duplicates",
+     "status": "correct",
+     "cli_cost_usd": 0.0416
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "intra-batch-duplicates",
+     "status": "correct",
+     "cli_cost_usd": 0.013
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "intra-batch-duplicates",
+     "status": "correct",
+     "cli_cost_usd": 0.0164
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "intra-batch-duplicates",
+     "status": "correct",
+     "cli_cost_usd": 0.017
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "intra-batch-duplicates",
+     "status": "correct",
+     "cli_cost_usd": 0.0128
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "wrong-caller-halts",
+     "status": "correct",
+     "cli_cost_usd": 0.0391
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "wrong-caller-halts",
+     "status": "correct",
+     "cli_cost_usd": 0.0093
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "wrong-caller-halts",
+     "status": "correct",
+     "cli_cost_usd": 0.0254
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "wrong-caller-halts",
+     "status": "correct",
+     "cli_cost_usd": 0.014
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "wrong-caller-halts",
+     "status": "incorrect",
+     "cli_cost_usd": 0.04
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "enrich-train-clean",
+     "status": "correct",
+     "cli_cost_usd": 0.1403
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "enrich-train-clean",
+     "status": "correct",
+     "cli_cost_usd": 0.0431
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "enrich-train-clean",
+     "status": "correct",
+     "cli_cost_usd": 0.022
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "enrich-train-clean",
+     "status": "correct",
+     "cli_cost_usd": 0.0258
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "enrich-train-clean",
+     "status": "correct",
+     "cli_cost_usd": 0.0314
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "harden-test-clean",
+     "status": "correct",
+     "cli_cost_usd": 0.1394
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "harden-test-clean",
+     "status": "correct",
+     "cli_cost_usd": 0.0264
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "harden-test-clean",
+     "status": "correct",
+     "cli_cost_usd": 0.0242
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "harden-test-clean",
+     "status": "correct",
+     "cli_cost_usd": 0.1022
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "harden-test-clean",
+     "status": "correct",
+     "cli_cost_usd": 0.0232
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "merged-drop-counts",
+     "status": "correct",
+     "cli_cost_usd": 0.1563
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "merged-drop-counts",
+     "status": "correct",
+     "cli_cost_usd": 0.0312
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "merged-drop-counts",
+     "status": "correct",
+     "cli_cost_usd": 0.0241
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "merged-drop-counts",
+     "status": "correct",
+     "cli_cost_usd": 0.0252
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "merged-drop-counts",
+     "status": "correct",
+     "cli_cost_usd": 0.0206
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "collisions-blocked",
+     "status": "correct",
+     "cli_cost_usd": 0.1519
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "collisions-blocked",
+     "status": "correct",
+     "cli_cost_usd": 0.0364
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "collisions-blocked",
+     "status": "correct",
+     "cli_cost_usd": 0.0276
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "collisions-blocked",
+     "status": "correct",
+     "cli_cost_usd": 0.0842
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "collisions-blocked",
+     "status": "correct",
+     "cli_cost_usd": 0.0295
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "contaminated-source",
+     "status": "correct",
+     "cli_cost_usd": 0.1493
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "contaminated-source",
+     "status": "correct",
+     "cli_cost_usd": 0.044
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "contaminated-source",
+     "status": "correct",
+     "cli_cost_usd": 0.0949
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "contaminated-source",
+     "status": "correct",
+     "cli_cost_usd": 0.028
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "contaminated-source",
+     "status": "correct",
+     "cli_cost_usd": 0.0363
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "collision-rate-denominator",
+     "status": "correct",
+     "cli_cost_usd": 0.2392
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "collision-rate-denominator",
+     "status": "correct",
+     "cli_cost_usd": 0.0252
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "collision-rate-denominator",
+     "status": "correct",
+     "cli_cost_usd": 0.0308
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "collision-rate-denominator",
+     "status": "correct",
+     "cli_cost_usd": 0.0311
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "collision-rate-denominator",
+     "status": "correct",
+     "cli_cost_usd": 0.0351
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "collision-rate-just-under-contamination",
+     "status": "correct",
+     "cli_cost_usd": 0.1418
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "collision-rate-just-under-contamination",
+     "status": "correct",
+     "cli_cost_usd": 0.0222
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "collision-rate-just-under-contamination",
+     "status": "correct",
+     "cli_cost_usd": 0.0239
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "collision-rate-just-under-contamination",
+     "status": "correct",
+     "cli_cost_usd": 0.0245
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "collision-rate-just-under-contamination",
+     "status": "correct",
+     "cli_cost_usd": 0.0264
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "unknown-license-still-integrates",
+     "status": "correct",
+     "cli_cost_usd": 0.2113
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "unknown-license-still-integrates",
+     "status": "correct",
+     "cli_cost_usd": 0.1006
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "unknown-license-still-integrates",
+     "status": "correct",
+     "cli_cost_usd": 0.0283
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "unknown-license-still-integrates",
+     "status": "correct",
+     "cli_cost_usd": 0.0475
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "unknown-license-still-integrates",
+     "status": "correct",
+     "cli_cost_usd": 0.0404
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "noncommercial-license-flags",
+     "status": "correct",
+     "cli_cost_usd": 0.1433
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "noncommercial-license-flags",
+     "status": "correct",
+     "cli_cost_usd": 0.09
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "noncommercial-license-flags",
+     "status": "correct",
+     "cli_cost_usd": 0.0332
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "noncommercial-license-flags",
+     "status": "correct",
+     "cli_cost_usd": 0.035
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "noncommercial-license-flags",
+     "status": "correct",
+     "cli_cost_usd": 0.03
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "permissive-license-negative-control",
+     "status": "correct",
+     "cli_cost_usd": 0.2076
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "permissive-license-negative-control",
+     "status": "correct",
+     "cli_cost_usd": 0.0816
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "permissive-license-negative-control",
+     "status": "correct",
+     "cli_cost_usd": 0.0303
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "permissive-license-negative-control",
+     "status": "correct",
+     "cli_cost_usd": 0.0958
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "permissive-license-negative-control",
+     "status": "correct",
+     "cli_cost_usd": 0.0795
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "intra-batch-duplicates",
+     "status": "correct",
+     "cli_cost_usd": 0.1563
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "intra-batch-duplicates",
+     "status": "correct",
+     "cli_cost_usd": 0.028
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "intra-batch-duplicates",
+     "status": "correct",
+     "cli_cost_usd": 0.0253
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "intra-batch-duplicates",
+     "status": "correct",
+     "cli_cost_usd": 0.1435
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "intra-batch-duplicates",
+     "status": "correct",
+     "cli_cost_usd": 0.0271
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "wrong-caller-halts",
+     "status": "correct",
+     "cli_cost_usd": 0.1431
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "wrong-caller-halts",
+     "status": "correct",
+     "cli_cost_usd": 0.0205
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "wrong-caller-halts",
+     "status": "correct",
+     "cli_cost_usd": 0.0264
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "wrong-caller-halts",
+     "status": "correct",
+     "cli_cost_usd": 0.024
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "wrong-caller-halts",
+     "status": "correct",
+     "cli_cost_usd": 0.0571
+    }
+   ]
+  },
+  {
+   "role": "evor-forge-analyst",
+   "fingerprint": {
+    "agent_file": "agents/evor-forge-analyst.md",
+    "agent_sha256": "4456d819ee75b0de",
+    "spec_sha256": "61b8a8ebf6747851",
+    "repeats": 5
+   },
+   "records": [
+    {
+     "tier": "opus-medium",
+     "case_id": "all-clear",
+     "status": "correct",
+     "cli_cost_usd": 0.5327
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "all-clear",
+     "status": "correct",
+     "cli_cost_usd": 0.0533
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "all-clear",
+     "status": "correct",
+     "cli_cost_usd": 0.1529
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "all-clear",
+     "status": "correct",
+     "cli_cost_usd": 0.1417
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "all-clear",
+     "status": "correct",
+     "cli_cost_usd": 0.1505
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "oom-critical",
+     "status": "correct",
+     "cli_cost_usd": 0.3267
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "oom-critical",
+     "status": "correct",
+     "cli_cost_usd": 0.2459
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "oom-critical",
+     "status": "correct",
+     "cli_cost_usd": 0.129
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "oom-critical",
+     "status": "correct",
+     "cli_cost_usd": 0.1618
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "oom-critical",
+     "status": "correct",
+     "cli_cost_usd": 0.2042
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "oom-high-no-checkpointing",
+     "status": "correct",
+     "cli_cost_usd": 0.2425
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "oom-high-no-checkpointing",
+     "status": "correct",
+     "cli_cost_usd": 0.1069
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "oom-high-no-checkpointing",
+     "status": "correct",
+     "cli_cost_usd": 0.0614
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "oom-high-no-checkpointing",
+     "status": "correct",
+     "cli_cost_usd": 0.1299
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "oom-high-no-checkpointing",
+     "status": "correct",
+     "cli_cost_usd": 0.1407
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "oom-high-with-checkpointing",
+     "status": "correct",
+     "cli_cost_usd": 0.3435
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "oom-high-with-checkpointing",
+     "status": "correct",
+     "cli_cost_usd": 0.1475
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "oom-high-with-checkpointing",
+     "status": "correct",
+     "cli_cost_usd": 0.1935
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "oom-high-with-checkpointing",
+     "status": "correct",
+     "cli_cost_usd": 0.1203
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "oom-high-with-checkpointing",
+     "status": "correct",
+     "cli_cost_usd": 0.1643
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "oom-medium",
+     "status": "correct",
+     "cli_cost_usd": 0.3317
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "oom-medium",
+     "status": "correct",
+     "cli_cost_usd": 0.1342
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "oom-medium",
+     "status": "correct",
+     "cli_cost_usd": 0.1147
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "oom-medium",
+     "status": "correct",
+     "cli_cost_usd": 0.2339
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "oom-medium",
+     "status": "correct",
+     "cli_cost_usd": 0.058
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "nan-high-lr-no-clip",
+     "status": "correct",
+     "cli_cost_usd": 0.3788
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "nan-high-lr-no-clip",
+     "status": "correct",
+     "cli_cost_usd": 0.1107
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "nan-high-lr-no-clip",
+     "status": "correct",
+     "cli_cost_usd": 0.1692
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "nan-high-lr-no-clip",
+     "status": "correct",
+     "cli_cost_usd": 0.1771
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "nan-high-lr-no-clip",
+     "status": "correct",
+     "cli_cost_usd": 0.0503
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "nan-bf16-no-loss-scaling",
+     "status": "correct",
+     "cli_cost_usd": 0.373
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "nan-bf16-no-loss-scaling",
+     "status": "correct",
+     "cli_cost_usd": 0.1702
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "nan-bf16-no-loss-scaling",
+     "status": "correct",
+     "cli_cost_usd": 0.1275
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "nan-bf16-no-loss-scaling",
+     "status": "correct",
+     "cli_cost_usd": 0.1261
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "nan-bf16-no-loss-scaling",
+     "status": "correct",
+     "cli_cost_usd": 0.1752
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "divergence-no-warmup",
+     "status": "correct",
+     "cli_cost_usd": 0.3091
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "divergence-no-warmup",
+     "status": "correct",
+     "cli_cost_usd": 0.1529
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "divergence-no-warmup",
+     "status": "correct",
+     "cli_cost_usd": 0.168
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "divergence-no-warmup",
+     "status": "correct",
+     "cli_cost_usd": 0.119
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "divergence-no-warmup",
+     "status": "correct",
+     "cli_cost_usd": 0.1405
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "divergence-constant-lr",
+     "status": "correct",
+     "cli_cost_usd": 0.3933
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "divergence-constant-lr",
+     "status": "correct",
+     "cli_cost_usd": 0.1402
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "divergence-constant-lr",
+     "status": "correct",
+     "cli_cost_usd": 0.0582
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "divergence-constant-lr",
+     "status": "correct",
+     "cli_cost_usd": 0.1964
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "divergence-constant-lr",
+     "status": "correct",
+     "cli_cost_usd": 0.1036
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "throughput-workers-zero",
+     "status": "correct",
+     "cli_cost_usd": 0.3147
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "throughput-workers-zero",
+     "status": "correct",
+     "cli_cost_usd": 0.0518
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "throughput-workers-zero",
+     "status": "correct",
+     "cli_cost_usd": 0.1878
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "throughput-workers-zero",
+     "status": "correct",
+     "cli_cost_usd": 0.1287
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "throughput-workers-zero",
+     "status": "correct",
+     "cli_cost_usd": 0.0584
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "loop-back-first-pass",
+     "status": "correct",
+     "cli_cost_usd": 0.1235
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "loop-back-first-pass",
+     "status": "correct",
+     "cli_cost_usd": 0.1974
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "loop-back-first-pass",
+     "status": "correct",
+     "cli_cost_usd": 0.0466
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "loop-back-first-pass",
+     "status": "correct",
+     "cli_cost_usd": 0.1711
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "loop-back-first-pass",
+     "status": "correct",
+     "cli_cost_usd": 0.1802
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "loop-back-second-pass",
+     "status": "correct",
+     "cli_cost_usd": 0.4163
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "loop-back-second-pass",
+     "status": "correct",
+     "cli_cost_usd": 0.1129
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "loop-back-second-pass",
+     "status": "correct",
+     "cli_cost_usd": 0.1312
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "loop-back-second-pass",
+     "status": "correct",
+     "cli_cost_usd": 0.12
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "loop-back-second-pass",
+     "status": "correct",
+     "cli_cost_usd": 0.1126
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "all-clear",
+     "status": "correct",
+     "cli_cost_usd": 0.1573
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "all-clear",
+     "status": "correct",
+     "cli_cost_usd": 0.0816
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "all-clear",
+     "status": "correct",
+     "cli_cost_usd": 0.1241
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "all-clear",
+     "status": "correct",
+     "cli_cost_usd": 0.1517
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "all-clear",
+     "status": "correct",
+     "cli_cost_usd": 0.1686
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "oom-critical",
+     "status": "incorrect",
+     "cli_cost_usd": 0.169
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "oom-critical",
+     "status": "incorrect",
+     "cli_cost_usd": 0.1675
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "oom-critical",
+     "status": "correct",
+     "cli_cost_usd": 0.1487
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "oom-critical",
+     "status": "correct",
+     "cli_cost_usd": 0.0316
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "oom-critical",
+     "status": "correct",
+     "cli_cost_usd": 0.0333
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "oom-high-no-checkpointing",
+     "status": "correct",
+     "cli_cost_usd": 0.2616
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "oom-high-no-checkpointing",
+     "status": "correct",
+     "cli_cost_usd": 0.1457
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "oom-high-no-checkpointing",
+     "status": "correct",
+     "cli_cost_usd": 0.0461
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "oom-high-no-checkpointing",
+     "status": "correct",
+     "cli_cost_usd": 0.1346
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "oom-high-no-checkpointing",
+     "status": "incorrect",
+     "cli_cost_usd": 0.0712
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "oom-high-with-checkpointing",
+     "status": "correct",
+     "cli_cost_usd": 0.2414
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "oom-high-with-checkpointing",
+     "status": "correct",
+     "cli_cost_usd": 0.0556
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "oom-high-with-checkpointing",
+     "status": "incorrect",
+     "cli_cost_usd": 0.1526
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "oom-high-with-checkpointing",
+     "status": "incorrect",
+     "cli_cost_usd": 0.2181
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "oom-high-with-checkpointing",
+     "status": "incorrect",
+     "cli_cost_usd": 0.153
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "oom-medium",
+     "status": "correct",
+     "cli_cost_usd": 0.2452
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "oom-medium",
+     "status": "correct",
+     "cli_cost_usd": 0.0286
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "oom-medium",
+     "status": "correct",
+     "cli_cost_usd": 0.1595
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "oom-medium",
+     "status": "correct",
+     "cli_cost_usd": 0.0367
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "oom-medium",
+     "status": "correct",
+     "cli_cost_usd": 0.0259
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "nan-high-lr-no-clip",
+     "status": "correct",
+     "cli_cost_usd": 0.2606
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "nan-high-lr-no-clip",
+     "status": "correct",
+     "cli_cost_usd": 0.1584
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "nan-high-lr-no-clip",
+     "status": "correct",
+     "cli_cost_usd": 0.1666
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "nan-high-lr-no-clip",
+     "status": "correct",
+     "cli_cost_usd": 0.1705
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "nan-high-lr-no-clip",
+     "status": "correct",
+     "cli_cost_usd": 0.1567
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "nan-bf16-no-loss-scaling",
+     "status": "correct",
+     "cli_cost_usd": 0.2994
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "nan-bf16-no-loss-scaling",
+     "status": "correct",
+     "cli_cost_usd": 0.0277
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "nan-bf16-no-loss-scaling",
+     "status": "correct",
+     "cli_cost_usd": 0.0379
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "nan-bf16-no-loss-scaling",
+     "status": "correct",
+     "cli_cost_usd": 0.0341
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "nan-bf16-no-loss-scaling",
+     "status": "correct",
+     "cli_cost_usd": 0.0323
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "divergence-no-warmup",
+     "status": "correct",
+     "cli_cost_usd": 0.2103
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "divergence-no-warmup",
+     "status": "correct",
+     "cli_cost_usd": 0.0273
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "divergence-no-warmup",
+     "status": "correct",
+     "cli_cost_usd": 0.0572
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "divergence-no-warmup",
+     "status": "correct",
+     "cli_cost_usd": 0.1606
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "divergence-no-warmup",
+     "status": "correct",
+     "cli_cost_usd": 0.1364
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "divergence-constant-lr",
+     "status": "correct",
+     "cli_cost_usd": 0.2393
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "divergence-constant-lr",
+     "status": "correct",
+     "cli_cost_usd": 0.1269
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "divergence-constant-lr",
+     "status": "correct",
+     "cli_cost_usd": 0.082
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "divergence-constant-lr",
+     "status": "correct",
+     "cli_cost_usd": 0.0345
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "divergence-constant-lr",
+     "status": "correct",
+     "cli_cost_usd": 0.2136
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "throughput-workers-zero",
+     "status": "correct",
+     "cli_cost_usd": 0.2322
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "throughput-workers-zero",
+     "status": "correct",
+     "cli_cost_usd": 0.2011
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "throughput-workers-zero",
+     "status": "correct",
+     "cli_cost_usd": 0.1896
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "throughput-workers-zero",
+     "status": "correct",
+     "cli_cost_usd": 0.179
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "throughput-workers-zero",
+     "status": "correct",
+     "cli_cost_usd": 0.203
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "loop-back-first-pass",
+     "status": "correct",
+     "cli_cost_usd": 0.1498
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "loop-back-first-pass",
+     "status": "correct",
+     "cli_cost_usd": 0.0545
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "loop-back-first-pass",
+     "status": "correct",
+     "cli_cost_usd": 0.1378
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "loop-back-first-pass",
+     "status": "correct",
+     "cli_cost_usd": 0.0963
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "loop-back-first-pass",
+     "status": "incorrect",
+     "cli_cost_usd": 0.2126
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "loop-back-second-pass",
+     "status": "correct",
+     "cli_cost_usd": 0.1457
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "loop-back-second-pass",
+     "status": "correct",
+     "cli_cost_usd": 0.1531
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "loop-back-second-pass",
+     "status": "correct",
+     "cli_cost_usd": 0.1185
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "loop-back-second-pass",
+     "status": "incorrect",
+     "cli_cost_usd": 0.1836
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "loop-back-second-pass",
+     "status": "correct",
+     "cli_cost_usd": 0.0507
+    }
+   ]
+  },
+  {
+   "role": "evor-forge-architect",
+   "fingerprint": {
+    "agent_file": "agents/evor-forge-architect.md",
+    "agent_sha256": "2a1b92a13aafe77d",
+    "spec_sha256": "12be8abd109f7e58",
+    "repeats": 5
+   },
+   "records": [
+    {
+     "tier": "opus-medium",
+     "case_id": "clean-approve",
+     "status": "correct",
+     "cli_cost_usd": 0.487
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "clean-approve",
+     "status": "correct",
+     "cli_cost_usd": 0.1429
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "clean-approve",
+     "status": "correct",
+     "cli_cost_usd": 0.05
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "clean-approve",
+     "status": "correct",
+     "cli_cost_usd": 0.1303
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "clean-approve",
+     "status": "correct",
+     "cli_cost_usd": 0.0478
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "cuda-under-cpu-only",
+     "status": "correct",
+     "cli_cost_usd": 0.3102
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "cuda-under-cpu-only",
+     "status": "correct",
+     "cli_cost_usd": 0.1271
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "cuda-under-cpu-only",
+     "status": "correct",
+     "cli_cost_usd": 0.3444
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "cuda-under-cpu-only",
+     "status": "correct",
+     "cli_cost_usd": 0.1165
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "cuda-under-cpu-only",
+     "status": "correct",
+     "cli_cost_usd": 0.117
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "bf16-on-sm61",
+     "status": "correct",
+     "cli_cost_usd": 0.2224
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "bf16-on-sm61",
+     "status": "correct",
+     "cli_cost_usd": 0.1187
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "bf16-on-sm61",
+     "status": "correct",
+     "cli_cost_usd": 0.05
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "bf16-on-sm61",
+     "status": "correct",
+     "cli_cost_usd": 0.1336
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "bf16-on-sm61",
+     "status": "correct",
+     "cli_cost_usd": 0.0416
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "gpu-code-negative-control",
+     "status": "correct",
+     "cli_cost_usd": 0.2379
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "gpu-code-negative-control",
+     "status": "correct",
+     "cli_cost_usd": 0.1136
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "gpu-code-negative-control",
+     "status": "correct",
+     "cli_cost_usd": 0.1138
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "gpu-code-negative-control",
+     "status": "correct",
+     "cli_cost_usd": 0.0497
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "gpu-code-negative-control",
+     "status": "correct",
+     "cli_cost_usd": 0.1069
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "neck-absent-but-specified",
+     "status": "correct",
+     "cli_cost_usd": 0.2279
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "neck-absent-but-specified",
+     "status": "correct",
+     "cli_cost_usd": 0.1175
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "neck-absent-but-specified",
+     "status": "correct",
+     "cli_cost_usd": 0.0436
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "neck-absent-but-specified",
+     "status": "correct",
+     "cli_cost_usd": 0.0422
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "neck-absent-but-specified",
+     "status": "correct",
+     "cli_cost_usd": 0.0434
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "wrong-loss-for-task",
+     "status": "correct",
+     "cli_cost_usd": 0.297
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "wrong-loss-for-task",
+     "status": "correct",
+     "cli_cost_usd": 0.1407
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "wrong-loss-for-task",
+     "status": "correct",
+     "cli_cost_usd": 0.1456
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "wrong-loss-for-task",
+     "status": "incorrect",
+     "cli_cost_usd": 0.1391
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "wrong-loss-for-task",
+     "status": "correct",
+     "cli_cost_usd": 0.1311
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "parametric-touches-extra-genes",
+     "status": "correct",
+     "cli_cost_usd": 0.3009
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "parametric-touches-extra-genes",
+     "status": "correct",
+     "cli_cost_usd": 0.1114
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "parametric-touches-extra-genes",
+     "status": "correct",
+     "cli_cost_usd": 0.1076
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "parametric-touches-extra-genes",
+     "status": "correct",
+     "cli_cost_usd": 0.1283
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "parametric-touches-extra-genes",
+     "status": "correct",
+     "cli_cost_usd": 0.0421
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "parametric-in-locus-negative-control",
+     "status": "correct",
+     "cli_cost_usd": 0.2336
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "parametric-in-locus-negative-control",
+     "status": "correct",
+     "cli_cost_usd": 0.1302
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "parametric-in-locus-negative-control",
+     "status": "correct",
+     "cli_cost_usd": 0.1142
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "parametric-in-locus-negative-control",
+     "status": "correct",
+     "cli_cost_usd": 0.0555
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "parametric-in-locus-negative-control",
+     "status": "correct",
+     "cli_cost_usd": 0.0519
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "structural-missing-new-knob",
+     "status": "correct",
+     "cli_cost_usd": 0.2258
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "structural-missing-new-knob",
+     "status": "correct",
+     "cli_cost_usd": 0.0422
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "structural-missing-new-knob",
+     "status": "correct",
+     "cli_cost_usd": 0.2201
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "structural-missing-new-knob",
+     "status": "correct",
+     "cli_cost_usd": 0.037
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "structural-missing-new-knob",
+     "status": "correct",
+     "cli_cost_usd": 0.0453
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "fidelity-library-substituted",
+     "status": "correct",
+     "cli_cost_usd": 0.3156
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "fidelity-library-substituted",
+     "status": "correct",
+     "cli_cost_usd": 0.126
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "fidelity-library-substituted",
+     "status": "correct",
+     "cli_cost_usd": 0.1309
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "fidelity-library-substituted",
+     "status": "correct",
+     "cli_cost_usd": 0.1413
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "fidelity-library-substituted",
+     "status": "correct",
+     "cli_cost_usd": 0.134
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "clean-approve",
+     "status": "correct",
+     "cli_cost_usd": 0.1328
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "clean-approve",
+     "status": "correct",
+     "cli_cost_usd": 0.024
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "clean-approve",
+     "status": "correct",
+     "cli_cost_usd": 0.0843
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "clean-approve",
+     "status": "correct",
+     "cli_cost_usd": 0.0227
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "clean-approve",
+     "status": "correct",
+     "cli_cost_usd": 0.0236
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "cuda-under-cpu-only",
+     "status": "correct",
+     "cli_cost_usd": 0.1316
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "cuda-under-cpu-only",
+     "status": "correct",
+     "cli_cost_usd": 0.0241
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "cuda-under-cpu-only",
+     "status": "correct",
+     "cli_cost_usd": 0.0575
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "cuda-under-cpu-only",
+     "status": "correct",
+     "cli_cost_usd": 0.0218
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "cuda-under-cpu-only",
+     "status": "correct",
+     "cli_cost_usd": 0.0221
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "bf16-on-sm61",
+     "status": "correct",
+     "cli_cost_usd": 0.1349
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "bf16-on-sm61",
+     "status": "correct",
+     "cli_cost_usd": 0.0244
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "bf16-on-sm61",
+     "status": "correct",
+     "cli_cost_usd": 0.0307
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "bf16-on-sm61",
+     "status": "correct",
+     "cli_cost_usd": 0.0251
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "bf16-on-sm61",
+     "status": "correct",
+     "cli_cost_usd": 0.024
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "gpu-code-negative-control",
+     "status": "correct",
+     "cli_cost_usd": 0.133
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "gpu-code-negative-control",
+     "status": "correct",
+     "cli_cost_usd": 0.023
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "gpu-code-negative-control",
+     "status": "correct",
+     "cli_cost_usd": 0.0267
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "gpu-code-negative-control",
+     "status": "correct",
+     "cli_cost_usd": 0.0257
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "gpu-code-negative-control",
+     "status": "correct",
+     "cli_cost_usd": 0.085
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "neck-absent-but-specified",
+     "status": "correct",
+     "cli_cost_usd": 0.1982
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "neck-absent-but-specified",
+     "status": "correct",
+     "cli_cost_usd": 0.0284
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "neck-absent-but-specified",
+     "status": "correct",
+     "cli_cost_usd": 0.0273
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "neck-absent-but-specified",
+     "status": "correct",
+     "cli_cost_usd": 0.0261
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "neck-absent-but-specified",
+     "status": "correct",
+     "cli_cost_usd": 0.0317
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "wrong-loss-for-task",
+     "status": "incorrect",
+     "cli_cost_usd": 0.1537
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "wrong-loss-for-task",
+     "status": "correct",
+     "cli_cost_usd": 0.0269
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "wrong-loss-for-task",
+     "status": "correct",
+     "cli_cost_usd": 0.0243
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "wrong-loss-for-task",
+     "status": "correct",
+     "cli_cost_usd": 0.0601
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "wrong-loss-for-task",
+     "status": "correct",
+     "cli_cost_usd": 0.0274
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "parametric-touches-extra-genes",
+     "status": "correct",
+     "cli_cost_usd": 0.1364
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "parametric-touches-extra-genes",
+     "status": "correct",
+     "cli_cost_usd": 0.0255
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "parametric-touches-extra-genes",
+     "status": "correct",
+     "cli_cost_usd": 0.1043
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "parametric-touches-extra-genes",
+     "status": "correct",
+     "cli_cost_usd": 0.0242
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "parametric-touches-extra-genes",
+     "status": "correct",
+     "cli_cost_usd": 0.0327
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "parametric-in-locus-negative-control",
+     "status": "correct",
+     "cli_cost_usd": 0.1341
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "parametric-in-locus-negative-control",
+     "status": "correct",
+     "cli_cost_usd": 0.0243
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "parametric-in-locus-negative-control",
+     "status": "correct",
+     "cli_cost_usd": 0.1098
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "parametric-in-locus-negative-control",
+     "status": "correct",
+     "cli_cost_usd": 0.0255
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "parametric-in-locus-negative-control",
+     "status": "correct",
+     "cli_cost_usd": 0.1061
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "structural-missing-new-knob",
+     "status": "correct",
+     "cli_cost_usd": 0.1344
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "structural-missing-new-knob",
+     "status": "correct",
+     "cli_cost_usd": 0.0896
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "structural-missing-new-knob",
+     "status": "correct",
+     "cli_cost_usd": 0.024
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "structural-missing-new-knob",
+     "status": "correct",
+     "cli_cost_usd": 0.0242
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "structural-missing-new-knob",
+     "status": "correct",
+     "cli_cost_usd": 0.0925
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "fidelity-library-substituted",
+     "status": "correct",
+     "cli_cost_usd": 0.1421
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "fidelity-library-substituted",
+     "status": "correct",
+     "cli_cost_usd": 0.0896
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "fidelity-library-substituted",
+     "status": "correct",
+     "cli_cost_usd": 0.0267
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "fidelity-library-substituted",
+     "status": "correct",
+     "cli_cost_usd": 0.1015
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "fidelity-library-substituted",
+     "status": "correct",
+     "cli_cost_usd": 0.0324
+    }
+   ]
+  },
+  {
+   "role": "evor-forge-critic",
+   "fingerprint": {
+    "agent_file": "agents/evor-forge-critic.md",
+    "agent_sha256": "8b930fd4cafc56bf",
+    "spec_sha256": "c7cd642aa049a354",
+    "repeats": 5
+   },
+   "records": [
+    {
+     "tier": "opus-medium",
+     "case_id": "clean-approve",
+     "status": "correct",
+     "cli_cost_usd": 0.538
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "clean-approve",
+     "status": "correct",
+     "cli_cost_usd": 0.0597
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "clean-approve",
+     "status": "correct",
+     "cli_cost_usd": 0.0451
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "clean-approve",
+     "status": "correct",
+     "cli_cost_usd": 0.0511
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "clean-approve",
+     "status": "correct",
+     "cli_cost_usd": 0.0884
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "hash-mismatch",
+     "status": "correct",
+     "cli_cost_usd": 0.3362
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "hash-mismatch",
+     "status": "correct",
+     "cli_cost_usd": 0.1496
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "hash-mismatch",
+     "status": "correct",
+     "cli_cost_usd": 0.3573
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "hash-mismatch",
+     "status": "correct",
+     "cli_cost_usd": 0.3257
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "hash-mismatch",
+     "status": "correct",
+     "cli_cost_usd": 0.1512
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "telemetry-env-only",
+     "status": "correct",
+     "cli_cost_usd": 0.2276
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "telemetry-env-only",
+     "status": "correct",
+     "cli_cost_usd": 0.0423
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "telemetry-env-only",
+     "status": "correct",
+     "cli_cost_usd": 0.04
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "telemetry-env-only",
+     "status": "incorrect",
+     "cli_cost_usd": 0.0804
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "telemetry-env-only",
+     "status": "correct",
+     "cli_cost_usd": 0.1223
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "clamp-missing",
+     "status": "correct",
+     "cli_cost_usd": 0.2306
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "clamp-missing",
+     "status": "correct",
+     "cli_cost_usd": 0.0926
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "clamp-missing",
+     "status": "correct",
+     "cli_cost_usd": 0.0469
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "clamp-missing",
+     "status": "correct",
+     "cli_cost_usd": 0.0532
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "clamp-missing",
+     "status": "correct",
+     "cli_cost_usd": 0.0564
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "clamp-output-only",
+     "status": "correct",
+     "cli_cost_usd": 0.2445
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "clamp-output-only",
+     "status": "correct",
+     "cli_cost_usd": 0.1293
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "clamp-output-only",
+     "status": "correct",
+     "cli_cost_usd": 0.0431
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "clamp-output-only",
+     "status": "correct",
+     "cli_cost_usd": 0.0516
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "clamp-output-only",
+     "status": "correct",
+     "cli_cost_usd": 0.0503
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "clamp-epsilon-too-large",
+     "status": "correct",
+     "cli_cost_usd": 0.2372
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "clamp-epsilon-too-large",
+     "status": "correct",
+     "cli_cost_usd": 0.0575
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "clamp-epsilon-too-large",
+     "status": "correct",
+     "cli_cost_usd": 0.1274
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "clamp-epsilon-too-large",
+     "status": "correct",
+     "cli_cost_usd": 0.0442
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "clamp-epsilon-too-large",
+     "status": "correct",
+     "cli_cost_usd": 0.1263
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "style-noise-negative-control",
+     "status": "correct",
+     "cli_cost_usd": 0.2647
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "style-noise-negative-control",
+     "status": "correct",
+     "cli_cost_usd": 0.1428
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "style-noise-negative-control",
+     "status": "correct",
+     "cli_cost_usd": 0.2451
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "style-noise-negative-control",
+     "status": "correct",
+     "cli_cost_usd": 0.1494
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "style-noise-negative-control",
+     "status": "correct",
+     "cli_cost_usd": 0.1223
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "no-singular-loss",
+     "status": "correct",
+     "cli_cost_usd": 0.2637
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "no-singular-loss",
+     "status": "correct",
+     "cli_cost_usd": 0.1375
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "no-singular-loss",
+     "status": "correct",
+     "cli_cost_usd": 0.0775
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "no-singular-loss",
+     "status": "correct",
+     "cli_cost_usd": 0.1216
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "no-singular-loss",
+     "status": "correct",
+     "cli_cost_usd": 0.0603
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "missing-head",
+     "status": "correct",
+     "cli_cost_usd": 0.2862
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "missing-head",
+     "status": "correct",
+     "cli_cost_usd": 0.2414
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "missing-head",
+     "status": "correct",
+     "cli_cost_usd": 0.0476
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "missing-head",
+     "status": "correct",
+     "cli_cost_usd": 0.0479
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "missing-head",
+     "status": "correct",
+     "cli_cost_usd": 0.0409
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "neck-contradiction",
+     "status": "correct",
+     "cli_cost_usd": 0.233
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "neck-contradiction",
+     "status": "correct",
+     "cli_cost_usd": 0.0408
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "neck-contradiction",
+     "status": "correct",
+     "cli_cost_usd": 0.1358
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "neck-contradiction",
+     "status": "correct",
+     "cli_cost_usd": 0.0412
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "neck-contradiction",
+     "status": "correct",
+     "cli_cost_usd": 0.1066
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "clean-approve",
+     "status": "correct",
+     "cli_cost_usd": 0.3157
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "clean-approve",
+     "status": "correct",
+     "cli_cost_usd": 0.0291
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "clean-approve",
+     "status": "correct",
+     "cli_cost_usd": 0.0391
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "clean-approve",
+     "status": "correct",
+     "cli_cost_usd": 0.0263
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "clean-approve",
+     "status": "incorrect",
+     "cli_cost_usd": 0.0508
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "hash-mismatch",
+     "status": "correct",
+     "cli_cost_usd": 0.1809
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "hash-mismatch",
+     "status": "correct",
+     "cli_cost_usd": 0.0951
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "hash-mismatch",
+     "status": "correct",
+     "cli_cost_usd": 0.0225
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "hash-mismatch",
+     "status": "correct",
+     "cli_cost_usd": 0.0882
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "hash-mismatch",
+     "status": "correct",
+     "cli_cost_usd": 0.0923
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "telemetry-env-only",
+     "status": "correct",
+     "cli_cost_usd": 0.1377
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "telemetry-env-only",
+     "status": "correct",
+     "cli_cost_usd": 0.0246
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "telemetry-env-only",
+     "status": "correct",
+     "cli_cost_usd": 0.0262
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "telemetry-env-only",
+     "status": "correct",
+     "cli_cost_usd": 0.0247
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "telemetry-env-only",
+     "status": "correct",
+     "cli_cost_usd": 0.0251
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "clamp-missing",
+     "status": "correct",
+     "cli_cost_usd": 0.1442
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "clamp-missing",
+     "status": "correct",
+     "cli_cost_usd": 0.1155
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "clamp-missing",
+     "status": "correct",
+     "cli_cost_usd": 0.0328
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "clamp-missing",
+     "status": "correct",
+     "cli_cost_usd": 0.0328
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "clamp-missing",
+     "status": "correct",
+     "cli_cost_usd": 0.0263
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "clamp-output-only",
+     "status": "correct",
+     "cli_cost_usd": 0.142
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "clamp-output-only",
+     "status": "correct",
+     "cli_cost_usd": 0.0768
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "clamp-output-only",
+     "status": "correct",
+     "cli_cost_usd": 0.0965
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "clamp-output-only",
+     "status": "correct",
+     "cli_cost_usd": 0.0355
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "clamp-output-only",
+     "status": "correct",
+     "cli_cost_usd": 0.0879
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "clamp-epsilon-too-large",
+     "status": "correct",
+     "cli_cost_usd": 0.1444
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "clamp-epsilon-too-large",
+     "status": "correct",
+     "cli_cost_usd": 0.0283
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "clamp-epsilon-too-large",
+     "status": "correct",
+     "cli_cost_usd": 0.1152
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "clamp-epsilon-too-large",
+     "status": "correct",
+     "cli_cost_usd": 0.029
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "clamp-epsilon-too-large",
+     "status": "correct",
+     "cli_cost_usd": 0.1002
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "style-noise-negative-control",
+     "status": "incorrect",
+     "cli_cost_usd": 0.2014
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "style-noise-negative-control",
+     "status": "incorrect",
+     "cli_cost_usd": 0.1158
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "style-noise-negative-control",
+     "status": "incorrect",
+     "cli_cost_usd": 0.0732
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "style-noise-negative-control",
+     "status": "incorrect",
+     "cli_cost_usd": 0.0466
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "style-noise-negative-control",
+     "status": "correct",
+     "cli_cost_usd": 0.0301
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "no-singular-loss",
+     "status": "correct",
+     "cli_cost_usd": 0.1414
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "no-singular-loss",
+     "status": "correct",
+     "cli_cost_usd": 0.031
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "no-singular-loss",
+     "status": "correct",
+     "cli_cost_usd": 0.0321
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "no-singular-loss",
+     "status": "correct",
+     "cli_cost_usd": 0.0295
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "no-singular-loss",
+     "status": "correct",
+     "cli_cost_usd": 0.0265
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "missing-head",
+     "status": "correct",
+     "cli_cost_usd": 0.1458
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "missing-head",
+     "status": "correct",
+     "cli_cost_usd": 0.0307
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "missing-head",
+     "status": "incorrect",
+     "cli_cost_usd": 0.051
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "missing-head",
+     "status": "correct",
+     "cli_cost_usd": 0.0367
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "missing-head",
+     "status": "correct",
+     "cli_cost_usd": 0.0248
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "neck-contradiction",
+     "status": "correct",
+     "cli_cost_usd": 0.1424
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "neck-contradiction",
+     "status": "correct",
+     "cli_cost_usd": 0.0776
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "neck-contradiction",
+     "status": "correct",
+     "cli_cost_usd": 0.0272
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "neck-contradiction",
+     "status": "correct",
+     "cli_cost_usd": 0.0979
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "neck-contradiction",
+     "status": "correct",
+     "cli_cost_usd": 0.1461
+    }
+   ]
+  },
+  {
+   "role": "evor-mutagen",
+   "fingerprint": {
+    "agent_file": "agents/evor-mutagen.md",
+    "agent_sha256": "a2842ad8d545a73a",
+    "spec_sha256": "fe4e23bf157de6fd",
+    "repeats": 5
+   },
+   "records": [
+    {
+     "tier": "haiku-medium",
+     "case_id": "parametric-low-wildness",
+     "status": "correct",
+     "cli_cost_usd": 0.0902
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "parametric-low-wildness",
+     "status": "correct",
+     "cli_cost_usd": 0.061
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "parametric-low-wildness",
+     "status": "correct",
+     "cli_cost_usd": 0.0883
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "parametric-low-wildness",
+     "status": "correct",
+     "cli_cost_usd": 0.0694
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "parametric-low-wildness",
+     "status": "correct",
+     "cli_cost_usd": 0.0446
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "structural-high-wildness",
+     "status": "correct",
+     "cli_cost_usd": 0.0726
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "structural-high-wildness",
+     "status": "correct",
+     "cli_cost_usd": 0.0742
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "structural-high-wildness",
+     "status": "correct",
+     "cli_cost_usd": 0.0458
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "structural-high-wildness",
+     "status": "correct",
+     "cli_cost_usd": 0.0633
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "structural-high-wildness",
+     "status": "correct",
+     "cli_cost_usd": 0.0637
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "wildness-boundary-at-half",
+     "status": "correct",
+     "cli_cost_usd": 0.1002
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "wildness-boundary-at-half",
+     "status": "correct",
+     "cli_cost_usd": 0.0789
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "wildness-boundary-at-half",
+     "status": "correct",
+     "cli_cost_usd": 0.0583
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "wildness-boundary-at-half",
+     "status": "correct",
+     "cli_cost_usd": 0.0616
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "wildness-boundary-at-half",
+     "status": "correct",
+     "cli_cost_usd": 0.0613
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "wildness-boundary-just-below",
+     "status": "correct",
+     "cli_cost_usd": 0.1051
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "wildness-boundary-just-below",
+     "status": "correct",
+     "cli_cost_usd": 0.1056
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "wildness-boundary-just-below",
+     "status": "correct",
+     "cli_cost_usd": 0.0638
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "wildness-boundary-just-below",
+     "status": "correct",
+     "cli_cost_usd": 0.0848
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "wildness-boundary-just-below",
+     "status": "correct",
+     "cli_cost_usd": 0.0546
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "dream-k-scales-with-train-k",
+     "status": "correct",
+     "cli_cost_usd": 0.0994
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "dream-k-scales-with-train-k",
+     "status": "correct",
+     "cli_cost_usd": 0.0902
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "dream-k-scales-with-train-k",
+     "status": "correct",
+     "cli_cost_usd": 0.0495
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "dream-k-scales-with-train-k",
+     "status": "correct",
+     "cli_cost_usd": 0.0484
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "dream-k-scales-with-train-k",
+     "status": "correct",
+     "cli_cost_usd": 0.0604
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "dream-k-small-tick",
+     "status": "correct",
+     "cli_cost_usd": 0.079
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "dream-k-small-tick",
+     "status": "unparseable",
+     "cli_cost_usd": 0.0135
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "dream-k-small-tick",
+     "status": "correct",
+     "cli_cost_usd": 0.141
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "dream-k-small-tick",
+     "status": "correct",
+     "cli_cost_usd": 0.0974
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "dream-k-small-tick",
+     "status": "correct",
+     "cli_cost_usd": 0.0686
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "crossover-two-close-lineages",
+     "status": "correct",
+     "cli_cost_usd": 0.1194
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "crossover-two-close-lineages",
+     "status": "correct",
+     "cli_cost_usd": 0.0565
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "crossover-two-close-lineages",
+     "status": "correct",
+     "cli_cost_usd": 0.0579
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "crossover-two-close-lineages",
+     "status": "correct",
+     "cli_cost_usd": 0.0546
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "crossover-two-close-lineages",
+     "status": "correct",
+     "cli_cost_usd": 0.0869
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "crossover-single-lineage",
+     "status": "correct",
+     "cli_cost_usd": 0.0829
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "crossover-single-lineage",
+     "status": "correct",
+     "cli_cost_usd": 0.0393
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "crossover-single-lineage",
+     "status": "correct",
+     "cli_cost_usd": 0.0907
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "crossover-single-lineage",
+     "status": "correct",
+     "cli_cost_usd": 0.0475
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "crossover-single-lineage",
+     "status": "correct",
+     "cli_cost_usd": 0.0589
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "crossover-lineages-far-apart",
+     "status": "correct",
+     "cli_cost_usd": 0.1234
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "crossover-lineages-far-apart",
+     "status": "correct",
+     "cli_cost_usd": 0.0975
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "crossover-lineages-far-apart",
+     "status": "correct",
+     "cli_cost_usd": 0.0614
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "crossover-lineages-far-apart",
+     "status": "correct",
+     "cli_cost_usd": 0.1492
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "crossover-lineages-far-apart",
+     "status": "correct",
+     "cli_cost_usd": 0.0429
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "hardware-gotcha-hard-block",
+     "status": "correct",
+     "cli_cost_usd": 0.1126
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "hardware-gotcha-hard-block",
+     "status": "correct",
+     "cli_cost_usd": 0.1238
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "hardware-gotcha-hard-block",
+     "status": "incorrect",
+     "cli_cost_usd": 0.0702
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "hardware-gotcha-hard-block",
+     "status": "correct",
+     "cli_cost_usd": 0.0782
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "hardware-gotcha-hard-block",
+     "status": "correct",
+     "cli_cost_usd": 0.0808
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "parametric-low-wildness",
+     "status": "correct",
+     "cli_cost_usd": 0.578
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "parametric-low-wildness",
+     "status": "correct",
+     "cli_cost_usd": 0.2843
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "parametric-low-wildness",
+     "status": "correct",
+     "cli_cost_usd": 0.2899
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "parametric-low-wildness",
+     "status": "correct",
+     "cli_cost_usd": 0.2875
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "parametric-low-wildness",
+     "status": "correct",
+     "cli_cost_usd": 0.3119
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "structural-high-wildness",
+     "status": "correct",
+     "cli_cost_usd": 0.5634
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "structural-high-wildness",
+     "status": "correct",
+     "cli_cost_usd": 0.2804
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "structural-high-wildness",
+     "status": "correct",
+     "cli_cost_usd": 0.5758
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "structural-high-wildness",
+     "status": "correct",
+     "cli_cost_usd": 0.3153
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "structural-high-wildness",
+     "status": "correct",
+     "cli_cost_usd": 0.3352
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "wildness-boundary-at-half",
+     "status": "correct",
+     "cli_cost_usd": 0.5774
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "wildness-boundary-at-half",
+     "status": "correct",
+     "cli_cost_usd": 0.2915
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "wildness-boundary-at-half",
+     "status": "correct",
+     "cli_cost_usd": 0.3064
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "wildness-boundary-at-half",
+     "status": "correct",
+     "cli_cost_usd": 0.277
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "wildness-boundary-at-half",
+     "status": "correct",
+     "cli_cost_usd": 0.3111
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "wildness-boundary-just-below",
+     "status": "correct",
+     "cli_cost_usd": 0.5534
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "wildness-boundary-just-below",
+     "status": "correct",
+     "cli_cost_usd": 0.3145
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "wildness-boundary-just-below",
+     "status": "correct",
+     "cli_cost_usd": 0.2996
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "wildness-boundary-just-below",
+     "status": "correct",
+     "cli_cost_usd": 0.347
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "wildness-boundary-just-below",
+     "status": "correct",
+     "cli_cost_usd": 0.3512
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "dream-k-scales-with-train-k",
+     "status": "correct",
+     "cli_cost_usd": 0.568
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "dream-k-scales-with-train-k",
+     "status": "correct",
+     "cli_cost_usd": 0.3227
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "dream-k-scales-with-train-k",
+     "status": "correct",
+     "cli_cost_usd": 0.2902
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "dream-k-scales-with-train-k",
+     "status": "correct",
+     "cli_cost_usd": 0.3083
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "dream-k-scales-with-train-k",
+     "status": "correct",
+     "cli_cost_usd": 0.3341
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "dream-k-small-tick",
+     "status": "correct",
+     "cli_cost_usd": 0.5242
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "dream-k-small-tick",
+     "status": "correct",
+     "cli_cost_usd": 0.2855
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "dream-k-small-tick",
+     "status": "correct",
+     "cli_cost_usd": 0.2932
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "dream-k-small-tick",
+     "status": "correct",
+     "cli_cost_usd": 0.3107
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "dream-k-small-tick",
+     "status": "correct",
+     "cli_cost_usd": 0.2899
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "crossover-two-close-lineages",
+     "status": "correct",
+     "cli_cost_usd": 0.5844
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "crossover-two-close-lineages",
+     "status": "correct",
+     "cli_cost_usd": 0.3279
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "crossover-two-close-lineages",
+     "status": "correct",
+     "cli_cost_usd": 0.2999
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "crossover-two-close-lineages",
+     "status": "correct",
+     "cli_cost_usd": 0.3441
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "crossover-two-close-lineages",
+     "status": "correct",
+     "cli_cost_usd": 0.3174
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "crossover-single-lineage",
+     "status": "correct",
+     "cli_cost_usd": 0.5059
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "crossover-single-lineage",
+     "status": "correct",
+     "cli_cost_usd": 0.2808
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "crossover-single-lineage",
+     "status": "correct",
+     "cli_cost_usd": 0.2849
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "crossover-single-lineage",
+     "status": "correct",
+     "cli_cost_usd": 0.3139
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "crossover-single-lineage",
+     "status": "correct",
+     "cli_cost_usd": 0.2856
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "crossover-lineages-far-apart",
+     "status": "correct",
+     "cli_cost_usd": 0.5812
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "crossover-lineages-far-apart",
+     "status": "correct",
+     "cli_cost_usd": 0.3263
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "crossover-lineages-far-apart",
+     "status": "correct",
+     "cli_cost_usd": 0.3222
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "crossover-lineages-far-apart",
+     "status": "correct",
+     "cli_cost_usd": 0.2736
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "crossover-lineages-far-apart",
+     "status": "correct",
+     "cli_cost_usd": 0.3196
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "hardware-gotcha-hard-block",
+     "status": "correct",
+     "cli_cost_usd": 0.5611
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "hardware-gotcha-hard-block",
+     "status": "correct",
+     "cli_cost_usd": 0.3339
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "hardware-gotcha-hard-block",
+     "status": "correct",
+     "cli_cost_usd": 0.3215
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "hardware-gotcha-hard-block",
+     "status": "correct",
+     "cli_cost_usd": 0.3112
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "hardware-gotcha-hard-block",
+     "status": "correct",
+     "cli_cost_usd": 0.3764
+    }
+   ]
+  },
+  {
+   "role": "evor-probe",
+   "fingerprint": {
+    "agent_file": "agents/evor-probe.md",
+    "agent_sha256": "50f92b88c5500f0a",
+    "spec_sha256": "c079558a56a3e5b6",
+    "repeats": 5
+   },
+   "records": [
+    {
+     "tier": "haiku-medium",
+     "case_id": "healthy-confirmed",
+     "status": "correct",
+     "cli_cost_usd": 0.1419
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "healthy-confirmed",
+     "status": "correct",
+     "cli_cost_usd": 0.0398
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "healthy-confirmed",
+     "status": "correct",
+     "cli_cost_usd": 0.0457
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "healthy-confirmed",
+     "status": "correct",
+     "cli_cost_usd": 0.029
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "healthy-confirmed",
+     "status": "correct",
+     "cli_cost_usd": 0.0446
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "nan-telemetry",
+     "status": "correct",
+     "cli_cost_usd": 0.0825
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "nan-telemetry",
+     "status": "correct",
+     "cli_cost_usd": 0.0251
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "nan-telemetry",
+     "status": "correct",
+     "cli_cost_usd": 0.0329
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "nan-telemetry",
+     "status": "correct",
+     "cli_cost_usd": 0.0407
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "nan-telemetry",
+     "status": "correct",
+     "cli_cost_usd": 0.0428
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "grad-explosion",
+     "status": "correct",
+     "cli_cost_usd": 0.0908
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "grad-explosion",
+     "status": "correct",
+     "cli_cost_usd": 0.0643
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "grad-explosion",
+     "status": "incorrect",
+     "cli_cost_usd": 0.0495
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "grad-explosion",
+     "status": "correct",
+     "cli_cost_usd": 0.0313
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "grad-explosion",
+     "status": "correct",
+     "cli_cost_usd": 0.1024
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "grad-vanishing",
+     "status": "correct",
+     "cli_cost_usd": 0.0842
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "grad-vanishing",
+     "status": "correct",
+     "cli_cost_usd": 0.0282
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "grad-vanishing",
+     "status": "correct",
+     "cli_cost_usd": 0.0309
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "grad-vanishing",
+     "status": "correct",
+     "cli_cost_usd": 0.0278
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "grad-vanishing",
+     "status": "correct",
+     "cli_cost_usd": 0.0305
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "plateaued-curve",
+     "status": "correct",
+     "cli_cost_usd": 0.085
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "plateaued-curve",
+     "status": "correct",
+     "cli_cost_usd": 0.0718
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "plateaued-curve",
+     "status": "correct",
+     "cli_cost_usd": 0.0353
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "plateaued-curve",
+     "status": "correct",
+     "cli_cost_usd": 0.0435
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "plateaued-curve",
+     "status": "correct",
+     "cli_cost_usd": 0.0538
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "oscillating-curve",
+     "status": "correct",
+     "cli_cost_usd": 0.0947
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "oscillating-curve",
+     "status": "correct",
+     "cli_cost_usd": 0.0504
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "oscillating-curve",
+     "status": "correct",
+     "cli_cost_usd": 0.0477
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "oscillating-curve",
+     "status": "correct",
+     "cli_cost_usd": 0.1293
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "oscillating-curve",
+     "status": "correct",
+     "cli_cost_usd": 0.0302
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "diverging-curve",
+     "status": "correct",
+     "cli_cost_usd": 0.0716
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "diverging-curve",
+     "status": "correct",
+     "cli_cost_usd": 0.0351
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "diverging-curve",
+     "status": "correct",
+     "cli_cost_usd": 0.0264
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "diverging-curve",
+     "status": "correct",
+     "cli_cost_usd": 0.0323
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "diverging-curve",
+     "status": "correct",
+     "cli_cost_usd": 0.1111
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "truncated-run-trap",
+     "status": "correct",
+     "cli_cost_usd": 0.0592
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "truncated-run-trap",
+     "status": "correct",
+     "cli_cost_usd": 0.0333
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "truncated-run-trap",
+     "status": "correct",
+     "cli_cost_usd": 0.0169
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "truncated-run-trap",
+     "status": "correct",
+     "cli_cost_usd": 0.1057
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "truncated-run-trap",
+     "status": "correct",
+     "cli_cost_usd": 0.0268
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "upgrade-negative-control",
+     "status": "correct",
+     "cli_cost_usd": 0.0939
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "upgrade-negative-control",
+     "status": "correct",
+     "cli_cost_usd": 0.0328
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "upgrade-negative-control",
+     "status": "correct",
+     "cli_cost_usd": 0.0316
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "upgrade-negative-control",
+     "status": "correct",
+     "cli_cost_usd": 0.039
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "upgrade-negative-control",
+     "status": "correct",
+     "cli_cost_usd": 0.0302
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "upgrade-positive",
+     "status": "correct",
+     "cli_cost_usd": 0.0336
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "upgrade-positive",
+     "status": "correct",
+     "cli_cost_usd": 0.0312
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "upgrade-positive",
+     "status": "correct",
+     "cli_cost_usd": 0.0615
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "upgrade-positive",
+     "status": "correct",
+     "cli_cost_usd": 0.0583
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "upgrade-positive",
+     "status": "correct",
+     "cli_cost_usd": 0.0451
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "refuted-verdict",
+     "status": "correct",
+     "cli_cost_usd": 0.0403
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "refuted-verdict",
+     "status": "correct",
+     "cli_cost_usd": 0.0363
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "refuted-verdict",
+     "status": "correct",
+     "cli_cost_usd": 0.0351
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "refuted-verdict",
+     "status": "correct",
+     "cli_cost_usd": 0.0505
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "refuted-verdict",
+     "status": "correct",
+     "cli_cost_usd": 0.0396
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "healthy-confirmed",
+     "status": "correct",
+     "cli_cost_usd": 0.5777
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "healthy-confirmed",
+     "status": "correct",
+     "cli_cost_usd": 0.2378
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "healthy-confirmed",
+     "status": "correct",
+     "cli_cost_usd": 0.2318
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "healthy-confirmed",
+     "status": "correct",
+     "cli_cost_usd": 0.3012
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "healthy-confirmed",
+     "status": "correct",
+     "cli_cost_usd": 0.5426
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "nan-telemetry",
+     "status": "correct",
+     "cli_cost_usd": 0.4808
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "nan-telemetry",
+     "status": "correct",
+     "cli_cost_usd": 0.2211
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "nan-telemetry",
+     "status": "correct",
+     "cli_cost_usd": 0.2317
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "nan-telemetry",
+     "status": "correct",
+     "cli_cost_usd": 0.3602
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "nan-telemetry",
+     "status": "correct",
+     "cli_cost_usd": 0.2436
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "grad-explosion",
+     "status": "correct",
+     "cli_cost_usd": 0.5482
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "grad-explosion",
+     "status": "correct",
+     "cli_cost_usd": 0.6209
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "grad-explosion",
+     "status": "correct",
+     "cli_cost_usd": 0.2632
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "grad-explosion",
+     "status": "correct",
+     "cli_cost_usd": 0.2885
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "grad-explosion",
+     "status": "correct",
+     "cli_cost_usd": 0.2792
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "grad-vanishing",
+     "status": "correct",
+     "cli_cost_usd": 0.4569
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "grad-vanishing",
+     "status": "correct",
+     "cli_cost_usd": 0.7207
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "grad-vanishing",
+     "status": "correct",
+     "cli_cost_usd": 0.2981
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "grad-vanishing",
+     "status": "correct",
+     "cli_cost_usd": 0.3541
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "grad-vanishing",
+     "status": "correct",
+     "cli_cost_usd": 0.2967
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "plateaued-curve",
+     "status": "correct",
+     "cli_cost_usd": 0.5256
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "plateaued-curve",
+     "status": "correct",
+     "cli_cost_usd": 0.3022
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "plateaued-curve",
+     "status": "correct",
+     "cli_cost_usd": 0.5092
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "plateaued-curve",
+     "status": "correct",
+     "cli_cost_usd": 0.2636
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "plateaued-curve",
+     "status": "correct",
+     "cli_cost_usd": 0.5392
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "oscillating-curve",
+     "status": "correct",
+     "cli_cost_usd": 0.5667
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "oscillating-curve",
+     "status": "correct",
+     "cli_cost_usd": 0.2776
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "oscillating-curve",
+     "status": "correct",
+     "cli_cost_usd": 0.2874
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "oscillating-curve",
+     "status": "correct",
+     "cli_cost_usd": 0.305
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "oscillating-curve",
+     "status": "correct",
+     "cli_cost_usd": 0.4664
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "diverging-curve",
+     "status": "correct",
+     "cli_cost_usd": 0.7454
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "diverging-curve",
+     "status": "correct",
+     "cli_cost_usd": 0.3977
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "diverging-curve",
+     "status": "correct",
+     "cli_cost_usd": 0.5473
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "diverging-curve",
+     "status": "correct",
+     "cli_cost_usd": 0.2759
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "diverging-curve",
+     "status": "correct",
+     "cli_cost_usd": 0.3076
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "truncated-run-trap",
+     "status": "correct",
+     "cli_cost_usd": 0.6449
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "truncated-run-trap",
+     "status": "correct",
+     "cli_cost_usd": 0.2205
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "truncated-run-trap",
+     "status": "correct",
+     "cli_cost_usd": 0.2066
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "truncated-run-trap",
+     "status": "correct",
+     "cli_cost_usd": 0.2007
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "truncated-run-trap",
+     "status": "correct",
+     "cli_cost_usd": 0.1953
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "upgrade-negative-control",
+     "status": "correct",
+     "cli_cost_usd": 0.5984
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "upgrade-negative-control",
+     "status": "correct",
+     "cli_cost_usd": 0.3156
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "upgrade-negative-control",
+     "status": "correct",
+     "cli_cost_usd": 0.5572
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "upgrade-negative-control",
+     "status": "correct",
+     "cli_cost_usd": 0.3261
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "upgrade-negative-control",
+     "status": "correct",
+     "cli_cost_usd": 0.3951
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "upgrade-positive",
+     "status": "correct",
+     "cli_cost_usd": 0.5894
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "upgrade-positive",
+     "status": "correct",
+     "cli_cost_usd": 0.1973
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "upgrade-positive",
+     "status": "correct",
+     "cli_cost_usd": 0.3108
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "upgrade-positive",
+     "status": "correct",
+     "cli_cost_usd": 0.28
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "upgrade-positive",
+     "status": "correct",
+     "cli_cost_usd": 0.1942
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "refuted-verdict",
+     "status": "correct",
+     "cli_cost_usd": 0.5771
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "refuted-verdict",
+     "status": "correct",
+     "cli_cost_usd": 0.2635
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "refuted-verdict",
+     "status": "correct",
+     "cli_cost_usd": 0.299
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "refuted-verdict",
+     "status": "correct",
+     "cli_cost_usd": 0.3469
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "refuted-verdict",
+     "status": "correct",
+     "cli_cost_usd": 0.4847
+    }
+   ]
+  },
+  {
+   "role": "evor-sage-junior",
+   "fingerprint": {
+    "agent_file": "agents/evor-sage-junior.md",
+    "agent_sha256": "3df9f95d1a1a13d6",
+    "spec_sha256": "6e7f2eef7bd2647a",
+    "repeats": 5
+   },
+   "records": [
+    {
+     "tier": "sonnet-medium",
+     "case_id": "two-sources-agree",
+     "status": "incorrect",
+     "cli_cost_usd": 0.3344
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "two-sources-agree",
+     "status": "correct",
+     "cli_cost_usd": 0.4156
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "two-sources-agree",
+     "status": "correct",
+     "cli_cost_usd": 0.2283
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "two-sources-agree",
+     "status": "unparseable",
+     "cli_cost_usd": 0.1573
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "two-sources-agree",
+     "status": "correct",
+     "cli_cost_usd": 0.221
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "single-source",
+     "status": "correct",
+     "cli_cost_usd": 0.4306
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "single-source",
+     "status": "incorrect",
+     "cli_cost_usd": 0.4499
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "single-source",
+     "status": "correct",
+     "cli_cost_usd": 0.2768
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "single-source",
+     "status": "incorrect",
+     "cli_cost_usd": 0.36
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "single-source",
+     "status": "incorrect",
+     "cli_cost_usd": 0.2525
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "single-source-second",
+     "status": "unparseable",
+     "cli_cost_usd": 0.2025
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "single-source-second",
+     "status": "incorrect",
+     "cli_cost_usd": 0.1905
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "single-source-second",
+     "status": "correct",
+     "cli_cost_usd": 0.3656
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "single-source-second",
+     "status": "correct",
+     "cli_cost_usd": 0.2139
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "single-source-second",
+     "status": "correct",
+     "cli_cost_usd": 0.2726
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "divergence-inside-band-incomparable",
+     "status": "correct",
+     "cli_cost_usd": 0.3029
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "divergence-inside-band-incomparable",
+     "status": "correct",
+     "cli_cost_usd": 0.1309
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "divergence-inside-band-incomparable",
+     "status": "correct",
+     "cli_cost_usd": 0.1715
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "divergence-inside-band-incomparable",
+     "status": "correct",
+     "cli_cost_usd": 0.2912
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "divergence-inside-band-incomparable",
+     "status": "correct",
+     "cli_cost_usd": 0.1651
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "divergence-just-inside-comparable",
+     "status": "incorrect",
+     "cli_cost_usd": 0.346
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "divergence-just-inside-comparable",
+     "status": "incorrect",
+     "cli_cost_usd": 0.1222
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "divergence-just-inside-comparable",
+     "status": "incorrect",
+     "cli_cost_usd": 0.2065
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "divergence-just-inside-comparable",
+     "status": "incorrect",
+     "cli_cost_usd": 0.1936
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "divergence-just-inside-comparable",
+     "status": "incorrect",
+     "cli_cost_usd": 0.187
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "divergence-just-outside",
+     "status": "correct",
+     "cli_cost_usd": 0.2837
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "divergence-just-outside",
+     "status": "correct",
+     "cli_cost_usd": 0.1257
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "divergence-just-outside",
+     "status": "correct",
+     "cli_cost_usd": 0.124
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "divergence-just-outside",
+     "status": "correct",
+     "cli_cost_usd": 0.1381
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "divergence-just-outside",
+     "status": "correct",
+     "cli_cost_usd": 0.1692
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "wide-disagreement",
+     "status": "correct",
+     "cli_cost_usd": 0.3061
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "wide-disagreement",
+     "status": "correct",
+     "cli_cost_usd": 0.1592
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "wide-disagreement",
+     "status": "correct",
+     "cli_cost_usd": 0.2611
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "wide-disagreement",
+     "status": "correct",
+     "cli_cost_usd": 0.2227
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "wide-disagreement",
+     "status": "correct",
+     "cli_cost_usd": 0.2325
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "inadmissible-marketing-copy",
+     "status": "correct",
+     "cli_cost_usd": 0.3849
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "inadmissible-marketing-copy",
+     "status": "correct",
+     "cli_cost_usd": 0.198
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "inadmissible-marketing-copy",
+     "status": "correct",
+     "cli_cost_usd": 0.1526
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "inadmissible-marketing-copy",
+     "status": "correct",
+     "cli_cost_usd": 0.2192
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "inadmissible-marketing-copy",
+     "status": "correct",
+     "cli_cost_usd": 0.2903
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "inadmissible-forum-anecdote",
+     "status": "correct",
+     "cli_cost_usd": 0.3798
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "inadmissible-forum-anecdote",
+     "status": "correct",
+     "cli_cost_usd": 0.4041
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "inadmissible-forum-anecdote",
+     "status": "correct",
+     "cli_cost_usd": 0.4476
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "inadmissible-forum-anecdote",
+     "status": "correct",
+     "cli_cost_usd": 0.3831
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "inadmissible-forum-anecdote",
+     "status": "correct",
+     "cli_cost_usd": 0.1955
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "no-evidence",
+     "status": "correct",
+     "cli_cost_usd": 0.4121
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "no-evidence",
+     "status": "correct",
+     "cli_cost_usd": 0.1088
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "no-evidence",
+     "status": "correct",
+     "cli_cost_usd": 0.1471
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "no-evidence",
+     "status": "correct",
+     "cli_cost_usd": 0.2924
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "no-evidence",
+     "status": "correct",
+     "cli_cost_usd": 0.1991
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "indirect-evidence-admissible",
+     "status": "correct",
+     "cli_cost_usd": 0.4562
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "indirect-evidence-admissible",
+     "status": "correct",
+     "cli_cost_usd": 0.1587
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "indirect-evidence-admissible",
+     "status": "correct",
+     "cli_cost_usd": 0.21
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "indirect-evidence-admissible",
+     "status": "correct",
+     "cli_cost_usd": 0.4065
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "indirect-evidence-admissible",
+     "status": "correct",
+     "cli_cost_usd": 0.238
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "two-sources-agree",
+     "status": "correct",
+     "cli_cost_usd": 0.06
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "two-sources-agree",
+     "status": "correct",
+     "cli_cost_usd": 0.0169
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "two-sources-agree",
+     "status": "correct",
+     "cli_cost_usd": 0.0525
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "two-sources-agree",
+     "status": "correct",
+     "cli_cost_usd": 0.0252
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "two-sources-agree",
+     "status": "correct",
+     "cli_cost_usd": 0.0414
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "single-source",
+     "status": "correct",
+     "cli_cost_usd": 0.0882
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "single-source",
+     "status": "correct",
+     "cli_cost_usd": 0.0334
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "single-source",
+     "status": "correct",
+     "cli_cost_usd": 0.0882
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "single-source",
+     "status": "correct",
+     "cli_cost_usd": 0.1112
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "single-source",
+     "status": "correct",
+     "cli_cost_usd": 0.0512
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "single-source-second",
+     "status": "correct",
+     "cli_cost_usd": 0.1058
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "single-source-second",
+     "status": "correct",
+     "cli_cost_usd": 0.076
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "single-source-second",
+     "status": "correct",
+     "cli_cost_usd": 0.033
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "single-source-second",
+     "status": "correct",
+     "cli_cost_usd": 0.1067
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "single-source-second",
+     "status": "correct",
+     "cli_cost_usd": 0.0519
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "divergence-inside-band-incomparable",
+     "status": "correct",
+     "cli_cost_usd": 0.0669
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "divergence-inside-band-incomparable",
+     "status": "incorrect",
+     "cli_cost_usd": 0.0875
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "divergence-inside-band-incomparable",
+     "status": "incorrect",
+     "cli_cost_usd": 0.0545
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "divergence-inside-band-incomparable",
+     "status": "correct",
+     "cli_cost_usd": 0.0745
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "divergence-inside-band-incomparable",
+     "status": "incorrect",
+     "cli_cost_usd": 0.0641
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "divergence-just-inside-comparable",
+     "status": "incorrect",
+     "cli_cost_usd": 0.0635
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "divergence-just-inside-comparable",
+     "status": "correct",
+     "cli_cost_usd": 0.0413
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "divergence-just-inside-comparable",
+     "status": "correct",
+     "cli_cost_usd": 0.0485
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "divergence-just-inside-comparable",
+     "status": "correct",
+     "cli_cost_usd": 0.0286
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "divergence-just-inside-comparable",
+     "status": "correct",
+     "cli_cost_usd": 0.0811
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "divergence-just-outside",
+     "status": "incorrect",
+     "cli_cost_usd": 0.1059
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "divergence-just-outside",
+     "status": "incorrect",
+     "cli_cost_usd": 0.053
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "divergence-just-outside",
+     "status": "correct",
+     "cli_cost_usd": 0.0326
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "divergence-just-outside",
+     "status": "incorrect",
+     "cli_cost_usd": 0.0382
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "divergence-just-outside",
+     "status": "incorrect",
+     "cli_cost_usd": 0.0556
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "wide-disagreement",
+     "status": "correct",
+     "cli_cost_usd": 0.0469
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "wide-disagreement",
+     "status": "correct",
+     "cli_cost_usd": 0.0538
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "wide-disagreement",
+     "status": "correct",
+     "cli_cost_usd": 0.0335
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "wide-disagreement",
+     "status": "correct",
+     "cli_cost_usd": 0.028
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "wide-disagreement",
+     "status": "incorrect",
+     "cli_cost_usd": 0.0492
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "inadmissible-marketing-copy",
+     "status": "correct",
+     "cli_cost_usd": 0.128
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "inadmissible-marketing-copy",
+     "status": "correct",
+     "cli_cost_usd": 0.0485
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "inadmissible-marketing-copy",
+     "status": "correct",
+     "cli_cost_usd": 0.0923
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "inadmissible-marketing-copy",
+     "status": "correct",
+     "cli_cost_usd": 0.0929
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "inadmissible-marketing-copy",
+     "status": "correct",
+     "cli_cost_usd": 0.1153
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "inadmissible-forum-anecdote",
+     "status": "correct",
+     "cli_cost_usd": 0.0966
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "inadmissible-forum-anecdote",
+     "status": "correct",
+     "cli_cost_usd": 0.1379
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "inadmissible-forum-anecdote",
+     "status": "correct",
+     "cli_cost_usd": 0.1258
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "inadmissible-forum-anecdote",
+     "status": "correct",
+     "cli_cost_usd": 0.0362
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "inadmissible-forum-anecdote",
+     "status": "correct",
+     "cli_cost_usd": 0.0537
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "no-evidence",
+     "status": "correct",
+     "cli_cost_usd": 0.0672
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "no-evidence",
+     "status": "correct",
+     "cli_cost_usd": 0.0611
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "no-evidence",
+     "status": "correct",
+     "cli_cost_usd": 0.077
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "no-evidence",
+     "status": "correct",
+     "cli_cost_usd": 0.0342
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "no-evidence",
+     "status": "correct",
+     "cli_cost_usd": 0.0812
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "indirect-evidence-admissible",
+     "status": "correct",
+     "cli_cost_usd": 0.068
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "indirect-evidence-admissible",
+     "status": "correct",
+     "cli_cost_usd": 0.0296
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "indirect-evidence-admissible",
+     "status": "correct",
+     "cli_cost_usd": 0.0454
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "indirect-evidence-admissible",
+     "status": "correct",
+     "cli_cost_usd": 0.0479
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "indirect-evidence-admissible",
+     "status": "correct",
+     "cli_cost_usd": 0.0563
+    }
+   ]
+  },
+  {
+   "role": "evor-sage",
+   "fingerprint": {
+    "agent_file": "agents/evor-sage.md",
+    "agent_sha256": "66c28dd63e352738",
+    "spec_sha256": "0dda1693e33c2428",
+    "repeats": 5
+   },
+   "records": [
+    {
+     "tier": "haiku-medium",
+     "case_id": "cross-junior-quorum",
+     "status": "correct",
+     "cli_cost_usd": 0.0517
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "cross-junior-quorum",
+     "status": "correct",
+     "cli_cost_usd": 0.0274
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "cross-junior-quorum",
+     "status": "correct",
+     "cli_cost_usd": 0.0137
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "cross-junior-quorum",
+     "status": "correct",
+     "cli_cost_usd": 0.0209
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "cross-junior-quorum",
+     "status": "correct",
+     "cli_cost_usd": 0.0313
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "mirrored-source-trap",
+     "status": "correct",
+     "cli_cost_usd": 0.0468
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "mirrored-source-trap",
+     "status": "correct",
+     "cli_cost_usd": 0.0167
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "mirrored-source-trap",
+     "status": "correct",
+     "cli_cost_usd": 0.0206
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "mirrored-source-trap",
+     "status": "correct",
+     "cli_cost_usd": 0.02
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "mirrored-source-trap",
+     "status": "correct",
+     "cli_cost_usd": 0.017
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "divergence-too-wide",
+     "status": "correct",
+     "cli_cost_usd": 0.0539
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "divergence-too-wide",
+     "status": "correct",
+     "cli_cost_usd": 0.0117
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "divergence-too-wide",
+     "status": "correct",
+     "cli_cost_usd": 0.0337
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "divergence-too-wide",
+     "status": "correct",
+     "cli_cost_usd": 0.0194
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "divergence-too-wide",
+     "status": "correct",
+     "cli_cost_usd": 0.0294
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "divergence-inside-band-incomparable",
+     "status": "incorrect",
+     "cli_cost_usd": 0.0562
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "divergence-inside-band-incomparable",
+     "status": "correct",
+     "cli_cost_usd": 0.0204
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "divergence-inside-band-incomparable",
+     "status": "correct",
+     "cli_cost_usd": 0.0361
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "divergence-inside-band-incomparable",
+     "status": "correct",
+     "cli_cost_usd": 0.028
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "divergence-inside-band-incomparable",
+     "status": "correct",
+     "cli_cost_usd": 0.0127
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "divergence-just-inside-comparable",
+     "status": "correct",
+     "cli_cost_usd": 0.0548
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "divergence-just-inside-comparable",
+     "status": "correct",
+     "cli_cost_usd": 0.0367
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "divergence-just-inside-comparable",
+     "status": "incorrect",
+     "cli_cost_usd": 0.0303
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "divergence-just-inside-comparable",
+     "status": "correct",
+     "cli_cost_usd": 0.0374
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "divergence-just-inside-comparable",
+     "status": "incorrect",
+     "cli_cost_usd": 0.0347
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "divergence-just-outside",
+     "status": "correct",
+     "cli_cost_usd": 0.054
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "divergence-just-outside",
+     "status": "correct",
+     "cli_cost_usd": 0.0224
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "divergence-just-outside",
+     "status": "correct",
+     "cli_cost_usd": 0.0254
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "divergence-just-outside",
+     "status": "correct",
+     "cli_cost_usd": 0.026
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "divergence-just-outside",
+     "status": "correct",
+     "cli_cost_usd": 0.0275
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "single-source",
+     "status": "correct",
+     "cli_cost_usd": 0.049
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "single-source",
+     "status": "correct",
+     "cli_cost_usd": 0.0169
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "single-source",
+     "status": "correct",
+     "cli_cost_usd": 0.014
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "single-source",
+     "status": "correct",
+     "cli_cost_usd": 0.052
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "single-source",
+     "status": "correct",
+     "cli_cost_usd": 0.0154
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "wiki-hit-provenance",
+     "status": "correct",
+     "cli_cost_usd": 0.0465
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "wiki-hit-provenance",
+     "status": "correct",
+     "cli_cost_usd": 0.076
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "wiki-hit-provenance",
+     "status": "correct",
+     "cli_cost_usd": 0.0208
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "wiki-hit-provenance",
+     "status": "correct",
+     "cli_cost_usd": 0.0234
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "wiki-hit-provenance",
+     "status": "correct",
+     "cli_cost_usd": 0.0124
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "mixed-provenance",
+     "status": "correct",
+     "cli_cost_usd": 0.0574
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "mixed-provenance",
+     "status": "correct",
+     "cli_cost_usd": 0.0217
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "mixed-provenance",
+     "status": "correct",
+     "cli_cost_usd": 0.0155
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "mixed-provenance",
+     "status": "correct",
+     "cli_cost_usd": 0.0364
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "mixed-provenance",
+     "status": "correct",
+     "cli_cost_usd": 0.0208
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "no-evidence-fallback",
+     "status": "correct",
+     "cli_cost_usd": 0.0533
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "no-evidence-fallback",
+     "status": "correct",
+     "cli_cost_usd": 0.0098
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "no-evidence-fallback",
+     "status": "correct",
+     "cli_cost_usd": 0.0156
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "no-evidence-fallback",
+     "status": "correct",
+     "cli_cost_usd": 0.022
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "no-evidence-fallback",
+     "status": "correct",
+     "cli_cost_usd": 0.0096
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "ambiguous-low-confidence",
+     "status": "correct",
+     "cli_cost_usd": 0.0792
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "ambiguous-low-confidence",
+     "status": "correct",
+     "cli_cost_usd": 0.0355
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "ambiguous-low-confidence",
+     "status": "incorrect",
+     "cli_cost_usd": 0.0254
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "ambiguous-low-confidence",
+     "status": "incorrect",
+     "cli_cost_usd": 0.0475
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "ambiguous-low-confidence",
+     "status": "correct",
+     "cli_cost_usd": 0.0521
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "single-source-second",
+     "status": "correct",
+     "cli_cost_usd": 0.0516
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "single-source-second",
+     "status": "correct",
+     "cli_cost_usd": 0.0137
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "single-source-second",
+     "status": "correct",
+     "cli_cost_usd": 0.0104
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "single-source-second",
+     "status": "correct",
+     "cli_cost_usd": 0.01
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "single-source-second",
+     "status": "correct",
+     "cli_cost_usd": 0.0097
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "quorum-across-three-juniors",
+     "status": "correct",
+     "cli_cost_usd": 0.0489
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "quorum-across-three-juniors",
+     "status": "correct",
+     "cli_cost_usd": 0.0154
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "quorum-across-three-juniors",
+     "status": "correct",
+     "cli_cost_usd": 0.0313
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "quorum-across-three-juniors",
+     "status": "correct",
+     "cli_cost_usd": 0.0186
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "quorum-across-three-juniors",
+     "status": "correct",
+     "cli_cost_usd": 0.0188
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "cross-junior-quorum",
+     "status": "correct",
+     "cli_cost_usd": 0.4968
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "cross-junior-quorum",
+     "status": "correct",
+     "cli_cost_usd": 0.1555
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "cross-junior-quorum",
+     "status": "correct",
+     "cli_cost_usd": 0.1446
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "cross-junior-quorum",
+     "status": "correct",
+     "cli_cost_usd": 0.1594
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "cross-junior-quorum",
+     "status": "correct",
+     "cli_cost_usd": 0.1602
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "mirrored-source-trap",
+     "status": "correct",
+     "cli_cost_usd": 0.3647
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "mirrored-source-trap",
+     "status": "correct",
+     "cli_cost_usd": 0.1423
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "mirrored-source-trap",
+     "status": "correct",
+     "cli_cost_usd": 0.1463
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "mirrored-source-trap",
+     "status": "correct",
+     "cli_cost_usd": 0.1432
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "mirrored-source-trap",
+     "status": "correct",
+     "cli_cost_usd": 0.1473
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "divergence-too-wide",
+     "status": "correct",
+     "cli_cost_usd": 0.4411
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "divergence-too-wide",
+     "status": "correct",
+     "cli_cost_usd": 0.1544
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "divergence-too-wide",
+     "status": "correct",
+     "cli_cost_usd": 0.1704
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "divergence-too-wide",
+     "status": "correct",
+     "cli_cost_usd": 0.1709
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "divergence-too-wide",
+     "status": "correct",
+     "cli_cost_usd": 0.1552
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "divergence-inside-band-incomparable",
+     "status": "correct",
+     "cli_cost_usd": 0.2848
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "divergence-inside-band-incomparable",
+     "status": "correct",
+     "cli_cost_usd": 0.1507
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "divergence-inside-band-incomparable",
+     "status": "correct",
+     "cli_cost_usd": 0.0638
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "divergence-inside-band-incomparable",
+     "status": "correct",
+     "cli_cost_usd": 0.2049
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "divergence-inside-band-incomparable",
+     "status": "correct",
+     "cli_cost_usd": 0.1678
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "divergence-just-inside-comparable",
+     "status": "correct",
+     "cli_cost_usd": 0.4149
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "divergence-just-inside-comparable",
+     "status": "incorrect",
+     "cli_cost_usd": 0.191
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "divergence-just-inside-comparable",
+     "status": "incorrect",
+     "cli_cost_usd": 0.2257
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "divergence-just-inside-comparable",
+     "status": "correct",
+     "cli_cost_usd": 0.2256
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "divergence-just-inside-comparable",
+     "status": "incorrect",
+     "cli_cost_usd": 0.2787
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "divergence-just-outside",
+     "status": "correct",
+     "cli_cost_usd": 0.3882
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "divergence-just-outside",
+     "status": "correct",
+     "cli_cost_usd": 0.0626
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "divergence-just-outside",
+     "status": "correct",
+     "cli_cost_usd": 0.1317
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "divergence-just-outside",
+     "status": "correct",
+     "cli_cost_usd": 0.0565
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "divergence-just-outside",
+     "status": "correct",
+     "cli_cost_usd": 0.1513
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "single-source",
+     "status": "correct",
+     "cli_cost_usd": 0.3796
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "single-source",
+     "status": "correct",
+     "cli_cost_usd": 0.1594
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "single-source",
+     "status": "correct",
+     "cli_cost_usd": 0.1445
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "single-source",
+     "status": "correct",
+     "cli_cost_usd": 0.1518
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "single-source",
+     "status": "correct",
+     "cli_cost_usd": 0.1403
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "wiki-hit-provenance",
+     "status": "correct",
+     "cli_cost_usd": 0.3535
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "wiki-hit-provenance",
+     "status": "correct",
+     "cli_cost_usd": 0.1573
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "wiki-hit-provenance",
+     "status": "correct",
+     "cli_cost_usd": 0.1655
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "wiki-hit-provenance",
+     "status": "correct",
+     "cli_cost_usd": 0.2041
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "wiki-hit-provenance",
+     "status": "correct",
+     "cli_cost_usd": 0.1393
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "mixed-provenance",
+     "status": "correct",
+     "cli_cost_usd": 0.3373
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "mixed-provenance",
+     "status": "correct",
+     "cli_cost_usd": 0.0888
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "mixed-provenance",
+     "status": "correct",
+     "cli_cost_usd": 0.4562
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "mixed-provenance",
+     "status": "correct",
+     "cli_cost_usd": 0.4727
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "mixed-provenance",
+     "status": "correct",
+     "cli_cost_usd": 0.5978
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "no-evidence-fallback",
+     "status": "correct",
+     "cli_cost_usd": 0.3598
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "no-evidence-fallback",
+     "status": "correct",
+     "cli_cost_usd": 0.0411
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "no-evidence-fallback",
+     "status": "correct",
+     "cli_cost_usd": 0.1309
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "no-evidence-fallback",
+     "status": "correct",
+     "cli_cost_usd": 0.1329
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "no-evidence-fallback",
+     "status": "correct",
+     "cli_cost_usd": 0.1373
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "ambiguous-low-confidence",
+     "status": "correct",
+     "cli_cost_usd": 0.4378
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "ambiguous-low-confidence",
+     "status": "correct",
+     "cli_cost_usd": 0.2223
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "ambiguous-low-confidence",
+     "status": "correct",
+     "cli_cost_usd": 0.2209
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "ambiguous-low-confidence",
+     "status": "correct",
+     "cli_cost_usd": 0.1721
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "ambiguous-low-confidence",
+     "status": "correct",
+     "cli_cost_usd": 0.1733
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "single-source-second",
+     "status": "correct",
+     "cli_cost_usd": 0.3653
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "single-source-second",
+     "status": "correct",
+     "cli_cost_usd": 0.1455
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "single-source-second",
+     "status": "correct",
+     "cli_cost_usd": 0.124
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "single-source-second",
+     "status": "correct",
+     "cli_cost_usd": 0.1356
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "single-source-second",
+     "status": "correct",
+     "cli_cost_usd": 0.4026
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "quorum-across-three-juniors",
+     "status": "correct",
+     "cli_cost_usd": 0.4056
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "quorum-across-three-juniors",
+     "status": "correct",
+     "cli_cost_usd": 0.4187
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "quorum-across-three-juniors",
+     "status": "correct",
+     "cli_cost_usd": 0.4068
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "quorum-across-three-juniors",
+     "status": "correct",
+     "cli_cost_usd": 0.2397
+    },
+    {
+     "tier": "opus-medium",
+     "case_id": "quorum-across-three-juniors",
+     "status": "correct",
+     "cli_cost_usd": 0.2226
+    }
+   ]
+  },
+  {
+   "role": "evor-tick",
+   "fingerprint": {
+    "agent_file": "agents/evor-tick.md",
+    "agent_sha256": "dfba1dc4dd60fb16",
+    "spec_sha256": "5a8fb307d2babb41",
+    "repeats": 5
+   },
+   "records": [
+    {
+     "tier": "sonnet-medium",
+     "case_id": "scored-node",
+     "status": "correct",
+     "cli_cost_usd": 0.1398
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "scored-node",
+     "status": "correct",
+     "cli_cost_usd": 0.0161
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "scored-node",
+     "status": "correct",
+     "cli_cost_usd": 0.0162
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "scored-node",
+     "status": "correct",
+     "cli_cost_usd": 0.0815
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "scored-node",
+     "status": "correct",
+     "cli_cost_usd": 0.0176
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "rejected-by-selector",
+     "status": "correct",
+     "cli_cost_usd": 0.5317
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "rejected-by-selector",
+     "status": "correct",
+     "cli_cost_usd": 0.3136
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "rejected-by-selector",
+     "status": "correct",
+     "cli_cost_usd": 0.1383
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "rejected-by-selector",
+     "status": "correct",
+     "cli_cost_usd": 0.0296
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "rejected-by-selector",
+     "status": "incorrect",
+     "cli_cost_usd": 0.0316
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "failed-tick-carries-its-reason",
+     "status": "correct",
+     "cli_cost_usd": 0.1078
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "failed-tick-carries-its-reason",
+     "status": "incorrect",
+     "cli_cost_usd": 0.016
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "failed-tick-carries-its-reason",
+     "status": "incorrect",
+     "cli_cost_usd": 0.0152
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "failed-tick-carries-its-reason",
+     "status": "incorrect",
+     "cli_cost_usd": 0.0671
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "failed-tick-carries-its-reason",
+     "status": "correct",
+     "cli_cost_usd": 0.0705
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "detail-stays-behind-a-pointer",
+     "status": "correct",
+     "cli_cost_usd": 0.1078
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "detail-stays-behind-a-pointer",
+     "status": "correct",
+     "cli_cost_usd": 0.0502
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "detail-stays-behind-a-pointer",
+     "status": "correct",
+     "cli_cost_usd": 0.1355
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "detail-stays-behind-a-pointer",
+     "status": "correct",
+     "cli_cost_usd": 0.1097
+    },
+    {
+     "tier": "sonnet-medium",
+     "case_id": "detail-stays-behind-a-pointer",
+     "status": "correct",
+     "cli_cost_usd": 0.0881
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "scored-node",
+     "status": "incorrect",
+     "cli_cost_usd": 0.0083
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "scored-node",
+     "status": "incorrect",
+     "cli_cost_usd": 0.0089
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "scored-node",
+     "status": "incorrect",
+     "cli_cost_usd": 0.0065
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "scored-node",
+     "status": "incorrect",
+     "cli_cost_usd": 0.0253
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "scored-node",
+     "status": "incorrect",
+     "cli_cost_usd": 0.0086
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "rejected-by-selector",
+     "status": "incorrect",
+     "cli_cost_usd": 0.0382
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "rejected-by-selector",
+     "status": "incorrect",
+     "cli_cost_usd": 0.0271
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "rejected-by-selector",
+     "status": "incorrect",
+     "cli_cost_usd": 0.0099
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "rejected-by-selector",
+     "status": "incorrect",
+     "cli_cost_usd": 0.0185
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "rejected-by-selector",
+     "status": "incorrect",
+     "cli_cost_usd": 0.0304
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "failed-tick-carries-its-reason",
+     "status": "incorrect",
+     "cli_cost_usd": 0.0407
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "failed-tick-carries-its-reason",
+     "status": "incorrect",
+     "cli_cost_usd": 0.0113
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "failed-tick-carries-its-reason",
+     "status": "incorrect",
+     "cli_cost_usd": 0.011
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "failed-tick-carries-its-reason",
+     "status": "incorrect",
+     "cli_cost_usd": 0.0389
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "failed-tick-carries-its-reason",
+     "status": "incorrect",
+     "cli_cost_usd": 0.0287
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "detail-stays-behind-a-pointer",
+     "status": "correct",
+     "cli_cost_usd": 0.0295
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "detail-stays-behind-a-pointer",
+     "status": "correct",
+     "cli_cost_usd": 0.0167
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "detail-stays-behind-a-pointer",
+     "status": "correct",
+     "cli_cost_usd": 0.0081
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "detail-stays-behind-a-pointer",
+     "status": "correct",
+     "cli_cost_usd": 0.0084
+    },
+    {
+     "tier": "haiku-medium",
+     "case_id": "detail-stays-behind-a-pointer",
+     "status": "incorrect",
+     "cli_cost_usd": 0.0157
+    }
+   ]
+  }
+ ]
+}

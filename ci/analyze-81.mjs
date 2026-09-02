@@ -21,18 +21,29 @@
  * So: per case, each arm's success RATE over its repeats; the paired
  * difference; then a cluster bootstrap resampling CASES (not calls).
  */
-import { readFileSync, readdirSync } from 'fs';
+import { readFileSync, readdirSync, statSync } from 'fs';
 import { join, resolve } from 'path';
 
-const dir = resolve(process.argv[2] ?? 'ci/out/matrix-81');
-const files = readdirSync(dir).filter((f) => f.endsWith('-report.json'));
-if (!files.length) { console.error(`no *-report.json under ${dir}`); process.exit(2); }
+// Accepts either a directory of raw reports or the committed digest, because a
+// table nobody outside this machine can regenerate is not evidence. See
+// ci/digest-81.mjs.
+const target = resolve(process.argv[2] ?? 'docs/evidence/matrix-81.json');
+let sources;
+if (statSync(target).isDirectory()) {
+  const files = readdirSync(target).filter((f) => f.endsWith('-report.json')).sort();
+  if (!files.length) { console.error(`no *-report.json under ${target}`); process.exit(2); }
+  sources = files.map((f) => ({ name: f, report: JSON.parse(readFileSync(join(target, f), 'utf8')) }));
+} else {
+  const digest = JSON.parse(readFileSync(target, 'utf8'));
+  sources = (digest.runs ?? []).map((r) => ({ name: `${r.role.replace(/^evor-/, '')}-report.json`, report: r }));
+}
 
 // Deterministic PRNG — a bootstrap that cannot be re-run to the same numbers is
 // not evidence anyone else can check.
 let seed = 0x2f6e2b1;
 const rnd = () => (((seed = (seed * 1664525 + 1013904223) >>> 0) / 0x100000000));
 
+const MARGIN = 0.10; // the non-inferiority margin this project set
 const pct = (x) => `${(x * 100).toFixed(1)}%`;
 const pp = (x) => `${x >= 0 ? '+' : ''}${(x * 100).toFixed(1)}pp`;
 
@@ -52,8 +63,7 @@ function bootstrapCI(perCaseDiffs, iters = 20000) {
 const allDiffs = [];
 const rows = [];
 
-for (const f of files.sort()) {
-  const rep = JSON.parse(readFileSync(join(dir, f), 'utf8'));
+for (const { name: f, report: rep } of sources) {
   const records = rep.records ?? [];
   const arms = [...new Set(records.map((r) => r.tier))];
   const spec = JSON.parse(readFileSync(resolve(`evals/${f.replace('-report.json', '')}/spec.json`), 'utf8'));
@@ -136,7 +146,18 @@ console.log(
 // THE VERDICT IS PER ROLE. Each retier is its own adoption decision, so each
 // gets its own interval and its own answer.
 for (const r of rows) {
-  r.verdict = r.ci.hi < 0.10 ? 'non-inferior' : 'NOT SHOWN';
+  // STRICTLY BELOW, AND NOT BY A ROUNDING ERROR.
+  //
+  // evor-mutagen's bootstrap upper bound is 0.09999999999999998 — the true
+  // 97.5th percentile is exactly 0.10, because the per-case differences are
+  // discrete (eight cases at 0.00, two at 0.20) and the percentile lands on one
+  // of them. It cleared `hi < 0.10` by 2e-17 and printed "non-inferior".
+  //
+  // A verdict decided by float representation is not a verdict, and an interval
+  // that TOUCHES the margin has not excluded it. The tolerance resolves the tie
+  // against adoption, which is the direction a non-inferiority test is supposed
+  // to fail in.
+  r.verdict = r.ci.hi < MARGIN - 1e-9 ? 'non-inferior' : 'NOT SHOWN';
   console.log(
     `${r.role.padEnd(22)} ${String(r.cases).padStart(5)} ${pct(r.curRate).padStart(8)} ${pct(r.canRate).padStart(9)}  ${pp(r.mean).padStart(9)}  ${`[${pp(r.ci.lo)}, ${pp(r.ci.hi)}]`.padEnd(22)} ${r.verdict}`,
   );
