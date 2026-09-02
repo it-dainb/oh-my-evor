@@ -21367,7 +21367,6 @@ var DecisionLogEntrySchema = external_exports.object({
     "prune",
     "stop",
     "meta-evolve",
-    ,
     // Item 9.4 / L-02: when no monotonic move exists, the system must be able
     // to SAY so. The charter asserts "a monotonic move always exists" in prose
     // on AutonomyCharter.invariant, with no code branch — so the one
@@ -23045,7 +23044,23 @@ var TickStateSchema = external_exports.object({
   current_step: external_exports.number().int().min(0).describe("Step within the tick (0-indexed)"),
   step_status: external_exports.enum(["pending", "running", "done", "failed"]).describe("Status of current_step"),
   step_outputs: external_exports.record(external_exports.string(), external_exports.unknown()).optional().describe("Keyed outputs produced by completed steps"),
-  updated_at: external_exports.string().optional().describe("ISO 8601 timestamp of last update")
+  updated_at: external_exports.string().optional().describe("ISO 8601 timestamp of last update"),
+  // ── Item 2b.3: name the wait ────────────────────────────────────────────
+  //
+  // `ARCHITECTURE.md:134` and `skills/evor/SKILL.md` told agents to idle on
+  // `job_complete` / `self_heal_event` signals. Those events have ZERO producers
+  // anywhere in the codebase — agents were instructed to wait for something
+  // nobody emits, so the choice was poll or guess.
+  //
+  // Blocking is a HOST affordance and stays that way: `Monitor` and
+  // `TaskOutput` already do it properly. What was ours to provide is a durable
+  // statement of WHAT is being waited on, so a tick that is waiting is
+  // distinguishable from one that has stalled — which is the difference C-05
+  // and 3.3's `max_dwell_s` both turn on.
+  blocked: external_exports.object({
+    on: external_exports.string().describe("What is awaited, e.g. 'artifact:forge-report.json' or 'job:abc123'"),
+    since: external_exports.string().describe("ISO 8601 \u2014 when the wait began, so staleness is computable")
+  }).nullable().optional().describe("Set while the tick waits on something it does not own. null = not waiting.")
 });
 var RunStatePatchSchema = external_exports.object({
   status: external_exports.enum(["initialized", "running", "paused", "completed", "failed"]).optional().describe("Run lifecycle status"),
@@ -24170,7 +24185,88 @@ function readArtifact(runId, tick, agent, kind, partial2, missionId) {
     error: String(data?.error ?? "unknown error from read_artifact_bridge")
   };
 }
+function artifactPathFor(runDir, tick, agent, kind) {
+  const slug = (kind ?? "").replace(/[^a-zA-Z0-9._-]+/g, "-").replace(/^-+|-+$/g, "");
+  const base = (0, import_path15.join)(runDir, "ticks", String(tick));
+  switch (agent) {
+    case "mutagen":
+      return (0, import_path15.join)(base, "mutagen", "proposals.json");
+    case "selector":
+      return (0, import_path15.join)(base, "selector", "verdict.json");
+    case "probe":
+      return (0, import_path15.join)(base, "probe", "findings.json");
+    case "sage":
+      return (0, import_path15.join)(base, "sage", "findings.json");
+    case "sage-junior":
+      return (0, import_path15.join)(base, "sage", "juniors", `${slug || "findings"}.json`);
+    case "forge":
+      return (0, import_path15.join)(base, "forge", "forge-report.json");
+    case "forge-architect":
+      return (0, import_path15.join)(base, "forge", "architect.json");
+    case "forge-critic":
+      return (0, import_path15.join)(base, "forge", "critic.json");
+    case "forge-analyst":
+      return (0, import_path15.join)(base, "forge", "analyst.json");
+    case "acquirer":
+      return (0, import_path15.join)(base, "acquirer", `${slug || "acquisition"}.json`);
+    default:
+      return (0, import_path15.join)(base, agent, `${slug || "artifact"}.json`);
+  }
+}
 function registerArtifactTools(server) {
+  server.tool(
+    "evor_await_artifact",
+    "Record that this tick is WAITING for an artifact, and report whether it has arrived. Does not block \u2014 use Monitor or TaskOutput(block:true) for that. This makes the wait visible in tick-state so a waiting tick is distinguishable from a stalled one.",
+    {
+      run_id: external_exports.string().describe("Active run identifier"),
+      tick: external_exports.number().int().min(0).describe("Tick number"),
+      agent: external_exports.string().describe("Agent whose artifact is awaited, e.g. 'forge'"),
+      kind: external_exports.string().optional().describe("Artifact kind when the agent writes several"),
+      mission_id: external_exports.string().optional().describe("Mission id; resolved from the active run when omitted"),
+      release: external_exports.boolean().optional().describe("Clear the wait instead of declaring one")
+    },
+    async ({ run_id, tick, agent, kind, mission_id, release }) => {
+      const missionId = mission_id ?? process.env.EVOR_MISSION_ID;
+      const paths = resolveRunPaths(run_id, missionId);
+      const tickStatePath = (0, import_path15.join)(paths.runDir, "tick-state.json");
+      let tickState = {};
+      if ((0, import_fs14.existsSync)(tickStatePath)) {
+        try {
+          tickState = JSON.parse((0, import_fs14.readFileSync)(tickStatePath, "utf8"));
+        } catch {
+          tickState = {};
+        }
+      }
+      const artifactPath = artifactPathFor(paths.runDir, tick, agent, kind);
+      const arrived = (0, import_fs14.existsSync)(artifactPath);
+      const waitingOn = `artifact:${agent}${kind ? `/${kind}` : ""}@tick${tick}`;
+      const previous = tickState.blocked ?? null;
+      let blocked = null;
+      if (!release && !arrived) {
+        blocked = {
+          on: waitingOn,
+          since: previous?.on === waitingOn && previous.since ? previous.since : (/* @__PURE__ */ new Date()).toISOString()
+        };
+      }
+      tickState.blocked = blocked;
+      tickState.updated_at = (/* @__PURE__ */ new Date()).toISOString();
+      try {
+        const tmp = `${tickStatePath}.tmp`;
+        (0, import_fs14.writeFileSync)(tmp, JSON.stringify(tickState, null, 2), "utf8");
+        (0, import_fs14.renameSync)(tmp, tickStatePath);
+      } catch (e) {
+        return err(`could not record the wait: ${String(e)}`);
+      }
+      return ok({
+        arrived,
+        waiting_on: blocked?.on ?? null,
+        waiting_since: blocked?.since ?? null,
+        // Told plainly, because the previous instruction was to wait on an event
+        // that does not exist.
+        next: arrived ? "the artifact is present \u2014 read it with evor_read_artifact" : "not yet written. Block with TaskOutput(task_id, block:true) on the agent that owes it, or Monitor the artifact path. Do NOT poll this tool in a loop."
+      });
+    }
+  );
   server.tool(
     "evor_write_artifact",
     [

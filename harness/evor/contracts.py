@@ -1347,6 +1347,15 @@ class GotchaEntry(BaseEvorModel):
 # Signal facet vocabularies — the ONLY closed sets in the signal system.
 # Signal `kind` stays free-text/open; facets are how lenses subscribe.
 SignalShape = Literal["limit", "opportunity", "failure", "trend"]
+
+#: Item 2b.1 — the kind that names "I was asked to do something I cannot do".
+#:
+#: The channel already worked. `evor-tick` emitted
+#: `forge-cannot-spawn-forge-junior-tool-gap` onto the bus, honestly and at the
+#: right moment, and NOTHING READ IT — so a human restarted the mission. The
+#: missing half was never transport; it was a name for the event and someone
+#: listening for it.
+CAPABILITY_GAP_KIND = "capability-gap"
 SignalAxis = Literal[
     "memory", "compute", "accuracy", "stability", "data", "generalization", "cost"
 ]

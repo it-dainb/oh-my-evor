@@ -19,7 +19,7 @@
  * sage, sage-junior, acquirer); all other agents pass through as plain JSON.
  */
 
-import { mkdtempSync, rmdirSync, unlinkSync, writeFileSync } from "fs";
+import { existsSync, mkdtempSync, readFileSync, renameSync, rmdirSync, unlinkSync, writeFileSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -27,7 +27,7 @@ import { z } from "zod";
 import { resolveRunPaths } from "../run-store.js";
 import { callBridge } from "../subprocess-bridge.js";
 import { resolveRunId } from "../active-run.js";
-import { err } from "../tool-result.js";
+import { err, ok } from "../tool-result.js";
 
 /**
  * Agent kinds whose artifacts are validated against a Pydantic contract at write
@@ -168,7 +168,111 @@ export function readArtifact(
 
 // ── Tool registration ─────────────────────────────────────────────────────────
 
+/**
+ * Where an agent's tick artifact lands. Mirrors the map in this file's header
+ * and `harness/evor/artifacts.resolve_artifact_path`.
+ *
+ * Duplicated rather than shared because the harness owns WRITING and this side
+ * only needs to ask whether the file has arrived yet — and shelling out to
+ * Python to answer "does a path exist" would make a cheap check expensive. If
+ * the layout moves, both must move; the header comment is the shared statement.
+ */
+function artifactPathFor(runDir: string, tick: number, agent: string, kind?: string): string {
+  const slug = (kind ?? "").replace(/[^a-zA-Z0-9._-]+/g, "-").replace(/^-+|-+$/g, "");
+  const base = join(runDir, "ticks", String(tick));
+  switch (agent) {
+    case "mutagen":         return join(base, "mutagen", "proposals.json");
+    case "selector":        return join(base, "selector", "verdict.json");
+    case "probe":           return join(base, "probe", "findings.json");
+    case "sage":            return join(base, "sage", "findings.json");
+    case "sage-junior":     return join(base, "sage", "juniors", `${slug || "findings"}.json`);
+    case "forge":           return join(base, "forge", "forge-report.json");
+    case "forge-architect": return join(base, "forge", "architect.json");
+    case "forge-critic":    return join(base, "forge", "critic.json");
+    case "forge-analyst":   return join(base, "forge", "analyst.json");
+    case "acquirer":        return join(base, "acquirer", `${slug || "acquisition"}.json`);
+    default:                return join(base, agent, `${slug || "artifact"}.json`);
+  }
+}
+
 export function registerArtifactTools(server: McpServer): void {
+  // ── evor_await_artifact (item 2b.3) ────────────────────────────────────────
+  server.tool(
+    "evor_await_artifact",
+    "Record that this tick is WAITING for an artifact, and report whether it has arrived. " +
+    "Does not block — use Monitor or TaskOutput(block:true) for that. This makes the wait " +
+    "visible in tick-state so a waiting tick is distinguishable from a stalled one.",
+    {
+      run_id: z.string().describe("Active run identifier"),
+      tick: z.number().int().min(0).describe("Tick number"),
+      agent: z.string().describe("Agent whose artifact is awaited, e.g. 'forge'"),
+      kind: z.string().optional().describe("Artifact kind when the agent writes several"),
+      mission_id: z.string().optional().describe("Mission id; resolved from the active run when omitted"),
+      release: z.boolean().optional().describe("Clear the wait instead of declaring one"),
+    },
+    async ({ run_id, tick, agent, kind, mission_id, release }) => {
+      // WHY THIS EXISTS. `ARCHITECTURE.md:134` and `skills/evor/SKILL.md` told
+      // agents to idle on `job_complete` / `self_heal_event` signals. Those
+      // events have ZERO producers anywhere in the codebase — agents were
+      // instructed to wait for something nobody emits, so the only options left
+      // were polling or guessing, and the field run did both.
+      //
+      // Blocking itself stays a HOST affordance: `Monitor` and
+      // `TaskOutput(block:true)` already do it properly, and reimplementing them
+      // here would be worse in every way. What was ours to provide is a DURABLE
+      // STATEMENT of what is being awaited — so a tick that is waiting is
+      // distinguishable from one that has stalled, which is exactly the
+      // distinction C-05 needed and 3.3's `max_dwell_s` computes.
+      const missionId = mission_id ?? process.env.EVOR_MISSION_ID;
+      const paths = resolveRunPaths(run_id, missionId);
+      const tickStatePath = join(paths.runDir, "tick-state.json");
+
+      let tickState: Record<string, unknown> = {};
+      if (existsSync(tickStatePath)) {
+        try { tickState = JSON.parse(readFileSync(tickStatePath, "utf8")); } catch { tickState = {}; }
+      }
+
+      const artifactPath = artifactPathFor(paths.runDir, tick, agent, kind);
+      const arrived = existsSync(artifactPath);
+      const waitingOn = `artifact:${agent}${kind ? `/${kind}` : ""}@tick${tick}`;
+
+      const previous = (tickState.blocked ?? null) as { on?: string; since?: string } | null;
+      let blocked: { on: string; since: string } | null = null;
+
+      if (!release && !arrived) {
+        // `since` is preserved across repeated calls: a wait that restarts its
+        // own clock on every poll can never be found stale, which would make the
+        // field's 8h16m stall invisible all over again.
+        blocked = {
+          on: waitingOn,
+          since: previous?.on === waitingOn && previous.since ? previous.since : new Date().toISOString(),
+        };
+      }
+
+      tickState.blocked = blocked;
+      tickState.updated_at = new Date().toISOString();
+      try {
+        const tmp = `${tickStatePath}.tmp`;
+        writeFileSync(tmp, JSON.stringify(tickState, null, 2), "utf8");
+        renameSync(tmp, tickStatePath);
+      } catch (e) {
+        return err(`could not record the wait: ${String(e)}`);
+      }
+
+      return ok({
+        arrived,
+        waiting_on: blocked?.on ?? null,
+        waiting_since: blocked?.since ?? null,
+        // Told plainly, because the previous instruction was to wait on an event
+        // that does not exist.
+        next: arrived
+          ? "the artifact is present — read it with evor_read_artifact"
+          : "not yet written. Block with TaskOutput(task_id, block:true) on the agent that owes it, " +
+            "or Monitor the artifact path. Do NOT poll this tool in a loop.",
+      });
+    },
+  );
+
   server.tool(
     "evor_write_artifact",
     [

@@ -32,6 +32,27 @@ const TickStateSchema = z.object({
     .optional()
     .describe("Keyed outputs produced by completed steps"),
   updated_at: z.string().optional().describe("ISO 8601 timestamp of last update"),
+
+  // ── Item 2b.3: name the wait ────────────────────────────────────────────
+  //
+  // `ARCHITECTURE.md:134` and `skills/evor/SKILL.md` told agents to idle on
+  // `job_complete` / `self_heal_event` signals. Those events have ZERO producers
+  // anywhere in the codebase — agents were instructed to wait for something
+  // nobody emits, so the choice was poll or guess.
+  //
+  // Blocking is a HOST affordance and stays that way: `Monitor` and
+  // `TaskOutput` already do it properly. What was ours to provide is a durable
+  // statement of WHAT is being waited on, so a tick that is waiting is
+  // distinguishable from one that has stalled — which is the difference C-05
+  // and 3.3's `max_dwell_s` both turn on.
+  blocked: z
+    .object({
+      on: z.string().describe("What is awaited, e.g. 'artifact:forge-report.json' or 'job:abc123'"),
+      since: z.string().describe("ISO 8601 — when the wait began, so staleness is computable"),
+    })
+    .nullable()
+    .optional()
+    .describe("Set while the tick waits on something it does not own. null = not waiting."),
 });
 
 /** Minimal run-state fields tracked by the MCP server. (exported for tests) */

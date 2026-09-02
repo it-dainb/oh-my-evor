@@ -31,7 +31,7 @@ from typing import Any, Optional
 
 from .runlock import run_lock
 from .state_root import assert_outside_plugin_root
-from evor.contracts import Signal
+from evor.contracts import CAPABILITY_GAP_KIND, Signal
 
 _SEVERITY_ORDER = {"low": 0, "medium": 1, "high": 2, "critical": 3}
 _INBOX_FILENAME = "signals-inbox.jsonl"
@@ -409,3 +409,22 @@ def _restore_inbox(inbox: Path, remaining: list[str]) -> None:
         # Nothing further can be done; the signals are lost either way, but the
         # exception that caused this is about to propagate and say so.
         pass
+
+
+def open_capability_gaps(run_dir: Path) -> list[Signal]:
+    """Capability gaps currently blocking this run (item 2b.1).
+
+    A `capability-gap` says an agent was asked to do something it cannot do —
+    `evor-tick` emitted `forge-cannot-spawn-forge-junior-tool-gap`, correctly and
+    at the right moment, and nothing read it, so the tick spun until a human
+    noticed and restarted the mission.
+
+    Returned newest first, because the most recent gap is the one blocking now.
+    """
+    try:
+        bus = SignalBus(run_dir)
+    except Exception:  # noqa: BLE001 — a bus that refuses to load blocks nothing
+        return []
+    gaps = [s for s in bus.query() if s.kind == CAPABILITY_GAP_KIND]
+    gaps.sort(key=lambda s: s.last_seen or "", reverse=True)
+    return gaps

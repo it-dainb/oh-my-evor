@@ -131,7 +131,17 @@ Evor (Opus, orchestrator)
 ```
 
 Evor idles via the Monitor tool during compute-bound Forge phases rather than
-polling, waking on `job_complete` or `self_heal_event` signals.
+polling.
+
+> **Corrected in v1.2.1 (item 2b.3).** This paragraph used to say a run wakes on
+> `job_complete` or `self_heal_event` signals. Those events have **zero producers**
+> — nothing in the codebase ever emitted one — so an agent following the text could
+> only poll or guess, and the field run did both.
+>
+> Waiting is a host affordance: block with `TaskOutput(task_id, block:true)` or
+> `Monitor` the artifact path. What evor provides is `evor_await_artifact`, which
+> records WHAT is awaited in `tick-state.blocked{on, since}`, so a waiting tick is
+> distinguishable from a stalled one.
 
 ---
 

@@ -140,9 +140,11 @@ loop); **sonnet** for leads and for any role that renders a verdict or handles e
 If `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` is set in the environment:
 - Multiple Forge agents run in parallel, one per approved proposal (up to ResourcePlan.concurrency).
 - Evor manages the shared task-board via `evor_state_write` for inter-agent coordination.
-- Use `Monitor` to watch for `job_complete` or `self_heal_event` signals during compute-bound phases.
+- **Do not wait on `job_complete` or `self_heal_event` — nothing emits them.** They are
+  documented in `ARCHITECTURE.md` and have zero producers anywhere in the codebase, so an
+  agent told to idle on them can only poll or guess. Instead call `evor_await_artifact` (records WHAT you are waiting for, so a waiting tick is distinguishable from a stalled one), then block with `TaskOutput(task_id, block:true)` on the agent that owes it, or `Monitor` the artifact path.
 
-If the env var is unavailable, fall back to sequential candidate execution (concurrency=1): Forge agents run one at a time; Evor waits for each job_complete signal before starting the next.
+If the env var is unavailable, fall back to sequential candidate execution (concurrency=1): Forge agents run one at a time; Evor waits for each job by calling `evor_run_status` after blocking on the launching Task, not by waiting for a `job_complete` signal — nothing emits one.
 </Parallel_Execution>
 
 <Steps>
@@ -277,7 +279,7 @@ For each approved proposal, spawn Forge as a REAL sub-agent. Do NOT write or run
 `Task(subagent_type="oh-my-evor:evor-forge", description="Implement <proposal_name>", prompt="Run dir: <run_dir>. Tick: <n>. Proposal name: <proposal_name>. Materialize the genome for this proposal, instrument telemetry via EVOR_TELEMETRY_PATH env-path append, store the delta, run the harness/training, and write your artifacts via evor_write_artifact.")`.
 - Pass the proposal by NAME. Do NOT pass raw `node_id` UUIDs or internal path literals. Forge derives its own artifact paths and writes via `evor_write_artifact`.
 - **POST-CONDITION:** call `evor_read_artifact({ run_id, tick: n, agent: "forge" })`. If it returns `{error:"not found"}`, re-spawn Forge.
-- If parallel teams available: launch Forge Tasks concurrently; use `Monitor` for job_complete. Otherwise run one at a time.
+- If parallel teams available: launch Forge Tasks concurrently and block on each with `TaskOutput(block:true)`; record the wait with `evor_await_artifact` so it is visible in tick-state. Otherwise run one at a time.
 - **P0-4 — Forge atomic completion contract:** `evor_read_artifact({ run_id, tick: n, agent: "forge" })` returning successfully is the ONLY signal that Forge's full turn is done. Individual forge-* sub-agent completions (forge-critic, forge-architect, forge-analyst, forge-junior completing their Tasks) are Forge's INTERNAL delegation — they are NOT signals that Forge itself has finished. Do NOT advance to Step 6 until the forge-report artifact is confirmed present. Treating a forge-critic or forge-analyst Task completion as "Forge done" is a protocol violation that corrupts the tick.
 - Then YOU (orchestrator) call `evor_record_node` to register each new node, and append a DecisionLogEntry (decision_type="implement", node_ids=[node_id]) via `evor_state_write`.
 - **Verify the returned node_name is non-null before advancing.** Training a candidate without a confirmed node record is a FAILED tick (the Stop hook enforces this).
@@ -502,7 +504,7 @@ always exists; take it and continue.
 - `evor_telemetry_ingest` — validate and append telemetry records for a node
 - `evor_gotcha_add` — record a gotcha surfaced by inbox drain routing
 - `evor_plot_report` — render the evolution tree at milestones and stop
-- `Monitor` — watch for job_complete or self_heal_event during compute-bound phases; idle here, do not poll
+- `Monitor` — watch an artifact PATH or a job's `status.json` during compute-bound phases; idle here, do not poll. (Not `job_complete`/`self_heal_event`: those events have no producers.)
 - `TaskCreate` / `TaskList` / `TaskUpdate` — track per-tick candidates and phase progress as a visible task list
 - `SendUserFile` — deliver evolution-tree PNG and metrics plot at milestones and mission stop
 </Tool_Usage>
@@ -547,7 +549,9 @@ before acting — the restore block is a navigation aid, not the authoritative s
 
 <Execution_Policy>
 - Evor (orchestrator) idles via `Monitor` during compute-bound Forge phases — do not poll.
-- Wake on `job_complete` signal from harness or `self_heal_event` from the harness.
+- Wake by blocking on the launching Task (`TaskOutput(task_id, block:true)`) or by
+  `Monitor`ing the job's `status.json`. There is no `job_complete` or
+  `self_heal_event` signal — those names appear in the docs and nothing emits them.
 - Do not spawn more Forge agents than ResourcePlan.concurrency.
 - Respect budget.max_wall_clock_hours and budget.max_gpu_hours if set.
 - Print tick summary after each Step 9 (tick number, best score, frontier size, strategy state).

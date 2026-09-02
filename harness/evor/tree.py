@@ -38,7 +38,7 @@ import os
 import re
 import sys
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Literal
@@ -752,6 +752,20 @@ class StopVerdict:
     frontier_count: int
     budget_remaining: dict[str, Any]
 
+    # ── Item 2b.1: a blocked tick is not a stopped run ──────────────────────
+    #
+    # `evor-tick` emitted `forge-cannot-spawn-forge-junior-tool-gap` onto the
+    # signal bus — honestly, at the right moment — and nothing read it. The tick
+    # span until a human noticed and restarted the mission.
+    #
+    # `blocked` is deliberately NOT `should_stop`. Stopping ends the mission;
+    # blocking says this tick cannot proceed until something is supplied, which
+    # is a different fact with a different remedy. Reporting a gap as a stop
+    # would end runs that need one tool call to continue.
+    blocked: bool = False
+    blocked_reason: str = ""
+    capability_gaps: list[dict[str, Any]] = field(default_factory=list)
+
 
 def check_stop_condition(
     goal: GoalContract,
@@ -786,6 +800,32 @@ def check_stop_condition(
 
     budget = goal.budget
     stop = goal.stop_condition
+
+    # ── Item 2b.1: the tick orchestrator is the consumer ────────────────────
+    #
+    # AF4 §5 places it here rather than in a hook or with a human: a hook fires
+    # per tool call and cannot see the run's step state, and a human is the
+    # ESCALATION, not the primary reader. `check_stop` already runs every step
+    # and already knows the run — it is the only actor positioned to notice.
+    gaps: list[dict[str, Any]] = []
+    run_dir = getattr(engine, "_run_dir", None)
+    if run_dir is not None:
+        try:
+            from .signals import open_capability_gaps
+
+            gaps = [
+                {
+                    "signature": g.signature,
+                    "severity": g.severity,
+                    "evidence": g.evidence,
+                    "source": g.source,
+                    "occurrences": g.occurrences,
+                    "last_seen": g.last_seen,
+                }
+                for g in open_capability_gaps(Path(run_dir))
+            ]
+        except Exception:  # noqa: BLE001 — an unreadable bus must not stop the run
+            gaps = []
 
     # ── Budget remaining ──────────────────────────────────────────────────────
     budget_remaining: dict[str, Any] = {
@@ -933,6 +973,25 @@ def check_stop_condition(
                 frontier_count=frontier_count, budget_remaining=budget_remaining,
             )
 
+    if gaps:
+        top = gaps[0]
+        return StopVerdict(
+            should_stop=False,
+            reason=f"no stop condition triggered (stop_type={stop_type!r}, tick={tick})",
+            tick_count=tick,
+            best_score=best_score,
+            frontier_count=frontier_count,
+            budget_remaining=budget_remaining,
+            blocked=True,
+            blocked_reason=(
+                f"capability gap {top['signature']!r} is open "
+                f"({top.get('occurrences', 1)} occurrence(s), source {top.get('source')!r}). "
+                "The tick cannot proceed until the missing capability is supplied or the "
+                "gap is resolved — this is a BLOCK, not a stop: the mission is still viable."
+            ),
+            capability_gaps=gaps,
+        )
+
     return StopVerdict(
         should_stop=False,
         reason=f"no stop condition triggered (stop_type={stop_type!r}, tick={tick})",
@@ -1014,6 +1073,9 @@ def _cli() -> None:  # pragma: no cover
             "best_score": verdict.best_score,
             "frontier_count": verdict.frontier_count,
             "budget_remaining": verdict.budget_remaining,
+            "blocked": verdict.blocked,
+            "blocked_reason": verdict.blocked_reason,
+            "capability_gaps": verdict.capability_gaps,
         }))
 
     else:
