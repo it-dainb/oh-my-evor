@@ -508,3 +508,99 @@ export function scoreByContract(contract, caseObj, parsed) {
       : null,
   };
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Is the distinction the spec grades actually STATED to the agent?
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// The Phase 8 pilot found `evals/tick` grading a distinction `agents/evor-tick.md`
+// never drew. The contract listed four outcomes; the agent file listed the same
+// four and said which applied for exactly one of them. The spec asserted
+// `rejected`; the model answered `skipped`, with sound reasoning, and was scored
+// incorrect. That arm measured the spec author's assumption, not the role — and
+// it was quoted as a tier result.
+//
+// `eval-specs.test.ts` already pins the two harness failures where NOTHING can
+// pass and where ANYTHING can. This is the third: a harness that discriminates
+// correctly on a rule the agent was never given. It is not a scoring bug — every
+// oracle check passes — so nothing else here can see it.
+//
+// A line is a RULE for value v when it names v and gives a condition. A line
+// that names v alongside its siblings is an ENUMERATION: it supplies the
+// vocabulary and defines nothing. That distinction is the whole check — counting
+// occurrences does not work, and the count-floor version of this scored
+// `rejected` (2 mentions, no rule) as grounded.
+
+const RULE_CONDITION =
+  /\b(when|if|unless|only|otherwise|means|applies|no |never|nothing|could not|any )/i;
+
+/** Lines of `agentText` that state WHEN `value` applies, as opposed to listing it. */
+export function ruleLinesFor(agentText, value, allValues) {
+  const v = String(value).toLowerCase();
+  const siblings = (allValues ?? []).filter((x) => String(x).toLowerCase() !== v);
+  // Naming SEVERAL siblings makes it a vocabulary list. Two is the floor, and it
+  // is not `siblings/2`: over a three-value enum that rounds to one, which threw
+  // out `confidence is "medium" for a single authoritative source; "low" for only
+  // indirect evidence` — a line that defines two values rather than listing
+  // three. Both sage files were reported ungrounded on that alone.
+  const enumerationFloor = Math.max(2, Math.floor(siblings.length / 2));
+  const out = [];
+  for (const raw of String(agentText).split('\n')) {
+    const line = raw.trim();
+    const low = line.toLowerCase();
+    if (!low.includes(v)) continue;
+    if (siblings.filter((s) => low.includes(String(s).toLowerCase())).length >= enumerationFloor) continue;
+
+    // A markdown table row whose other cell carries prose — `| scored | a node
+    // was trained AND evaluated |`. This is the shape the tick fix used.
+    if (line.startsWith('|')) {
+      const cells = line.replace(/^\||\|$/g, '').split('|').map((c) => c.trim());
+      if (cells.length >= 2 && cells.some((c) => c.split(/\s+/).length >= 3)) { out.push(line); continue; }
+    }
+    // A definition-list entry — `- "confirmed": actual delta is within range`,
+    // or the same without a bullet: `"high"   — >=2 independent sources agree`.
+    // Requiring the bullet reported sage's whole confidence ceiling as unstated.
+    const def = new RegExp(`^(?:[-*]\\s*|\\d+[.)]\\s*)?["\`]?${escapeRegExp(value)}["\`]?\\s*[:\\u2014-]\\s*(.+)$`, 'i').exec(line);
+    if (def && def[1].split(/\s+/).length >= 3) { out.push(line); continue; }
+
+    if (RULE_CONDITION.test(line)) out.push(line);
+  }
+  return out;
+}
+
+const escapeRegExp = (s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/**
+ * Every enum value a spec grades that its agent file never states a rule for.
+ * Returns `[{ path, value, cases }]` — `cases` is how many cases hang on it.
+ */
+export function ungroundedEnumValues(agentText, contract, cases) {
+  const found = [];
+  for (const f of contract?.fields ?? []) {
+    // `every` carries a vocabulary too — `findings[].trust_level`,
+    // `proposals[].mutation_tier` — and checking only `enum` skipped it. Those
+    // are graded per element and are exactly as capable of grading an unstated
+    // distinction. Boolean vocabularies are excluded: "true"/"false" is not a
+    // vocabulary an agent has to be taught, and matching those tokens lexically
+    // reports every such field as unstated.
+    if (f.kind !== 'enum' && f.kind !== 'every') continue;
+    const values = (f.values ?? []).map((v) => String(v).toLowerCase());
+    if (values.length && values.every((v) => v === 'true' || v === 'false')) continue;
+    const graded = new Map();
+    for (const c of cases ?? []) {
+      // `every` paths are graded as `findings[].trust_level`, and may carry a
+      // `@condition` suffix naming the subset the row applies to.
+      for (const [k, v] of Object.entries(c.expect ?? {})) {
+        if (typeof v === 'string' && k.split('@')[0] === f.path) graded.set(v, (graded.get(v) ?? 0) + 1);
+      }
+      const direct = getPath(c.expect ?? {}, f.path);
+      if (typeof direct === 'string') graded.set(direct, (graded.get(direct) ?? 0) + 1);
+    }
+    for (const [value, n] of graded) {
+      if (ruleLinesFor(agentText, value, f.values ?? []).length === 0) {
+        found.push({ path: f.path, value, cases: n });
+      }
+    }
+  }
+  return found;
+}

@@ -113,9 +113,16 @@ async function main() {
     console.error(`usage: node ci/role-eval.mjs <spec.json>   (no such file: ${specPath})`);
     process.exit(2);
   }
-  const spec = JSON.parse(readFileSync(specPath, 'utf8'));
+  // Read ONCE and hash THESE bytes. The fingerprint used to re-read both files
+  // after the run — which, for a run measured in hours, is a different file than
+  // the one that produced the records whenever anyone edits an agent in the
+  // meantime. The report would then attribute the numbers to a version that
+  // never generated them, and the fingerprint exists precisely to stop that.
+  const specText = readFileSync(specPath, 'utf8');
+  const spec = JSON.parse(specText);
   const agentFile = resolve(REPO_ROOT, spec.agent_file);
-  const agentPromptBlock = extractAgentPromptBlock(readFileSync(agentFile, 'utf8'));
+  const agentText = readFileSync(agentFile, 'utf8');
+  const agentPromptBlock = extractAgentPromptBlock(agentText);
 
   const tiers = process.env.ROLE_EVAL_TIERS
     ? parseTiers(process.env.ROLE_EVAL_TIERS)
@@ -158,8 +165,8 @@ async function main() {
   const report = buildReport({ role: spec.role, tiers, records });
   report.fingerprint = {
     agent_file: spec.agent_file,
-    agent_sha256: sha(readFileSync(agentFile, 'utf8')),
-    spec_sha256: sha(readFileSync(specPath, 'utf8')),
+    agent_sha256: sha(agentText),
+    spec_sha256: sha(specText),
     repeats,
   };
   mkdirSync(dirname(outPath), { recursive: true });

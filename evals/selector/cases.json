@@ -162,7 +162,8 @@
         }
       ],
       "expect_any_rejected_for": "h003",
-      "expect_note": "The gate is a set-level property; which member is rejected is a judgement call, so the case scores on whether h003 was identified at all."
+      "expect_min_rejections": 2,
+      "expect_note": "Set-level property. WHICH member is rejected is a judgement call; HOW MANY is not. Three proposals share approach_family=algo and H003 permits one, so exactly two must be rejected on h003. Scoring on \"any one rejection\" accepted a verdict that leaves a colliding pair standing \u2014 the precise violation this case exists to catch, scored correct."
     },
     {
       "id": "schema-missing-field",
@@ -320,7 +321,8 @@
         }
       ],
       "expect_any_rejected_for": "h004",
-      "expect_note": "Set-level property; scores on whether h004 was identified."
+      "expect_min_rejections": 1,
+      "expect_note": "Set-level property, identity-free but not count-free. Four proposals, so H004 caps a parent at floor(4/2)=2; three share n-a, so at least one must be rejected on h004."
     },
     {
       "id": "h001-digit-in-wrong-field",

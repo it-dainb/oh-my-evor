@@ -103,7 +103,18 @@ disallowedTools: Write, Edit
     - Extract grad_norm series. Compute: mean, p95, max, trend (slope of linear fit over last 50% of steps).
     - Flag explosion: max(grad_norm) > 100 OR p95 > 10x mean → emit `gradient-explosion` signal (see Signal_Lens).
     - Flag vanishing: mean(grad_norm[-10:]) < 0.001 AND param_norm available AND mean(param_norm) > 0.01 → emit `gradient-vanishing` signal (see Signal_Lens).
-    - Classify: "healthy", "exploding", "vanishing", "unstable" (high variance, no clear trend).
+    - Classify `gradient_health`. The two thresholds above decide the signal AND this field:
+        1. "exploding"  — the explosion threshold fired: max(grad_norm) > 100 OR p95 > 10x mean.
+        2. "vanishing"  — the vanishing threshold fired: mean(grad_norm[-10:]) < 0.001 with
+                          param_norm available and mean(param_norm) > 0.01.
+        3. "unstable"   — neither threshold fired, but grad_norm shows high variance with no
+                          clear trend over the last 50% of steps.
+        4. "healthy"    — none of the above: no threshold fired and the series is stable.
+      Take the first that applies. "healthy" is the COMPLEMENT of the other three, not the
+      value to fall back on when you are unsure — if the grad_norm series is missing or too
+      short to compute, gradient_health is not "healthy"; that is what telemetry_sane and
+      an "inconclusive" verdict are for. This list previously named the four values and gave
+      a condition for one, so "healthy" was graded and never defined.
 
     **Check 3 — LR Sensitivity:**
     - Extract lr series. Compute: schedule shape (constant, linear decay, cosine, step).

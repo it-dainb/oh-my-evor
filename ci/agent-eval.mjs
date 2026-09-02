@@ -305,15 +305,27 @@ export function scoreCase(caseObj, parsed) {
     const gate = caseObj.expect_any_rejected_for;
     const gateKey = SHORT_TO_GATE_KEY[gate];
     if (!gateKey) return { status: 'unparseable', reason: `unknown gate short name "${gate}"` };
-    const hit = parsed.reviews.find((r) => {
+    const hits = parsed.reviews.filter((r) => {
       const cr = r?.critic_review;
       return !!cr && cr.verdict === 'rejected' && cr[gateKey] === 'fail';
     });
+    // WHICH member is rejected is a judgement call. HOW MANY is arithmetic, and
+    // scoring without it accepted the violation the case exists to catch: with
+    // three proposals sharing one approach_family, a verdict rejecting exactly
+    // one leaves a colliding PAIR standing and H003 still broken — and scored
+    // `correct`. The floor is derived per case in cases.json and defaults to 1,
+    // which is what every other set-level case means by "identified".
+    const min = typeof caseObj.expect_min_rejections === 'number' ? caseObj.expect_min_rejections : 1;
+    const ok = hits.length >= min;
     return {
-      status: hit ? 'correct' : 'incorrect',
+      status: ok ? 'correct' : 'incorrect',
       set_level_gate: gate,
-      named_gate: hit ? gate : null,
-      note: hit ? `${hit.proposal_id} rejected on ${gate}` : `no review rejected with ${gateKey}=fail`,
+      named_gate: ok ? gate : null,
+      rejections_on_gate: hits.length,
+      rejections_required: min,
+      note: ok
+        ? `${hits.map((h) => h.proposal_id).join(', ')} rejected on ${gate} (needed ${min})`
+        : `${hits.length} review(s) rejected with ${gateKey}=fail; ${min} required`,
     };
   }
 
