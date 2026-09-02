@@ -71,7 +71,17 @@ export function addCitation(
   citation: string,
   missionId?: string
 ): { ok: boolean; citations?: string[]; error?: string } {
-  const resolvedId = resolveNodeRef(runId, nodeId, missionId);
+  // `resolveNodeRef` now THROWS for a reference no node claims (O-01), rather
+  // than resolving it to itself and minting a second identity. That is exactly
+  // the case this tool must handle gracefully: Sage cites an angle slug before
+  // any node exists, which is not an error — it is the normal shape of the only
+  // role the citation mandate binds.
+  let resolvedId: string;
+  try {
+    resolvedId = resolveNodeRef(runId, nodeId, missionId);
+  } catch {
+    return appendPendingCitation(runId, nodeId, citation, missionId);
+  }
   const nodes = readTree(runId, missionId);
   const node = nodes[resolvedId];
 

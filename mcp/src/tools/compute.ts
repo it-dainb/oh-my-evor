@@ -25,7 +25,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { resolveRunPaths, getEvorRoot, getActiveRunPath } from "../run-store.js";
 import { callPythonModule, type PyResult } from "../subprocess-bridge.js";
-import { resolveNodeRef } from "./node-ref.js";
+import { resolveNodeRef, tryResolveNodeRef } from "./node-ref.js";
 import { nextState } from "../fsm.js";
 
 // ── Shared helpers ────────────────────────────────────────────────────────────
@@ -298,7 +298,16 @@ export function lockEvaluate(
   nodeRef: string,
   missionId?: string,
 ): { ok: boolean; node_name: string; error?: string } {
-  const nodeId = resolveNodeRef(runId, nodeRef, missionId);
+  // A verification function: an unknown node is a reportable failure, not a
+  // crash. Its return type already carries `error` for exactly this.
+  const nodeId = tryResolveNodeRef(runId, nodeRef, missionId);
+  if (nodeId === null) {
+    return {
+      ok: false,
+      node_name: nodeRef,
+      error: `node '${nodeRef}' is not in this run's tree — check the name with evor_tree_read.`,
+    };
+  }
   const worktree = join(getEvorRoot(), "worktrees", nodeId);
   const evalPath = join(worktree, "evaluate.py");
   if (!existsSync(evalPath)) {
@@ -352,15 +361,31 @@ export function verifyArtifacts(
   nodeRef: string,
   missionId?: string,
 ): { ok: boolean; node_name: string; has_results: boolean; has_telemetry: boolean } {
-  const nodeId = resolveNodeRef(runId, nodeRef, missionId);
-  const nodeDir = join(resolveRunPaths(runId, missionId).runDir, "nodes", nodeId);
+  // A reporting function: an unknown node yields "found nothing", not a crash.
+  const nodeId = tryResolveNodeRef(runId, nodeRef, missionId);
+  const runDir = resolveRunPaths(runId, missionId).runDir;
+
+  // ── O-01 (item 1.5): look under BOTH identities ──────────────────────────
+  //
+  // The trainer writes `nodes/<slug>/telemetry.jsonl`; this looked only under
+  // `nodes/<uuid>/`. Neither writer was wrong — the slug is the right name for a
+  // directory a human reads, the UUID the right key for a machine — but nothing
+  // owned the mapping, so the reader guessed. A guess that resolves to a missing
+  // path fails in the direction of "the candidate is bad", which is what makes
+  // it expensive: good work discarded, quietly, as a verdict.
+  //
+  // This is the harness fix (`evor/node_identity.py`) applied to the TypeScript
+  // reader. It only ever finds files that EXIST, so it can rescue a misfiled
+  // artifact and can never manufacture one.
+  const identities = [nodeId, nodeRef].filter((v, i, a): v is string => !!v && a.indexOf(v) === i);
   const present = (rel: string, minBytes: number): boolean => {
-    try {
-      const p = join(nodeDir, rel);
-      return existsSync(p) && statSync(p).size > minBytes;
-    } catch {
-      return false;
+    for (const identity of identities) {
+      try {
+        const p = join(runDir, "nodes", identity, rel);
+        if (existsSync(p) && statSync(p).size > minBytes) return true;
+      } catch { /* try the next identity */ }
     }
+    return false;
   };
   const has_results = present("results.json", 2);
   const has_telemetry = present("telemetry.jsonl", 0);
@@ -469,7 +494,15 @@ export function registerComputeTools(server: McpServer): void {
     async ({ run_id, node_id, run_dir, worktree, eval_version }) => {
       const missionId = process.env.EVOR_MISSION_ID;
       const resolvedDir = run_dir ?? resolveRunPaths(run_id, missionId).runDir;
-      const resolvedNodeId = resolveNodeRef(run_id, node_id, missionId);
+      // Strict here on purpose: launching training for a node the tree does not
+      // know would create its artifacts under an unregistered identity, which is
+      // O-01 happening again at the other end.
+      let resolvedNodeId: string;
+      try {
+        resolvedNodeId = resolveNodeRef(run_id, node_id, missionId);
+      } catch (e) {
+        return err(String(e instanceof Error ? e.message : e));
+      }
       const result = jobStart(resolvedNodeId, run_id, resolvedDir, worktree, eval_version);
       if (!result.ok) return err(result.error ?? "evor_run_start failed");
 
@@ -827,8 +860,86 @@ export function registerComputeTools(server: McpServer): void {
           "no evaluation script found for this version — write the canonical evaluator before sealing it, then try again.",
         );
       }
-      const hash = createHash("sha256").update(readFileSync(evalScriptPath)).digest("hex");
+      const content = readFileSync(evalScriptPath);
+      const hash = createHash("sha256").update(content).digest("hex");
+
+      // ── J-01: re-sealing must not launder an out-of-band rewrite ─────────
+      //
+      // The seal was four lines: hash, patch, done. When the contract ALREADY
+      // anchors a different hash, this call is not a first seal — it is an
+      // evaluator replacement, and re-running it rewrites the anchor so the
+      // tampered file becomes "the sealed one". In the field an agent edited
+      // the evaluator at 23:49 and the seal was re-applied over it; the
+      // integrity gate then compared the new file against the new hash and
+      // passed.
+      //
+      // Identical content is a no-op success, deliberately: setup flows call
+      // the seal twice legitimately, and locking them out would make this a
+      // worse failure than the one it fixes.
+      // The question is not "does the contract anchor a different hash" — a
+      // contract can carry a placeholder anchor that never matched any file, and
+      // sealing into that is a FIRST seal. The question is whether THIS RUN
+      // previously sealed this version, and the file has changed since.
+      //
+      // That needs a record the run owns, for the same reason O-09 needed one:
+      // `goal-contract.json` is state other things write, so reading it cannot
+      // distinguish "we sealed this" from "someone wrote a hash here". The
+      // receipt is written by the seal and by nothing else.
+      const receiptPath = `${runDir}/eval-suites/${eval_version}.sealed.json`;
+      let receipt: { hash?: string; sealed_at?: string } | null = null;
+      try { receipt = JSON.parse(readFileSync(receiptPath, "utf8")); } catch { receipt = null; }
+
+      if (receipt?.hash && receipt.hash !== hash) {
+        return err(
+          `refusing to re-seal ${eval_version}: this run sealed it at ` +
+          `${String(receipt.sealed_at ?? "an earlier time")} with hash ` +
+          `${receipt.hash.slice(0, 12)}…, and the file on disk now hashes to ${hash.slice(0, 12)}…. ` +
+          `The evaluator changed after it was sealed. Re-sealing would make the changed file ` +
+          `the sealed one and retroactively validate every score recorded under the old anchor — ` +
+          `which is what happened at 23:49 in the field run. If replacing the evaluator is ` +
+          `intended, seal it under a NEW eval_version so existing scores keep the evaluator ` +
+          `they were measured with.`,
+        );
+      }
+
+      // ── M-01 / I-02 (item 2.7): custody — break the hardlink ─────────────
+      //
+      // All three runs' `eval-suites/v1.py` were ONE inode with nlink 5, shared
+      // with the project root. The seal never inspected `st_nlink` and never
+      // copied, so a write through the UNPROTECTED alias reached every sealed
+      // copy — and a 23:49 rewrite retroactively replaced r1's and r2's sealed
+      // evaluators, months after those runs ended.
+      //
+      // The `.evor/runs/**` write guard could never have caught this: the write
+      // did not go through a guarded path. Custody closes it with no new matcher
+      // — copy the bytes, so the sealed file is the run's own inode and an alias
+      // elsewhere is just a different file.
+      try {
+        if (statSync(evalScriptPath).nlink > 1) {
+          const tmp = `${evalScriptPath}.seal-tmp`;
+          writeFileSync(tmp, content);
+          renameSync(tmp, evalScriptPath);   // atomic: replaces the link, not the target
+        }
+      } catch (e) {
+        return err(
+          `could not take custody of ${eval_version}: ${String(e)}. The evaluator is ` +
+          `hardlinked outside the run, so sealing it would anchor a file another path can ` +
+          `still rewrite.`,
+        );
+      }
+
       patchGoalContract(runDir, { eval_script_hash: hash });
+
+      // The receipt is what makes the NEXT call able to tell a tamper from a
+      // first seal. Written after custody, so it attests the file this run owns.
+      try {
+        writeFileSync(
+          receiptPath,
+          JSON.stringify({ eval_version, hash, sealed_at: new Date().toISOString() }, null, 2),
+          "utf8",
+        );
+      } catch { /* unwritable run dir — the contract anchor still stands */ }
+
       return ok({ ok: true, eval_version });
     },
   );
@@ -912,11 +1023,18 @@ export function registerComputeTools(server: McpServer): void {
       const { runDir } = resolveRunPaths(run_id, missionId);
 
       // Resolve each logical node name → node_id + worktree path server-side.
-      const resolvedCandidates: BatchCandidate[] = candidates.map((c) => {
-        const nodeId = resolveNodeRef(run_id, c.node_name, missionId);
-        const worktree = join(evorRoot, "worktrees", nodeId);
-        return { node_id: nodeId, worktree, eval_version: c.eval_version };
-      });
+      let resolvedCandidates: BatchCandidate[];
+      try {
+        resolvedCandidates = candidates.map((c) => {
+          const nodeId = resolveNodeRef(run_id, c.node_name, missionId);
+          const worktree = join(evorRoot, "worktrees", nodeId);
+          return { node_id: nodeId, worktree, eval_version: c.eval_version };
+        });
+      } catch (e) {
+        // One unknown candidate fails the batch: a partial launch would leave
+        // the caller believing every candidate started.
+        return err(String(e instanceof Error ? e.message : e));
+      }
 
       const result = forgeDispatchBatch(run_id, resolvedCandidates, runDir, gpu_fraction);
       return ok(result);

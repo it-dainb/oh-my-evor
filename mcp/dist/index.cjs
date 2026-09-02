@@ -21914,6 +21914,13 @@ function callBridge(scriptName, args, opts) {
 }
 
 // src/tools/node-ref.ts
+function tryResolveNodeRef(runId, ref, missionId) {
+  try {
+    return resolveNodeRef(runId, ref, missionId);
+  } catch {
+    return null;
+  }
+}
 function resolveNodeRef(runId, ref, missionId) {
   if (!ref) return ref;
   let nodes;
@@ -21934,7 +21941,10 @@ function resolveNodeRef(runId, ref, missionId) {
       if (node && node.name === base) return node.id;
     }
   }
-  return ref;
+  if (Object.keys(nodes).length === 0) return ref;
+  throw new Error(
+    `node '${ref}' is not in this run's tree. Check the name with evor_tree_read. The tree lists ${Object.keys(nodes).length} node(s) and none of them claims this reference; resolving it to itself would mint a second identity for a node that already has one, which is how a node's telemetry becomes invisible to the gate that scores it.`
+  );
 }
 function nameForId(runId, id, missionId) {
   if (!id) return id;
@@ -23602,7 +23612,12 @@ function appendPendingCitation(runId, ref, citation, missionId) {
   }
 }
 function addCitation(runId, nodeId, citation, missionId) {
-  const resolvedId = resolveNodeRef(runId, nodeId, missionId);
+  let resolvedId;
+  try {
+    resolvedId = resolveNodeRef(runId, nodeId, missionId);
+  } catch {
+    return appendPendingCitation(runId, nodeId, citation, missionId);
+  }
   const nodes = readTree(runId, missionId);
   const node = nodes[resolvedId];
   if (!node) {
@@ -24659,7 +24674,14 @@ function gotchasList(kind, scope, minConfidence, evorRoot, runDir) {
   return callPythonModule("evor", args, { timeout: 3e4 });
 }
 function lockEvaluate(runId, nodeRef, missionId) {
-  const nodeId = resolveNodeRef(runId, nodeRef, missionId);
+  const nodeId = tryResolveNodeRef(runId, nodeRef, missionId);
+  if (nodeId === null) {
+    return {
+      ok: false,
+      node_name: nodeRef,
+      error: `node '${nodeRef}' is not in this run's tree \u2014 check the name with evor_tree_read.`
+    };
+  }
   const worktree = (0, import_path17.join)(getEvorRoot(), "worktrees", nodeId);
   const evalPath = (0, import_path17.join)(worktree, "evaluate.py");
   if (!(0, import_fs16.existsSync)(evalPath)) {
@@ -24696,15 +24718,18 @@ function lockEvaluate(runId, nodeRef, missionId) {
   }
 }
 function verifyArtifacts(runId, nodeRef, missionId) {
-  const nodeId = resolveNodeRef(runId, nodeRef, missionId);
-  const nodeDir = (0, import_path17.join)(resolveRunPaths(runId, missionId).runDir, "nodes", nodeId);
+  const nodeId = tryResolveNodeRef(runId, nodeRef, missionId);
+  const runDir = resolveRunPaths(runId, missionId).runDir;
+  const identities = [nodeId, nodeRef].filter((v, i, a) => !!v && a.indexOf(v) === i);
   const present = (rel, minBytes) => {
-    try {
-      const p = (0, import_path17.join)(nodeDir, rel);
-      return (0, import_fs16.existsSync)(p) && (0, import_fs16.statSync)(p).size > minBytes;
-    } catch {
-      return false;
+    for (const identity of identities) {
+      try {
+        const p = (0, import_path17.join)(runDir, "nodes", identity, rel);
+        if ((0, import_fs16.existsSync)(p) && (0, import_fs16.statSync)(p).size > minBytes) return true;
+      } catch {
+      }
     }
+    return false;
   };
   const has_results = present("results.json", 2);
   const has_telemetry = present("telemetry.jsonl", 0);
@@ -24762,7 +24787,12 @@ function registerComputeTools(server) {
     async ({ run_id, node_id, run_dir, worktree, eval_version }) => {
       const missionId = process.env.EVOR_MISSION_ID;
       const resolvedDir = run_dir ?? resolveRunPaths(run_id, missionId).runDir;
-      const resolvedNodeId = resolveNodeRef(run_id, node_id, missionId);
+      let resolvedNodeId;
+      try {
+        resolvedNodeId = resolveNodeRef(run_id, node_id, missionId);
+      } catch (e) {
+        return err2(String(e instanceof Error ? e.message : e));
+      }
       const result = jobStart(resolvedNodeId, run_id, resolvedDir, worktree, eval_version);
       if (!result.ok) return err2(result.error ?? "evor_run_start failed");
       const jobData = result.data;
@@ -25014,8 +25044,40 @@ function registerComputeTools(server) {
           "no evaluation script found for this version \u2014 write the canonical evaluator before sealing it, then try again."
         );
       }
-      const hash = (0, import_crypto4.createHash)("sha256").update((0, import_fs16.readFileSync)(evalScriptPath)).digest("hex");
+      const content = (0, import_fs16.readFileSync)(evalScriptPath);
+      const hash = (0, import_crypto4.createHash)("sha256").update(content).digest("hex");
+      const receiptPath = `${runDir}/eval-suites/${eval_version}.sealed.json`;
+      let receipt = null;
+      try {
+        receipt = JSON.parse((0, import_fs16.readFileSync)(receiptPath, "utf8"));
+      } catch {
+        receipt = null;
+      }
+      if (receipt?.hash && receipt.hash !== hash) {
+        return err2(
+          `refusing to re-seal ${eval_version}: this run sealed it at ${String(receipt.sealed_at ?? "an earlier time")} with hash ${receipt.hash.slice(0, 12)}\u2026, and the file on disk now hashes to ${hash.slice(0, 12)}\u2026. The evaluator changed after it was sealed. Re-sealing would make the changed file the sealed one and retroactively validate every score recorded under the old anchor \u2014 which is what happened at 23:49 in the field run. If replacing the evaluator is intended, seal it under a NEW eval_version so existing scores keep the evaluator they were measured with.`
+        );
+      }
+      try {
+        if ((0, import_fs16.statSync)(evalScriptPath).nlink > 1) {
+          const tmp = `${evalScriptPath}.seal-tmp`;
+          (0, import_fs16.writeFileSync)(tmp, content);
+          (0, import_fs16.renameSync)(tmp, evalScriptPath);
+        }
+      } catch (e) {
+        return err2(
+          `could not take custody of ${eval_version}: ${String(e)}. The evaluator is hardlinked outside the run, so sealing it would anchor a file another path can still rewrite.`
+        );
+      }
       patchGoalContract(runDir, { eval_script_hash: hash });
+      try {
+        (0, import_fs16.writeFileSync)(
+          receiptPath,
+          JSON.stringify({ eval_version, hash, sealed_at: (/* @__PURE__ */ new Date()).toISOString() }, null, 2),
+          "utf8"
+        );
+      } catch {
+      }
       return ok2({ ok: true, eval_version });
     }
   );
@@ -25082,11 +25144,16 @@ function registerComputeTools(server) {
       const missionId = process.env.EVOR_MISSION_ID;
       const evorRoot = getEvorRoot();
       const { runDir } = resolveRunPaths(run_id, missionId);
-      const resolvedCandidates = candidates.map((c) => {
-        const nodeId = resolveNodeRef(run_id, c.node_name, missionId);
-        const worktree = (0, import_path17.join)(evorRoot, "worktrees", nodeId);
-        return { node_id: nodeId, worktree, eval_version: c.eval_version };
-      });
+      let resolvedCandidates;
+      try {
+        resolvedCandidates = candidates.map((c) => {
+          const nodeId = resolveNodeRef(run_id, c.node_name, missionId);
+          const worktree = (0, import_path17.join)(evorRoot, "worktrees", nodeId);
+          return { node_id: nodeId, worktree, eval_version: c.eval_version };
+        });
+      } catch (e) {
+        return err2(String(e instanceof Error ? e.message : e));
+      }
       const result = forgeDispatchBatch(run_id, resolvedCandidates, runDir, gpu_fraction);
       return ok2(result);
     }
