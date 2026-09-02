@@ -7,9 +7,9 @@
     "Verify an installed tree with: evor doctor  (see _check_plugin_tree_drift)."
   ],
   "version": "1.2.1",
-  "commit": "86bdabef271288172a8b8d3a4c76bde774634521",
-  "generated_at": "2026-09-02T11:51:20.119Z",
-  "file_count": 544,
+  "commit": "bb3e12d356bd7cbf0ff0c94d605ccb734aebdc8e",
+  "generated_at": "2026-09-02T11:54:53.604Z",
+  "file_count": 546,
   "files": {
     ".claude-plugin/marketplace.json": "81634a97666c1502ee2ff2386ec4b5fc554241f182a3fe2b4d5d4b6f3bd28813",
     ".claude-plugin/plugin.json": "eb18b7eff39f912b03dfb9bc2def1528a1348bdcf58e75d2139ddcdfe1f35d68",
@@ -142,6 +142,7 @@
     "ci/agentic-quality/score_cross_domain.py": "542ba8e012fb826b360d2bff9910de6467e7c76830e8b78ee5f63fbf106e1228",
     "ci/agentic-quality/score_dreamer.py": "e75324a734abccd0e0b42753579a5a952e88793c6d9cab79f0bd71195ad3bb6e",
     "ci/agentic-quality/score_researcher.py": "1ae129e5b9a262ff32d581871c94f9be51a62c8ae785ebfb0b7ca63cd25d0413",
+    "ci/analyze-81.mjs": "5db0c5483bab11eb364f1769529b96302c2fe5176c9cb32f230a31fb96188bce",
     "ci/autonomy-live.mjs": "1ebcdf6c9436cd031fae483ec3e2817187dfa40261cd7e16c99f913bc806a910",
     "ci/bench-tick.mjs": "3f79f1528538ccd55f8ec742bdf46e0598347007cee5ec74f20205a7bbc5ad1b",
     "ci/bench-tick.sh": "5035c1106a7f6a7ab5c869057fa4041fd8a14615ce6d75ed2e3ab1bc0696a863",
@@ -174,6 +175,7 @@
     "ci/retier-report.py": "1c4581159773f916e6462a489f168d5fb16b624a6d87b60b517560355e05797c",
     "ci/role-eval.mjs": "2e8cb43901de56a412843f708adb58471f0ec11f4e8dc3561b794afc8f7b00af",
     "ci/run-checks.mjs": "c1bc2b3dd4e4368cdd7c09ae763f0169e5e4d647e92254805c41624465c6e794",
+    "ci/tier-matrix-81.mjs": "1ceaf6acb33db2b3b64f971a12dce31a5326fb92aea425ee795545d095d6980e",
     "commands/evor-dashboard.md": "511085cc4dd834a9a5b14f7a985d8d52aa0ebec0bcc4c542b2ad0d0d41931c58",
     "commands/evor-distill.md": "4d71ccdb6946873ce5c14012b394792b5bd2cb9e2c2c28775cbc33736a1c123b",
     "commands/evor-doctor.md": "fd7093fd05bf769c286d3d3746806efa5f0f78c3ee901a47ef2bc364526cd4c8",
