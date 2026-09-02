@@ -944,6 +944,39 @@ export function registerComputeTools(server: McpServer): void {
     },
   );
 
+  // ── evor_scaffold_evaluator (item 2.5) ──────────────────────────────────────
+  server.tool(
+    "evor_scaffold_evaluator",
+    "Generate the evaluator harness for this run from the goal contract, eval suite and "
+    + "frozen index. The mission then writes ONLY score(pred, gt) in score_plugin.py. "
+    + "Deterministic: the server can regenerate and byte-compare, which is what makes the "
+    + "seal custody rather than an assertion.",
+    {
+      run_id: z.string().describe("Active run identifier"),
+      eval_version: z.string().default("v1").describe("Eval suite version"),
+      mission_id: z.string().optional().describe("Mission id; resolved from the active run when omitted"),
+      overwrite_plugin: z.boolean().optional().describe(
+        "Replace an existing score_plugin.py. Off by default — the plugin is the mission's own work.",
+      ),
+    },
+    async ({ run_id, eval_version, mission_id, overwrite_plugin }) => {
+      // AF2 §4.1: every field failure lived in the column the agent hand-wrote —
+      // polarity, gate scope, the domain join — while the parts identical across
+      // every mission were re-derived by hand beside them. The server owns the
+      // harness; the mission owns one function.
+      const resolvedMission = mission_id ?? process.env.EVOR_MISSION_ID;
+      const { runDir } = resolveRunPaths(run_id, resolvedMission);
+      const result = callPythonModule("evor.scaffold_evaluator", [
+        "generate", "--run-dir", runDir, "--eval-version", eval_version,
+        ...(overwrite_plugin ? ["--overwrite-plugin"] : []),
+      ]);
+      if (!result.ok || result.data == null) {
+        return err(result.error ?? "evor_scaffold_evaluator failed");
+      }
+      return ok(result.data);
+    },
+  );
+
   // ── evor_meta_evolve ────────────────────────────────────────────────────────
   server.tool(
     "evor_meta_evolve",

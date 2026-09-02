@@ -25185,6 +25185,34 @@ function registerComputeTools(server) {
     }
   );
   server.tool(
+    "evor_scaffold_evaluator",
+    "Generate the evaluator harness for this run from the goal contract, eval suite and frozen index. The mission then writes ONLY score(pred, gt) in score_plugin.py. Deterministic: the server can regenerate and byte-compare, which is what makes the seal custody rather than an assertion.",
+    {
+      run_id: external_exports.string().describe("Active run identifier"),
+      eval_version: external_exports.string().default("v1").describe("Eval suite version"),
+      mission_id: external_exports.string().optional().describe("Mission id; resolved from the active run when omitted"),
+      overwrite_plugin: external_exports.boolean().optional().describe(
+        "Replace an existing score_plugin.py. Off by default \u2014 the plugin is the mission's own work."
+      )
+    },
+    async ({ run_id, eval_version, mission_id, overwrite_plugin }) => {
+      const resolvedMission = mission_id ?? process.env.EVOR_MISSION_ID;
+      const { runDir } = resolveRunPaths(run_id, resolvedMission);
+      const result = callPythonModule("evor.scaffold_evaluator", [
+        "generate",
+        "--run-dir",
+        runDir,
+        "--eval-version",
+        eval_version,
+        ...overwrite_plugin ? ["--overwrite-plugin"] : []
+      ]);
+      if (!result.ok || result.data == null) {
+        return err2(result.error ?? "evor_scaffold_evaluator failed");
+      }
+      return ok2(result.data);
+    }
+  );
+  server.tool(
     "evor_meta_evolve",
     "Run TreeEngine.meta_evolve to update strategy.json based on the current frontier. Returns the updated StrategyState.",
     {
