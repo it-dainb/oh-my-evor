@@ -7,8 +7,8 @@
     "Verify an installed tree with: evor doctor  (see _check_plugin_tree_drift)."
   ],
   "version": "1.2.1",
-  "commit": "ce3e8f0e8610af51c833f24bd1fd024e4d3d20ab",
-  "generated_at": "2026-09-02T10:20:20.910Z",
+  "commit": "d7c48df66c3a52cd206114d7c3dd697182293480",
+  "generated_at": "2026-09-02T10:33:56.114Z",
   "file_count": 543,
   "files": {
     ".claude-plugin/marketplace.json": "81634a97666c1502ee2ff2386ec4b5fc554241f182a3fe2b4d5d4b6f3bd28813",
@@ -17,7 +17,7 @@
     ".dockerignore": "2036e5aa1a04ed87eab8ba1c373570bd65ab826697e92bdc8a10b002eff02be4",
     ".github/workflows/l1-l2.yml": "8a471d0b7737a4647d52fde471925037ee12dc0ae13c8bac34825e3bffba3237",
     ".github/workflows/l3.yml": "d7a5c02e089f81f6871365c9a6da1e9ebae2c1b856f4835fe76b24fdb6f99eb2",
-    ".gitignore": "90a5ec6fff2ef4a5ba718c6329497a27022dddd4aace71c64647584e0b6a4039",
+    ".gitignore": "3c5c699a57cd33cd6e83c11d61944b01be30158c457ee8b1a750d47e4486f1e8",
     ".lsp.json": "3f28e50e24ca417c40e992a4b6a70f2c8ce88364d19977fc170b94932c771ef9",
     ".mcp.json": "4441676a414d3aa618287154c1a8d4256bca2ad45909ebe77e45061f3c561ace",
     ".omc/logs/delegation-audit.jsonl": "096d92b35b88129f3e78c19c19f0b65135953e575f28fdfcaaa4c73e1ce8f91d",

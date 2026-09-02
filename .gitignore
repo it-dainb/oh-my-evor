@@ -70,3 +70,6 @@ logs/
 
 # machine-local Claude Code overrides
 .claude/settings.local.json
+
+# Operator working document, not part of the release (untracked before v1.2.1)
+MARKETING_PLAN.md
