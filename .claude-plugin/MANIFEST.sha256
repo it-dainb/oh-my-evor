@@ -7,9 +7,9 @@
     "Verify an installed tree with: evor doctor  (see _check_plugin_tree_drift)."
   ],
   "version": "1.2.1",
-  "commit": "c69026c2a7bdb24d848fb598429ab88a02e470b9",
-  "generated_at": "2026-09-02T16:00:54.806Z",
-  "file_count": 552,
+  "commit": "76cb69c0eeec9ee04415c63ee7223d3864088b2a",
+  "generated_at": "2026-09-02T16:12:31.963Z",
+  "file_count": 553,
   "files": {
     ".claude-plugin/marketplace.json": "81634a97666c1502ee2ff2386ec4b5fc554241f182a3fe2b4d5d4b6f3bd28813",
     ".claude-plugin/plugin.json": "eb18b7eff39f912b03dfb9bc2def1528a1348bdcf58e75d2139ddcdfe1f35d68",
@@ -249,6 +249,7 @@
     "docs/v1-cost-and-verification.md": "a1a866b639b25a989172b8727b922c5866d05c757f6f41408ec5f06cd68f2be5",
     "docs/v1.2.1-plan.md": "9f6d35e3edaf217d547ae5f2bd2d282d69aa4ed082741aca83cbb3a4659df65c",
     "docs/v1.2.1-test-deletions.md": "868457b0089e3975ddab5a8d0d6287ac7351a7e79c2b0f0c81c783d0a7233197",
+    "docs/v1.2.2-plan.md": "bbaf5a14abd51bab243b6b2eb09b958cb22c3f330313a220143af9bc974bae52",
     "evals/acquirer/spec.json": "e88bc86164846cca978e61694147f4b0c9b9be20c84dac188b6f4b9f0dbd22a7",
     "evals/forge-analyst/spec.json": "61b8a8ebf6747851b0614067f8d9f55dae7b2bda0e5637789b6f17a80393b5d7",
     "evals/forge-architect/spec.json": "12be8abd109f7e585f6202979773cb8ccbc5f941eb0710f79edd79b40365142e",
