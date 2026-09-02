@@ -135,6 +135,30 @@ class FrozenSplitManager:
             domains=split_config.get("val_domains"),
             groups=split_config.get("val_groups"),
         )
+        # ── G-4 (item 2.4): anchor TRAIN too, when it is declared ────────────
+        #
+        # `freeze_splits` returned only test and val, and the contract anchored
+        # the test hash alone — train was never hashed, never anchored, never
+        # recorded. So the training set could change between ticks with no anchor
+        # violation: fitness stayed comparable by the contract's own definition
+        # while the denominator of LEARNING moved underneath it. Silent, which is
+        # why it survived the field run unremarked.
+        #
+        # `IntegrityGate.lock_splits` already computed a three-way anchor and had
+        # zero production callers. The affordance existed; nothing used it.
+        train_entries = split_config.get("train") or {}
+        if train_entries:
+            self._freeze_one(
+                split_type="train",
+                entries=train_entries,
+                eval_version=eval_version,
+                run_dir=run_dir,
+                mission_id=mission_id,
+                allow_refreeze=allow_refreeze,
+                domains=split_config.get("train_domains"),
+                groups=split_config.get("train_groups"),
+            )
+
         return test_split, val_split
 
     def _freeze_one(
@@ -528,7 +552,7 @@ def _load_declared_splits(dataset_path: Path) -> dict[str, Any]:
         return {}
 
     out: dict[str, Any] = {}
-    for split in ("test", "val"):
+    for split in ("test", "val", "train"):
         manifest = anchor / f"eval_manifest_{split}.json"
         if not manifest.exists():
             continue

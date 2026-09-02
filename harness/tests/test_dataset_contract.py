@@ -280,3 +280,75 @@ class TestFitnessAggregationHasOneAuthority:
 
         c = self._Contract("worst-domain", [self._Spec("macro_avg", role="secondary")])
         assert validate_fitness_aggregation(c) == []
+
+
+class TestTheFourSilentDegradations:
+    """§2.4 — G-4 through G-7, each a fact the system could not represent."""
+
+    def test_train_is_a_split(self):
+        """G-4: train was never hashed, never anchored, never recorded."""
+        import typing
+
+        from evor.contracts import FrozenSplit
+
+        assert "train" in typing.get_args(FrozenSplit.model_fields["split_type"].annotation), (
+            "the training set could change between ticks with no anchor violation — "
+            "fitness stayed comparable by the contract's own definition while the "
+            "denominator of LEARNING moved underneath it"
+        )
+
+    def test_a_declared_train_split_is_frozen(self, tmp_path: Path):
+        from evor.freeze import FrozenSplitManager
+
+        corpus = _corpus(tmp_path, n=6)
+        declared = _load_declared_splits(corpus)
+        run_dir = tmp_path / "run"
+        FrozenSplitManager().freeze_splits(
+            dataset_path=corpus,
+            split_config={
+                "mission_id": "m", "test": declared["test"], "val": {},
+                "train": {k: v for k, v in list(declared["test"].items())[:2]},
+            },
+            eval_version="v1",
+            run_dir=run_dir,
+        )
+        assert (run_dir / "frozen-splits" / "v1-train.json").exists(), (
+            "`IntegrityGate.lock_splits` computed a three-way anchor and had ZERO "
+            "production callers — the affordance was built and never wired"
+        )
+
+    def test_a_sample_can_be_more_than_one_file(self):
+        """G-5: segmentation, detection and ASR samples are all pairs."""
+        from evor.contracts import FrozenSplit
+
+        split = FrozenSplit(
+            split_id="s", mission_id="m", split_type="test", split_hash="h",
+            per_sample_hashes={"0": "aaa"}, item_count=1, frozen_at="t",
+            storage_path="p", eval_version="v1",
+            per_sample_files={"0": ["images/000000.png", "gt/000000.png"]},
+        )
+        assert split.per_sample_files["0"] == ["images/000000.png", "gt/000000.png"]
+        # The field workaround hashed both files under separate keys, forcing
+        # item_count to N while per_sample_hashes held 2N — breaking the
+        # invariant every consumer assumed.
+        assert split.item_count == len(split.per_sample_hashes)
+
+    def test_corpus_version_is_first_class(self):
+        """G-6: `dataset_ref` is a path; the corpus has real semver and lineage."""
+        from evor.contracts import GoalContract
+
+        assert "corpus_version" in GoalContract.model_fields
+        assert "corpus_derived_from" in GoalContract.model_fields
+
+    def test_unlabeled_data_is_declarable(self):
+        """G-7: asked where the 4k data was, the operator said "its unlabeled"."""
+        import typing
+
+        from evor.contracts import GoalContract
+
+        options = typing.get_args(GoalContract.model_fields["supervision"].annotation)
+        assert {"labeled", "unlabeled", "partially-labeled"} <= set(options), (
+            "a fact the operator stated in plain words had nowhere to go: "
+            "AcquisitionProvenance has no label-status field and DetectedDataset.kind "
+            "describes a container format, not a supervision level"
+        )

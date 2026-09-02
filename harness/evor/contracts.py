@@ -401,6 +401,29 @@ class GoalContract(BaseEvorModel):
     created_at: Optional[str] = None
 
     # ── P0-7: metric scale ────────────────────────────────────────────────────
+    corpus_version: Optional[str] = None
+    """The corpus version this mission is measured against (item 2.4 / G-6).
+
+    ``dataset_ref`` is a PATH. `corpora/` holds 18 sibling versions, and
+    `dataset_card.yaml` maintains a real semver with a documented convention —
+    "MINOR for offline augmentation recipes, MAJOR for a change to raw split
+    composition" — plus a `derived_from` lineage chain. **The corpus has a richer
+    versioning model than evor does**, and evor recorded a directory name.
+    """
+    corpus_derived_from: Optional[str] = None
+    """The corpus this one was derived from, mirroring `dataset_card.yaml`'s lineage."""
+
+    supervision: Literal["labeled", "unlabeled", "partially-labeled", "unspecified"] = "unspecified"
+    """Whether this data carries labels (item 2.4 / G-7).
+
+    Asked where the in-house 4k data was, the operator answered **"its
+    unlabeled."** That answer was not representable anywhere:
+    `AcquisitionProvenance` has `sample_count` and `license_identifier` but no
+    label status, and `DetectedDataset.kind` describes a CONTAINER FORMAT
+    (`images-dir|csv|parquet|…`), not a supervision level. A fact the operator
+    stated in plain words had nowhere to go.
+    """
+
     label_semantics: Literal["foreground_is_1", "foreground_is_0", "unspecified"] = "unspecified"
     """Which pixel value means "ink" (item 2.8).
 
@@ -1026,7 +1049,20 @@ class FrozenSplit(BaseEvorModel):
 
     split_id: str
     mission_id: str
-    split_type: Literal["test", "val"]
+    split_type: Literal["test", "val", "train"]
+    """Which split this is (item 2.4 / G-4).
+
+    ``train`` was absent. `freeze_splits` returned only test and val, and
+    `GoalContract.locked_split_hash` anchored the test hash alone — **train was
+    never hashed, never anchored, never recorded.** So the training set could
+    change between ticks with no anchor violation: fitness stayed comparable by
+    the contract's own definition while the denominator of LEARNING moved
+    underneath it.
+
+    `IntegrityGate.lock_splits` already computed a three-way anchor and had ZERO
+    production callers — the richer affordance was built and never wired, which
+    is the shape of half these findings.
+    """
     split_hash: str
     per_sample_hashes: dict[str, str]
     item_count: int
@@ -1049,6 +1085,21 @@ class FrozenSplit(BaseEvorModel):
     the split; a count derived from the split is a property of it — the
     ``record.ts:162`` pattern ("absence of a failure verdict is not evidence of
     integrity") applied to coverage.
+    """
+
+    per_sample_files: dict[str, list[str]] = Field(default_factory=dict)
+    """Item 2.4 / G-5 — the files that make up each sample, when a sample is not one file.
+
+    Segmentation ``(image, mask)``, detection ``(image, annotation)``, ASR
+    ``(audio, transcript)``: none of these had a representation. One sample, one
+    file, one hash was the only shape available.
+
+    The field workaround hashed both files under SEPARATE KEYS, which forced
+    ``item_count`` to be overridden to N while ``per_sample_hashes`` held 2N
+    entries — breaking the ``item_count == len(per_sample_hashes)`` invariant
+    every consumer assumed. This keeps one entry per SAMPLE and records its parts
+    here, so the invariant holds and multi-file samples stop being an
+    improvisation.
     """
 
     # ── Item 2.3: per-item source-page lineage ──────────────────────────────
