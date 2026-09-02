@@ -81,6 +81,19 @@ def _answers(mission_id: str) -> dict:
 
 def _init(tmp_path: Path, evor_root: Path, mission_id: str, run_id: str) -> Path:
     """Initialise a mission run under *evor_root*; return its run_dir."""
+    # Item 6.1 / R-08: `run_init_run` refuses without a fresh capability probe —
+    # the field run began 26 minutes BEFORE its own. These cases are about
+    # supersession, not probe policy, so the root gets a probe.
+    evor_root.mkdir(parents=True, exist_ok=True)
+    if not (evor_root / "capability.json").exists():
+        from datetime import datetime, timezone
+        (evor_root / "capability.json").write_text(json.dumps({
+            "gpu_arch": None, "gpu_name": None, "vram_gb": None,
+            "supported_dtypes": ["fp32"], "available_libs": [],
+            "cuda_version": None, "cpu_only": True,
+            "probed_at": datetime.now(timezone.utc).isoformat(),
+            "source": "probe",
+        }))
     answers_path = tmp_path / f"answers-{mission_id}.json"
     answers_path.write_text(json.dumps(_answers(mission_id)))
     rc = run_init_run(

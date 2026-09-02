@@ -182,6 +182,80 @@ def _env_manifest() -> dict:
     return manifest
 
 
+def _supersede_prior_missions(evor_root: Path, successor_id: str, successor_run: str) -> None:
+    """Transition every other live mission in this root out of its live state.
+
+    Writes the reason and the successor IN THE SAME WRITE that changes the
+    status — a reason produced by the transition cannot drift from the state
+    that caused it, which a hand-written one demonstrably did.
+
+    Best-effort per mission: one unreadable sibling must not prevent a new run
+    from starting, and leaving the others unclosed would be worse.
+    """
+    runs_root = Path(evor_root) / "runs"
+    if not runs_root.is_dir():
+        return
+
+    now = _now_iso()
+    for mission_dir in sorted(runs_root.iterdir()):
+        if not mission_dir.is_dir() or mission_dir.name == successor_id:
+            continue
+        for run_dir in sorted(mission_dir.iterdir()):
+            if not run_dir.is_dir():
+                continue
+            ms_path = run_dir / "mission-state.json"
+            if not ms_path.exists():
+                continue
+            try:
+                ms = json.loads(ms_path.read_text())
+            except Exception:  # noqa: BLE001
+                continue
+            # Any NON-TERMINAL prior mission is superseded, not just a running
+            # one. `active-run.json` is singular (item 1.9), so creating a
+            # successor displaces whatever held it — a `draft` mission that has
+            # lost the pointer will never run, and leaving it looking startable
+            # is the same orphan state one label earlier.
+            if str(ms.get("status", "")) in ("completed", "failed", "superseded"):
+                continue
+
+            prior = str(ms.get("status", ""))
+            reason = (
+                f"superseded by mission {successor_id!r} (run {successor_run!r}), which "
+                f"took over active-run.json in this .evor root; two missions may not be "
+                f"live at once"
+            )
+            ms.update({
+                "status": "superseded",
+                "superseded_by": successor_id,
+                "superseded_reason": reason,
+                "superseded_at": now,
+                "updated_at": now,
+                "entered_at": now,
+            })
+            history = ms.get("status_history")
+            if not isinstance(history, list):
+                history = []
+            history.append({
+                "at": now, "from": prior, "to": "superseded",
+                "actor": "init_run", "reason": reason,
+            })
+            ms["status_history"] = history
+
+            try:
+                _atomic_write_json(ms_path, ms)
+            except Exception:  # noqa: BLE001
+                continue
+
+            # The superseded run's own decision log is where a reader looking at
+            # THAT run will go. An entry only in the successor's log requires
+            # already knowing the successor exists.
+            try:
+                with open(run_dir / "decision-log.md", "a") as fh:
+                    fh.write(f"\n- `{now}` **mission superseded** — {reason}\n")
+            except OSError:
+                pass
+
+
 def run_init_run(
     answers_path: str,
     *,
@@ -358,6 +432,20 @@ def run_init_run(
         f"- **run_id**: {run_id}\n"
         f"- **objective**: {contract.task_description}\n"
     ))
+
+    # ── O-09 / I-11: close out the mission this one supersedes ───────────────
+    #
+    # THREE missions read status "running" concurrently for 15.6 hours, closed
+    # out by a single retroactive write 40 seconds after r3's own mission-state
+    # was created — a reason typed in by hand, into two files, that disagreed
+    # with the run's own tick-state halt_reason.
+    #
+    # Creating a successor is the moment the predecessor is KNOWN to be stale,
+    # and `init_run` already writes both `mission-state.json` and
+    # `active-run.json`. A rule that permits the overlap and asks for honest
+    # bookkeeping afterwards cannot be enforced by any single writer, so this
+    # prevents the state instead of asking someone to correct it later.
+    _supersede_prior_missions(evor_root, mission_id, run_id)
 
     # ── 7. active-run.json  (evor_root, NOT run_dir) ──────────────────────────
     evor_root.mkdir(parents=True, exist_ok=True)

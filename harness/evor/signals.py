@@ -30,6 +30,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 from .runlock import run_lock
+from .state_root import assert_outside_plugin_root
 from evor.contracts import Signal
 
 _SEVERITY_ORDER = {"low": 0, "medium": 1, "high": 2, "critical": 3}
@@ -148,6 +149,12 @@ class SignalBus:
         were considered and cut — a lock around a single-writer file buys nothing
         and adds a stale-lock failure mode.
         """
+        # P-02: refuse at the WRITE, which is the thing that must not happen.
+        # Checking at construction was tried and is worse: a bus that is built
+        # and never emits writes nothing, so refusing to build it denies an act
+        # that was never going to occur — and it moves the error to a line that
+        # is not the one doing anything wrong.
+        assert_outside_plugin_root(self._run_dir, "the signal bus")
         with run_lock(self._run_dir):
             return self._emit_locked(signal)
 
@@ -342,12 +349,22 @@ def drain_inbox(run_dir: Path, bus: "SignalBus | None" = None) -> int:
             pass
         return 0
 
+    # ── O-17: an interrupted drain must not eat the batch it claimed ────────
+    #
+    # The claimed batch used to be unlinked in a `finally`, so anything the loop
+    # had not reached was destroyed — and the interruption that matters here is
+    # a `KeyboardInterrupt` or an OOM kill, which are BaseExceptions and sail
+    # straight past `except Exception: continue`. Claiming the inbox by rename
+    # is right; deleting the claim before the work is done is not.
+    #
+    # The remainder is written BACK to the inbox, so a later drain delivers it.
+    # Re-delivering an already-emitted signal is harmless — the bus dedups by
+    # signature and counts occurrences — while losing one is not, which is what
+    # makes returning the whole remainder the safe direction.
+    lines = [ln.strip() for ln in Path(tmp).read_text().splitlines() if ln.strip()]
     emitted = 0
     try:
-        for raw in Path(tmp).read_text().splitlines():
-            raw = raw.strip()
-            if not raw:
-                continue
+        for index, raw in enumerate(lines):
             try:
                 entry = json.loads(raw)
                 sig = make_signal(
@@ -362,7 +379,13 @@ def drain_inbox(run_dir: Path, bus: "SignalBus | None" = None) -> int:
                 bus.emit(sig)
                 emitted += 1
             except Exception:
+                # A malformed line is skipped, as before: one bad entry must
+                # never block the rest of the batch.
                 continue
+    except BaseException:
+        # Interrupted. Return everything from the line that failed onward.
+        _restore_inbox(inbox, lines[index:])
+        raise
     finally:
         try:
             os.unlink(tmp)
@@ -370,3 +393,19 @@ def drain_inbox(run_dir: Path, bus: "SignalBus | None" = None) -> int:
             pass
 
     return emitted
+
+
+def _restore_inbox(inbox: Path, remaining: list[str]) -> None:
+    """Put un-drained lines back, ahead of anything written since (O-17)."""
+    if not remaining:
+        return
+    try:
+        existing = inbox.read_text().splitlines() if inbox.exists() else []
+    except OSError:
+        existing = []
+    try:
+        inbox.write_text("\n".join([*remaining, *[ln for ln in existing if ln.strip()]]) + "\n")
+    except OSError:
+        # Nothing further can be done; the signals are lost either way, but the
+        # exception that caused this is about to propagate and say so.
+        pass

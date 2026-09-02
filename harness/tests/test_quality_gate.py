@@ -104,7 +104,7 @@ class TestGoldenFixturePasses:
         assert check is not None
         assert check.passed, check.reason
 
-    def test_golden_all_six_checks_present(self) -> None:
+    def test_golden_all_seven_checks_present(self) -> None:
         report = _gate().check(_GOLDEN)
         names = {c.name for c in report.checks}
         expected = {
@@ -114,6 +114,11 @@ class TestGoldenFixturePasses:
             "forward_pass",
             "eval_locked",
             "telemetry",
+            # R-15: candidate code must anchor imports to __file__, not the cwd.
+            # `sys.path.insert(0, os.getcwd())` resolved against whatever
+            # directory the launcher was in and raised ModuleNotFoundError at
+            # launch — after the merge and after the review.
+            "path_anchoring",
         }
         assert names == expected
 
@@ -798,7 +803,7 @@ class TestGoldenEmbeddingFixturePasses:
         assert check is not None
         assert check.passed, check.reason
 
-    def test_embedding_all_six_checks_present(self) -> None:
+    def test_embedding_all_seven_checks_present(self) -> None:
         report = _gate().check(self._DIR)
         names = {c.name for c in report.checks}
         expected = {
@@ -808,5 +813,10 @@ class TestGoldenEmbeddingFixturePasses:
             "forward_pass",
             "eval_locked",
             "telemetry",
+            # R-15: candidate code must anchor imports to __file__, not the cwd.
+            # `sys.path.insert(0, os.getcwd())` resolved against whatever
+            # directory the launcher was in and raised ModuleNotFoundError at
+            # launch — after the merge and after the review.
+            "path_anchoring",
         }
         assert names == expected

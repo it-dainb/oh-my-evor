@@ -29,6 +29,8 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
+from .state_root import is_inside_plugin_root
+
 # ─── Path mapping ─────────────────────────────────────────────────────────────
 
 # Agents with a fixed (groupdir, filename-stem) pair.
@@ -149,6 +151,21 @@ def write_artifact(
         {"ok": True, "path": str}     on success
         {"error": str}                on validation or I/O failure
     """
+    # P-02: refuse before resolving a path, and certainly before creating a
+    # directory. This reports by RETURN VALUE rather than by raising, so the
+    # refusal has to hold on the filesystem too — an error envelope that still
+    # wrote the file would not close the finding, which is why the test asserts
+    # both.
+    if is_inside_plugin_root(run_dir):
+        return {
+            "error": (
+                f"refusing to write an artifact inside the installed plugin tree "
+                f"({run_dir}). Run state belongs to the project; an artifact written "
+                f"there is destroyed by the next plugin update and leaks into every "
+                f"project that installs the plugin. Point EVOR_ROOT at the project."
+            )
+        }
+
     try:
         target = resolve_artifact_path(run_dir, tick, agent, kind=kind, partial=partial)
     except ValueError as exc:
