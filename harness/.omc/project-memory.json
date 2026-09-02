@@ -25,7 +25,7 @@
   },
   "build": {
     "buildCommand": "cd /storages_local/research/oh-my-evor/mcp && npm run build 2>&1",
-    "testCommand": "cd /storages_local/research/oh-my-evor/mcp && npx vitest run 2>&1 | tail -60",
+    "testCommand": "python -m pytest -q 2>&1 | tail -3",
     "lintCommand": "ruff check",
     "devCommand": null,
     "scripts": {}
@@ -136,6 +136,12 @@
       "type": "file"
     },
     {
+      "path": "tests/test_tabular_ladder.py",
+      "accessCount": 4,
+      "lastAccessed": 1785556279653,
+      "type": "file"
+    },
+    {
       "path": "evor/angle_registry.py",
       "accessCount": 3,
       "lastAccessed": 1783094697580,
@@ -178,6 +184,12 @@
       "type": "file"
     },
     {
+      "path": "evor/scheduler.py",
+      "accessCount": 2,
+      "lastAccessed": 1783337203117,
+      "type": "file"
+    },
+    {
       "path": "tests/test_store.py",
       "accessCount": 1,
       "lastAccessed": 1783094606934,
@@ -193,12 +205,6 @@
       "path": "tests/conftest.py",
       "accessCount": 1,
       "lastAccessed": 1783094686315,
-      "type": "file"
-    },
-    {
-      "path": "evor/scheduler.py",
-      "accessCount": 1,
-      "lastAccessed": 1783095375084,
       "type": "file"
     },
     {
@@ -223,6 +229,18 @@
       "path": "tests/test_handoff.py",
       "accessCount": 1,
       "lastAccessed": 1783164766383,
+      "type": "file"
+    },
+    {
+      "path": "evor/telemetry.py",
+      "accessCount": 1,
+      "lastAccessed": 1783330733587,
+      "type": "file"
+    },
+    {
+      "path": "evor/quality_gate.py",
+      "accessCount": 1,
+      "lastAccessed": 1783330734028,
       "type": "file"
     }
   ],

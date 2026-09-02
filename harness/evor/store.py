@@ -16,6 +16,7 @@ import shutil
 import stat
 import subprocess
 import tempfile
+from .runlock import run_lock
 from pathlib import Path
 from typing import Literal
 
@@ -54,20 +55,36 @@ class ContentAddressedStore:
         return h.hexdigest()
 
     def _load_refcounts(self) -> dict[str, int]:
-        """Load refcounts; clean up any orphaned .tmp left by a prior crash."""
-        if self._tmp_path.exists():
-            # previous process died between tmp-write and os.replace() — remove orphan
-            self._tmp_path.unlink(missing_ok=True)
+        """Load refcounts. Never touches any ``.tmp`` (O-17).
+
+        This used to unlink `.refcounts.json.tmp` on every read, on the theory
+        that it was an orphan from a crashed writer. A LIVE writer's in-flight
+        tmp is byte-for-byte the same thing — so a concurrent read destroyed a
+        write that was still happening, and the reader had no way to know it had
+        done so. A cleanup that cannot distinguish a corpse from a patient is
+        not cleanup.
+
+        Orphans are handled by construction instead: `_save_refcounts` writes to
+        a PID-unique temp name, so a dead writer's leftover can never collide
+        with a live one and nothing has to guess which is which.
+        """
         if self._refcounts_path.exists():
             with open(self._refcounts_path) as f:
                 return json.load(f)
         return {}
 
     def _save_refcounts(self, counts: dict[str, int]) -> None:
-        """Atomic write: serialise to .tmp then os.replace() → .json."""
+        """Atomic write: serialise to a PID-unique .tmp then os.replace().
+
+        The unique name is what lets `_load_refcounts` stop deleting temp files
+        (O-17): two writers can no longer collide on one path, so a leftover from
+        a crash is inert rather than dangerous, and a reader never has to decide
+        whether a `.tmp` is alive.
+        """
         data = json.dumps(counts, indent=2, sort_keys=True).encode()
-        self._tmp_path.write_bytes(data)
-        os.replace(self._tmp_path, self._refcounts_path)
+        tmp = self._blobs / f".refcounts.json.{os.getpid()}.tmp"
+        tmp.write_bytes(data)
+        os.replace(tmp, self._refcounts_path)
 
     def _load_namespaces(self) -> dict[str, dict]:
         if self._ns_path.exists():
@@ -92,8 +109,6 @@ class ContentAddressedStore:
         Orphaned .refcounts.json.tmp from a prior crash is removed before any
         refcount update.
         """
-        counts = self._load_refcounts()
-
         content_hash = self._sha256_file(src_path)
         dest = self._blob_path(content_hash)
 
@@ -107,9 +122,36 @@ class ContentAddressedStore:
             # make immutable regardless of how the blob landed
             dest.chmod(stat.S_IRUSR | stat.S_IRGRP | stat.S_IROTH)
 
-        counts[content_hash] = counts.get(content_hash, 0) + 1
-        self._save_refcounts(counts)
+        # ── The refcount update is a read-modify-write (item 1.8) ────────────
+        #
+        # Load, increment, save — with nothing between processes. Eight writers
+        # doing fifteen puts each lost most of them: every concurrent pair read
+        # the same counts and the second write erased the first. A refcount that
+        # undercounts is not a cosmetic error — it is what decides when a blob is
+        # safe to delete, so losing puts eventually deletes data that is still
+        # referenced.
+        #
+        # Blob content is addressed by hash and written before the lock, so the
+        # expensive part stays parallel and the lock covers only the counter.
+        with run_lock(self._blobs):
+            # Orphan cleanup belongs to a WRITER, not a reader (O-17). Inside the
+            # lock no other writer can be mid-write, so every temp file present
+            # is by definition a leftover from a crash — which is the fact
+            # `_load_refcounts` could not establish, and why it used to delete
+            # live writers' files trying to guess.
+            self._sweep_stale_temps()
+            counts = self._load_refcounts()
+            counts[content_hash] = counts.get(content_hash, 0) + 1
+            self._save_refcounts(counts)
         return content_hash
+
+    def _sweep_stale_temps(self) -> None:
+        """Remove leftover refcount temp files. MUST be called under the lock."""
+        try:
+            for stale in self._blobs.glob(".refcounts.json*.tmp"):
+                stale.unlink(missing_ok=True)
+        except OSError:
+            pass
 
     def get(self, content_hash: str) -> Path:
         """Return path to blob; raise FileNotFoundError if missing."""

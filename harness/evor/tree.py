@@ -38,11 +38,12 @@ import os
 import re
 import sys
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Literal
 
+from evor.runlock import run_lock
 from evor.contracts import (
     ApproachFamily,
     CriticReview,
@@ -277,6 +278,24 @@ class TreeEngine:
         if self._run_dir is None:
             return
         tree_path = Path(self._run_dir) / "tree.json"
+
+        # Item 1.8. Re-reading fresh (below) narrows the race but cannot close
+        # it: this is a read-modify-write, and the MCP server's `upsertNode` does
+        # the same thing to the same file from another process. That side already
+        # takes `<run_dir>/.tree.lock` via `withRunLock` in mcp/src/lock.ts —
+        # Python took nothing, so the mutual exclusion was mutual only among
+        # TypeScript callers. RC3: the lock was "a TypeScript implementation
+        # detail rather than a property of the on-disk format".
+        with run_lock(self._run_dir):
+            self._rewrite_visit_counts(tree_path, node_ids)
+
+    def _rewrite_visit_counts(self, tree_path: Path, node_ids: set[str]) -> None:
+        """The critical section of :meth:`_persist_visit_increments`.
+
+        Split out so the lock scope is exactly the read-modify-write and nothing
+        else — a lock held wider than its invariant is how the 2 s acquisition
+        deadline starts firing under normal load.
+        """
         if tree_path.exists():
             with open(tree_path) as fh:
                 tree_data = json.load(fh)
@@ -388,7 +407,6 @@ class TreeEngine:
             hypothesis=hypothesis,
             citations=[],
             wildness=self._strategy.wildness,
-            critic_approved=True,
             critic_review=critic_review,
         )
 
@@ -734,6 +752,20 @@ class StopVerdict:
     frontier_count: int
     budget_remaining: dict[str, Any]
 
+    # ── Item 2b.1: a blocked tick is not a stopped run ──────────────────────
+    #
+    # `evor-tick` emitted `forge-cannot-spawn-forge-junior-tool-gap` onto the
+    # signal bus — honestly, at the right moment — and nothing read it. The tick
+    # span until a human noticed and restarted the mission.
+    #
+    # `blocked` is deliberately NOT `should_stop`. Stopping ends the mission;
+    # blocking says this tick cannot proceed until something is supplied, which
+    # is a different fact with a different remedy. Reporting a gap as a stop
+    # would end runs that need one tool call to continue.
+    blocked: bool = False
+    blocked_reason: str = ""
+    capability_gaps: list[dict[str, Any]] = field(default_factory=list)
+
 
 def check_stop_condition(
     goal: GoalContract,
@@ -769,11 +801,66 @@ def check_stop_condition(
     budget = goal.budget
     stop = goal.stop_condition
 
+    # ── Item 2b.1: the tick orchestrator is the consumer ────────────────────
+    #
+    # AF4 §5 places it here rather than in a hook or with a human: a hook fires
+    # per tool call and cannot see the run's step state, and a human is the
+    # ESCALATION, not the primary reader. `check_stop` already runs every step
+    # and already knows the run — it is the only actor positioned to notice.
+    gaps: list[dict[str, Any]] = []
+    run_dir = getattr(engine, "_run_dir", None)
+    if run_dir is not None:
+        try:
+            from .signals import open_capability_gaps
+
+            gaps = [
+                {
+                    "signature": g.signature,
+                    "severity": g.severity,
+                    "evidence": g.evidence,
+                    "source": g.source,
+                    "occurrences": g.occurrences,
+                    "last_seen": g.last_seen,
+                }
+                for g in open_capability_gaps(Path(run_dir))
+            ]
+        except Exception:  # noqa: BLE001 — an unreadable bus must not stop the run
+            gaps = []
+
     # ── Budget remaining ──────────────────────────────────────────────────────
     budget_remaining: dict[str, Any] = {
         "iterations_left": max(0, budget.max_iterations - tick),
-        "cost_left_usd": (max(0.0, budget.max_cost_usd - total_cost) if budget.max_cost_usd else None),
+        "cost_left_usd": (
+            max(0.0, budget.max_cost_usd - total_cost)
+            if budget.max_cost_usd is not None else None
+        ),
     }
+
+    # ── Cost ceiling (item 6.6, K-07) — applies to EVERY stop_type ───────────
+    #
+    # Two defects in one line. The ceiling lived inside the
+    # `maximize-under-budget` branch, so a run with `stop_type: "target"` had no
+    # spend limit at all — $217.70 went out under a contract that declared one.
+    # And the guard was `if budget.max_cost_usd and ...`, so a ceiling of ZERO is
+    # falsy and the check was skipped: 0 meant UNLIMITED, the exact opposite of
+    # what an operator setting it to zero means, in a three-way doc/code/type
+    # collision the plan calls out by name.
+    #
+    # It now runs before the stop_type branch, like the circuit breaker, and 0 is
+    # read as "no spend permitted". `validate_run` rejects a zero ceiling at init
+    # (item 9.3) so this is the second line of defence, not the only one.
+    if budget.max_cost_usd is not None and total_cost >= budget.max_cost_usd:
+        return StopVerdict(
+            should_stop=True,
+            reason=(
+                f"cost ceiling: ${total_cost:.2f} spent >= max_cost_usd "
+                f"${budget.max_cost_usd:.2f}"
+                + (" (a ceiling of 0 permits no spend; it does not mean unlimited)"
+                   if budget.max_cost_usd == 0 else "")
+            ),
+            tick_count=tick, best_score=best_score,
+            frontier_count=frontier_count, budget_remaining=budget_remaining,
+        )
 
     # ── Circuit-breaker override (always wins) ─────────────────────────────────
     if tick >= budget.circuit_breaker:
@@ -825,13 +912,8 @@ def check_stop_condition(
                 tick_count=tick, best_score=best_score,
                 frontier_count=frontier_count, budget_remaining=budget_remaining,
             )
-        if budget.max_cost_usd and total_cost >= budget.max_cost_usd:
-            return StopVerdict(
-                should_stop=True,
-                reason=f"maximize-under-budget: cost ${total_cost:.2f} >= max_cost_usd ${budget.max_cost_usd:.2f}",
-                tick_count=tick, best_score=best_score,
-                frontier_count=frontier_count, budget_remaining=budget_remaining,
-            )
+        # The cost ceiling is checked above, for every stop_type. Leaving a copy
+        # here would be a second predicate over one condition — §1.2's shape.
 
     elif stop_type == "evolve-until-plateau":
         # Delegate to the same plateau logic used by evor_check_plateau.
@@ -890,6 +972,25 @@ def check_stop_condition(
                 tick_count=tick, best_score=best_score,
                 frontier_count=frontier_count, budget_remaining=budget_remaining,
             )
+
+    if gaps:
+        top = gaps[0]
+        return StopVerdict(
+            should_stop=False,
+            reason=f"no stop condition triggered (stop_type={stop_type!r}, tick={tick})",
+            tick_count=tick,
+            best_score=best_score,
+            frontier_count=frontier_count,
+            budget_remaining=budget_remaining,
+            blocked=True,
+            blocked_reason=(
+                f"capability gap {top['signature']!r} is open "
+                f"({top.get('occurrences', 1)} occurrence(s), source {top.get('source')!r}). "
+                "The tick cannot proceed until the missing capability is supplied or the "
+                "gap is resolved — this is a BLOCK, not a stop: the mission is still viable."
+            ),
+            capability_gaps=gaps,
+        )
 
     return StopVerdict(
         should_stop=False,
@@ -972,6 +1073,9 @@ def _cli() -> None:  # pragma: no cover
             "best_score": verdict.best_score,
             "frontier_count": verdict.frontier_count,
             "budget_remaining": verdict.budget_remaining,
+            "blocked": verdict.blocked,
+            "blocked_reason": verdict.blocked_reason,
+            "capability_gaps": verdict.capability_gaps,
         }))
 
     else:

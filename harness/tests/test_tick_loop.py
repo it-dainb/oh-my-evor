@@ -70,7 +70,6 @@ def _make_goal(locked_split_hash: str, eval_script_hash: str) -> GoalContract:
         mission_type="fixed",
         task_description="Tick-loop dry-run (GPU-free)",
         dataset_ref="/data/fake",
-        metrics=[{"name": "accuracy", "direction": "higher", "primary": True}],
         metric_specs=[{
             "metric_name": "accuracy",
             "direction": "higher",
@@ -321,10 +320,11 @@ class TestTickLoopDryRun:
             ),
             citations=[],
             wildness=0.5,
-            critic_approved=True,
             critic_review=_approved_critic_review(),
         )
-        assert mutation_proposal.critic_approved
+        # 2b.2: `critic_approved` removed — it asked the PROPOSER to assert the
+        # REVIEWER's verdict and nothing read it. The review itself is asserted
+        # below via critic_review, which is the thing that carries a verdict.
         assert len(mutation_proposal.parent_node_ids) == 1, "mutation has exactly 1 parent"
 
         # ── 8b. Second node (distinct lineage, depth=0) for crossover ──────────
@@ -352,7 +352,7 @@ class TestTickLoopDryRun:
             "crossover proposal must carry exactly 2 parent IDs"
         )
         assert set(crossover_proposal.parent_node_ids) == {ROOT_ID, BRANCH_ID}
-        assert crossover_proposal.critic_approved
+        # 2b.2: see above.
 
         # ── 9. Write shared telemetry for integrity checks ─────────────────────
         # Both clean and cheat nodes reuse the same telemetry content; the

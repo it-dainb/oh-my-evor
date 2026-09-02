@@ -3,7 +3,7 @@
   "agent_file": "agents/evor-mutagen.md",
   "arms": [
     {
-      "model": "sonnet",
+      "model": "haiku",
       "effort": "medium",
       "label": "current"
     },
@@ -318,7 +318,7 @@
     {
       "id": "dream-k-small-tick",
       "gate": "dream_k",
-      "note": "train_k is 2, so at least 4 proposals",
+      "note": "train_k is 2, so train_k*2 = 4 \u2014 but the formula floors at 5: dream_k = min(max(0, 4, 5), 7) = 5. This case exists to grade the dream_k gate and asserted 4, the one value the formula never returns \u2014 it accepted the answer the rule forbids.",
       "capability": {
         "cpu_only": false,
         "gpu_arch": "sm_86",
@@ -361,7 +361,7 @@
       "expect": {
         "wildness_used": 0.35,
         "proposals": {
-          "min": 4
+          "min": 5
         },
         "proposals[].approach_family": true,
         "crossover_triggered": false,

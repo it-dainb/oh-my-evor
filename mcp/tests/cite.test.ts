@@ -111,15 +111,33 @@ describe("addCitation", () => {
     expect(result.citations).toEqual(["existing-bib-key", "new-bib-key"]);
   });
 
-  it("returns error when node not found in tree", () => {
+  it("records a citation for an unknown reference as PENDING, not as a node citation", () => {
+    // ITEM 5.1 CHANGED THIS DELIBERATELY. It asserted `ok: false`, and that
+    // rejection is why all 18 evor_cite calls in the field run failed: every one
+    // came from Sage/Sage-junior, which runs BEFORE any node exists and cites its
+    // own angle slug. A mandate its only caller can never satisfy is not a
+    // mandate — the citation-backed research requirement recorded nothing for a
+    // whole mission.
+    //
+    // This test's INTENT — an unknown reference must not be silently treated as a
+    // node — is preserved and still asserted: the result is flagged `pending`,
+    // and nothing is written into the tree.
     const runId = "run-cite-005";
     const fakeNodeId = randomUUID();
     // No tree.json written — node does not exist
 
     const result = addCitation(runId, fakeNodeId, "some-citation", "test-mission");
 
-    expect(result.ok).toBe(false);
-    expect(result.error).toContain(fakeNodeId);
+    expect(result.ok).toBe(true);
+    expect(
+      (result as { pending?: boolean }).pending,
+      "the caller must be told this was NOT attached to a node",
+    ).toBe(true);
+    expect(result.citations).toEqual(["some-citation"]);
+    expect(
+      Object.keys(readTree(runId, "test-mission")),
+      "a citation for an unknown reference must not invent a node",
+    ).toEqual([]);
   });
 
   it("does not touch other nodes in the tree", () => {

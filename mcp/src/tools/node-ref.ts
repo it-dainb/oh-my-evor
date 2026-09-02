@@ -38,6 +38,31 @@ export function isUuid(ref: string): boolean {
  *
  * @returns the resolved node id, or the original ref when unresolvable.
  */
+/**
+ * Resolve a ref, or return null when no node claims it.
+ *
+ * Two different questions hide behind one function name, and conflating them is
+ * how the strict version broke five reporting tests:
+ *
+ *   "What is the canonical id for this ref?"  — an unregistered ref has NO
+ *     answer, and returning `ref` mints a second identity. That is O-01, and
+ *     `resolveNodeRef` throws.
+ *
+ *   "Does this node have artifacts?"          — for a ref no node claims, the
+ *     honest answer is "no results, no telemetry", not an exception. A reporting
+ *     function that crashes on an unknown node is less useful than one that says
+ *     it found nothing.
+ *
+ * Readers use this; writers use `resolveNodeRef`.
+ */
+export function tryResolveNodeRef(runId: string, ref: string, missionId?: string): string | null {
+  try {
+    return resolveNodeRef(runId, ref, missionId);
+  } catch {
+    return null;
+  }
+}
+
 export function resolveNodeRef(runId: string, ref: string, missionId?: string): string {
   if (!ref) return ref;
 
@@ -66,8 +91,32 @@ export function resolveNodeRef(runId: string, ref: string, missionId?: string): 
     }
   }
 
-  // 4. Unresolvable — fail-open
-  return ref;
+  // ── 4. Unresolvable — REFUSE (item 1.5, finding O-01) ────────────────────
+  //
+  // This returned `ref` unchanged. That fail-open is how a second node identity
+  // gets minted: an unregistered slug resolves "successfully" to itself, a
+  // writer then creates `nodes/<slug>/`, and the node now exists under two names
+  // with no registry entry tying them together. Integrity check 5 looked under
+  // the UUID, found nothing, and failed a node with 12,000 well-formed telemetry
+  // records — a verdict that stood as the run's final word.
+  //
+  // Failing loudly here is the difference between "I do not know this node" and
+  // "this node is bad". Callers that legitimately handle an unknown ref catch
+  // this — `addCitation` records a pending citation rather than inventing a node.
+  // An EMPTY tree is not a registry that excludes this ref — it is the absence of
+  // a registry. Setup and pre-first-node flows legitimately resolve a name before
+  // any node is recorded, and refusing there would turn "nothing has happened
+  // yet" into an error. Absence is not a verdict, which is 1.4's rule pointed at
+  // identity instead of liveness.
+  if (Object.keys(nodes).length === 0) return ref;
+
+  throw new Error(
+    `node '${ref}' is not in this run's tree. Check the name with evor_tree_read. ` +
+    `The tree lists ${Object.keys(nodes).length} node(s) and none of them claims this ` +
+    `reference; resolving it to itself would mint a second identity for a node that ` +
+    `already has one, which is how a node's telemetry becomes invisible to the gate ` +
+    `that scores it.`,
+  );
 }
 
 /**

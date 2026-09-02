@@ -156,7 +156,6 @@ def _make_goal(
         mission_type="fixed",
         task_description="Test task",
         dataset_ref="/data/test",
-        metrics=[{"name": "accuracy", "direction": "higher", "primary": True}],
         metric_specs=[{
             "metric_name": "accuracy",
             "direction": "higher",
@@ -308,7 +307,12 @@ class TestCleanNode:
         assert report.verdict == "passed"
         assert report.checks.split_hash_match is True
         assert report.checks.no_test_leakage is True
-        assert report.checks.no_label_contamination is True
+        # 2.11: was `is True`, which pinned `_check_no_label_contamination`'s
+        # `return True` stub as the specification. No training hashes are supplied
+        # here, so the honest answer is "not evaluated" — and being able to say
+        # that is the entire point of the item. Strengthened: the test now
+        # distinguishes clean from never-looked, which it previously could not.
+        assert report.checks.no_label_contamination is None
         assert report.checks.no_eval_shift is True
         assert report.checks.telemetry_sane is True
         assert report.checks.reward_hacking_probe is False

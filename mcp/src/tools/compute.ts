@@ -18,14 +18,15 @@
  * evor_gotchas_list    — list accumulated gotchas (wraps `evor gotchas`)
  */
 
-import { chmodSync, existsSync, readFileSync, renameSync, statSync, writeFileSync } from "fs";
+import { appendFileSync, chmodSync, existsSync, readFileSync, renameSync, statSync, writeFileSync } from "fs";
 import { createHash } from "crypto";
 import { join } from "path";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { resolveRunPaths, getEvorRoot, getActiveRunPath } from "../run-store.js";
 import { callPythonModule, type PyResult } from "../subprocess-bridge.js";
-import { resolveNodeRef } from "./node-ref.js";
+import { resolveNodeRef, tryResolveNodeRef } from "./node-ref.js";
+import { nextState } from "../fsm.js";
 
 // ── Shared helpers ────────────────────────────────────────────────────────────
 
@@ -297,7 +298,16 @@ export function lockEvaluate(
   nodeRef: string,
   missionId?: string,
 ): { ok: boolean; node_name: string; error?: string } {
-  const nodeId = resolveNodeRef(runId, nodeRef, missionId);
+  // A verification function: an unknown node is a reportable failure, not a
+  // crash. Its return type already carries `error` for exactly this.
+  const nodeId = tryResolveNodeRef(runId, nodeRef, missionId);
+  if (nodeId === null) {
+    return {
+      ok: false,
+      node_name: nodeRef,
+      error: `node '${nodeRef}' is not in this run's tree — check the name with evor_tree_read.`,
+    };
+  }
   const worktree = join(getEvorRoot(), "worktrees", nodeId);
   const evalPath = join(worktree, "evaluate.py");
   if (!existsSync(evalPath)) {
@@ -351,15 +361,31 @@ export function verifyArtifacts(
   nodeRef: string,
   missionId?: string,
 ): { ok: boolean; node_name: string; has_results: boolean; has_telemetry: boolean } {
-  const nodeId = resolveNodeRef(runId, nodeRef, missionId);
-  const nodeDir = join(resolveRunPaths(runId, missionId).runDir, "nodes", nodeId);
+  // A reporting function: an unknown node yields "found nothing", not a crash.
+  const nodeId = tryResolveNodeRef(runId, nodeRef, missionId);
+  const runDir = resolveRunPaths(runId, missionId).runDir;
+
+  // ── O-01 (item 1.5): look under BOTH identities ──────────────────────────
+  //
+  // The trainer writes `nodes/<slug>/telemetry.jsonl`; this looked only under
+  // `nodes/<uuid>/`. Neither writer was wrong — the slug is the right name for a
+  // directory a human reads, the UUID the right key for a machine — but nothing
+  // owned the mapping, so the reader guessed. A guess that resolves to a missing
+  // path fails in the direction of "the candidate is bad", which is what makes
+  // it expensive: good work discarded, quietly, as a verdict.
+  //
+  // This is the harness fix (`evor/node_identity.py`) applied to the TypeScript
+  // reader. It only ever finds files that EXIST, so it can rescue a misfiled
+  // artifact and can never manufacture one.
+  const identities = [nodeId, nodeRef].filter((v, i, a): v is string => !!v && a.indexOf(v) === i);
   const present = (rel: string, minBytes: number): boolean => {
-    try {
-      const p = join(nodeDir, rel);
-      return existsSync(p) && statSync(p).size > minBytes;
-    } catch {
-      return false;
+    for (const identity of identities) {
+      try {
+        const p = join(runDir, "nodes", identity, rel);
+        if (existsSync(p) && statSync(p).size > minBytes) return true;
+      } catch { /* try the next identity */ }
     }
+    return false;
   };
   const has_results = present("results.json", 2);
   const has_telemetry = present("telemetry.jsonl", 0);
@@ -379,20 +405,70 @@ export function verifyArtifacts(
  * every other field is preserved, and failures are non-fatal (the gate still
  * fails closed if the anchor is missing).
  */
+/**
+ * Append one line to `decision-log.md` (item I-01).
+ *
+ * Best-effort: an unwritable log must not fail the write it describes. The log
+ * is evidence, not a gate.
+ */
+function appendDecision(runDir: string, what: string, why: string): void {
+  try {
+    appendFileSync(
+      `${runDir}/decision-log.md`,
+      `- \`${new Date().toISOString()}\` **${what}** — ${why}\n`,
+    );
+  } catch {
+    // best-effort by design
+  }
+}
+
+/**
+ * Rewrite fields of a sealed goal contract — and SAY SO (item I-01).
+ *
+ * This is the only code path in the MCP server that rewrites a sealed
+ * `goal-contract.json`, and it was best-effort and silent by construction. Gate
+ * and threshold changes were made through it — GPU 10ms→500ms, CPU 0.1s→1.0s,
+ * LAT_CPU_THREADS 32→8 — and left no trace anywhere.
+ *
+ * The `eval_script_hash` case is the sharpest: when the contract already anchors
+ * a DIFFERENT hash, this is not a first seal, it is an evaluator REPLACEMENT
+ * that silently overwrites the anchor making the previous scores reproducible.
+ * In the field the anchor moved three times (8d7107cf → 3dc2f7da → f123d17c →
+ * a3776de4) and f123d17c's evaluator now exists nowhere on disk. Every number
+ * scored under it is unreproducible, and nothing recorded that it changed.
+ *
+ * `harness/evor/benchmark.py` already gets this right — it appends a
+ * "## BenchmarkUpgrade" block for every eval-suite upgrade. This is that,
+ * applied to the writer that needed it.
+ */
 function patchGoalContract(runDir: string, patch: Record<string, string>): void {
   const contractPath = `${runDir}/goal-contract.json`;
   if (!existsSync(contractPath)) return;
   try {
     const contract = JSON.parse(readFileSync(contractPath, "utf8")) as Record<string, unknown>;
-    let changed = false;
+    const changes: string[] = [];
     for (const [k, v] of Object.entries(patch)) {
       if (v && contract[k] !== v) {
+        const previous = contract[k];
         contract[k] = v;
-        changed = true;
+        // The PREVIOUS value is what makes the entry useful: it is the only
+        // surviving record of an anchor whose evaluator may no longer exist.
+        changes.push(
+          previous === undefined
+            ? `${k} set to ${String(v).slice(0, 24)}`
+            : `${k} ${String(previous).slice(0, 24)} -> ${String(v).slice(0, 24)}`,
+        );
       }
     }
-    if (changed) {
+    if (changes.length) {
       writeFileSync(contractPath, JSON.stringify(contract, null, 2), "utf8");
+      appendDecision(
+        runDir,
+        `sealed goal-contract mutated: ${changes.join(", ")}`,
+        Object.keys(patch).includes("eval_script_hash")
+          ? "the evaluator anchor moved; scores recorded under the previous anchor are no longer reproducible"
+          : "contract field rewritten through evor_seal_eval_script",
+      );
     }
   } catch {
     // Best-effort: the integrity gate still fails closed if the anchor is absent.
@@ -418,7 +494,15 @@ export function registerComputeTools(server: McpServer): void {
     async ({ run_id, node_id, run_dir, worktree, eval_version }) => {
       const missionId = process.env.EVOR_MISSION_ID;
       const resolvedDir = run_dir ?? resolveRunPaths(run_id, missionId).runDir;
-      const resolvedNodeId = resolveNodeRef(run_id, node_id, missionId);
+      // Strict here on purpose: launching training for a node the tree does not
+      // know would create its artifacts under an unregistered identity, which is
+      // O-01 happening again at the other end.
+      let resolvedNodeId: string;
+      try {
+        resolvedNodeId = resolveNodeRef(run_id, node_id, missionId);
+      } catch (e) {
+        return err(String(e instanceof Error ? e.message : e));
+      }
       const result = jobStart(resolvedNodeId, run_id, resolvedDir, worktree, eval_version);
       if (!result.ok) return err(result.error ?? "evor_run_start failed");
 
@@ -446,6 +530,52 @@ export function registerComputeTools(server: McpServer): void {
         } catch {
           // fail-open — never block the caller on an active-run write error
         }
+      }
+
+      // ── 1.9c: the mission enters `running` HERE, server-side ──────────────
+      //
+      // `skills/evor-run/SKILL.md:80` already asked the orchestrator to call
+      // `evor_state_write({ mission_status: "running" })`. That is a prose
+      // obligation, and §2's whole thesis is that an obligation stated in prose
+      // to an agent is one the system has decided not to have — in the field it
+      // was not honoured, `mission-state` stayed `locked` for the entire run,
+      // and `stop.mjs`'s M-2 comment recorded that as though it were the design.
+      //
+      // It has to be true here rather than requested there, because the three
+      // stop-hook gates re-home onto mission liveness in this same phase. A
+      // governance check pointed at a field only a cooperating agent sets is not
+      // a check.
+      //
+      // Best-effort: launching the job succeeded, and failing the caller because
+      // a status write did not land would be worse than the stale status.
+      try {
+        const msPath = join(resolvedDir, "mission-state.json");
+        let ms: Record<string, unknown> = {};
+        if (existsSync(msPath)) {
+          try { ms = JSON.parse(readFileSync(msPath, "utf8")); } catch { /* start fresh */ }
+        }
+        const from = String(ms.status ?? "locked");
+        if (from !== "running" && nextState("mission", from, "start_run") === "running") {
+          ms.status = "running";
+          ms.updated_at = new Date().toISOString();
+          ms.entered_at = ms.updated_at;
+          const msTmp = `${msPath}.tmp`;
+          writeFileSync(msTmp, JSON.stringify(ms, null, 2), "utf8");
+          renameSync(msTmp, msPath);
+          appendFileSync(
+            join(resolvedDir, "transitions.jsonl"),
+            JSON.stringify({
+              at: ms.updated_at,
+              entity: "mission",
+              from,
+              to: "running",
+              actor: "evor_run_start",
+              reason: `job ${jobId ?? "?"} launched for node ${node_id}`,
+            }) + "\n",
+          );
+        }
+      } catch {
+        // fail-open — see above
       }
 
       // Return only the job handle the agent needs — strip internal paths.
@@ -632,11 +762,20 @@ export function registerComputeTools(server: McpServer): void {
           patchGoalContract(runDir, { locked_split_hash: _lh });
         }
 
-        // Zero-item guard: a freeze that captured nothing means the location
-        // held no data files (usually it points at a folder of sub-folders, or
-        // the wrong folder). Freezing an empty eval set silently would let the
-        // whole run proceed with nothing to evaluate against — fail loudly with
-        // actionable guidance instead of returning a hollow ok:true.
+        // ── Item 2.10: guard the SHAPE that actually failed ──────────────────
+        //
+        // This caught `test === 0 && val === 0`. The real failure returned 5 and
+        // 2 — a freeze of `corpora/v10`'s seven top-level METADATA files, split
+        // 80/20 — and sailed through, because a non-zero count looked like
+        // success. Every fitness number in a 19-hour run was then computed
+        // against `dataset_card.yaml` and `test.txt`.
+        //
+        // Fixing the predicate rather than the outcome, as the plan requires. A
+        // count is not evidence that the right things were counted, so the guard
+        // now asks whether the split can answer the question the contract poses:
+        // an eval set too small to be one, or one carrying no domain labels when
+        // the corpus is organised by domain, is not a small answer — it is an
+        // answer to a different question.
         const testCount = Number(clean.test_item_count ?? 0);
         const valCount = Number(clean.val_item_count ?? 0);
         if (testCount === 0 && valCount === 0) {
@@ -646,6 +785,21 @@ export function registerComputeTools(server: McpServer): void {
             "Point it at the folder that holds the files themselves and try again.",
           );
         }
+
+        // NO ITEM-COUNT FLOOR HERE, and the reason is the finding itself.
+        //
+        // A floor was written and removed: it rejected `test=3, val=0`, which
+        // `compute.test.ts` asserts must be allowed, and it was right to. "Few
+        // items" is not the metadata-freeze signature — a genuinely small corpus
+        // is small. The signature is that the frozen files ARE the corpus's
+        // manifests, and only the freeze can see that, because only the freeze
+        // knows their names.
+        //
+        // So the refusal lives at `_refuse_if_metadata_only` in
+        // harness/evor/freeze.py, keyed on `dataset_card.yaml`, `manifest.json`,
+        // `test.txt` and friends. AF1's warning is exactly this: "the guard is
+        // not too weak; it is reasoning over a representation that cannot carry
+        // the distinction it needs to make." A count cannot carry it.
 
         return ok({ ok: true, ...clean });
       }
@@ -706,9 +860,120 @@ export function registerComputeTools(server: McpServer): void {
           "no evaluation script found for this version — write the canonical evaluator before sealing it, then try again.",
         );
       }
-      const hash = createHash("sha256").update(readFileSync(evalScriptPath)).digest("hex");
+      const content = readFileSync(evalScriptPath);
+      const hash = createHash("sha256").update(content).digest("hex");
+
+      // ── J-01: re-sealing must not launder an out-of-band rewrite ─────────
+      //
+      // The seal was four lines: hash, patch, done. When the contract ALREADY
+      // anchors a different hash, this call is not a first seal — it is an
+      // evaluator replacement, and re-running it rewrites the anchor so the
+      // tampered file becomes "the sealed one". In the field an agent edited
+      // the evaluator at 23:49 and the seal was re-applied over it; the
+      // integrity gate then compared the new file against the new hash and
+      // passed.
+      //
+      // Identical content is a no-op success, deliberately: setup flows call
+      // the seal twice legitimately, and locking them out would make this a
+      // worse failure than the one it fixes.
+      // The question is not "does the contract anchor a different hash" — a
+      // contract can carry a placeholder anchor that never matched any file, and
+      // sealing into that is a FIRST seal. The question is whether THIS RUN
+      // previously sealed this version, and the file has changed since.
+      //
+      // That needs a record the run owns, for the same reason O-09 needed one:
+      // `goal-contract.json` is state other things write, so reading it cannot
+      // distinguish "we sealed this" from "someone wrote a hash here". The
+      // receipt is written by the seal and by nothing else.
+      const receiptPath = `${runDir}/eval-suites/${eval_version}.sealed.json`;
+      let receipt: { hash?: string; sealed_at?: string } | null = null;
+      try { receipt = JSON.parse(readFileSync(receiptPath, "utf8")); } catch { receipt = null; }
+
+      if (receipt?.hash && receipt.hash !== hash) {
+        return err(
+          `refusing to re-seal ${eval_version}: this run sealed it at ` +
+          `${String(receipt.sealed_at ?? "an earlier time")} with hash ` +
+          `${receipt.hash.slice(0, 12)}…, and the file on disk now hashes to ${hash.slice(0, 12)}…. ` +
+          `The evaluator changed after it was sealed. Re-sealing would make the changed file ` +
+          `the sealed one and retroactively validate every score recorded under the old anchor — ` +
+          `which is what happened at 23:49 in the field run. If replacing the evaluator is ` +
+          `intended, seal it under a NEW eval_version so existing scores keep the evaluator ` +
+          `they were measured with.`,
+        );
+      }
+
+      // ── M-01 / I-02 (item 2.7): custody — break the hardlink ─────────────
+      //
+      // All three runs' `eval-suites/v1.py` were ONE inode with nlink 5, shared
+      // with the project root. The seal never inspected `st_nlink` and never
+      // copied, so a write through the UNPROTECTED alias reached every sealed
+      // copy — and a 23:49 rewrite retroactively replaced r1's and r2's sealed
+      // evaluators, months after those runs ended.
+      //
+      // The `.evor/runs/**` write guard could never have caught this: the write
+      // did not go through a guarded path. Custody closes it with no new matcher
+      // — copy the bytes, so the sealed file is the run's own inode and an alias
+      // elsewhere is just a different file.
+      try {
+        if (statSync(evalScriptPath).nlink > 1) {
+          const tmp = `${evalScriptPath}.seal-tmp`;
+          writeFileSync(tmp, content);
+          renameSync(tmp, evalScriptPath);   // atomic: replaces the link, not the target
+        }
+      } catch (e) {
+        return err(
+          `could not take custody of ${eval_version}: ${String(e)}. The evaluator is ` +
+          `hardlinked outside the run, so sealing it would anchor a file another path can ` +
+          `still rewrite.`,
+        );
+      }
+
       patchGoalContract(runDir, { eval_script_hash: hash });
+
+      // The receipt is what makes the NEXT call able to tell a tamper from a
+      // first seal. Written after custody, so it attests the file this run owns.
+      try {
+        writeFileSync(
+          receiptPath,
+          JSON.stringify({ eval_version, hash, sealed_at: new Date().toISOString() }, null, 2),
+          "utf8",
+        );
+      } catch { /* unwritable run dir — the contract anchor still stands */ }
+
       return ok({ ok: true, eval_version });
+    },
+  );
+
+  // ── evor_scaffold_evaluator (item 2.5) ──────────────────────────────────────
+  server.tool(
+    "evor_scaffold_evaluator",
+    "Generate the evaluator harness for this run from the goal contract, eval suite and "
+    + "frozen index. The mission then writes ONLY score(pred, gt) in score_plugin.py. "
+    + "Deterministic: the server can regenerate and byte-compare, which is what makes the "
+    + "seal custody rather than an assertion.",
+    {
+      run_id: z.string().describe("Active run identifier"),
+      eval_version: z.string().default("v1").describe("Eval suite version"),
+      mission_id: z.string().optional().describe("Mission id; resolved from the active run when omitted"),
+      overwrite_plugin: z.boolean().optional().describe(
+        "Replace an existing score_plugin.py. Off by default — the plugin is the mission's own work.",
+      ),
+    },
+    async ({ run_id, eval_version, mission_id, overwrite_plugin }) => {
+      // AF2 §4.1: every field failure lived in the column the agent hand-wrote —
+      // polarity, gate scope, the domain join — while the parts identical across
+      // every mission were re-derived by hand beside them. The server owns the
+      // harness; the mission owns one function.
+      const resolvedMission = mission_id ?? process.env.EVOR_MISSION_ID;
+      const { runDir } = resolveRunPaths(run_id, resolvedMission);
+      const result = callPythonModule("evor.scaffold_evaluator", [
+        "generate", "--run-dir", runDir, "--eval-version", eval_version,
+        ...(overwrite_plugin ? ["--overwrite-plugin"] : []),
+      ]);
+      if (!result.ok || result.data == null) {
+        return err(result.error ?? "evor_scaffold_evaluator failed");
+      }
+      return ok(result.data);
     },
   );
 
@@ -791,11 +1056,18 @@ export function registerComputeTools(server: McpServer): void {
       const { runDir } = resolveRunPaths(run_id, missionId);
 
       // Resolve each logical node name → node_id + worktree path server-side.
-      const resolvedCandidates: BatchCandidate[] = candidates.map((c) => {
-        const nodeId = resolveNodeRef(run_id, c.node_name, missionId);
-        const worktree = join(evorRoot, "worktrees", nodeId);
-        return { node_id: nodeId, worktree, eval_version: c.eval_version };
-      });
+      let resolvedCandidates: BatchCandidate[];
+      try {
+        resolvedCandidates = candidates.map((c) => {
+          const nodeId = resolveNodeRef(run_id, c.node_name, missionId);
+          const worktree = join(evorRoot, "worktrees", nodeId);
+          return { node_id: nodeId, worktree, eval_version: c.eval_version };
+        });
+      } catch (e) {
+        // One unknown candidate fails the batch: a partial launch would leave
+        // the caller believing every candidate started.
+        return err(String(e instanceof Error ? e.message : e));
+      }
 
       const result = forgeDispatchBatch(run_id, resolvedCandidates, runDir, gpu_fraction);
       return ok(result);

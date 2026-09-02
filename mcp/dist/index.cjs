@@ -2981,7 +2981,7 @@ var require_compile = __commonJS({
       const schOrFunc = root.refs[ref];
       if (schOrFunc)
         return schOrFunc;
-      let _sch = resolve3.call(this, root, ref);
+      let _sch = resolve4.call(this, root, ref);
       if (_sch === void 0) {
         const schema = (_a = root.localRefs) === null || _a === void 0 ? void 0 : _a[ref];
         const { schemaId } = this.opts;
@@ -3008,7 +3008,7 @@ var require_compile = __commonJS({
     function sameSchemaEnv(s1, s2) {
       return s1.schema === s2.schema && s1.root === s2.root && s1.baseId === s2.baseId;
     }
-    function resolve3(root, ref) {
+    function resolve4(root, ref) {
       let sch;
       while (typeof (sch = this.refs[ref]) == "string")
         ref = sch;
@@ -3583,7 +3583,7 @@ var require_fast_uri = __commonJS({
       }
       return uri;
     }
-    function resolve3(baseURI, relativeURI, options) {
+    function resolve4(baseURI, relativeURI, options) {
       const schemelessOptions = options ? Object.assign({ scheme: "null" }, options) : { scheme: "null" };
       const resolved = resolveComponent(parse3(baseURI, schemelessOptions), parse3(relativeURI, schemelessOptions), schemelessOptions, true);
       schemelessOptions.skipEscape = true;
@@ -3810,7 +3810,7 @@ var require_fast_uri = __commonJS({
     var fastUri = {
       SCHEMES,
       normalize,
-      resolve: resolve3,
+      resolve: resolve4,
       resolveComponent,
       equal,
       serialize,
@@ -18889,7 +18889,7 @@ var Protocol = class {
           return;
         }
         const pollInterval = task2.pollInterval ?? this._options?.defaultTaskPollInterval ?? 1e3;
-        await new Promise((resolve3) => setTimeout(resolve3, pollInterval));
+        await new Promise((resolve4) => setTimeout(resolve4, pollInterval));
         options?.signal?.throwIfAborted();
       }
     } catch (error2) {
@@ -18906,7 +18906,7 @@ var Protocol = class {
    */
   request(request, resultSchema, options) {
     const { relatedRequestId, resumptionToken, onresumptiontoken, task, relatedTask } = options ?? {};
-    return new Promise((resolve3, reject) => {
+    return new Promise((resolve4, reject) => {
       const earlyReject = (error2) => {
         reject(error2);
       };
@@ -18984,7 +18984,7 @@ var Protocol = class {
           if (!parseResult.success) {
             reject(parseResult.error);
           } else {
-            resolve3(parseResult.data);
+            resolve4(parseResult.data);
           }
         } catch (error2) {
           reject(error2);
@@ -19245,12 +19245,12 @@ var Protocol = class {
       }
     } catch {
     }
-    return new Promise((resolve3, reject) => {
+    return new Promise((resolve4, reject) => {
       if (signal.aborted) {
         reject(new McpError(ErrorCode.InvalidRequest, "Request cancelled"));
         return;
       }
-      const timeoutId = setTimeout(resolve3, interval);
+      const timeoutId = setTimeout(resolve4, interval);
       signal.addEventListener("abort", () => {
         clearTimeout(timeoutId);
         reject(new McpError(ErrorCode.InvalidRequest, "Request cancelled"));
@@ -20350,7 +20350,7 @@ var McpServer = class {
     let task = createTaskResult.task;
     const pollInterval = task.pollInterval ?? 5e3;
     while (task.status !== "completed" && task.status !== "failed" && task.status !== "cancelled") {
-      await new Promise((resolve3) => setTimeout(resolve3, pollInterval));
+      await new Promise((resolve4) => setTimeout(resolve4, pollInterval));
       const updatedTask = await extra.taskStore.getTask(taskId);
       if (!updatedTask) {
         throw new McpError(ErrorCode.InternalError, `Task ${taskId} not found during polling`);
@@ -20999,12 +20999,12 @@ var StdioServerTransport = class {
     this.onclose?.();
   }
   send(message) {
-    return new Promise((resolve3) => {
+    return new Promise((resolve4) => {
       const json = serializeMessage(message);
       if (this._stdout.write(json)) {
-        resolve3();
+        resolve4();
       } else {
-        this._stdout.once("drain", resolve3);
+        this._stdout.once("drain", resolve4);
       }
     });
   }
@@ -21194,7 +21194,9 @@ var MutationProposalSchema = external_exports.object({
   hypothesis: HypothesisSchema,
   citations: external_exports.array(external_exports.string()),
   wildness: external_exports.number().min(0).max(1),
-  critic_approved: external_exports.boolean(),
+  // `critic_approved` REMOVED (item 2b.2): the contract required the PROPOSER to
+  // assert the REVIEWER's verdict, and nothing read it. A self-report standing in
+  // for a review is the self-approval vector the review gates exist to prevent.
   // Server-owned: evor_validate_proposals computes gate codes deterministically.
   // Agent must NOT supply internal gate codes; the server populates critic_review.
   critic_review: external_exports.object({
@@ -21295,6 +21297,19 @@ var LessonEntrySchema = external_exports.object({
   citations: external_exports.array(external_exports.string()),
   telemetry_evidence: external_exports.string().optional(),
   tags: external_exports.array(external_exports.string()),
+  // ── Item 5.3: a lesson refuted by measurement must be markable ──────────
+  //
+  // N-02. The r1 entry claiming a latency figure was falsified TWICE — measured
+  // at 81.4ms and 74.85ms — and was never retracted. It was then cited 23 times
+  // across the tree. Overwriting in place is not enough: the refutation needs a
+  // POINTER to the evidence, or the next reader cannot tell a stale claim from a
+  // live one, and the history of having believed it is lost.
+  superseded_by: external_exports.string().optional().describe(
+    "Node or lesson id whose measurement refutes this entry. Set => not a confirmed lesson."
+  ),
+  superseded_reason: external_exports.string().optional().describe(
+    "Why it was superseded, recorded when it was, not reconstructed afterwards."
+  ),
   // Server-owned: filled via now(); defaults to "" to keep stored type as string.
   created_at: ISODate.optional().default("")
 });
@@ -21351,7 +21366,13 @@ var DecisionLogEntrySchema = external_exports.object({
     "record",
     "prune",
     "stop",
-    "meta-evolve"
+    "meta-evolve",
+    // Item 9.4 / L-02: when no monotonic move exists, the system must be able
+    // to SAY so. The charter asserts "a monotonic move always exists" in prose
+    // on AutonomyCharter.invariant, with no code branch — so the one
+    // representable part is the vocabulary: an agent that has proved the
+    // contract unsatisfiable records that, instead of silently asking a human.
+    "contract-infeasible"
   ]),
   rationale: external_exports.string(),
   node_ids: external_exports.array(external_exports.string()),
@@ -21564,6 +21585,88 @@ var SignalSchema = external_exports.object({
   occurrences: external_exports.number().int().min(1),
   first_seen: ISODate,
   last_seen: ISODate
+});
+var RunStatusSchema = external_exports.enum([
+  "initialized",
+  "running",
+  "paused",
+  "completed",
+  "failed"
+]);
+var MissionStatusSchema = external_exports.enum([
+  "draft",
+  "locked",
+  "running",
+  "paused",
+  "completed",
+  "failed",
+  "superseded"
+]);
+var StepStatusSchema = external_exports.enum(["pending", "running", "done", "failed"]);
+var TICK_FINAL_STEP = 9;
+var CampaignSchema = external_exports.object({
+  campaign_id: external_exports.string(),
+  objective: external_exports.string(),
+  created_at: ISODate,
+  /** Attempt ids in the order they were made. */
+  attempt_ids: external_exports.array(external_exports.string()),
+  status: MissionStatusSchema
+});
+var MissionAttemptSchema = external_exports.object({
+  attempt_id: external_exports.string(),
+  campaign_id: external_exports.string(),
+  mission_id: external_exports.string(),
+  /** 1-based; r3 is attempt 3. */
+  ordinal: external_exports.number().int().positive(),
+  started_at: ISODate,
+  ended_at: ISODate.nullable().default(null),
+  /**
+   * Why this attempt ended, recorded WHEN it ended. K-08's supersession reason
+   * was reconstructed afterwards by a human editing JSON in vim, because there
+   * was no field to write it into at the time.
+   */
+  outcome_reason: external_exports.string().nullable().default(null),
+  supersedes_attempt_id: external_exports.string().nullable().default(null)
+});
+var MissionSchema = external_exports.object({
+  mission_id: external_exports.string(),
+  campaign_id: external_exports.string().nullable().default(null),
+  status: MissionStatusSchema,
+  created_at: ISODate,
+  updated_at: ISODate,
+  /** Set when status is `paused` — the origin the pause is walked back to (0.7). */
+  paused_from: MissionStatusSchema.nullable().default(null),
+  paused_at: ISODate.nullable().default(null),
+  paused_by: external_exports.string().nullable().default(null)
+});
+var RunSchema = external_exports.object({
+  run_id: external_exports.string(),
+  mission_id: external_exports.string(),
+  status: RunStatusSchema,
+  tick_count: external_exports.number().int().min(0),
+  frontier_ids: external_exports.array(external_exports.string()),
+  best_score: external_exports.number().nullable().default(null),
+  current_eval_version: external_exports.string().default("v1"),
+  pending_node_ids: external_exports.array(external_exports.string()).default([]),
+  /**
+   * The validated state root, established once at lock time (1.3). Every hook
+   * re-derived this independently from `CLAUDE_PLUGIN_ROOT ?? process.cwd()`,
+   * and when both were wrong all 14 of them read a different project's `.evor/`
+   * for 19 hours without one noticing (Q-01).
+   */
+  state_root: external_exports.string().nullable().default(null),
+  started_at: ISODate.nullable().default(null),
+  ended_at: ISODate.nullable().default(null)
+});
+var TickSchema = external_exports.object({
+  tick: external_exports.number().int().min(0),
+  run_id: external_exports.string(),
+  current_step: external_exports.number().int().min(0).max(TICK_FINAL_STEP),
+  step_status: StepStatusSchema,
+  pending_subagent_ids: external_exports.array(external_exports.string()).default([]),
+  /** Set while the tick waits on something it does not own (2b.3). */
+  blocked: external_exports.object({ on: external_exports.string(), since: ISODate }).nullable().default(null),
+  started_at: ISODate.nullable().default(null)
 });
 
 // src/tree-store.ts
@@ -21817,6 +21920,13 @@ function callBridge(scriptName, args, opts) {
 }
 
 // src/tools/node-ref.ts
+function tryResolveNodeRef(runId, ref, missionId) {
+  try {
+    return resolveNodeRef(runId, ref, missionId);
+  } catch {
+    return null;
+  }
+}
 function resolveNodeRef(runId, ref, missionId) {
   if (!ref) return ref;
   let nodes;
@@ -21837,7 +21947,10 @@ function resolveNodeRef(runId, ref, missionId) {
       if (node && node.name === base) return node.id;
     }
   }
-  return ref;
+  if (Object.keys(nodes).length === 0) return ref;
+  throw new Error(
+    `node '${ref}' is not in this run's tree. Check the name with evor_tree_read. The tree lists ${Object.keys(nodes).length} node(s) and none of them claims this reference; resolving it to itself would mint a second identity for a node that already has one, which is how a node's telemetry becomes invisible to the gate that scores it.`
+  );
 }
 function nameForId(runId, id, missionId) {
   if (!id) return id;
@@ -21992,30 +22105,40 @@ function registerIntegrityTools(server) {
 }
 
 // src/tools/record.ts
+function defaultRunState(runId) {
+  return {
+    run_id: runId,
+    // 1.4 then 1.9b. This was `"running"` — a run whose state file had never
+    // been written, or had been corrupted, reported itself as LIVE. That is A6:
+    // absence of state read as liveness.
+    //
+    // 1.4 made it `"initialized"`; 1.9b retires the field entirely. AF3 §4.1: a
+    // new FSM must REPLACE a field, never accompany it, and `run-state.status`
+    // duplicated the mission's — it "was wrong in all three field runs". Mission
+    // state is now the single lifecycle state, driven server-side by
+    // `evor_run_start` and read by the three stop-hook gates (1.9c).
+    //
+    // Keeping the key here is what would make it a fifth status field, which AF3
+    // names as the highest-probability failure mode of this whole redesign. The
+    // key is OMITTED rather than set undefined, so `"status" in state` is false
+    // and a reader cannot mistake "present but empty" for "declared".
+    tick_count: 0,
+    best_score: null,
+    frontier_ids: [],
+    current_eval_version: "v1",
+    pending_node_ids: []
+  };
+}
 function readRunState(runStatePath, runId) {
-  if (!(0, import_fs5.existsSync)(runStatePath)) {
-    return {
-      run_id: runId,
-      status: "running",
-      tick_count: 0,
-      best_score: null,
-      frontier_ids: [],
-      current_eval_version: "v1",
-      pending_node_ids: []
-    };
-  }
+  if (!(0, import_fs5.existsSync)(runStatePath)) return defaultRunState(runId);
   try {
     return JSON.parse((0, import_fs5.readFileSync)(runStatePath, "utf8"));
-  } catch {
-    return {
-      run_id: runId,
-      status: "running",
-      tick_count: 0,
-      best_score: null,
-      frontier_ids: [],
-      current_eval_version: "v1",
-      pending_node_ids: []
-    };
+  } catch (err3) {
+    process.stderr.write(
+      `[evor] run-state unreadable at ${runStatePath}: ${String(err3)} \u2014 treating as uninitialized
+`
+    );
+    return defaultRunState(runId);
   }
 }
 function writeRunState(runStatePath, state) {
@@ -22520,18 +22643,24 @@ var import_fs6 = require("fs");
 var import_path7 = require("path");
 
 // src/tool-result.ts
-function wrap(payload) {
-  return { content: [{ type: "text", text: JSON.stringify(payload) }] };
+function wrap(payload, isError = false) {
+  const result = { content: [{ type: "text", text: JSON.stringify(payload) }] };
+  if (isError) result.isError = true;
+  return result;
 }
 function ok(data) {
   if (data === void 0 || data === null) return wrap({ ok: true });
   if (typeof data === "object" && !Array.isArray(data)) {
-    return wrap({ ok: true, ...data });
+    const payload = data;
+    if (payload.ok === false) {
+      return wrap(payload, true);
+    }
+    return wrap({ ok: true, ...payload });
   }
   return wrap({ ok: true, data });
 }
 function err(message) {
-  return wrap({ ok: false, error: message });
+  return wrap({ ok: false, error: message }, true);
 }
 
 // src/tools/wiki.ts
@@ -22646,10 +22775,10 @@ function loadCorpus(indexPath) {
   } catch {
     return { mtime: 0, generation: wikiGeneration, entries: [], entryVecs: [], df: /* @__PURE__ */ new Map(), N: 0 };
   }
-  const cached2 = idfCache.get(indexPath);
-  if (cached2 && cached2.mtime === mtime && cached2.generation === wikiGeneration) {
+  const cached3 = idfCache.get(indexPath);
+  if (cached3 && cached3.mtime === mtime && cached3.generation === wikiGeneration) {
     _wikiCacheStats.hits++;
-    return cached2;
+    return cached3;
   }
   _wikiCacheStats.misses++;
   const entries = [];
@@ -22687,10 +22816,21 @@ function loadCorpus(indexPath) {
   idfCache.set(indexPath, result);
   return result;
 }
-function wikiAdd(runId, entry, missionId) {
+function wikiAdd(runId, entry, missionId, opts) {
   const paths = resolveRunPaths(runId, missionId);
   const evorRoot = getEvorRoot();
   const wikiRoot = (0, import_path7.join)(evorRoot, "wiki");
+  let citation_status;
+  if (opts?.resolveCitation) {
+    citation_status = {};
+    for (const citation of entry.citations ?? []) {
+      try {
+        citation_status[citation] = opts.resolveCitation(citation);
+      } catch (err3) {
+        citation_status[citation] = { resolved: false, title: `resolver error: ${String(err3)}` };
+      }
+    }
+  }
   const rendered = renderLesson(entry);
   (0, import_fs6.mkdirSync)(wikiRoot, { recursive: true });
   (0, import_fs6.writeFileSync)((0, import_path7.join)(wikiRoot, `${entry.lesson_id}.md`), rendered, "utf8");
@@ -22699,7 +22839,7 @@ function wikiAdd(runId, entry, missionId) {
   const runWikiDir = (0, import_path7.join)(paths.runDir, "wiki");
   (0, import_fs6.mkdirSync)(runWikiDir, { recursive: true });
   (0, import_fs6.writeFileSync)((0, import_path7.join)(runWikiDir, `${entry.lesson_id}.md`), rendered, "utf8");
-  return { lessonId: entry.lesson_id, indexPath };
+  return { lessonId: entry.lesson_id, indexPath, citation_status };
 }
 function wikiQuery(query, opts) {
   const evorRoot = getEvorRoot();
@@ -22721,6 +22861,7 @@ function wikiQuery(query, opts) {
     }
     if (opts?.family && entry.approach_family !== opts.family) continue;
     if (opts?.confirmedOnly && entry.hypothesis_verdict !== "confirmed") continue;
+    if (opts?.confirmedOnly && entry.superseded_by) continue;
     if (keywords.length === 0) {
       scored.push({ hits: 0, createdAt: entry.created_at, entry });
       continue;
@@ -22838,14 +22979,91 @@ function registerWikiTools(server) {
 }
 
 // src/tools/state.ts
+var import_fs8 = require("fs");
+var import_path9 = require("path");
+
+// src/fsm.ts
 var import_fs7 = require("fs");
 var import_path8 = require("path");
+var import_meta = {};
+function locateContractsDir() {
+  const here = typeof __dirname !== "undefined" ? __dirname : (0, import_path8.dirname)(new URL(".", import_meta.url).pathname);
+  return (0, import_path8.resolve)(here, "..", "..", "contracts");
+}
+var TABLE_PATH = (0, import_path8.join)(locateContractsDir(), "state-machines.json");
+var cached2 = null;
+function loadTable() {
+  if (!cached2) cached2 = JSON.parse((0, import_fs7.readFileSync)(TABLE_PATH, "utf8"));
+  return cached2;
+}
+function machine(entity) {
+  const m = loadTable().machines[entity];
+  if (!m) throw new Error(`no state machine for '${entity}'; known: ${Object.keys(loadTable().machines).join(", ")}`);
+  return m;
+}
+function initialState(entity) {
+  return machine(entity).initial;
+}
+function isTerminal2(entity, state) {
+  return machine(entity).terminal.includes(state);
+}
+function nextState(entity, state, event) {
+  return machine(entity).states[state]?.on?.[event]?.to;
+}
+function reachableFrom(entity, state) {
+  return [...new Set(Object.values(machine(entity).states[state]?.on ?? {}).map((e) => e.to))].sort();
+}
+var IllegalTransition = class extends Error {
+};
+function assertReachable(entity, from, to) {
+  if (from === to) return;
+  if (!machine(entity).states[to]) {
+    throw new IllegalTransition(
+      `${entity}: '${to}' is not a state. Known: ${Object.keys(machine(entity).states).join(", ")}`
+    );
+  }
+  const allowed = reachableFrom(entity, from);
+  if (!allowed.includes(to)) {
+    throw new IllegalTransition(
+      `${entity}: '${from}' -> '${to}' is not a legal transition. From '${from}' you may reach: ${allowed.join(", ") || "(terminal \u2014 nothing)"}`
+    );
+  }
+}
+function maxDwellSeconds(entity, state) {
+  const v = machine(entity).states[state]?.max_dwell_s;
+  return v === void 0 ? null : v;
+}
+function isStale(entity, state, enteredAt, now = Date.now()) {
+  const limit = maxDwellSeconds(entity, state);
+  if (limit === null || !enteredAt) return false;
+  const started = Date.parse(enteredAt);
+  if (Number.isNaN(started)) return false;
+  return (now - started) / 1e3 > limit;
+}
+
+// src/tools/state.ts
 var TickStateSchema = external_exports.object({
   tick: external_exports.number().int().min(0).describe("Current tick number"),
   current_step: external_exports.number().int().min(0).describe("Step within the tick (0-indexed)"),
   step_status: external_exports.enum(["pending", "running", "done", "failed"]).describe("Status of current_step"),
   step_outputs: external_exports.record(external_exports.string(), external_exports.unknown()).optional().describe("Keyed outputs produced by completed steps"),
-  updated_at: external_exports.string().optional().describe("ISO 8601 timestamp of last update")
+  updated_at: external_exports.string().optional().describe("ISO 8601 timestamp of last update"),
+  // ── Item 2b.3: name the wait ────────────────────────────────────────────
+  //
+  // `ARCHITECTURE.md:134` and `skills/evor/SKILL.md` told agents to idle on
+  // `job_complete` / `self_heal_event` signals. Those events have ZERO producers
+  // anywhere in the codebase — agents were instructed to wait for something
+  // nobody emits, so the choice was poll or guess.
+  //
+  // Blocking is a HOST affordance and stays that way: `Monitor` and
+  // `TaskOutput` already do it properly. What was ours to provide is a durable
+  // statement of WHAT is being waited on, so a tick that is waiting is
+  // distinguishable from one that has stalled — which is the difference C-05
+  // and 3.3's `max_dwell_s` both turn on.
+  blocked: external_exports.object({
+    on: external_exports.string().describe("What is awaited, e.g. 'artifact:forge-report.json' or 'job:abc123'"),
+    since: external_exports.string().describe("ISO 8601 \u2014 when the wait began, so staleness is computable")
+  }).nullable().optional().describe("Set while the tick waits on something it does not own. null = not waiting.")
 });
 var RunStatePatchSchema = external_exports.object({
   status: external_exports.enum(["initialized", "running", "paused", "completed", "failed"]).optional().describe("Run lifecycle status"),
@@ -22867,6 +23085,15 @@ var RunStatePatchSchema = external_exports.object({
     external_exports.enum(["draft", "running", "paused", "completed", "failed"])
   ).optional().describe(
     "Mission lifecycle state (draft, locked, running, paused, completed, failed). If set, patches the mission's status (gate: draft\u2192locked requires contract validation)."
+  ),
+  mission_status_reason: external_exports.string().optional().describe(
+    "Why a mission reached this status. Recorded with the transition. The field run's reason was typed into the artifact by hand 14h39m later, because the tool surface had no way to express it (I-11)."
+  ),
+  superseded_by: external_exports.string().optional().describe(
+    "Mission id that supersedes this one. r1 -> r2 -> r3 were three attempts at one goal and there was no supported way to link them, so the link was hand-written into the state file after the fact."
+  ),
+  reason: external_exports.string().optional().describe(
+    "Why this transition is being made. Recorded in transitions.jsonl at the moment of the write, never backfilled. K-08's supersession reason had to be reconstructed afterwards by a human editing JSON in vim, because nothing captured it when it happened."
   ),
   active_run: external_exports.object({
     mission_id: external_exports.string(),
@@ -22895,24 +23122,128 @@ var RunStatePatchSchema = external_exports.object({
   }).optional().describe(
     "When present, compute bias=(predicted-actual)/(predicted+1e-9) and accumulate into prediction_bias_history (rolling avg_bias + n_samples) server-side. Must not be set together with a direct prediction_bias_history write."
   )
-});
+}).strict();
 function stateRead(runId, missionId) {
   const paths = resolveRunPaths(runId, missionId);
   const state = readRunState(paths.runStatePath, runId);
-  const tickStatePath = (0, import_path8.join)(paths.runDir, "tick-state.json");
-  if ((0, import_fs7.existsSync)(tickStatePath)) {
+  const tickStatePath = (0, import_path9.join)(paths.runDir, "tick-state.json");
+  if ((0, import_fs8.existsSync)(tickStatePath)) {
     try {
-      state.tick_state = JSON.parse((0, import_fs7.readFileSync)(tickStatePath, "utf8"));
+      state.tick_state = JSON.parse((0, import_fs8.readFileSync)(tickStatePath, "utf8"));
     } catch {
+    }
+  }
+  const tick = state.tick_state;
+  if (tick) {
+    const stepStatus = String(tick.step_status ?? "");
+    const enteredAt = tick.entered_at ?? tick.updated_at ?? tick.started_at;
+    if (stepStatus && enteredAt && isStale("tick", stepStatus, enteredAt)) {
+      state.stalled = true;
+      const limit = maxDwellSeconds("tick", stepStatus);
+      const ageS = Math.round((Date.now() - Date.parse(enteredAt)) / 1e3);
+      state.stall_reason = `tick ${tick.tick ?? "?"} has been at step ${tick.current_step ?? "?"} (step_status="${stepStatus}") for ${Math.round(ageS / 60)} min, past its ${limit}s limit for that state`;
+    } else {
+      state.stalled = false;
     }
   }
   return state;
 }
+function claimRunningMission(runDir, missionId) {
+  const runsRoot = (0, import_path9.dirname)((0, import_path9.dirname)(runDir));
+  const claimPath = (0, import_path9.join)(runsRoot, "running-mission.json");
+  let holder = null;
+  if ((0, import_fs8.existsSync)(claimPath)) {
+    try {
+      holder = String(JSON.parse((0, import_fs8.readFileSync)(claimPath, "utf8"))?.mission_id ?? "") || null;
+    } catch {
+      holder = null;
+    }
+  }
+  if (holder && holder !== missionId && missionStillRunning(runsRoot, holder)) {
+    throw new Error(
+      `refusing to mark '${missionId}' running: '${holder}' already holds the running claim in this .evor/ root. Two missions advancing concurrently each compute a frontier the other invalidates. Complete, fail or pause '${holder}' first.`
+    );
+  }
+  try {
+    (0, import_fs8.writeFileSync)(
+      claimPath,
+      JSON.stringify({ mission_id: missionId, claimed_at: (/* @__PURE__ */ new Date()).toISOString() }, null, 2),
+      "utf8"
+    );
+  } catch {
+  }
+}
+function releaseRunningMission(runDir, missionId) {
+  const claimPath = (0, import_path9.join)((0, import_path9.dirname)((0, import_path9.dirname)(runDir)), "running-mission.json");
+  try {
+    if (!(0, import_fs8.existsSync)(claimPath)) return;
+    if (String(JSON.parse((0, import_fs8.readFileSync)(claimPath, "utf8"))?.mission_id ?? "") !== missionId) return;
+    (0, import_fs8.unlinkSync)(claimPath);
+  } catch {
+  }
+}
+function missionStillRunning(runsRoot, missionId) {
+  try {
+    const missionDir = (0, import_path9.join)(runsRoot, missionId);
+    for (const run of (0, import_fs8.readdirSync)(missionDir, { withFileTypes: true })) {
+      if (!run.isDirectory()) continue;
+      const msPath = (0, import_path9.join)(missionDir, run.name, "mission-state.json");
+      if (!(0, import_fs8.existsSync)(msPath)) continue;
+      try {
+        if (String(JSON.parse((0, import_fs8.readFileSync)(msPath, "utf8"))?.status ?? "") === "running") return true;
+      } catch {
+      }
+    }
+  } catch {
+  }
+  return false;
+}
+function appendDecision(runDir, what, why) {
+  try {
+    const line = `- \`${(/* @__PURE__ */ new Date()).toISOString()}\` **${what}** \u2014 ${why}
+`;
+    (0, import_fs8.appendFileSync)((0, import_path9.join)(runDir, "decision-log.md"), line);
+  } catch {
+  }
+}
+function appendTransition(runDir, record2) {
+  try {
+    (0, import_fs8.appendFileSync)(
+      (0, import_path9.join)(runDir, "transitions.jsonl"),
+      JSON.stringify({ at: (/* @__PURE__ */ new Date()).toISOString(), ...record2 }) + "\n"
+    );
+  } catch {
+  }
+}
+function assertStateRootOutsidePlugin(runDir) {
+  const resolved = (0, import_path9.resolve)(runDir);
+  const parts = resolved.split(import_path9.sep);
+  const pluginsAt = parts.lastIndexOf("plugins");
+  if (pluginsAt >= 0 && ["cache", "marketplaces"].includes(parts[pluginsAt + 1] ?? "")) {
+    throw new Error(
+      `refusing to write run state inside the plugin install (${parts.slice(0, pluginsAt + 2).join(import_path9.sep)}). A run recorded there is destroyed by the next plugin update and leaks into every project that installs the plugin \u2014 which is how the decoy .evor/ that Q-01's hooks read for 19 hours came to exist. Set EVOR_ROOT to a directory in the PROJECT, or run from the project directory.`
+    );
+  }
+  for (const root of [process.env.CLAUDE_PLUGIN_ROOT, process.env.EVOR_PLUGIN_ROOT].filter(Boolean)) {
+    const r = (0, import_path9.resolve)(root);
+    if (resolved === r || resolved.startsWith(r + import_path9.sep)) {
+      throw new Error(
+        `refusing to write run state inside the plugin install (${r}). Set EVOR_ROOT to a directory in the PROJECT, or run from the project directory.`
+      );
+    }
+  }
+}
 function stateWrite(runId, patch, missionId) {
   const paths = ensureRunDirs(runId, missionId);
+  assertStateRootOutsidePlugin(paths.runDir);
   const {
     strategy: strategyDelta,
     mission_status: missionStatus,
+    // Destructured so the reason lands in transitions.jsonl and NOT in
+    // run-state.json — it explains one edge, it is not run state.
+    reason: patchReason,
+    mission_status_reason: missionStatusReason,
+    superseded_by: supersededBy,
     active_run: activeRun,
     tick_state: tickState,
     prediction_bias_sample: biasSample,
@@ -22940,49 +23271,83 @@ function stateWrite(runId, patch, missionId) {
   writeRunState(paths.runStatePath, updated);
   if (strategyDelta && Object.keys(strategyDelta).length > 0) {
     let currentStrategy = {};
-    if ((0, import_fs7.existsSync)(paths.strategyPath)) {
+    if ((0, import_fs8.existsSync)(paths.strategyPath)) {
       try {
-        currentStrategy = JSON.parse((0, import_fs7.readFileSync)(paths.strategyPath, "utf8"));
+        currentStrategy = JSON.parse((0, import_fs8.readFileSync)(paths.strategyPath, "utf8"));
       } catch {
       }
     }
     const updatedStrategy = { ...currentStrategy, ...strategyDelta };
     const strategyTmpPath = `${paths.strategyPath}.tmp`;
-    (0, import_fs7.writeFileSync)(strategyTmpPath, JSON.stringify(updatedStrategy, null, 2), "utf8");
-    (0, import_fs7.renameSync)(strategyTmpPath, paths.strategyPath);
+    (0, import_fs8.writeFileSync)(strategyTmpPath, JSON.stringify(updatedStrategy, null, 2), "utf8");
+    (0, import_fs8.renameSync)(strategyTmpPath, paths.strategyPath);
   }
   if (missionStatus !== void 0) {
-    const missionStatePath = (0, import_path8.join)(paths.runDir, "mission-state.json");
+    const missionStatePath = (0, import_path9.join)(paths.runDir, "mission-state.json");
     let ms = {};
-    if ((0, import_fs7.existsSync)(missionStatePath)) {
+    if ((0, import_fs8.existsSync)(missionStatePath)) {
       try {
-        ms = JSON.parse((0, import_fs7.readFileSync)(missionStatePath, "utf8"));
+        ms = JSON.parse((0, import_fs8.readFileSync)(missionStatePath, "utf8"));
       } catch {
       }
     }
+    const from = String(ms.status ?? initialState("mission"));
+    assertReachable("mission", from, missionStatus);
+    const thisMission = missionId ?? String(ms.mission_id ?? "");
+    if (missionStatus === "running") {
+      claimRunningMission(paths.runDir, thisMission);
+    } else if (isTerminal2("mission", missionStatus) || missionStatus === "paused") {
+      releaseRunningMission(paths.runDir, thisMission);
+    }
+    const now = (/* @__PURE__ */ new Date()).toISOString();
+    const history = Array.isArray(ms.status_history) ? ms.status_history : [];
+    history.push({
+      at: now,
+      from,
+      to: missionStatus,
+      actor: "evor_state_write",
+      reason: missionStatusReason ?? patchReason ?? null
+    });
+    ms.status_history = history;
     ms.status = missionStatus;
-    ms.updated_at = (/* @__PURE__ */ new Date()).toISOString();
+    ms.updated_at = now;
+    if (missionStatusReason !== void 0) ms.status_reason = missionStatusReason;
+    if (supersededBy !== void 0) ms.superseded_by = supersededBy;
+    ms.entered_at = now;
     const msTmp = `${missionStatePath}.tmp`;
-    (0, import_fs7.writeFileSync)(msTmp, JSON.stringify(ms, null, 2), "utf8");
-    (0, import_fs7.renameSync)(msTmp, missionStatePath);
+    (0, import_fs8.writeFileSync)(msTmp, JSON.stringify(ms, null, 2), "utf8");
+    (0, import_fs8.renameSync)(msTmp, missionStatePath);
+    appendDecision(
+      paths.runDir,
+      `mission ${from} -> ${missionStatus}`,
+      String(missionStatusReason ?? patchReason ?? "(no reason given)")
+    );
+    appendTransition(paths.runDir, {
+      entity: "mission",
+      entity_id: missionId ?? String(ms.mission_id ?? ""),
+      from,
+      to: missionStatus,
+      actor: "evor_state_write",
+      reason: typeof patchReason === "string" ? patchReason : null
+    });
   }
   if (activeRun !== void 0) {
     const evorRoot = getEvorRoot();
-    (0, import_fs7.mkdirSync)(evorRoot, { recursive: true });
+    (0, import_fs8.mkdirSync)(evorRoot, { recursive: true });
     const arPath = getActiveRunPath();
     const arTmp = `${arPath}.tmp`;
-    (0, import_fs7.writeFileSync)(arTmp, JSON.stringify(activeRun, null, 2), "utf8");
-    (0, import_fs7.renameSync)(arTmp, arPath);
+    (0, import_fs8.writeFileSync)(arTmp, JSON.stringify(activeRun, null, 2), "utf8");
+    (0, import_fs8.renameSync)(arTmp, arPath);
   }
   if (tickState !== void 0) {
-    const tickStatePath = (0, import_path8.join)(paths.runDir, "tick-state.json");
+    const tickStatePath = (0, import_path9.join)(paths.runDir, "tick-state.json");
     const tsData = {
       ...tickState,
       updated_at: tickState.updated_at ?? (/* @__PURE__ */ new Date()).toISOString()
     };
     const tsTmp = `${tickStatePath}.tmp`;
-    (0, import_fs7.writeFileSync)(tsTmp, JSON.stringify(tsData, null, 2), "utf8");
-    (0, import_fs7.renameSync)(tsTmp, tickStatePath);
+    (0, import_fs8.writeFileSync)(tsTmp, JSON.stringify(tsData, null, 2), "utf8");
+    (0, import_fs8.renameSync)(tsTmp, tickStatePath);
   }
   return updated;
 }
@@ -23016,8 +23381,8 @@ function checkPlateauCondition(runId, missionId) {
 }
 function readGoalContract(runId, missionId) {
   const paths = resolveRunPaths(runId, missionId);
-  const contractPath = (0, import_path8.join)(paths.runDir, "goal-contract.json");
-  if (!(0, import_fs7.existsSync)(contractPath)) {
+  const contractPath = (0, import_path9.join)(paths.runDir, "goal-contract.json");
+  if (!(0, import_fs8.existsSync)(contractPath)) {
     return {
       ok: false,
       error: "no goal contract for this run \u2014 initialize the run with evor_init_run first."
@@ -23025,7 +23390,7 @@ function readGoalContract(runId, missionId) {
   }
   let raw;
   try {
-    raw = JSON.parse((0, import_fs7.readFileSync)(contractPath, "utf8"));
+    raw = JSON.parse((0, import_fs8.readFileSync)(contractPath, "utf8"));
   } catch {
     return {
       ok: false,
@@ -23059,19 +23424,19 @@ function lockMission(runId, missionId) {
       validation_report: validationReport
     };
   }
-  const missionStatePath = (0, import_path8.join)(paths.runDir, "mission-state.json");
+  const missionStatePath = (0, import_path9.join)(paths.runDir, "mission-state.json");
   let ms = {};
-  if ((0, import_fs7.existsSync)(missionStatePath)) {
+  if ((0, import_fs8.existsSync)(missionStatePath)) {
     try {
-      ms = JSON.parse((0, import_fs7.readFileSync)(missionStatePath, "utf8"));
+      ms = JSON.parse((0, import_fs8.readFileSync)(missionStatePath, "utf8"));
     } catch {
     }
   }
   ms.status = "locked";
   ms.updated_at = (/* @__PURE__ */ new Date()).toISOString();
   const msTmp = `${missionStatePath}.tmp`;
-  (0, import_fs7.writeFileSync)(msTmp, JSON.stringify(ms, null, 2), "utf8");
-  (0, import_fs7.renameSync)(msTmp, missionStatePath);
+  (0, import_fs8.writeFileSync)(msTmp, JSON.stringify(ms, null, 2), "utf8");
+  (0, import_fs8.renameSync)(msTmp, missionStatePath);
   return {
     ok: true,
     run_id: runId,
@@ -23226,17 +23591,21 @@ function registerStateTools(server) {
   );
 }
 
+// src/tools/cite.ts
+var import_fs10 = require("fs");
+var import_path11 = require("path");
+
 // src/active-run.ts
-var import_fs8 = require("fs");
-var import_path9 = require("path");
+var import_fs9 = require("fs");
+var import_path10 = require("path");
 function resolveRunId(provided) {
   const given = (provided ?? "").trim();
   if (given) return given;
   if (process.env.EVOR_ACTIVE_RUN_ID) return process.env.EVOR_ACTIVE_RUN_ID;
   try {
-    const file = (0, import_path9.join)(getEvorRoot(), "active-run.json");
-    if (!(0, import_fs8.existsSync)(file)) return "";
-    const record2 = JSON.parse((0, import_fs8.readFileSync)(file, "utf8"));
+    const file = (0, import_path10.join)(getEvorRoot(), "active-run.json");
+    if (!(0, import_fs9.existsSync)(file)) return "";
+    const record2 = JSON.parse((0, import_fs9.readFileSync)(file, "utf8"));
     return String(record2?.run_id ?? "");
   } catch {
     return "";
@@ -23244,12 +23613,40 @@ function resolveRunId(provided) {
 }
 
 // src/tools/cite.ts
+function appendPendingCitation(runId, ref, citation, missionId) {
+  try {
+    const paths = ensureRunDirs(runId, missionId);
+    const file = (0, import_path11.join)(paths.runDir, "pending-citations.json");
+    let store = {};
+    if ((0, import_fs10.existsSync)(file)) {
+      try {
+        store = JSON.parse((0, import_fs10.readFileSync)(file, "utf8"));
+      } catch {
+        store = {};
+      }
+    }
+    const existing = Array.isArray(store[ref]) ? store[ref] : [];
+    const citations = existing.includes(citation) ? existing : [...existing, citation];
+    store[ref] = citations;
+    const tmp = `${file}.tmp`;
+    (0, import_fs10.writeFileSync)(tmp, JSON.stringify(store, null, 2), "utf8");
+    (0, import_fs10.renameSync)(tmp, file);
+    return { ok: true, citations, pending: true };
+  } catch (err3) {
+    return { ok: false, error: `could not record a pending citation for '${ref}': ${String(err3)}` };
+  }
+}
 function addCitation(runId, nodeId, citation, missionId) {
-  const resolvedId = resolveNodeRef(runId, nodeId, missionId);
+  let resolvedId;
+  try {
+    resolvedId = resolveNodeRef(runId, nodeId, missionId);
+  } catch {
+    return appendPendingCitation(runId, nodeId, citation, missionId);
+  }
   const nodes = readTree(runId, missionId);
   const node = nodes[resolvedId];
   if (!node) {
-    return { ok: false, error: `node '${nodeId}' not found in this run's tree \u2014 check the name with evor_tree_read.` };
+    return appendPendingCitation(runId, nodeId, citation, missionId);
   }
   if (node.citations.includes(citation)) {
     return { ok: true, citations: node.citations };
@@ -23290,13 +23687,13 @@ function registerCiteTools(server) {
 }
 
 // src/tools/telemetry.ts
-var import_fs9 = require("fs");
-var import_path10 = require("path");
+var import_fs11 = require("fs");
+var import_path12 = require("path");
 function telemetryIngest(runId, nodeId, records, missionId) {
   const paths = resolveRunPaths(runId, missionId);
-  const nodeDir = (0, import_path10.join)(paths.nodesDir, nodeId);
-  if (!(0, import_fs9.existsSync)(nodeDir)) {
-    (0, import_fs9.mkdirSync)(nodeDir, { recursive: true });
+  const nodeDir = (0, import_path12.join)(paths.nodesDir, nodeId);
+  if (!(0, import_fs11.existsSync)(nodeDir)) {
+    (0, import_fs11.mkdirSync)(nodeDir, { recursive: true });
   }
   const now = (/* @__PURE__ */ new Date()).toISOString();
   const filled = records.map((r) => ({
@@ -23305,9 +23702,9 @@ function telemetryIngest(runId, nodeId, records, missionId) {
     run_id: r.run_id || runId,
     timestamp: r.timestamp || now
   }));
-  const telemetryPath = (0, import_path10.join)(nodeDir, "telemetry.jsonl");
+  const telemetryPath = (0, import_path12.join)(nodeDir, "telemetry.jsonl");
   const lines = filled.map((r) => JSON.stringify(r)).join("\n") + "\n";
-  (0, import_fs9.appendFileSync)(telemetryPath, lines, "utf8");
+  (0, import_fs11.appendFileSync)(telemetryPath, lines, "utf8");
   return { telemetryPath, count: records.length };
 }
 function registerTelemetryTools(server) {
@@ -23336,8 +23733,8 @@ function registerTelemetryTools(server) {
 
 // src/tools/signals.ts
 var import_crypto2 = require("crypto");
-var import_fs10 = require("fs");
-var import_path11 = require("path");
+var import_fs12 = require("fs");
+var import_path13 = require("path");
 var SEVERITY_ORDER = {
   low: 0,
   medium: 1,
@@ -23352,9 +23749,9 @@ function signalId(kind, signature) {
   return `sig-${h}`;
 }
 function loadSignals(signalsPath) {
-  if (!(0, import_fs10.existsSync)(signalsPath)) return [];
+  if (!(0, import_fs12.existsSync)(signalsPath)) return [];
   const out = [];
-  for (const line of (0, import_fs10.readFileSync)(signalsPath, "utf8").split("\n")) {
+  for (const line of (0, import_fs12.readFileSync)(signalsPath, "utf8").split("\n")) {
     const t = line.trim();
     if (!t) continue;
     try {
@@ -23365,35 +23762,35 @@ function loadSignals(signalsPath) {
   return out;
 }
 function atomicWriteJsonl(signalsPath, records) {
-  const dir = (0, import_path11.dirname)(signalsPath);
-  if (!(0, import_fs10.existsSync)(dir)) (0, import_fs10.mkdirSync)(dir, { recursive: true });
+  const dir = (0, import_path13.dirname)(signalsPath);
+  if (!(0, import_fs12.existsSync)(dir)) (0, import_fs12.mkdirSync)(dir, { recursive: true });
   const tmpPath = `${signalsPath}.tmp`;
-  (0, import_fs10.writeFileSync)(tmpPath, records.map((r) => JSON.stringify(r)).join("\n") + "\n", "utf8");
-  (0, import_fs10.renameSync)(tmpPath, signalsPath);
+  (0, import_fs12.writeFileSync)(tmpPath, records.map((r) => JSON.stringify(r)).join("\n") + "\n", "utf8");
+  (0, import_fs12.renameSync)(tmpPath, signalsPath);
 }
 function drainSignalsInbox(runDir, runId, missionId) {
-  const inboxPath = (0, import_path11.join)(runDir, "signals-inbox.jsonl");
-  if (!(0, import_fs10.existsSync)(inboxPath)) return;
+  const inboxPath = (0, import_path13.join)(runDir, "signals-inbox.jsonl");
+  if (!(0, import_fs12.existsSync)(inboxPath)) return;
   const tmpPath = `${inboxPath}.drain-tmp`;
-  if ((0, import_fs10.existsSync)(tmpPath)) {
+  if ((0, import_fs12.existsSync)(tmpPath)) {
     try {
-      (0, import_fs10.unlinkSync)(tmpPath);
+      (0, import_fs12.unlinkSync)(tmpPath);
     } catch {
     }
   }
   try {
-    (0, import_fs10.renameSync)(inboxPath, tmpPath);
+    (0, import_fs12.renameSync)(inboxPath, tmpPath);
   } catch {
     return;
   }
   let lines;
   try {
-    lines = (0, import_fs10.readFileSync)(tmpPath, "utf8").split("\n");
+    lines = (0, import_fs12.readFileSync)(tmpPath, "utf8").split("\n");
   } catch {
     return;
   } finally {
     try {
-      (0, import_fs10.unlinkSync)(tmpPath);
+      (0, import_fs12.unlinkSync)(tmpPath);
     } catch {
     }
   }
@@ -23624,14 +24021,14 @@ function registerSignalTools(server) {
 }
 
 // src/tools/init.ts
-var import_fs11 = require("fs");
-var import_path12 = require("path");
+var import_fs13 = require("fs");
+var import_path14 = require("path");
 var import_os = require("os");
 var import_crypto3 = require("crypto");
 function initRun(answers, opts) {
-  const tmpFile = (0, import_path12.join)((0, import_os.tmpdir)(), `evor-init-answers-${(0, import_crypto3.randomUUID)()}.json`);
+  const tmpFile = (0, import_path14.join)((0, import_os.tmpdir)(), `evor-init-answers-${(0, import_crypto3.randomUUID)()}.json`);
   try {
-    (0, import_fs11.writeFileSync)(tmpFile, JSON.stringify(answers), "utf8");
+    (0, import_fs13.writeFileSync)(tmpFile, JSON.stringify(answers), "utf8");
     const args = ["init-run", "--answers", tmpFile];
     if (opts?.runId) args.push("--run-id", opts.runId);
     if (opts?.missionId) args.push("--mission-id", opts.missionId);
@@ -23646,7 +24043,7 @@ function initRun(answers, opts) {
     return result.data;
   } finally {
     try {
-      (0, import_fs11.unlinkSync)(tmpFile);
+      (0, import_fs13.unlinkSync)(tmpFile);
     } catch {
     }
   }
@@ -23691,8 +24088,8 @@ function registerInitTools(server) {
 }
 
 // src/tools/artifact.ts
-var import_fs12 = require("fs");
-var import_path13 = require("path");
+var import_fs14 = require("fs");
+var import_path15 = require("path");
 var import_os2 = require("os");
 var CONTRACT_VALIDATED_AGENTS = /* @__PURE__ */ new Set([
   "mutagen",
@@ -23718,9 +24115,9 @@ function writeArtifact(runId, tick, agent, payload, kind, partial2, missionId) {
   let tmpDir = null;
   let payloadFile = null;
   try {
-    tmpDir = (0, import_fs12.mkdtempSync)((0, import_path13.join)((0, import_os2.tmpdir)(), "evor-artifact-"));
-    payloadFile = (0, import_path13.join)(tmpDir, "payload.json");
-    (0, import_fs12.writeFileSync)(payloadFile, JSON.stringify(payload), "utf8");
+    tmpDir = (0, import_fs14.mkdtempSync)((0, import_path15.join)((0, import_os2.tmpdir)(), "evor-artifact-"));
+    payloadFile = (0, import_path15.join)(tmpDir, "payload.json");
+    (0, import_fs14.writeFileSync)(payloadFile, JSON.stringify(payload), "utf8");
   } catch (err3) {
     return {
       ok: false,
@@ -23744,11 +24141,11 @@ function writeArtifact(runId, tick, agent, payload, kind, partial2, missionId) {
     result = callBridge("artifact_bridge.py", bridgeArgs);
   } finally {
     try {
-      if (payloadFile) (0, import_fs12.unlinkSync)(payloadFile);
+      if (payloadFile) (0, import_fs14.unlinkSync)(payloadFile);
     } catch {
     }
     try {
-      if (tmpDir) (0, import_fs12.rmdirSync)(tmpDir);
+      if (tmpDir) (0, import_fs14.rmdirSync)(tmpDir);
     } catch {
     }
   }
@@ -23791,7 +24188,88 @@ function readArtifact(runId, tick, agent, kind, partial2, missionId) {
     error: String(data?.error ?? "unknown error from read_artifact_bridge")
   };
 }
+function artifactPathFor(runDir, tick, agent, kind) {
+  const slug = (kind ?? "").replace(/[^a-zA-Z0-9._-]+/g, "-").replace(/^-+|-+$/g, "");
+  const base = (0, import_path15.join)(runDir, "ticks", String(tick));
+  switch (agent) {
+    case "mutagen":
+      return (0, import_path15.join)(base, "mutagen", "proposals.json");
+    case "selector":
+      return (0, import_path15.join)(base, "selector", "verdict.json");
+    case "probe":
+      return (0, import_path15.join)(base, "probe", "findings.json");
+    case "sage":
+      return (0, import_path15.join)(base, "sage", "findings.json");
+    case "sage-junior":
+      return (0, import_path15.join)(base, "sage", "juniors", `${slug || "findings"}.json`);
+    case "forge":
+      return (0, import_path15.join)(base, "forge", "forge-report.json");
+    case "forge-architect":
+      return (0, import_path15.join)(base, "forge", "architect.json");
+    case "forge-critic":
+      return (0, import_path15.join)(base, "forge", "critic.json");
+    case "forge-analyst":
+      return (0, import_path15.join)(base, "forge", "analyst.json");
+    case "acquirer":
+      return (0, import_path15.join)(base, "acquirer", `${slug || "acquisition"}.json`);
+    default:
+      return (0, import_path15.join)(base, agent, `${slug || "artifact"}.json`);
+  }
+}
 function registerArtifactTools(server) {
+  server.tool(
+    "evor_await_artifact",
+    "Record that this tick is WAITING for an artifact, and report whether it has arrived. Does not block \u2014 use Monitor or TaskOutput(block:true) for that. This makes the wait visible in tick-state so a waiting tick is distinguishable from a stalled one.",
+    {
+      run_id: external_exports.string().describe("Active run identifier"),
+      tick: external_exports.number().int().min(0).describe("Tick number"),
+      agent: external_exports.string().describe("Agent whose artifact is awaited, e.g. 'forge'"),
+      kind: external_exports.string().optional().describe("Artifact kind when the agent writes several"),
+      mission_id: external_exports.string().optional().describe("Mission id; resolved from the active run when omitted"),
+      release: external_exports.boolean().optional().describe("Clear the wait instead of declaring one")
+    },
+    async ({ run_id, tick, agent, kind, mission_id, release }) => {
+      const missionId = mission_id ?? process.env.EVOR_MISSION_ID;
+      const paths = resolveRunPaths(run_id, missionId);
+      const tickStatePath = (0, import_path15.join)(paths.runDir, "tick-state.json");
+      let tickState = {};
+      if ((0, import_fs14.existsSync)(tickStatePath)) {
+        try {
+          tickState = JSON.parse((0, import_fs14.readFileSync)(tickStatePath, "utf8"));
+        } catch {
+          tickState = {};
+        }
+      }
+      const artifactPath = artifactPathFor(paths.runDir, tick, agent, kind);
+      const arrived = (0, import_fs14.existsSync)(artifactPath);
+      const waitingOn = `artifact:${agent}${kind ? `/${kind}` : ""}@tick${tick}`;
+      const previous = tickState.blocked ?? null;
+      let blocked = null;
+      if (!release && !arrived) {
+        blocked = {
+          on: waitingOn,
+          since: previous?.on === waitingOn && previous.since ? previous.since : (/* @__PURE__ */ new Date()).toISOString()
+        };
+      }
+      tickState.blocked = blocked;
+      tickState.updated_at = (/* @__PURE__ */ new Date()).toISOString();
+      try {
+        const tmp = `${tickStatePath}.tmp`;
+        (0, import_fs14.writeFileSync)(tmp, JSON.stringify(tickState, null, 2), "utf8");
+        (0, import_fs14.renameSync)(tmp, tickStatePath);
+      } catch (e) {
+        return err(`could not record the wait: ${String(e)}`);
+      }
+      return ok({
+        arrived,
+        waiting_on: blocked?.on ?? null,
+        waiting_since: blocked?.since ?? null,
+        // Told plainly, because the previous instruction was to wait on an event
+        // that does not exist.
+        next: arrived ? "the artifact is present \u2014 read it with evor_read_artifact" : "not yet written. Block with TaskOutput(task_id, block:true) on the agent that owes it, or Monitor the artifact path. Do NOT poll this tool in a loop."
+      });
+    }
+  );
   server.tool(
     "evor_write_artifact",
     [
@@ -23891,20 +24369,20 @@ function registerArtifactTools(server) {
 }
 
 // src/tools/lineage.ts
-var import_fs13 = require("fs");
-var import_path14 = require("path");
+var import_fs15 = require("fs");
+var import_path16 = require("path");
 var import_os3 = require("os");
 function storePatch(runId, nodeId, patchContent, missionId) {
   const paths = resolveRunPaths(runId, missionId);
-  const nodeDir = (0, import_path14.join)(paths.nodesDir, nodeId);
+  const nodeDir = (0, import_path16.join)(paths.nodesDir, nodeId);
   try {
-    if (!(0, import_fs13.existsSync)(nodeDir)) {
-      (0, import_fs13.mkdirSync)(nodeDir, { recursive: true });
+    if (!(0, import_fs15.existsSync)(nodeDir)) {
+      (0, import_fs15.mkdirSync)(nodeDir, { recursive: true });
     }
-    const patchPath = (0, import_path14.join)(nodeDir, "parent.patch");
+    const patchPath = (0, import_path16.join)(nodeDir, "parent.patch");
     const tmpPath = `${patchPath}.tmp`;
-    (0, import_fs13.writeFileSync)(tmpPath, patchContent, "utf8");
-    (0, import_fs13.renameSync)(tmpPath, patchPath);
+    (0, import_fs15.writeFileSync)(tmpPath, patchContent, "utf8");
+    (0, import_fs15.renameSync)(tmpPath, patchPath);
     return { ok: true, patchPath };
   } catch (err3) {
     return {
@@ -23918,9 +24396,9 @@ function writeHandoff(runId, tick, data, missionId) {
   let tmpDir = null;
   let payloadFile = null;
   try {
-    tmpDir = (0, import_fs13.mkdtempSync)((0, import_path14.join)((0, import_os3.tmpdir)(), "evor-handoff-"));
-    payloadFile = (0, import_path14.join)(tmpDir, "payload.json");
-    (0, import_fs13.writeFileSync)(payloadFile, JSON.stringify(data), "utf8");
+    tmpDir = (0, import_fs15.mkdtempSync)((0, import_path16.join)((0, import_os3.tmpdir)(), "evor-handoff-"));
+    payloadFile = (0, import_path16.join)(tmpDir, "payload.json");
+    (0, import_fs15.writeFileSync)(payloadFile, JSON.stringify(data), "utf8");
   } catch (err3) {
     return {
       ok: false,
@@ -23939,11 +24417,11 @@ function writeHandoff(runId, tick, data, missionId) {
     ]);
   } finally {
     try {
-      if (payloadFile) (0, import_fs13.unlinkSync)(payloadFile);
+      if (payloadFile) (0, import_fs15.unlinkSync)(payloadFile);
     } catch {
     }
     try {
-      if (tmpDir) (0, import_fs13.rmdirSync)(tmpDir);
+      if (tmpDir) (0, import_fs15.rmdirSync)(tmpDir);
     } catch {
     }
   }
@@ -24155,9 +24633,9 @@ function registerLineageTools(server) {
 }
 
 // src/tools/compute.ts
-var import_fs14 = require("fs");
+var import_fs16 = require("fs");
 var import_crypto4 = require("crypto");
-var import_path15 = require("path");
+var import_path17 = require("path");
 function ok2(data) {
   return { content: [{ type: "text", text: JSON.stringify(data) }] };
 }
@@ -24302,10 +24780,17 @@ function gotchasList(kind, scope, minConfidence, evorRoot, runDir) {
   return callPythonModule("evor", args, { timeout: 3e4 });
 }
 function lockEvaluate(runId, nodeRef, missionId) {
-  const nodeId = resolveNodeRef(runId, nodeRef, missionId);
-  const worktree = (0, import_path15.join)(getEvorRoot(), "worktrees", nodeId);
-  const evalPath = (0, import_path15.join)(worktree, "evaluate.py");
-  if (!(0, import_fs14.existsSync)(evalPath)) {
+  const nodeId = tryResolveNodeRef(runId, nodeRef, missionId);
+  if (nodeId === null) {
+    return {
+      ok: false,
+      node_name: nodeRef,
+      error: `node '${nodeRef}' is not in this run's tree \u2014 check the name with evor_tree_read.`
+    };
+  }
+  const worktree = (0, import_path17.join)(getEvorRoot(), "worktrees", nodeId);
+  const evalPath = (0, import_path17.join)(worktree, "evaluate.py");
+  if (!(0, import_fs16.existsSync)(evalPath)) {
     return {
       ok: false,
       node_name: nodeRef,
@@ -24315,15 +24800,15 @@ function lockEvaluate(runId, nodeRef, missionId) {
   let contractHash = "";
   try {
     const { runDir } = resolveRunPaths(runId, missionId);
-    const contractPath = (0, import_path15.join)(runDir, "goal-contract.json");
-    if ((0, import_fs14.existsSync)(contractPath)) {
-      const contract = JSON.parse((0, import_fs14.readFileSync)(contractPath, "utf8"));
+    const contractPath = (0, import_path17.join)(runDir, "goal-contract.json");
+    if ((0, import_fs16.existsSync)(contractPath)) {
+      const contract = JSON.parse((0, import_fs16.readFileSync)(contractPath, "utf8"));
       contractHash = typeof contract.eval_script_hash === "string" ? contract.eval_script_hash : "";
     }
   } catch {
   }
   try {
-    const hash = (0, import_crypto4.createHash)("sha256").update((0, import_fs14.readFileSync)(evalPath)).digest("hex");
+    const hash = (0, import_crypto4.createHash)("sha256").update((0, import_fs16.readFileSync)(evalPath)).digest("hex");
     if (contractHash && contractHash !== hash) {
       return {
         ok: false,
@@ -24331,42 +24816,63 @@ function lockEvaluate(runId, nodeRef, missionId) {
         error: "this node's evaluate.py does not match the mission's locked evaluation script \u2014 it must be an exact copy of the canonical evaluator, not a modified or re-authored one"
       };
     }
-    (0, import_fs14.writeFileSync)((0, import_path15.join)(worktree, "evaluate.py.lock"), hash, "utf8");
-    (0, import_fs14.chmodSync)(evalPath, 292);
+    (0, import_fs16.writeFileSync)((0, import_path17.join)(worktree, "evaluate.py.lock"), hash, "utf8");
+    (0, import_fs16.chmodSync)(evalPath, 292);
     return { ok: true, node_name: nodeRef };
   } catch {
     return { ok: false, node_name: nodeRef, error: "could not lock evaluate.py" };
   }
 }
 function verifyArtifacts(runId, nodeRef, missionId) {
-  const nodeId = resolveNodeRef(runId, nodeRef, missionId);
-  const nodeDir = (0, import_path15.join)(resolveRunPaths(runId, missionId).runDir, "nodes", nodeId);
+  const nodeId = tryResolveNodeRef(runId, nodeRef, missionId);
+  const runDir = resolveRunPaths(runId, missionId).runDir;
+  const identities = [nodeId, nodeRef].filter((v, i, a) => !!v && a.indexOf(v) === i);
   const present = (rel, minBytes) => {
-    try {
-      const p = (0, import_path15.join)(nodeDir, rel);
-      return (0, import_fs14.existsSync)(p) && (0, import_fs14.statSync)(p).size > minBytes;
-    } catch {
-      return false;
+    for (const identity of identities) {
+      try {
+        const p = (0, import_path17.join)(runDir, "nodes", identity, rel);
+        if ((0, import_fs16.existsSync)(p) && (0, import_fs16.statSync)(p).size > minBytes) return true;
+      } catch {
+      }
     }
+    return false;
   };
   const has_results = present("results.json", 2);
   const has_telemetry = present("telemetry.jsonl", 0);
   return { ok: has_results && has_telemetry, node_name: nodeRef, has_results, has_telemetry };
 }
+function appendDecision2(runDir, what, why) {
+  try {
+    (0, import_fs16.appendFileSync)(
+      `${runDir}/decision-log.md`,
+      `- \`${(/* @__PURE__ */ new Date()).toISOString()}\` **${what}** \u2014 ${why}
+`
+    );
+  } catch {
+  }
+}
 function patchGoalContract(runDir, patch) {
   const contractPath = `${runDir}/goal-contract.json`;
-  if (!(0, import_fs14.existsSync)(contractPath)) return;
+  if (!(0, import_fs16.existsSync)(contractPath)) return;
   try {
-    const contract = JSON.parse((0, import_fs14.readFileSync)(contractPath, "utf8"));
-    let changed = false;
+    const contract = JSON.parse((0, import_fs16.readFileSync)(contractPath, "utf8"));
+    const changes = [];
     for (const [k, v] of Object.entries(patch)) {
       if (v && contract[k] !== v) {
+        const previous = contract[k];
         contract[k] = v;
-        changed = true;
+        changes.push(
+          previous === void 0 ? `${k} set to ${String(v).slice(0, 24)}` : `${k} ${String(previous).slice(0, 24)} -> ${String(v).slice(0, 24)}`
+        );
       }
     }
-    if (changed) {
-      (0, import_fs14.writeFileSync)(contractPath, JSON.stringify(contract, null, 2), "utf8");
+    if (changes.length) {
+      (0, import_fs16.writeFileSync)(contractPath, JSON.stringify(contract, null, 2), "utf8");
+      appendDecision2(
+        runDir,
+        `sealed goal-contract mutated: ${changes.join(", ")}`,
+        Object.keys(patch).includes("eval_script_hash") ? "the evaluator anchor moved; scores recorded under the previous anchor are no longer reproducible" : "contract field rewritten through evor_seal_eval_script"
+      );
     }
   } catch {
   }
@@ -24387,7 +24893,12 @@ function registerComputeTools(server) {
     async ({ run_id, node_id, run_dir, worktree, eval_version }) => {
       const missionId = process.env.EVOR_MISSION_ID;
       const resolvedDir = run_dir ?? resolveRunPaths(run_id, missionId).runDir;
-      const resolvedNodeId = resolveNodeRef(run_id, node_id, missionId);
+      let resolvedNodeId;
+      try {
+        resolvedNodeId = resolveNodeRef(run_id, node_id, missionId);
+      } catch (e) {
+        return err2(String(e instanceof Error ? e.message : e));
+      }
       const result = jobStart(resolvedNodeId, run_id, resolvedDir, worktree, eval_version);
       if (!result.ok) return err2(result.error ?? "evor_run_start failed");
       const jobData = result.data;
@@ -24396,9 +24907,9 @@ function registerComputeTools(server) {
         try {
           const arPath = getActiveRunPath();
           let existing = {};
-          if ((0, import_fs14.existsSync)(arPath)) {
+          if ((0, import_fs16.existsSync)(arPath)) {
             try {
-              existing = JSON.parse((0, import_fs14.readFileSync)(arPath, "utf8"));
+              existing = JSON.parse((0, import_fs16.readFileSync)(arPath, "utf8"));
             } catch {
             }
           }
@@ -24410,10 +24921,41 @@ function registerComputeTools(server) {
           };
           if (missionId && !ar.mission_id) ar.mission_id = missionId;
           const arTmp = `${arPath}.tmp`;
-          (0, import_fs14.writeFileSync)(arTmp, JSON.stringify(ar, null, 2), "utf8");
-          (0, import_fs14.renameSync)(arTmp, arPath);
+          (0, import_fs16.writeFileSync)(arTmp, JSON.stringify(ar, null, 2), "utf8");
+          (0, import_fs16.renameSync)(arTmp, arPath);
         } catch {
         }
+      }
+      try {
+        const msPath = (0, import_path17.join)(resolvedDir, "mission-state.json");
+        let ms = {};
+        if ((0, import_fs16.existsSync)(msPath)) {
+          try {
+            ms = JSON.parse((0, import_fs16.readFileSync)(msPath, "utf8"));
+          } catch {
+          }
+        }
+        const from = String(ms.status ?? "locked");
+        if (from !== "running" && nextState("mission", from, "start_run") === "running") {
+          ms.status = "running";
+          ms.updated_at = (/* @__PURE__ */ new Date()).toISOString();
+          ms.entered_at = ms.updated_at;
+          const msTmp = `${msPath}.tmp`;
+          (0, import_fs16.writeFileSync)(msTmp, JSON.stringify(ms, null, 2), "utf8");
+          (0, import_fs16.renameSync)(msTmp, msPath);
+          (0, import_fs16.appendFileSync)(
+            (0, import_path17.join)(resolvedDir, "transitions.jsonl"),
+            JSON.stringify({
+              at: ms.updated_at,
+              entity: "mission",
+              from,
+              to: "running",
+              actor: "evor_run_start",
+              reason: `job ${jobId ?? "?"} launched for node ${node_id}`
+            }) + "\n"
+          );
+        }
+      } catch {
       }
       return ok2({ status: "started", job_id: jobId ?? null });
     }
@@ -24437,8 +24979,8 @@ function registerComputeTools(server) {
       if (!resolvedJobId) {
         try {
           const arPath = getActiveRunPath();
-          if ((0, import_fs14.existsSync)(arPath)) {
-            const ar = JSON.parse((0, import_fs14.readFileSync)(arPath, "utf8"));
+          if ((0, import_fs16.existsSync)(arPath)) {
+            const ar = JSON.parse((0, import_fs16.readFileSync)(arPath, "utf8"));
             if (typeof ar.job_id === "string") resolvedJobId = ar.job_id;
           }
         } catch {
@@ -24474,7 +25016,7 @@ function registerComputeTools(server) {
         return err2(result.error ?? "evor capability failed");
       }
       try {
-        const cap = JSON.parse((0, import_fs14.readFileSync)((0, import_path15.join)(root, "capability.json"), "utf8"));
+        const cap = JSON.parse((0, import_fs16.readFileSync)((0, import_path17.join)(root, "capability.json"), "utf8"));
         return ok2(cap);
       } catch {
         return err2(
@@ -24584,8 +25126,8 @@ function registerComputeTools(server) {
       const result = initEvalSuite(mission_id, eval_version, task_description, runDir);
       if (!result.ok) return err2(result.error ?? "evor_init_eval_suite failed");
       const evalScriptPath = `${runDir}/eval-suites/${eval_version}.py`;
-      if ((0, import_fs14.existsSync)(evalScriptPath)) {
-        const hash = (0, import_crypto4.createHash)("sha256").update((0, import_fs14.readFileSync)(evalScriptPath)).digest("hex");
+      if ((0, import_fs16.existsSync)(evalScriptPath)) {
+        const hash = (0, import_crypto4.createHash)("sha256").update((0, import_fs16.readFileSync)(evalScriptPath)).digest("hex");
         patchGoalContract(runDir, { eval_script_hash: hash });
       }
       return ok2(result.data);
@@ -24603,14 +25145,74 @@ function registerComputeTools(server) {
       const resolvedMission = mission_id ?? process.env.EVOR_MISSION_ID;
       const { runDir } = resolveRunPaths(run_id, resolvedMission);
       const evalScriptPath = `${runDir}/eval-suites/${eval_version}.py`;
-      if (!(0, import_fs14.existsSync)(evalScriptPath)) {
+      if (!(0, import_fs16.existsSync)(evalScriptPath)) {
         return err2(
           "no evaluation script found for this version \u2014 write the canonical evaluator before sealing it, then try again."
         );
       }
-      const hash = (0, import_crypto4.createHash)("sha256").update((0, import_fs14.readFileSync)(evalScriptPath)).digest("hex");
+      const content = (0, import_fs16.readFileSync)(evalScriptPath);
+      const hash = (0, import_crypto4.createHash)("sha256").update(content).digest("hex");
+      const receiptPath = `${runDir}/eval-suites/${eval_version}.sealed.json`;
+      let receipt = null;
+      try {
+        receipt = JSON.parse((0, import_fs16.readFileSync)(receiptPath, "utf8"));
+      } catch {
+        receipt = null;
+      }
+      if (receipt?.hash && receipt.hash !== hash) {
+        return err2(
+          `refusing to re-seal ${eval_version}: this run sealed it at ${String(receipt.sealed_at ?? "an earlier time")} with hash ${receipt.hash.slice(0, 12)}\u2026, and the file on disk now hashes to ${hash.slice(0, 12)}\u2026. The evaluator changed after it was sealed. Re-sealing would make the changed file the sealed one and retroactively validate every score recorded under the old anchor \u2014 which is what happened at 23:49 in the field run. If replacing the evaluator is intended, seal it under a NEW eval_version so existing scores keep the evaluator they were measured with.`
+        );
+      }
+      try {
+        if ((0, import_fs16.statSync)(evalScriptPath).nlink > 1) {
+          const tmp = `${evalScriptPath}.seal-tmp`;
+          (0, import_fs16.writeFileSync)(tmp, content);
+          (0, import_fs16.renameSync)(tmp, evalScriptPath);
+        }
+      } catch (e) {
+        return err2(
+          `could not take custody of ${eval_version}: ${String(e)}. The evaluator is hardlinked outside the run, so sealing it would anchor a file another path can still rewrite.`
+        );
+      }
       patchGoalContract(runDir, { eval_script_hash: hash });
+      try {
+        (0, import_fs16.writeFileSync)(
+          receiptPath,
+          JSON.stringify({ eval_version, hash, sealed_at: (/* @__PURE__ */ new Date()).toISOString() }, null, 2),
+          "utf8"
+        );
+      } catch {
+      }
       return ok2({ ok: true, eval_version });
+    }
+  );
+  server.tool(
+    "evor_scaffold_evaluator",
+    "Generate the evaluator harness for this run from the goal contract, eval suite and frozen index. The mission then writes ONLY score(pred, gt) in score_plugin.py. Deterministic: the server can regenerate and byte-compare, which is what makes the seal custody rather than an assertion.",
+    {
+      run_id: external_exports.string().describe("Active run identifier"),
+      eval_version: external_exports.string().default("v1").describe("Eval suite version"),
+      mission_id: external_exports.string().optional().describe("Mission id; resolved from the active run when omitted"),
+      overwrite_plugin: external_exports.boolean().optional().describe(
+        "Replace an existing score_plugin.py. Off by default \u2014 the plugin is the mission's own work."
+      )
+    },
+    async ({ run_id, eval_version, mission_id, overwrite_plugin }) => {
+      const resolvedMission = mission_id ?? process.env.EVOR_MISSION_ID;
+      const { runDir } = resolveRunPaths(run_id, resolvedMission);
+      const result = callPythonModule("evor.scaffold_evaluator", [
+        "generate",
+        "--run-dir",
+        runDir,
+        "--eval-version",
+        eval_version,
+        ...overwrite_plugin ? ["--overwrite-plugin"] : []
+      ]);
+      if (!result.ok || result.data == null) {
+        return err2(result.error ?? "evor_scaffold_evaluator failed");
+      }
+      return ok2(result.data);
     }
   );
   server.tool(
@@ -24676,11 +25278,16 @@ function registerComputeTools(server) {
       const missionId = process.env.EVOR_MISSION_ID;
       const evorRoot = getEvorRoot();
       const { runDir } = resolveRunPaths(run_id, missionId);
-      const resolvedCandidates = candidates.map((c) => {
-        const nodeId = resolveNodeRef(run_id, c.node_name, missionId);
-        const worktree = (0, import_path15.join)(evorRoot, "worktrees", nodeId);
-        return { node_id: nodeId, worktree, eval_version: c.eval_version };
-      });
+      let resolvedCandidates;
+      try {
+        resolvedCandidates = candidates.map((c) => {
+          const nodeId = resolveNodeRef(run_id, c.node_name, missionId);
+          const worktree = (0, import_path17.join)(evorRoot, "worktrees", nodeId);
+          return { node_id: nodeId, worktree, eval_version: c.eval_version };
+        });
+      } catch (e) {
+        return err2(String(e instanceof Error ? e.message : e));
+      }
       const result = forgeDispatchBatch(run_id, resolvedCandidates, runDir, gpu_fraction);
       return ok2(result);
     }
@@ -24763,8 +25370,8 @@ function registerComputeTools(server) {
 }
 
 // src/tools/gotcha.ts
-var import_fs15 = require("fs");
-var import_path16 = require("path");
+var import_fs17 = require("fs");
+var import_path18 = require("path");
 var import_os4 = require("os");
 function gotchaQuery(params) {
   const evorRoot = params.evorRoot ?? getEvorRoot();
@@ -24804,9 +25411,9 @@ function gotchaAdd(params) {
   let tmpDir = null;
   let payloadFile = null;
   try {
-    tmpDir = (0, import_fs15.mkdtempSync)((0, import_path16.join)((0, import_os4.tmpdir)(), "evor-gotcha-"));
-    payloadFile = (0, import_path16.join)(tmpDir, "payload.json");
-    (0, import_fs15.writeFileSync)(
+    tmpDir = (0, import_fs17.mkdtempSync)((0, import_path18.join)((0, import_os4.tmpdir)(), "evor-gotcha-"));
+    payloadFile = (0, import_path18.join)(tmpDir, "payload.json");
+    (0, import_fs17.writeFileSync)(
       payloadFile,
       JSON.stringify({
         kind: params.kind,
@@ -24840,11 +25447,11 @@ function gotchaAdd(params) {
     result = callBridge("gotcha_bridge.py", bridgeArgs);
   } finally {
     try {
-      if (payloadFile) (0, import_fs15.unlinkSync)(payloadFile);
+      if (payloadFile) (0, import_fs17.unlinkSync)(payloadFile);
     } catch {
     }
     try {
-      if (tmpDir) (0, import_fs15.rmdirSync)(tmpDir);
+      if (tmpDir) (0, import_fs17.rmdirSync)(tmpDir);
     } catch {
     }
   }
@@ -24862,8 +25469,8 @@ function gotchaAdd(params) {
 }
 function storeBlob(params) {
   const runDir = resolveRunPaths(params.runId, params.missionId).runDir;
-  if (!(0, import_fs15.existsSync)(runDir)) {
-    (0, import_fs15.mkdirSync)(runDir, { recursive: true });
+  if (!(0, import_fs17.existsSync)(runDir)) {
+    (0, import_fs17.mkdirSync)(runDir, { recursive: true });
   }
   let srcPath = params.path;
   let tmpDir = null;
@@ -24873,9 +25480,9 @@ function storeBlob(params) {
       return { ok: false, error: "one of 'path' or 'content' is required" };
     }
     try {
-      tmpDir = (0, import_fs15.mkdtempSync)((0, import_path16.join)((0, import_os4.tmpdir)(), "evor-blob-"));
-      tmpFile = (0, import_path16.join)(tmpDir, "blob.bin");
-      (0, import_fs15.writeFileSync)(tmpFile, params.content, "utf8");
+      tmpDir = (0, import_fs17.mkdtempSync)((0, import_path18.join)((0, import_os4.tmpdir)(), "evor-blob-"));
+      tmpFile = (0, import_path18.join)(tmpDir, "blob.bin");
+      (0, import_fs17.writeFileSync)(tmpFile, params.content, "utf8");
       srcPath = tmpFile;
     } catch (err3) {
       return {
@@ -24898,11 +25505,11 @@ function storeBlob(params) {
     result = callBridge("store_blob_bridge.py", bridgeArgs);
   } finally {
     try {
-      if (tmpFile) (0, import_fs15.unlinkSync)(tmpFile);
+      if (tmpFile) (0, import_fs17.unlinkSync)(tmpFile);
     } catch {
     }
     try {
-      if (tmpDir) (0, import_fs15.rmdirSync)(tmpDir);
+      if (tmpDir) (0, import_fs17.rmdirSync)(tmpDir);
     } catch {
     }
   }

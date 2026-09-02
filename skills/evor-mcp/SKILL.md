@@ -22,7 +22,15 @@ user-invocable: false
 
 ## Tool Catalog
 
-All tools are deferred. Load them with `ToolSearch("select:evor_<name>,…")` before first use.
+All tools are deferred. Load them before first use with the **full wire name**:
+
+```
+ToolSearch("select:mcp__plugin_oh-my-evor_evor__evor_<name>")
+```
+
+`select:` matches a tool's exact registered name, and every evor tool is registered
+under the MCP prefix — the bare `evor_<name>` is not a name any tool has. See the
+[Tool-Search Note](#tool-search-note); getting this wrong is silent, not an error.
 
 ### Lifecycle
 | Tool | Purpose |
@@ -221,12 +229,39 @@ If `evor_read_artifact` returns an error object, the upstream step has not produ
 
 ## Tool-Search Note
 
-Evor tools are deferred by default — only tool names load upfront, not their full schemas. Load schemas before first use:
+Evor tools are deferred by default — only tool names load upfront, not their full schemas.
+
+**Every evor tool is registered as `mcp__plugin_oh-my-evor_evor__evor_<name>`.** The prefix
+is the MCP server namespace plus the tool's own name, so `evor_` appears twice. `select:`
+matches the exact registered name, and the bare `evor_<name>` is not a name any tool has —
+so `select:evor_write_artifact` resolves nothing.
+
+It does so **silently**. It is not an error, just an empty result, which is why this cost a
+real mission: Mutagen needed `evor_write_artifact`, issued five `ToolSearch` calls for the
+bare name exactly as this file used to instruct, re-read the skill, tried the CLI, and
+finally delegated the write to another agent. A `general-purpose` helper in the same run
+asked for the prefixed name and had the tool on its first try. Mutagen never held the tool
+it was told to use — a discovery defect, not misuse.
+
+Load schemas before first use:
 
 ```
-ToolSearch("select:evor_init_run,evor_validate,evor_state_read")
-ToolSearch("select:evor_write_artifact,evor_read_artifact,evor_record_node")
-ToolSearch("select:evor_run_start,evor_run_status,evor_record_eval,evor_integrity_check")
+ToolSearch("select:mcp__plugin_oh-my-evor_evor__evor_init_run,mcp__plugin_oh-my-evor_evor__evor_validate,mcp__plugin_oh-my-evor_evor__evor_state_read")
+ToolSearch("select:mcp__plugin_oh-my-evor_evor__evor_write_artifact,mcp__plugin_oh-my-evor_evor__evor_read_artifact,mcp__plugin_oh-my-evor_evor__evor_record_node")
+ToolSearch("select:mcp__plugin_oh-my-evor_evor__evor_run_start,mcp__plugin_oh-my-evor_evor__evor_run_status,mcp__plugin_oh-my-evor_evor__evor_record_eval,mcp__plugin_oh-my-evor_evor__evor_integrity_check")
 ```
 
-Load only what the current turn needs. The MCP tool prefix is `mcp__plugin_oh-my-evor_evor__<tool>` (used in hook matchers).
+If you do not have the exact name, use keyword search instead of `select:` — it ranks by
+relevance rather than requiring an exact match:
+
+```
+ToolSearch("evor write artifact")
+```
+
+**If a `select:` returns nothing, do not retry the same string.** The name is wrong, not the
+timing. Retry once with the keyword form above; if that also returns nothing, emit a
+`capability-gap` signal rather than working around the missing tool. Elsewhere in the
+catalog tools are written bare (`evor_write_artifact`) for readability — that is the tool's
+own name, and the prefix above is what you pass to `ToolSearch`.
+
+Load only what the current turn needs.

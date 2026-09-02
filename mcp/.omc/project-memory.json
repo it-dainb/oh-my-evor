@@ -1,7 +1,7 @@
 {
   "version": "1.0.0",
-  "lastScanned": 1783274455059,
-  "projectRoot": "/storages_local/research/oh-my-evor/mcp",
+  "lastScanned": 1788251846736,
+  "projectRoot": "/home/dainb_1/research/oh-my-evor/mcp",
   "techStack": {
     "languages": [
       {
@@ -53,6 +53,7 @@
     "isMonorepo": false,
     "workspaces": [],
     "mainDirectories": [
+      "bin",
       "src",
       "tests"
     ],
@@ -60,21 +61,33 @@
   },
   "customNotes": [],
   "directoryMap": {
+    "bin": {
+      "path": "bin",
+      "purpose": "Executable scripts",
+      "fileCount": 1,
+      "lastAccessed": 1788251846711,
+      "keyFiles": [
+        "py-mcp.cjs"
+      ]
+    },
     "bridge": {
       "path": "bridge",
       "purpose": null,
-      "fileCount": 2,
-      "lastAccessed": 1783274455049,
+      "fileCount": 9,
+      "lastAccessed": 1788251846712,
       "keyFiles": [
-        "integrity_bridge.py",
-        "scheduler_bridge.py"
+        "artifact_bridge.py",
+        "gotcha_bridge.py",
+        "handoff_bridge.py",
+        "inbox_bridge.py",
+        "integrity_bridge.py"
       ]
     },
     "dist": {
       "path": "dist",
       "purpose": "Distribution/build output",
       "fileCount": 1,
-      "lastAccessed": 1783274455049,
+      "lastAccessed": 1788251846722,
       "keyFiles": [
         "index.cjs"
       ]
@@ -82,37 +95,110 @@
     "src": {
       "path": "src",
       "purpose": "Source code",
-      "fileCount": 5,
-      "lastAccessed": 1783274455054,
+      "fileCount": 8,
+      "lastAccessed": 1788251846726,
       "keyFiles": [
+        "active-run.ts",
         "contracts.ts",
         "index.ts",
-        "run-store.ts",
-        "subprocess-bridge.ts",
-        "tree-store.ts"
+        "lock.ts",
+        "run-store.ts"
       ]
     },
     "tests": {
       "path": "tests",
       "purpose": "Test files",
-      "fileCount": 12,
-      "lastAccessed": 1783274455055,
+      "fileCount": 65,
+      "lastAccessed": 1788251846727,
       "keyFiles": [
-        "cite.test.ts",
-        "hooks.test.ts",
-        "integrity.test.ts",
-        "record.test.ts",
-        "schemas.test.ts"
+        "acquire.test.ts",
+        "agent-eval.test.ts",
+        "agent-frontmatter.test.ts",
+        "artifact.test.ts",
+        "best-score-propagation.test.ts"
       ]
     },
     "src/schemas": {
       "path": "src/schemas",
       "purpose": "Schema definitions",
       "fileCount": 0,
-      "lastAccessed": 1783274455056,
+      "lastAccessed": 1788251846728,
       "keyFiles": []
     }
   },
-  "hotPaths": [],
+  "hotPaths": [
+    {
+      "path": "tests/hooks.test.ts",
+      "accessCount": 7,
+      "lastAccessed": 1783328611332,
+      "type": "file"
+    },
+    {
+      "path": "src/tools/tree.ts",
+      "accessCount": 3,
+      "lastAccessed": 1783327958266,
+      "type": "file"
+    },
+    {
+      "path": "src/index.ts",
+      "accessCount": 2,
+      "lastAccessed": 1783328085657,
+      "type": "file"
+    },
+    {
+      "path": "tests/eval-specs.test.ts",
+      "accessCount": 2,
+      "lastAccessed": 1787295702368,
+      "type": "file"
+    },
+    {
+      "path": "bin/py-mcp.cjs",
+      "accessCount": 1,
+      "lastAccessed": 1783318545527,
+      "type": "file"
+    },
+    {
+      "path": "src/subprocess-bridge.ts",
+      "accessCount": 1,
+      "lastAccessed": 1783328610852,
+      "type": "file"
+    },
+    {
+      "path": "tests/hooks-runid-fallback.test.ts",
+      "accessCount": 1,
+      "lastAccessed": 1785088298877,
+      "type": "file"
+    },
+    {
+      "path": "tests/wave3-bugs.test.ts",
+      "accessCount": 1,
+      "lastAccessed": 1785090524060,
+      "type": "file"
+    },
+    {
+      "path": "tests/tick-return-contract.test.ts",
+      "accessCount": 1,
+      "lastAccessed": 1785477674606,
+      "type": "file"
+    },
+    {
+      "path": "tests/governor-enforcement-inventory.test.ts",
+      "accessCount": 1,
+      "lastAccessed": 1785477875576,
+      "type": "file"
+    },
+    {
+      "path": "tests/stop-incomplete-tick.test.ts",
+      "accessCount": 1,
+      "lastAccessed": 1785479430067,
+      "type": "file"
+    },
+    {
+      "path": "tests/eval-core.test.ts",
+      "accessCount": 1,
+      "lastAccessed": 1787294642894,
+      "type": "file"
+    }
+  ],
   "userDirectives": []
 }

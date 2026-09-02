@@ -42,6 +42,7 @@ from evor.contracts import (
     IntegrityReport,
     TreeNode,
 )
+from evor.node_identity import resolve_node_artifact
 from evor.freeze import DataProvenanceTracker, FrozenSplitManager
 
 if TYPE_CHECKING:
@@ -144,6 +145,9 @@ class IntegrityGate:
         frozen_test: FrozenSplit,
         provenance_path: Path | None,
         run_dir: Path | None = None,
+        # Check 3 (item 2.11): sha256 of every training sample, when the caller
+        # has them. Absent means the check reports "not evaluated", never "clean".
+        train_hashes: set[str] | None = None,
         # Acquisition-gate inputs (checks 11–13)
         acquired_samples: list[bytes] | None = None,
         acquisition_provenance: AcquisitionProvenance | None = None,
@@ -183,15 +187,20 @@ class IntegrityGate:
         # ── Checks 2–3: short-circuited if check-1 failed (R-7a) ─────────
         if split_hash_match:
             no_test_leakage = self._check_no_test_leakage(frozen_test)
-            no_label_contamination = self._check_no_label_contamination(frozen_test)
+            no_label_contamination = self._check_no_label_contamination(
+                frozen_test, train_hashes=train_hashes
+            )
             if not no_test_leakage:
                 failures.append(
                     "no_test_leakage: test indices or content-hashes found in training data"
                 )
-            if not no_label_contamination:
+            if no_label_contamination is False:
                 failures.append(
                     "no_label_contamination: test sample sha256 hashes overlap with training data"
                 )
+            # `None` means NOT EVALUATED — no training hashes were supplied. It is
+            # not a failure, and deliberately not a pass either: the report carries
+            # None so a reader can tell "clean" from "never looked".
         else:
             # Cannot meaningfully evaluate leakage on a corrupted split
             no_test_leakage = False
@@ -210,8 +219,63 @@ class IntegrityGate:
                 "no_eval_shift: eval_script sha256 does not match GoalContract.eval_script_hash"
             )
 
+        # ── Check 3b: source-page leakage (items 2.3 / 9.1, finding M-03) ───
+        #
+        # The corpus is built by DEGRADING source pages. When the same page is
+        # degraded into a train item and a test item, the two have different
+        # image bytes and a byte-identical GT mask — so every hash-based check
+        # sees two unrelated samples. The field harness counted exactly that
+        # signal ("48 benign mask-only collisions ignored") and then declared it
+        # benign, citing this corpus's own leakage count as the reason.
+        #
+        # Mask identity is NOT a usable discriminator on its own: 132 test items
+        # yield 128 unique masks, so collisions occur legitimately within a
+        # single split. What settles it is DECLARED LINEAGE — the group key 2.3
+        # put on FrozenSplit — compared against the train side's
+        # `source_sample_id`.
+        #
+        # When the corpus declares no lineage this returns None: NOT EVALUATED,
+        # not clean. See KNOWN_GAPS.md — closing M-03 for the field corpus needs
+        # a corpus-builder change, and asserting cleanliness without the evidence
+        # would be the reclassification that caused the finding.
+        no_source_page_leakage = self._check_source_page_leakage(
+            frozen_test, provenance_path
+        )
+        if no_source_page_leakage is False:
+            failures.append(
+                "no_source_page_leakage: a test item's source page also appears in "
+                "training data — the same page degraded twice, split across the two "
+                "sets, is leakage however different the bytes are"
+            )
+
+        # ── Check 5b: trainer_completed (item 6.4 / R-11) ──────────────────
+        #
+        # A killed trainer leaves a checkpoint, and that checkpoint scores like
+        # any other — it just looks like a worse model. Nothing distinguished
+        # "this approach did not work" from "this run was cut off at step 254 of
+        # 450", and only the first is evidence about the approach.
+        trainer_completed = self._check_trainer_completed(node, result)
+        if trainer_completed is False:
+            failures.append(
+                "trainer_completed: telemetry stops well short of the node's declared "
+                "step budget — the trainer did not finish, so this score is not a "
+                "measurement of the candidate"
+            )
+
         # ── Check 5: telemetry_sane ───────────────────────────────────────
-        telemetry_sane = self._check_telemetry_sane(telemetry_path)
+        # O-01 (item 1.5): the trainer writes `nodes/<slug>/telemetry.jsonl` and
+        # this gate is handed `nodes/<uuid>/telemetry.jsonl`. Neither writer was
+        # wrong; nothing owned the mapping, so the reader guessed — and a guess
+        # that resolves to a non-existent path fails silently in the direction of
+        # "the candidate is bad". `iir-scan-binnet-02` was failed this way with
+        # 12,000 well-formed telemetry records on disk, and that false negative
+        # stood as the run's final verdict.
+        #
+        # `resolve_node_artifact` returns only paths that EXIST, so it can rescue
+        # a misfiled artifact and can never manufacture one: when telemetry is
+        # genuinely absent it returns None and the check fails exactly as before.
+        resolved_telemetry = resolve_node_artifact(telemetry_path, node)
+        telemetry_sane = self._check_telemetry_sane(resolved_telemetry or telemetry_path)
         if not telemetry_sane:
             failures.append(
                 "telemetry_sane: telemetry fails sanity (NaN/Inf loss, constant loss, "
@@ -339,6 +403,8 @@ class IntegrityGate:
             node_id=node.id,
             eval_version=result.eval_version,
             checks=IntegrityChecks(
+            no_source_page_leakage=no_source_page_leakage,
+            trainer_completed=trainer_completed,
                 split_hash_match=split_hash_match,
                 frozen_split_read_only=frozen_split_read_only,
                 no_test_leakage=no_test_leakage,
@@ -394,14 +460,100 @@ class IntegrityGate:
         # Any duplicates within the frozen test split indicate corruption
         return len(hashes) == len(set(hashes))
 
-    def _check_no_label_contamination(self, frozen_test: FrozenSplit) -> bool:
-        """Check 3: sha256(test_sample_i) ∉ {sha256(train_sample_j)} over 100 pairs.
+    def _check_no_label_contamination(
+        self, frozen_test: FrozenSplit, train_hashes: set[str] | None = None
+    ) -> bool:
+        """Check 3: sha256(test_sample_i) not in {sha256(train_sample_j)}.
 
-        Production: requires access to training data (GPU/data-gated).
-        Returns True by default when training data is not available for cross-check;
-        the frozen-split hash chain (checks 1, 7) provides the primary tamper guard.
+        Item 2.11. This was ``return True`` — three lines of docstring and an
+        unconditional pass. It could not fail for any input, which means it was
+        not a check; it was the SHAPE of one, and `integrity.py:200` reports its
+        verdict beside four checks that can. A gate that always passes is
+        indistinguishable from a gate that is working, which is the same class of
+        defect as the un-fired spoofing guard and the disarmed stop gates.
+
+        It still cannot cross-check what it is not given. The difference is that
+        it now says so: with no training hashes it returns ``None``, which the
+        caller records as *not evaluated* rather than as *passed*. That
+        distinction is the whole of `record.ts:162` — "absence of a failure
+        verdict is not evidence of integrity."
+
+        Returns True (clean), False (contaminated), or None (not evaluated).
         """
-        return True
+        if not train_hashes:
+            return None  # type: ignore[return-value]
+        overlap = set(frozen_test.per_sample_hashes.values()) & set(train_hashes)
+        return not overlap
+
+    def _check_trainer_completed(self, node, result) -> Optional[bool]:
+        """Did the trainer reach the step budget the node declared? (Item 6.4.)
+
+        Returns None when the node declares no budget: with nothing to compare
+        against, "not evaluated" is the honest answer, and reporting True would
+        be `integrity.py:404`'s mistake again.
+
+        The 90% threshold leaves room for a trainer that stops a few steps early
+        for legitimate reasons. It exists to catch 254 of 450, not to police the
+        last epoch.
+        """
+        config = getattr(node, "config", None) or {}
+        declared = None
+        for key in ("max_steps", "expected_steps", "total_steps", "steps"):
+            value = config.get(key)
+            if isinstance(value, (int, float)) and value > 0:
+                declared = int(value)
+                break
+        if declared is None:
+            return None
+
+        summary = getattr(result, "telemetry_summary", None)
+        actual = getattr(summary, "total_steps", None) if summary is not None else None
+        if not isinstance(actual, (int, float)):
+            return None
+
+        return int(actual) >= int(declared * 0.9)
+
+    def _check_source_page_leakage(
+        self, frozen_test: FrozenSplit, provenance_path: Path | None
+    ) -> Optional[bool]:
+        """Does any test item share a SOURCE PAGE with a training item? (M-03.)
+
+        Returns True (clean), False (leaked), or None (not evaluated — the
+        corpus declares no per-item lineage, so the question cannot be answered
+        from what is on disk).
+
+        The None case is the honest one for the field corpus and is recorded in
+        KNOWN_GAPS.md. Reporting True there would be exactly the move that
+        produced the finding: a check that cannot see a leak declaring its
+        absence.
+        """
+        test_groups = set((getattr(frozen_test, "per_sample_groups", None) or {}).values())
+        if not test_groups:
+            return None
+        if provenance_path is None or not Path(provenance_path).exists():
+            return None
+
+        train_sources: set[str] = set()
+        try:
+            for line in Path(provenance_path).read_text().splitlines():
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    record = json.loads(line)
+                except ValueError:
+                    continue
+                if str(record.get("split_type", "")) != "train":
+                    continue
+                source = record.get("source_sample_id")
+                if source:
+                    train_sources.add(str(source))
+        except OSError:
+            return None
+
+        if not train_sources:
+            return None
+        return not (test_groups & train_sources)
 
     def _check_telemetry_sane(self, telemetry_path: Path) -> bool:
         """Check 5: parse telemetry.jsonl; validate loss + optional grad_norm.

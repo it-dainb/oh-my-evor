@@ -44,6 +44,32 @@ from evor.contracts import (
 from evor.tree import StopVerdict, TreeEngine, check_stop_condition
 
 
+# ── Item 6.1 / R-08: a run may not start before its machine is measured ──────
+#
+# `run_init_run` now refuses when `.evor/capability.json` is absent or stale:
+# the field run began 26 minutes BEFORE its own capability probe, so its sizing
+# decisions preceded the measurement they depend on.
+#
+# These tests are about what init WRITES, not about probe policy, so they get a
+# probe. Fixture migration only — no assertion changes.
+@pytest.fixture(autouse=True)
+def _seed_capability_probe(tmp_path):
+    import json as _json
+    from datetime import datetime, timezone
+
+    evor_root = tmp_path / ".evor"
+    evor_root.mkdir(parents=True, exist_ok=True)
+    (evor_root / "capability.json").write_text(_json.dumps({
+        "gpu_arch": None, "gpu_name": None, "vram_gb": None,
+        "supported_dtypes": ["fp32"], "available_libs": [],
+        "cuda_version": None, "cpu_only": True,
+        "probed_at": datetime.now(timezone.utc).isoformat(),
+        "source": "probe",
+    }))
+    return evor_root
+
+
+
 # ── Fixture factories ─────────────────────────────────────────────────────────
 
 
@@ -442,17 +468,44 @@ def test_stop_worst_angle_plateau(tmp_path: Path) -> None:
 # ── FIX 1 new tests: check_stop_condition null/zero edge cases ────────────────
 
 
-def test_stop_max_cost_zero_does_not_stop_at_tick_zero(tmp_path: Path) -> None:
-    """max_cost_usd=0 means no cost cap (local-only); must NOT stop at tick 0 with cost 0."""
+def test_stop_max_cost_zero_permits_no_spend(tmp_path: Path) -> None:
+    """max_cost_usd=0 means ZERO SPEND, not unlimited (item 6.6 / K-07).
+
+    This asserted the opposite — that 0 means "no cost cap (local-only)" — and
+    that reading is the defect. `evor_check_stop` guarded the ceiling with
+    `if budget.max_cost_usd and …`, so zero was falsy, the check was skipped
+    entirely, and $217.70 went out under a contract that declared a ceiling.
+    The plan names this as a three-way doc/code/type collision, and the reading
+    that costs money is the one that was shipped.
+
+    A ceiling of zero now permits no spend. `validate_run` also rejects a zero
+    ceiling at init (item 9.3), so a real run cannot reach this state without
+    having been told twice.
+    """
     budget = _make_budget(max_iterations=50, circuit_breaker=100, max_cost_usd=0.0)
     goal = _make_goal(stop_type="maximize-under-budget", target=None, budget=budget)
     engine = _make_engine(goal=goal, tmp_path=tmp_path)
-    # tick=0, total_cost=0 — with the old 0>=0 bug this would stop immediately
     state = _run_state(tick=0, best_score=0.0, total_cost_usd=0.0)
     verdict = check_stop_condition(goal, state, engine)
-    assert verdict.should_stop is False, (
-        "max_cost_usd=0 (no cap) must not stop at tick 0; only circuit-breaker/max_iterations should gate"
+    assert verdict.should_stop is True, (
+        "a zero ceiling must permit no spend; reading it as unlimited is what let "
+        f"$217.70 out of a run that declared one. reason={verdict.reason}"
     )
+    assert "ceiling" in verdict.reason.lower()
+
+
+def test_stop_positive_cost_ceiling_does_not_stop_at_tick_zero(tmp_path: Path) -> None:
+    """Control: a real ceiling with nothing spent must NOT stop.
+
+    Preserves what the original case was actually guarding — the `0 >= 0` bug
+    that stopped a run before it began — now expressed with a ceiling that means
+    something.
+    """
+    budget = _make_budget(max_iterations=50, circuit_breaker=100, max_cost_usd=100.0)
+    goal = _make_goal(stop_type="maximize-under-budget", target=None, budget=budget)
+    engine = _make_engine(goal=goal, tmp_path=tmp_path)
+    state = _run_state(tick=0, best_score=0.0, total_cost_usd=0.0)
+    assert check_stop_condition(goal, state, engine).should_stop is False
 
 
 def test_stop_best_score_none_does_not_crash(tmp_path: Path) -> None:

@@ -101,6 +101,13 @@ skills: [oh-my-evor:evor-mcp]
     - oom_risk is "critical" or "high" (without gradient checkpointing mitigation), OR
     - nan_risk is "high" AND suggested fix is concrete and implementable by forge-junior
 
+    verdict="approved" when neither rejection condition holds. That list is exhaustive: a
+    "medium" or "low" reading on any dimension is an approval, not a hedge, and a risk you
+    noted but did not rate critical/high is reported in the risk_assessment — it is not a
+    reason to withhold the verdict. You are the last resource gate before `evor_run_start`,
+    not the last word on the design; refusing to approve a run you have no stated ground to
+    reject stalls the tick and hides the reason from everyone downstream.
+
     loop_back_recommended=True only when ALL hold:
     a. The rejection is diagnosable (not "unknown model size")
     b. The fix is concrete: specific file, field, old value, new value

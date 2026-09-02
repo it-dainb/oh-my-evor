@@ -17,31 +17,75 @@ import { resolveNodeRef, assignUniqueName, deriveName } from "./node-ref.js";
 
 // ── Shared helpers ──────────────────────────────────────────────────────────
 
+/**
+ * The run-state a caller sees when the file is missing or unparseable.
+ *
+ * ONE place, deliberately (plan item 1.3a). This shape was duplicated across the
+ * two branches of `readRunState`, so "what does absence mean" had two definitions
+ * that had to be kept in step by hand — and the answer they gave, `status:
+ * "running"`, is the A6 failure itself: **absence of state read as liveness**. A
+ * run whose state file has never been written, or has been corrupted, reported
+ * itself as live.
+ *
+ * 1.3a is a pure refactor and leaves that answer unchanged. 1.4 changes it, here,
+ * at one site rather than two.
+ */
+export function defaultRunState(runId: string): Record<string, unknown> {
+  return {
+    run_id: runId,
+    // 1.4 then 1.9b. This was `"running"` — a run whose state file had never
+    // been written, or had been corrupted, reported itself as LIVE. That is A6:
+    // absence of state read as liveness.
+    //
+    // 1.4 made it `"initialized"`; 1.9b retires the field entirely. AF3 §4.1: a
+    // new FSM must REPLACE a field, never accompany it, and `run-state.status`
+    // duplicated the mission's — it "was wrong in all three field runs". Mission
+    // state is now the single lifecycle state, driven server-side by
+    // `evor_run_start` and read by the three stop-hook gates (1.9c).
+    //
+    // Keeping the key here is what would make it a fifth status field, which AF3
+    // names as the highest-probability failure mode of this whole redesign. The
+    // key is OMITTED rather than set undefined, so `"status" in state` is false
+    // and a reader cannot mistake "present but empty" for "declared".
+    tick_count: 0,
+    best_score: null,
+    frontier_ids: [],
+    current_eval_version: "v1",
+    pending_node_ids: [],
+  };
+}
+
+/**
+ * The run's declared lifecycle status, or undefined when it declares none.
+ *
+ * Named so that retiring the field at 1.9b is a compile error rather than a grep.
+ * Absence and liveness are different questions; `isRunLive` answers the second.
+ */
+export function readRunStatus(state: Record<string, unknown> | null | undefined): string | undefined {
+  const raw = state?.status;
+  return raw === undefined || raw === null ? undefined : String(raw);
+}
+
+/** Is this run live — may a check still hold on its behalf? */
+export function isRunLive(state: Record<string, unknown> | null | undefined): boolean {
+  return readRunStatus(state) === "running";
+}
+
 /** Read run-state.json; return parsed object or a fresh default. */
 export function readRunState(runStatePath: string, runId: string): Record<string, unknown> {
-  if (!existsSync(runStatePath)) {
-    return {
-      run_id: runId,
-      status: "running",
-      tick_count: 0,
-      best_score: null,
-      frontier_ids: [],
-      current_eval_version: "v1",
-      pending_node_ids: [],
-    };
-  }
+  if (!existsSync(runStatePath)) return defaultRunState(runId);
   try {
     return JSON.parse(readFileSync(runStatePath, "utf8"));
-  } catch {
-    return {
-      run_id: runId,
-      status: "running",
-      tick_count: 0,
-      best_score: null,
-      frontier_ids: [],
-      current_eval_version: "v1",
-      pending_node_ids: [],
-    };
+  } catch (err) {
+    // A corrupt state file is not a fresh run, and it is worth saying so. The old
+    // code returned `status: "running"` here too, so a truncated write made the
+    // run look live — the same defect as the missing-file branch, arriving by a
+    // route nobody was watching. Defaulting stays (a governor must not crash a
+    // session) but it no longer defaults toward liveness, and no longer silently.
+    process.stderr.write(
+      `[evor] run-state unreadable at ${runStatePath}: ${String(err)} — treating as uninitialized\n`,
+    );
+    return defaultRunState(runId);
   }
 }
 

@@ -1,0 +1,170 @@
+{
+  "role": "evor-tick",
+  "agent_file": "agents/evor-tick.md",
+  "$comment": [
+    "Plan item 7.4 / the 'every declared role has eval coverage' gate.",
+    "",
+    "evor-tick shipped on sonnet with NO spec and NO cases, so its tier was",
+    "asserted and never measured \u2014 in either direction. This spec measures the",
+    "one thing evor-tick's contract actually states: that its entire final",
+    "response is a single JSON object of a fixed shape, under 1500 characters.",
+    "",
+    "That is the boundary's whole value proposition. evor-tick exists so the",
+    "orchestrator's context stays flat across 100-200 ticks; a tick that returns",
+    "a narrative instead of a pointer has not done its job, however good the",
+    "narrative is. Measuring conformance is therefore measuring the role, not a",
+    "proxy for it.",
+    "",
+    "Deliberately NOT a stub. A spec that exists only to turn a test green would",
+    "be exactly the fake completion this release is about."
+  ],
+  "arms": [
+    {
+      "model": "sonnet",
+      "effort": "medium",
+      "label": "current"
+    },
+    {
+      "model": "haiku",
+      "effort": "medium",
+      "label": "cheaper (candidate)"
+    }
+  ],
+  "contract": {
+    "heading": "Tick Return",
+    "mode": "json",
+    "max_chars": 1500,
+    "fields": [
+      {
+        "path": "tick",
+        "kind": "number"
+      },
+      {
+        "path": "outcome",
+        "kind": "enum",
+        "values": [
+          "scored",
+          "rejected",
+          "skipped",
+          "failed"
+        ]
+      },
+      {
+        "path": "node_id",
+        "kind": "present"
+      },
+      {
+        "path": "score",
+        "kind": "number",
+        "tol": 0.001
+      },
+      {
+        "path": "error",
+        "kind": "present"
+      },
+      {
+        "path": "pointers",
+        "kind": "count"
+      }
+    ]
+  },
+  "cases": [
+    {
+      "id": "scored-node",
+      "gate": "baseline",
+      "note": "the ordinary path: a node was trained and evaluated, so node_id and score are reported",
+      "tick_state": {
+        "tick": 7,
+        "current_step": 9,
+        "step_status": "done"
+      },
+      "forge_report": {
+        "node_id": "n-0042",
+        "recorded": true
+      },
+      "evaluation": {
+        "score": 0.813,
+        "integrity_verdict": "passed"
+      },
+      "expect": {
+        "tick": 7,
+        "outcome": "scored",
+        "node_id": "n-0042",
+        "score": 0.813,
+        "pointers": {
+          "min": 1
+        }
+      }
+    },
+    {
+      "id": "rejected-by-selector",
+      "gate": "baseline",
+      "note": "no node was evaluated; node_id and score must be ABSENT rather than null or invented",
+      "tick_state": {
+        "tick": 8,
+        "current_step": 9,
+        "step_status": "done"
+      },
+      "selector_verdict": {
+        "approved": []
+      },
+      "expect": {
+        "tick": 8,
+        "outcome": "rejected",
+        "pointers": {
+          "min": 1
+        }
+      }
+    },
+    {
+      "id": "failed-tick-carries-its-reason",
+      "gate": "baseline",
+      "note": "a failing tick is a normal outcome, not an error to hide: same compact shape, plus `error`",
+      "tick_state": {
+        "tick": 9,
+        "current_step": 4,
+        "step_status": "failed"
+      },
+      "failure": {
+        "step": 4,
+        "reason": "forge-junior produced no candidate"
+      },
+      "expect": {
+        "tick": 9,
+        "outcome": "failed",
+        "error": true,
+        "pointers": {
+          "min": 1
+        }
+      }
+    },
+    {
+      "id": "detail-stays-behind-a-pointer",
+      "gate": "boundary",
+      "note": "the case the boundary exists for: given a 40k-character forge report, the return must POINT at it, not carry it. Graded by the contract's max_chars.",
+      "tick_state": {
+        "tick": 10,
+        "current_step": 9,
+        "step_status": "done"
+      },
+      "forge_report": {
+        "node_id": "n-0051",
+        "recorded": true,
+        "narrative_chars": 40000
+      },
+      "evaluation": {
+        "score": 0.77,
+        "integrity_verdict": "passed"
+      },
+      "expect": {
+        "tick": 10,
+        "outcome": "scored",
+        "node_id": "n-0051",
+        "score": 0.77,
+        "pointers": {
+          "min": 1
+        }
+      }
+    }
+  ]
+}

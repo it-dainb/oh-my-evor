@@ -3,7 +3,7 @@
   "agent_file": "agents/evor-probe.md",
   "arms": [
     {
-      "model": "sonnet",
+      "model": "haiku",
       "effort": "medium",
       "label": "current"
     },
@@ -74,8 +74,8 @@
           0.0003,
           0.00026,
           0.00017,
-          8e-05,
-          1e-05
+          0.00008,
+          0.00001
         ]
       },
       "hypothesis": {
@@ -95,7 +95,7 @@
         {
           "step": 0,
           "train_loss": 2.475,
-          "grad_norm": 2.0,
+          "grad_norm": 2,
           "param_norm": 11.8,
           "node_id": "healthy_confirmed_node",
           "run_id": "run-2026-08-20-a",
@@ -186,7 +186,7 @@
           "step": 200,
           "train_loss": 0.9033,
           "grad_norm": 1.864,
-          "param_norm": 12.0,
+          "param_norm": 12,
           "node_id": "healthy_confirmed_node",
           "run_id": "run-2026-08-20-a",
           "timestamp": "2026-08-20T14:10:00Z"
@@ -333,7 +333,7 @@
         "eda_summary.gradient_health": "healthy",
         "eda_summary.telemetry_sane": true,
         "hypothesis_verdict": "confirmed",
-        "eda_summary.per_domain_gap_pp": 4.0,
+        "eda_summary.per_domain_gap_pp": 4,
         "benchmark_upgrade_proposal": false
       }
     },
@@ -349,8 +349,8 @@
           0.0003,
           0.00026,
           0.00017,
-          8e-05,
-          1e-05
+          0.00008,
+          0.00001
         ]
       },
       "hypothesis": {
@@ -365,7 +365,7 @@
         {
           "step": 0,
           "train_loss": 2.475,
-          "grad_norm": 2.0,
+          "grad_norm": 2,
           "node_id": "nan_telemetry_node",
           "run_id": "run-2026-08-20-a",
           "timestamp": "2026-08-20T14:00:00Z"
@@ -596,7 +596,7 @@
         {
           "step": 0,
           "train_loss": 2.5,
-          "grad_norm": 2.0,
+          "grad_norm": 2,
           "node_id": "grad_explosion_node",
           "run_id": "run-2026-08-20-a",
           "timestamp": "2026-08-20T14:00:00Z"
@@ -708,7 +708,7 @@
         {
           "step": 280,
           "train_loss": 1.252,
-          "grad_norm": 88.0,
+          "grad_norm": 88,
           "node_id": "grad_explosion_node",
           "run_id": "run-2026-08-20-a",
           "timestamp": "2026-08-20T14:14:00Z"
@@ -808,11 +808,11 @@
         "completed_steps": 500,
         "lr_schedule": "step",
         "lr_values": [
-          1e-05,
-          1e-05,
-          1e-05,
-          1e-05,
-          1e-05
+          0.00001,
+          0.00001,
+          0.00001,
+          0.00001,
+          0.00001
         ]
       },
       "hypothesis": {
@@ -1067,8 +1067,8 @@
           0.0003,
           0.00026,
           0.00017,
-          8e-05,
-          1e-05
+          0.00008,
+          0.00001
         ]
       },
       "hypothesis": {
@@ -1083,7 +1083,7 @@
         {
           "step": 0,
           "train_loss": 1.52,
-          "grad_norm": 2.0,
+          "grad_norm": 2,
           "node_id": "plateaued_curve_node",
           "run_id": "run-2026-08-20-a",
           "timestamp": "2026-08-20T14:00:00Z"
@@ -1314,7 +1314,7 @@
         {
           "step": 0,
           "train_loss": 1.52,
-          "grad_norm": 2.0,
+          "grad_norm": 2,
           "node_id": "oscillating_curve_node",
           "run_id": "run-2026-08-20-a",
           "timestamp": "2026-08-20T14:00:00Z"
@@ -1545,7 +1545,7 @@
         {
           "step": 0,
           "train_loss": 2.32,
-          "grad_norm": 2.0,
+          "grad_norm": 2,
           "node_id": "diverging_curve_node",
           "run_id": "run-2026-08-20-a",
           "timestamp": "2026-08-20T14:00:00Z"
@@ -1773,7 +1773,7 @@
         {
           "step": 0,
           "train_loss": 2.475,
-          "grad_norm": 2.0,
+          "grad_norm": 2,
           "node_id": "truncated_run_trap_node",
           "run_id": "run-2026-08-20-a",
           "timestamp": "2026-08-20T14:00:00Z"
@@ -1828,8 +1828,8 @@
           0.0003,
           0.00026,
           0.00017,
-          8e-05,
-          1e-05
+          0.00008,
+          0.00001
         ]
       },
       "hypothesis": {
@@ -1849,7 +1849,7 @@
         {
           "step": 0,
           "train_loss": 2.475,
-          "grad_norm": 2.0,
+          "grad_norm": 2,
           "param_norm": 11.8,
           "node_id": "upgrade_negative_control_node",
           "run_id": "run-2026-08-20-a",
@@ -1940,7 +1940,7 @@
           "step": 200,
           "train_loss": 0.9033,
           "grad_norm": 1.864,
-          "param_norm": 12.0,
+          "param_norm": 12,
           "node_id": "upgrade_negative_control_node",
           "run_id": "run-2026-08-20-a",
           "timestamp": "2026-08-20T14:10:00Z"
@@ -2084,7 +2084,7 @@
       ],
       "expect": {
         "benchmark_upgrade_proposal": false,
-        "eda_summary.per_domain_gap_pp": 6.0
+        "eda_summary.per_domain_gap_pp": 6
       }
     },
     {
@@ -2099,8 +2099,8 @@
           0.0003,
           0.00026,
           0.00017,
-          8e-05,
-          1e-05
+          0.00008,
+          0.00001
         ]
       },
       "hypothesis": {
@@ -2120,7 +2120,7 @@
         {
           "step": 0,
           "train_loss": 1.52,
-          "grad_norm": 2.0,
+          "grad_norm": 2,
           "node_id": "upgrade_positive_node",
           "run_id": "run-2026-08-20-a",
           "timestamp": "2026-08-20T14:00:00Z"
@@ -2353,8 +2353,8 @@
           0.0003,
           0.00026,
           0.00017,
-          8e-05,
-          1e-05
+          0.00008,
+          0.00001
         ]
       },
       "hypothesis": {
@@ -2369,7 +2369,7 @@
         {
           "step": 0,
           "train_loss": 2.475,
-          "grad_norm": 2.0,
+          "grad_norm": 2,
           "param_norm": 11.8,
           "node_id": "refuted_verdict_node",
           "run_id": "run-2026-08-20-a",
@@ -2460,7 +2460,7 @@
           "step": 200,
           "train_loss": 0.9033,
           "grad_norm": 1.864,
-          "param_norm": 12.0,
+          "param_norm": 12,
           "node_id": "refuted_verdict_node",
           "run_id": "run-2026-08-20-a",
           "timestamp": "2026-08-20T14:10:00Z"

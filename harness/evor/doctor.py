@@ -12,6 +12,7 @@ Checks:
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import shutil
@@ -367,6 +368,123 @@ def _check_frozen_split_hash(run_dir: Path, items: list[DoctorItem]) -> None:
 
 # ─── Main doctor function ─────────────────────────────────────────────────────
 
+def _check_plugin_tree_drift(items: list[DoctorItem]) -> None:
+    """Compare the installed tree against the manifest it shipped with (A-04/P-01).
+
+    ``evor doctor`` is the self-check that ships with the plugin and runs INSIDE
+    the installed tree — the only place a drift check can fire for a real user.
+    It checked ``.evor/`` layout and mission state and said nothing whatsoever
+    about the plugin's own files.
+
+    During the field run 17 files in the installed tree were modified in place,
+    including ``hooks/stop.mjs`` — part of the enforcement layer — and 26
+    ``.bak-*`` files were left beside them. None of it was reported for 19 hours,
+    and the drift was eventually established by hand with ``diff -rq`` against a
+    fresh clone, after the fact. The version string in ``plugin.json`` did not
+    change, because a version does not change when files are patched underneath
+    it.
+
+    The leftover ``.bak-*`` files are reported too: they are the agents' own
+    convention for "I am about to overwrite something", and they were the only
+    trace the modification happened at all.
+    """
+    plugin_root = Path(
+        os.environ.get("EVOR_PLUGIN_ROOT")
+        or os.environ.get("CLAUDE_PLUGIN_ROOT")
+        or Path(__file__).resolve().parents[2]
+    )
+    manifest_path = plugin_root / ".claude-plugin" / "MANIFEST.sha256"
+
+    if not manifest_path.exists():
+        items.append(DoctorItem(
+            category="plugin",
+            name="plugin_tree_drift",
+            status="warn",
+            detail=(
+                f"no {manifest_path.name} in this install, so the shipped tree cannot be "
+                "compared against its release. Regenerate with `node ci/generate-provenance.mjs`."
+            ),
+        ))
+        return
+
+    try:
+        manifest = json.loads(manifest_path.read_text())
+    except Exception as exc:  # noqa: BLE001
+        items.append(DoctorItem(
+            category="plugin", name="plugin_tree_drift", status="warn",
+            detail=f"{manifest_path.name} is unreadable ({exc}); cannot verify the tree",
+        ))
+        return
+
+    modified: list[str] = []
+    missing: list[str] = []
+    for rel, expected in (manifest.get("files") or {}).items():
+        target = plugin_root / rel
+        if not target.exists():
+            missing.append(rel)
+            continue
+        try:
+            actual = hashlib.sha256(target.read_bytes()).hexdigest()
+        except OSError:
+            continue
+        if actual != expected:
+            modified.append(rel)
+
+    # The agents' own `.bak-<ts>` convention — the only trace the field
+    # modifications left behind.
+    backups = [
+        str(p.relative_to(plugin_root))
+        for p in plugin_root.rglob("*.bak-*")
+        if p.is_file() and ".evor" not in p.parts and "node_modules" not in p.parts
+    ]
+
+    if not modified and not missing and not backups:
+        items.append(DoctorItem(
+            category="plugin",
+            name="plugin_tree_drift",
+            status="ok",
+            detail=(
+                f"{len(manifest.get('files') or {})} files match "
+                f"{(manifest.get('commit') or 'the recorded release')[:12]}"
+            ),
+        ))
+        return
+
+    parts = []
+    if modified:
+        parts.append(f"{len(modified)} modified ({', '.join(sorted(modified)[:5])}"
+                     + (", …" if len(modified) > 5 else "") + ")")
+    if missing:
+        parts.append(f"{len(missing)} missing ({', '.join(sorted(missing)[:3])}"
+                     + (", …" if len(missing) > 3 else "") + ")")
+    if backups:
+        parts.append(f"{len(backups)} leftover .bak-* file(s)")
+
+    # A DEV CHECKOUT is expected to differ from the last release — that is what
+    # working on it means. Reporting an error there would make this check fire
+    # constantly for the people most able to turn it off, which is how a guard
+    # stops being read. The condition it exists for is an INSTALLED tree that has
+    # drifted, and an installed tree has no `.git`.
+    is_checkout = (plugin_root / ".git").exists()
+
+    items.append(DoctorItem(
+        category="plugin",
+        name="plugin_tree_drift",
+        # In an installed tree, an edited enforcement layer is an error: an agent
+        # that can modify the code that governs it is not governed.
+        status="warn" if is_checkout else ("error" if modified else "warn"),
+        detail=(
+            ("this checkout differs from the release recorded in MANIFEST.sha256 "
+             "(expected while developing; regenerate with `node ci/generate-provenance.mjs`): "
+             if is_checkout else
+             "the installed tree differs from the release it records: ")
+            + "; ".join(parts)
+            + ("" if is_checkout else
+               ". Reinstall the plugin — files were changed after it was released.")
+        ),
+    ))
+
+
 def run_doctor(
     run_dir: Path | None = None,
     repair: bool = False,
@@ -389,6 +507,7 @@ def run_doctor(
     _check_node(items)
     _check_env_vars(items)
     _check_patch_tool(items)
+    _check_plugin_tree_drift(items)
 
     # ── .evor integrity checks (only when run_dir provided) ──────────────────
     if run_dir is not None:

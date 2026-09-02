@@ -23,7 +23,12 @@ import { describe, it, expect } from "vitest";
 import { readFileSync, readdirSync, existsSync } from "fs";
 import { dirname, resolve } from "path";
 import { fileURLToPath } from "url";
-import { scoreByContract, buildRolePrompt } from "../../ci/eval-core.mjs";
+import {
+  scoreByContract,
+  buildRolePrompt,
+  ruleLinesFor,
+  ungroundedEnumValues,
+} from "../../ci/eval-core.mjs";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const EVALS = resolve(REPO_ROOT, "evals");
@@ -242,5 +247,100 @@ describe.each(specs)("$dir", ({ spec }) => {
         floor,
       );
     }
+  });
+});
+
+/**
+ * The third harness failure — a spec that grades a distinction the agent file
+ * never draws.
+ *
+ * The Phase 8 pilot found `evals/tick` asserting `outcome: "rejected"` where
+ * `agents/evor-tick.md` listed four outcomes and said which applied for exactly
+ * one. The model answered `"skipped"` with sound reasoning and was scored
+ * incorrect. Every check above passes on that spec: the oracle scores `correct`,
+ * no constant answer clears the floor. The scorer was right and the question was
+ * unanswerable, which is invisible to anything that only inspects the scorer.
+ */
+describe("graded distinctions are stated to the agent", () => {
+  // The real pre-fix prose, trimmed. `failed` carried a rule and the model got
+  // it right; the other three were vocabulary only. A checker that cannot tell
+  // those apart cannot catch this, so this fixture is the checker's own gate.
+  const TICK_BEFORE = [
+    "`outcome` is one of `\"scored\"`, `\"rejected\"`, `\"skipped\"`, `\"failed\"`; add `\"error\"` when it is",
+    "`\"failed\"`. `node_id` and `score` only when a node was actually evaluated.",
+  ].join("\n");
+  const TICK_AFTER = [
+    TICK_BEFORE,
+    "| `scored` | a node was trained AND evaluated; `node_id` and `score` are present |",
+    "| `rejected` | candidates existed and the selector approved none of them |",
+    "| `skipped` | there was nothing to decide — no proposals reached the selector at all |",
+  ].join("\n");
+  const OUTCOMES = ["scored", "rejected", "skipped", "failed"];
+
+  it("sees the defect the pilot found, and sees the fix", () => {
+    const before = OUTCOMES.filter((v) => ruleLinesFor(TICK_BEFORE, v, OUTCOMES).length === 0);
+    expect(before.sort()).toEqual(["rejected", "scored", "skipped"]);
+    const after = OUTCOMES.filter((v) => ruleLinesFor(TICK_AFTER, v, OUTCOMES).length === 0);
+    expect(after).toEqual([]);
+  });
+
+  it("does not mistake a vocabulary list for a rule", () => {
+    // The enumeration names every sibling AND contains "when" — for a different
+    // field. Counting mentions, or grepping for a conditional, both pass it.
+    expect(ruleLinesFor(TICK_BEFORE, "rejected", OUTCOMES)).toEqual([]);
+  });
+
+  it.each(specs)("$dir grades nothing its agent file leaves undefined", ({ spec }) => {
+    const agentPath = resolve(REPO_ROOT, spec.agent_file);
+    expect(existsSync(agentPath), `${spec.agent_file} is missing`).toBe(true);
+    const ungrounded = ungroundedEnumValues(readFileSync(agentPath, "utf8"), spec.contract, spec.cases);
+    expect(
+      ungrounded,
+      ungrounded
+        .map(
+          (u) =>
+            `${spec.agent_file} never states when ${u.path}="${u.value}" applies, ` +
+            `but ${u.cases} case(s) are graded on it`,
+        )
+        .join("\n"),
+    ).toEqual([]);
+  });
+});
+
+/**
+ * The count axis of the same failure.
+ *
+ * `agents/evor-mutagen.md` states the proposal count as arithmetic —
+ * `dream_k = min(max(strategy.dream_k or 0, train_k * 2, 5), 7)` — so unlike an
+ * enum, "is the rule stated?" has a checkable answer: recompute it.
+ *
+ * Nine of ten cases matched. The tenth was `dream-k-small-tick`, the case that
+ * exists to grade this gate: its note read "train_k is 2, so at least 4
+ * proposals", applying `train_k * 2` and dropping the floor. It accepted 4 — the
+ * one count the formula can never return. A lenient expectation cannot fail, so
+ * nothing here could see it; it would have been reported as the dream_k gate
+ * passing.
+ */
+describe("mutagen's graded proposal count is the count its agent file computes", () => {
+  const mutagen = specs.find((s) => s.spec.role === "evor-mutagen");
+  const dreamK = (trainK: number, stated = 0) => Math.min(Math.max(stated, trainK * 2, 5), 7);
+
+  it("recomputes the formula for every case that grades a count", () => {
+    expect(mutagen, "evals/mutagen/spec.json vanished").toBeDefined();
+    for (const c of mutagen!.spec.cases as any[]) {
+      const min = c.expect?.proposals?.min;
+      if (min === undefined) continue;
+      expect(typeof c.train_k, `${c.id} grades a count with no train_k in its payload`).toBe("number");
+      expect(min, `${c.id}: agent file computes dream_k=${dreamK(c.train_k)} from train_k=${c.train_k}`).toBe(
+        dreamK(c.train_k),
+      );
+    }
+  });
+
+  it("the formula is still the one the agent file states", () => {
+    // If this drifts, the check above is measuring a rule the agent no longer
+    // has — the failure this whole block exists to catch, one level up.
+    const text = readFileSync(resolve(REPO_ROOT, "agents/evor-mutagen.md"), "utf8");
+    expect(text).toContain("min(max(strategy.dream_k or 0, train_k * 2, 5), 7)");
   });
 });

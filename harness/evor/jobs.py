@@ -138,6 +138,26 @@ def start_job(cmd_args: list[str], run_dir: Path) -> dict[str, str]:
     }
 
 
+def _pid_alive(pid: int) -> bool:
+    """Is this process still running? (Item 6.4.)
+
+    Signal 0 performs the permission and existence checks without delivering
+    anything. ``PermissionError`` means the process EXISTS and belongs to another
+    user — alive, and not ours to judge.
+    """
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    except OSError:
+        # Cannot tell. Absence of an answer is not evidence of death — the same
+        # rule as 1.4, and reporting a live job dead would discard real work.
+        return True
+    return True
+
+
 def status(job_id: str, run_dir: Path) -> dict[str, Any]:
     """Read jobs/<job_id>/status.json; return error dict if absent or unreadable."""
     sp = status_path(run_dir, job_id)
@@ -149,6 +169,29 @@ def status(job_id: str, run_dir: Path) -> dict[str, Any]:
         }
     try:
         data: dict[str, Any] = json.loads(sp.read_text())
+
+        # ── R-11 (item 6.4): a claim of "running" must be CHECKED ────────────
+        #
+        # This re-read `status.json` and echoed it. When a job is killed — OOM,
+        # SIGKILL, the machine going away — nothing rewrites that file, so the
+        # record says `running` forever and every reader believes it. The
+        # supervisor flips the status on a clean exit; being killed is precisely
+        # the case where it does not get to.
+        #
+        # `os.kill(pid, 0)` asks the kernel, which is the only party that knows.
+        # It is the same shape as 3.3's staleness rule: liveness needed an event
+        # nobody emitted, so ask something that cannot fail to answer.
+        if str(data.get("state", "")) == "running":
+            pid = data.get("pid")
+            if isinstance(pid, int) and pid > 0 and not _pid_alive(pid):
+                data["state"] = "dead"
+                data["error"] = (
+                    f"process {pid} is not running, but status.json still said 'running'. "
+                    "The job was killed without the supervisor getting to record it — "
+                    "its checkpoint must not be scored."
+                )
+                data["detected_dead_at"] = datetime.now(timezone.utc).isoformat()
+
         # Append last log lines as tail when the job is still running or just finished
         lp = log_path(run_dir, job_id)
         if lp.exists():

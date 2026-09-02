@@ -327,15 +327,54 @@ describe("agent-eval — scoring: per-proposal cases", () => {
 });
 
 describe("agent-eval — scoring: set-level cases (expect_any_rejected_for)", () => {
-  it("scores h003-family-collision correct when ANY review is rejected on h003", () => {
+  // CORRECTED, not weakened. This test asserted that ONE rejection on h003 was
+  // enough — with three proposals sharing `algo`, that verdict leaves a
+  // colliding PAIR approved and H003 still broken. The case exists to catch
+  // exactly that verdict and was scoring it `correct`.
+  //
+  // Which member is rejected stays a judgement call; how many does not.
+  it("scores h003-family-collision INCORRECT when only one of three collisions is rejected", () => {
     const c = caseById("h003-family-collision");
     const parsed = {
       reviews: [passReview("p1"), failReview("p2", "h003"), passReview("p3")],
       winner: "p1",
     };
     const out = scoreCase(c, parsed);
+    expect(out.status).toBe("incorrect");
+    expect(out.rejections_on_gate).toBe(1);
+    expect(out.rejections_required).toBe(2);
+  });
+
+  it("scores h003-family-collision correct when the collision is actually resolved", () => {
+    const c = caseById("h003-family-collision");
+    const parsed = {
+      reviews: [passReview("p1"), failReview("p2", "h003"), failReview("p3", "h003")],
+      winner: "p1",
+    };
+    const out = scoreCase(c, parsed);
     expect(out.status).toBe("correct");
     expect(out.named_gate).toBe("h003");
+  });
+
+  // The floor is arithmetic on the case payload, not a number someone typed:
+  // a family group of size N leaves N-1 to reject, and a parent shared by K
+  // proposals out of N leaves K - floor(N/2).
+  it("each set-level floor is the one its payload derives", () => {
+    const h3 = caseById("h003-family-collision");
+    const families = new Map<string, number>();
+    for (const p of h3.proposals) families.set(p.approach_family, (families.get(p.approach_family) ?? 0) + 1);
+    const owed = [...families.values()].reduce((a, n) => a + Math.max(0, n - 1), 0);
+    expect(h3.expect_min_rejections, `h003 payload owes ${owed} rejection(s)`).toBe(owed);
+
+    const h4 = caseById("h004-parent-concentration");
+    const parents = new Map<string, number>();
+    for (const p of h4.proposals) {
+      const k = JSON.stringify(p.parent_node_ids);
+      parents.set(k, (parents.get(k) ?? 0) + 1);
+    }
+    const cap = Math.floor(h4.proposals.length / 2);
+    const owed4 = [...parents.values()].reduce((a, n) => a + Math.max(0, n - cap), 0);
+    expect(h4.expect_min_rejections, `h004 payload owes ${owed4} rejection(s)`).toBe(owed4);
   });
 
   it("scores h003-family-collision incorrect when nothing is rejected on h003", () => {

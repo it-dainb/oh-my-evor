@@ -143,7 +143,6 @@ class TestApproachFamily:
             ),
             citations=[],
             wildness=0.5,
-            critic_approved=True,
             critic_review=VALID_CRITIC_REVIEW,
         )
         assert prop.approach_family == tag
@@ -251,7 +250,6 @@ class TestMutationProposal:
             hypothesis=Hypothesis(id="h-001", statement="AdamW converges faster", prediction="+2pp"),
             citations=["https://arxiv.org/abs/1711.05101"],
             wildness=0.3,
-            critic_approved=True,
             critic_review=VALID_CRITIC_REVIEW,
         )
         return MutationProposal(**{**base, **overrides})
@@ -272,7 +270,7 @@ class TestMutationProposal:
             verdict="rejected",
             rejection_reason="Family streak exceeded",
         )
-        prop = self._make(critic_approved=False, critic_review=review)
+        prop = self._make(critic_review=review)  # 2b.2: critic_approved removed
         assert prop.critic_review.verdict == "rejected"
         assert prop.critic_review.rejection_reason == "Family streak exceeded"
 
@@ -1116,7 +1114,6 @@ class TestServerOwnedDefaults:
             hypothesis=Hypothesis(id="h-1", statement="s", prediction="p"),
             citations=[],
             wildness=0.3,
-            critic_approved=True,
         )
         assert prop.proposal_id is None
 
@@ -1129,7 +1126,6 @@ class TestServerOwnedDefaults:
             hypothesis=Hypothesis(id="h-1", statement="s", prediction="p"),
             citations=[],
             wildness=0.3,
-            critic_approved=True,
         )
         assert prop.critic_review is None
 
@@ -1142,7 +1138,6 @@ class TestServerOwnedDefaults:
             hypothesis=Hypothesis(id="h-2", statement="s", prediction="p"),
             citations=[],
             wildness=0.5,
-            critic_approved=False,
         )
         assert prop.proposal_id is None
         assert prop.critic_review is None

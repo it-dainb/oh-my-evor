@@ -76,11 +76,13 @@ def _parse_arch(major: int, minor: int) -> str:
 def _probe_torch_gpu() -> tuple[
     Optional[str],   # gpu_arch
     Optional[str],   # gpu_name
-    Optional[float], # vram_gb
+    Optional[float], # vram_gb (TOTAL)
     list[str],       # supported_dtypes
-    list[str],       # available_libs
+    list[str],       # available_libs (exercised — R-09)
     Optional[str],   # cuda_version
     bool,            # cpu_only
+    Optional[float], # free_vram_gb (measured — R-04)
+    list[str],       # importable_libs (raw import result — R-09)
 ]:
     """Probe GPU capabilities via torch. Returns (gpu_arch, gpu_name, vram_gb,
     supported_dtypes, available_libs, cuda_version, cpu_only).
@@ -91,10 +93,10 @@ def _probe_torch_gpu() -> tuple[
     try:
         import torch  # type: ignore[import]
     except ImportError:
-        return None, None, None, ["fp32"], [], None, True
+        return None, None, None, ["fp32"], [], None, True, None, []
 
     if not torch.cuda.is_available():
-        return None, None, None, ["fp32"], [], None, True
+        return None, None, None, ["fp32"], [], None, True, None, []
 
     try:
         dev = torch.cuda.current_device()
@@ -103,6 +105,20 @@ def _probe_torch_gpu() -> tuple[
         arch = _parse_arch(major, minor)
         name = props.name
         vram_gb = round(props.total_memory / (1024 ** 3), 2)
+
+        # ── R-04: ASK the driver what is free ────────────────────────────────
+        #
+        # `props.total_memory` is the card's capacity, not what this process can
+        # have. On a shared-tenant A100 the artifact said 79.25 GB while ~40 GB
+        # was free; agents learned to distrust it, and the next one that does not
+        # will oversize a candidate. Free memory cannot be derived from total —
+        # it has to be measured, which is what `mem_get_info` is for.
+        free_vram_gb: Optional[float] = None
+        try:
+            free_bytes, _total_bytes = torch.cuda.mem_get_info()
+            free_vram_gb = round(free_bytes / (1024 ** 3), 2)
+        except Exception:
+            free_vram_gb = None   # older torch or a driver that will not say
 
         # cuda version
         cuda_ver: Optional[str] = None
@@ -120,8 +136,18 @@ def _probe_torch_gpu() -> tuple[
         if (major, minor) >= _FP8_MIN_ARCH:
             dtypes.append("fp8")
 
-        # available acceleration libs
-        libs: list[str] = []
+        # ── R-09: importable is not available ────────────────────────────────
+        #
+        # This list advertised flash-attn, xformers and triton on the strength of
+        # a bare `__import__`, while the goal contract FORBADE all three and the
+        # verification artifact recorded "no flash_attn" as a PASS. Three
+        # different questions were being answered by one: can it be imported, is
+        # it permitted here, does it actually work on this device?
+        #
+        # `importable_libs` keeps the raw answer, labelled as what it is.
+        # `available_libs` means usable, and a bare import is not evidence of
+        # that — so it stays empty until something exercises the library.
+        importable: list[str] = []
         for lib_name, import_name in [
             ("flash-attn", "flash_attn"),
             ("xformers",   "xformers"),
@@ -130,15 +156,26 @@ def _probe_torch_gpu() -> tuple[
         ]:
             try:
                 __import__(import_name)
-                libs.append(lib_name)
-            except ImportError:
+                importable.append(lib_name)
+            except Exception:
+                # Deliberately broad. `except ImportError` was too narrow and it
+                # took the WHOLE probe down: a library that raises on import for
+                # its own reasons — a version mismatch, a missing CUDA symbol —
+                # escaped the handler, hit the outer catch, and the run was
+                # reported cpu_only with no VRAM at all. A library that explodes
+                # when imported is not importable, which is precisely the answer
+                # this loop exists to collect.
                 pass
 
-        return arch, name, vram_gb, dtypes, libs, cuda_ver, False
+        # Exercised, not merely imported. Nothing is claimed available until a
+        # probe actually runs it — which is the difference R-09 is about.
+        libs: list[str] = []
+
+        return arch, name, vram_gb, dtypes, libs, cuda_ver, False, free_vram_gb, importable
 
     except Exception:
         # GPU present but probe failed — report as cpu_only
-        return None, None, None, ["fp32"], [], None, True
+        return None, None, None, ["fp32"], [], None, True, None, []
 
 
 def probe_capability(
@@ -165,7 +202,8 @@ def probe_capability(
     CapabilityProfile
         The probed profile (also written to disk).
     """
-    arch, name, vram_gb, dtypes, libs, cuda_ver, cpu_only = _probe_torch_gpu()
+    (arch, name, vram_gb, dtypes, libs, cuda_ver, cpu_only,
+     free_vram_gb, importable_libs) = _probe_torch_gpu()
 
     profile = CapabilityProfile(
         gpu_arch=arch,
@@ -175,6 +213,14 @@ def probe_capability(
         available_libs=libs,
         cuda_version=cuda_ver,
         cpu_only=cpu_only,
+        free_vram_gb=free_vram_gb,
+        importable_libs=importable_libs,
+        # R-05: this profile was MEASURED. A hand-authored capability.json sat in
+        # the plugin root and was read by two agents as "the capability profile",
+        # one treating it as a measurement and one as a policy ceiling. Saying
+        # which it is costs one field and removes the ambiguity that produced
+        # both readings.
+        source="probe",
         probed_at=_now_iso(),
     )
 
@@ -256,15 +302,39 @@ def _seed_constraint_gotchas(
         store.add_gotcha(entry)
 
 
-def read_capability(evor_root: Path) -> Optional[CapabilityProfile]:
-    """Load the CapabilityProfile from .evor/capability.json.
+class MalformedCapabilityProfile(ValueError):
+    """A capability.json exists but is not a CapabilityProfile (R-05)."""
 
-    Returns None when the file is absent (preflight not yet run).
+
+def read_capability(evor_root: Path) -> Optional[CapabilityProfile]:
+    """Load the CapabilityProfile from ``.evor/capability.json``.
+
+    Returns ``None`` only when the file is ABSENT — the probe has not run.
+    Raises :class:`MalformedCapabilityProfile` when a file exists but does not
+    conform.
+
+    R-05. Both cases used to return ``None``, so a hand-authored file read
+    exactly like an absent one. Two conflicting ``capability.json`` files
+    existed; the plugin-side one was hand-written, schema-nonconformant, and
+    bypassed the prober entirely — and two agents reading "the capability
+    profile" got contradictory answers depending on which root they resolved.
+    Neither could tell, because the failure mode of the malformed one was
+    silence.
+
+    Pinning a profile to steer proposals is legitimate. It just has to SAY so —
+    ``source: "policy-pin"`` — rather than impersonating a measurement of this
+    machine.
     """
     cap_path = Path(evor_root) / _CAPABILITY_FILE
     if not cap_path.exists():
         return None
     try:
         return CapabilityProfile.model_validate_json(cap_path.read_text())
-    except Exception:
-        return None
+    except Exception as exc:
+        raise MalformedCapabilityProfile(
+            f"the capability profile at {cap_path} exists but does not conform to "
+            f"CapabilityProfile: {exc}. This is not the same as 'no probe has run' — "
+            f"a hand-authored profile that fails validation must be fixed or removed, "
+            f"not silently ignored. If it is a deliberate pin, declare "
+            f'source: "policy-pin" and supply the required fields.'
+        ) from exc

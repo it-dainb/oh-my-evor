@@ -1,0 +1,28 @@
+{
+  "$comment": [
+    "Runtime limits for an evor mission. Declared, never inherited.",
+    "",
+    "CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH: nested spawning shipped in 2.1.172,",
+    "was turned OFF by default in 2.1.217 (depth 1), and restored at depth 3 in",
+    "2.1.219. The ceiling is 5. evor's tree is main(0) -> evor-tick(1) ->",
+    "leads(2) -> juniors(3), so depth 3 is the minimum that lets forge-junior and",
+    "sage-junior spawn at all. 4 leaves one level of headroom without pretending",
+    "to a depth the design does not use. A default that has already moved twice is",
+    "not something a 100-200 tick mission should depend on silently.",
+    "",
+    "CLAUDE_CODE_MAX_SUBAGENTS_PER_SESSION: the 200 default binds around tick",
+    "20-22 at the observed ~7-9 spawns/tick, far inside the target run length.",
+    "Raised to 2000 to cover 200 ticks. Note this is a runaway-loop backstop, so",
+    "raising it removes a safety net: maxTurns in the agent frontmatter and the",
+    "session rotation planned for Phase 4.1 are what bound spawn growth instead.",
+    "",
+    "CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS: sized against the widest fan-out in",
+    "the system, Forge's four reviewers plus its junior. 8 leaves room for two",
+    "such fan-outs without queueing; the default is 20."
+  ],
+  "env": {
+    "CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH": "4",
+    "CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS": "8",
+    "CLAUDE_CODE_MAX_SUBAGENTS_PER_SESSION": "2000"
+  }
+}

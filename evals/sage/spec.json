@@ -3,7 +3,7 @@
   "agent_file": "agents/evor-sage.md",
   "arms": [
     {
-      "model": "sonnet",
+      "model": "haiku",
       "effort": "medium",
       "label": "current"
     },
@@ -285,7 +285,7 @@
               "trust_level": "indicative",
               "sota_bar": {
                 "metric": "top-1 accuracy",
-                "value": 80.0,
+                "value": 80,
                 "dataset": "ImageNet-1k"
               },
               "applicable_families": [
@@ -357,7 +357,7 @@
               "trust_level": "indicative",
               "sota_bar": {
                 "metric": "top-1 accuracy",
-                "value": 80.0,
+                "value": 80,
                 "dataset": "ImageNet-1k"
               },
               "applicable_families": [
@@ -424,7 +424,7 @@
               "trust_level": "indicative",
               "sota_bar": {
                 "metric": "top-1 accuracy",
-                "value": 80.0,
+                "value": 80,
                 "dataset": "ImageNet-1k"
               },
               "applicable_families": [
@@ -760,7 +760,7 @@
               "trust_level": "indicative",
               "sota_bar": {
                 "metric": "box AP",
-                "value": 42.0,
+                "value": 42,
                 "dataset": "COCO"
               },
               "applicable_families": [
@@ -808,7 +808,7 @@
               "trust_level": "indicative",
               "sota_bar": {
                 "metric": "mIoU",
-                "value": 81.0,
+                "value": 81,
                 "dataset": "Cityscapes"
               },
               "applicable_families": [

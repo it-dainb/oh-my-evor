@@ -13,10 +13,13 @@ from __future__ import annotations
 
 import json
 import random
+import time
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Optional
+
+from .run_status import REQUIRED_RUN_STATE_FIELDS
 
 # ─── Trivially-gameable metric names (rule-registry fast pre-check) ───────────
 # These metrics reach 1.0 (or 0.0) via degenerate all-positive / all-negative
@@ -688,7 +691,7 @@ def _check_run_state(run_dir: Path) -> list[CheckResult]:
         ))
         return checks
 
-    required = ("status", "tick_count", "frontier_ids")
+    required = REQUIRED_RUN_STATE_FIELDS
     missing = [f for f in required if f not in data]
     if missing:
         checks.append(CheckResult(
@@ -707,6 +710,316 @@ def _check_run_state(run_dir: Path) -> list[CheckResult]:
 
 
 # ─── Main validate_run ─────────────────────────────────────────────────────────
+
+def _check_stop_reachable(run_dir: Path) -> list[CheckResult]:
+    """Is there any state this run could reach that would stop it? (Item 9.3.)
+
+    K-06 / K-07 / L-05. A stop condition that cannot be met is not a stop
+    condition — the mission has no exit, and nothing says so until someone
+    notices hours later that it is still going. These are all checkable at
+    init, from the contract alone, which is the only moment fixing them is cheap.
+    """
+    out: list[CheckResult] = []
+    gc_path = run_dir / "goal-contract.json"
+    if not gc_path.exists():
+        return out
+    try:
+        gc = json.loads(gc_path.read_text())
+    except Exception:  # noqa: BLE001
+        return out
+
+    stop = gc.get("stop_condition") or {}
+    stop_type = str(stop.get("stop_type") or stop.get("type") or "")
+    coverage_target = gc.get("coverage_target")
+    if coverage_target is None:
+        coverage_target = stop.get("coverage_target")
+
+    # ── K-06: coverage-target stops ──────────────────────────────────────────
+    if coverage_target is not None:
+        try:
+            target = float(coverage_target)
+        except (TypeError, ValueError):
+            target = None
+        if target is not None and not (0.0 < target <= 1.0):
+            out.append(CheckResult(
+                name="coverage_target_reachable",
+                ok=False,
+                detail=(
+                    f"coverage_target={target} is outside (0, 1]. Coverage is a fraction "
+                    "of the angle registry, so no run can ever reach it and the mission "
+                    "has no exit."
+                ),
+            ))
+        elif stop_type in ("coverage-target", "coverage_target"):
+            registry = _angle_registry_size(run_dir)
+            if registry == 0:
+                out.append(CheckResult(
+                    name="coverage_target_reachable",
+                    ok=False,
+                    detail=(
+                        "the stop condition is coverage-target but the angle registry is "
+                        "EMPTY. Coverage over nothing is undefined, so the run has no "
+                        "reachable termination criterion."
+                    ),
+                ))
+            else:
+                out.append(CheckResult(
+                    name="coverage_target_reachable", ok=True,
+                    detail=f"coverage_target={target} over {registry} angle(s)",
+                ))
+
+    budget = gc.get("budget") or {}
+
+    # ── K-06: a circuit breaker below the advertised iteration budget ────────
+    breaker = budget.get("circuit_breaker")
+    max_iter = budget.get("max_iterations")
+    if isinstance(breaker, int) and isinstance(max_iter, int) and 0 < breaker < max_iter:
+        out.append(CheckResult(
+            name="circuit_breaker_consistent",
+            ok=False,
+            detail=(
+                f"circuit_breaker={breaker} trips long before max_iterations={max_iter}. "
+                "The advertised budget is unreachable: the run stops at "
+                f"{breaker} consecutive non-improving ticks, so the other "
+                f"{max_iter - breaker} are budget the mission can never spend."
+            ),
+        ))
+
+    # ── K-07: a zero cost ceiling ───────────────────────────────────────────
+    # `0` currently means UNLIMITED in a three-way doc/code/type collision, which
+    # is the most expensive possible reading of a field an operator sets to zero
+    # when they mean "do not spend".
+    if "max_cost_usd" in budget:
+        try:
+            ceiling = float(budget["max_cost_usd"])
+        except (TypeError, ValueError):
+            ceiling = None
+        if ceiling is not None and ceiling <= 0:
+            out.append(CheckResult(
+                name="cost_ceiling_enforceable",
+                ok=False,
+                detail=(
+                    f"max_cost_usd={budget['max_cost_usd']} disables the spend ceiling. "
+                    "Zero is read as 'unlimited' by the stop path — the opposite of what "
+                    "an operator setting it to zero means. Set a positive ceiling, or "
+                    "omit the field to accept the default."
+                ),
+            ))
+        else:
+            out.append(CheckResult(
+                name="cost_ceiling_enforceable", ok=True,
+                detail=f"max_cost_usd={budget['max_cost_usd']}",
+            ))
+
+    return out
+
+
+def _angle_registry_size(run_dir: Path) -> int:
+    """How many angles this run's registry declares. 0 when there is none."""
+    for candidate in ("angle-registry.json", "angles.json"):
+        path = run_dir / candidate
+        if not path.exists():
+            continue
+        try:
+            data = json.loads(path.read_text())
+        except Exception:  # noqa: BLE001
+            continue
+        angles = data.get("angles") if isinstance(data, dict) else data
+        if isinstance(angles, (list, dict)):
+            return len(angles)
+    return 0
+
+
+def _check_gate_feasible(run_dir: Path) -> list[CheckResult]:
+    """Can a candidate satisfy the gates this contract sets? (Items 9.3 / L-05.)
+
+    Two failures, both discovered late in the field:
+
+      An out-of-RANGE threshold — `precision >= 1.5` — that no candidate can meet
+      because the metric cannot take that value.
+
+      An out-of-REACH threshold: a precision floor of 0.80 against a measured
+      incumbent of 0.0040, two hundred times below it. Every candidate was
+      penalised to fitness 0.0 and the run had no way to succeed. That was
+      discovered 26 hours in; the incumbent's own measurement was on disk the
+      whole time.
+    """
+    out: list[CheckResult] = []
+    gc_path = run_dir / "goal-contract.json"
+    if not gc_path.exists():
+        return out
+    try:
+        gc = json.loads(gc_path.read_text())
+    except Exception:  # noqa: BLE001
+        return out
+
+    baseline = None
+    baseline_path = run_dir / "baseline-eval.json"
+    if baseline_path.exists():
+        try:
+            baseline = json.loads(baseline_path.read_text())
+        except Exception:  # noqa: BLE001
+            baseline = None
+
+    #: Metrics bounded to [0, 1] by definition. A threshold outside that is not
+    #: a demanding gate, it is an unmeetable one.
+    BOUNDED = ("precision", "recall", "fmeasure", "f1", "accuracy", "iou", "auc", "coverage")
+
+    for spec in gc.get("metric_specs") or []:
+        for constraint in (spec.get("constraints") or []):
+            metric = str(constraint.get("metric", ""))
+            op = str(constraint.get("op", ""))
+            try:
+                threshold = float(constraint.get("threshold"))
+            except (TypeError, ValueError):
+                continue
+
+            if any(b in metric.lower() for b in BOUNDED) and op in (">=", ">") and threshold > 1.0:
+                out.append(CheckResult(
+                    name=f"constraint_in_range:{metric}",
+                    ok=False,
+                    detail=(
+                        f"{metric} {op} {threshold} can never be satisfied: {metric} is "
+                        "bounded above by 1.0. Every candidate is penalised to fitness 0.0 "
+                        "regardless of how good it is."
+                    ),
+                ))
+                continue
+
+            measured = _measured_metric(baseline, metric)
+            if measured is not None and op in (">=", ">") and threshold > 0 and measured >= 0:
+                # A gate far above the measured incumbent is a research goal
+                # stated as a gameability guard. 10x is deliberately generous —
+                # this exists to catch 200x, not to police ambition.
+                if measured > 0 and threshold / measured >= 10:
+                    out.append(CheckResult(
+                        name=f"constraint_satisfiable:{metric}",
+                        ok=False,
+                        detail=(
+                            f"{metric} {op} {threshold} is {threshold / measured:.0f}x the "
+                            f"measured incumbent ({measured}). As a hard constraint this "
+                            "penalises every candidate to fitness 0.0, so the run cannot "
+                            "succeed. Declare it as a goal (purpose='goal') rather than a "
+                            "floor, or set a floor the incumbent can approach."
+                        ),
+                    ))
+                elif measured == 0 and threshold > 0:
+                    out.append(CheckResult(
+                        name=f"constraint_satisfiable:{metric}",
+                        ok=False,
+                        detail=(
+                            f"{metric} {op} {threshold} against a measured incumbent of 0. "
+                            "Nothing in the run has ever produced a non-zero value for this "
+                            "metric, so the floor cannot currently be cleared by anything."
+                        ),
+                    ))
+    return out
+
+
+def _measured_metric(baseline: Optional[dict], metric: str) -> Optional[float]:
+    """The incumbent's worst measured value for `metric`, across domains.
+
+    Worst rather than mean: a per-domain floor binds on the weakest domain, and
+    that is the number the gate has to clear.
+    """
+    if not baseline:
+        return None
+    values: list[float] = []
+    top = (baseline.get("metrics") or {}).get(metric)
+    if isinstance(top, (int, float)):
+        values.append(float(top))
+    for per_domain in (baseline.get("per_domain") or {}).values():
+        v = (per_domain or {}).get(metric)
+        if isinstance(v, (int, float)):
+            values.append(float(v))
+    return min(values) if values else None
+
+
+def _check_liveness(run_dir: Path) -> list[CheckResult]:
+    """Is this run actually alive, and do its state files agree? (C-01, item 3.3.)
+
+    The field run's `run-state.json` read `status: running` after 8 hours of no
+    activity, and its `mission-state.json` was 2h07m behind its own
+    `tick-state.json`. Neither was reported, because "is this still alive?"
+    required an event nobody emitted.
+
+    3.3 made it arithmetic: `max_dwell_s` per state, compared against how long
+    the entity has sat there. This is that predicate applied to a run's files at
+    validation time, using mtime as the activity signal — a file nobody has
+    written in eight hours is not being written by a live loop, whatever its
+    `status` field says.
+
+    A missing timestamp is NOT stale. An unknown age is not evidence of death,
+    which is A6's mistake with the sign flipped.
+    """
+    out: list[CheckResult] = []
+    state_files = ["run-state.json", "tick-state.json", "mission-state.json"]
+    present = [(n, run_dir / n) for n in state_files if (run_dir / n).exists()]
+    if not present:
+        return out
+
+    now = time.time()
+    ages = {name: (now - path.stat().st_mtime) for name, path in present}
+    freshest = min(ages.values())
+
+    # The dwell budget for a tick that is running, from the shared FSM table —
+    # the same number `stop.mjs` and `stateRead` use, so the three languages
+    # cannot disagree about when a run has stalled.
+    try:
+        from .fsm import max_dwell_s
+        limit = max_dwell_s("tick", "running") or 7200
+    except Exception:  # noqa: BLE001
+        limit = 7200
+
+    claims_running = False
+    for name, path in present:
+        try:
+            if str(json.loads(path.read_text()).get("status", "")) == "running":
+                claims_running = True
+        except Exception:  # noqa: BLE001
+            continue
+
+    if claims_running and freshest > limit:
+        out.append(CheckResult(
+            name="run_not_stale",
+            ok=False,
+            detail=(
+                f"this run reports status=running but no state file has been written "
+                f"for {freshest / 3600:.1f}h (limit {limit / 3600:.1f}h). A file nobody "
+                "has written is not being written by a live loop."
+            ),
+        ))
+    else:
+        out.append(CheckResult(
+            name="run_not_stale", ok=True,
+            detail=f"most recent state write {freshest / 60:.0f} min ago",
+        ))
+
+    # ── mission-state lagging tick-state ────────────────────────────────────
+    #
+    # Separate from staleness: both files can be recent while one is hours behind
+    # the other, and a mission whose own record trails its tick loop by two hours
+    # is describing a run that has moved on without it.
+    if "mission-state.json" in ages and "tick-state.json" in ages:
+        lag = ages["mission-state.json"] - ages["tick-state.json"]
+        if lag > limit / 2:
+            out.append(CheckResult(
+                name="mission_state_current",
+                ok=False,
+                detail=(
+                    f"mission-state.json is {lag / 3600:.1f}h older than tick-state.json. "
+                    "The mission's own record trails its tick loop, so anything reading "
+                    "mission state is reading a run that has moved on without it."
+                ),
+            ))
+        else:
+            out.append(CheckResult(
+                name="mission_state_current", ok=True,
+                detail=f"mission-state within {abs(lag) / 60:.0f} min of tick-state",
+            ))
+
+    return out
+
 
 def validate_run(run_dir: Path) -> ValidationReport:
     """Validate all contracts and state for a run directory.
@@ -730,6 +1043,14 @@ def validate_run(run_dir: Path) -> ValidationReport:
     all_checks.extend(_check_frozen_splits(run_dir))
     all_checks.extend(_check_tree(run_dir))
     all_checks.extend(_check_run_state(run_dir))
+    # Items 9.3 / K-06 / K-07 / L-05: a run whose stop condition cannot be met,
+    # or whose gates cannot be satisfied, has no exit. All of it is checkable
+    # from the contract at init — the only moment fixing it is cheap.
+    all_checks.extend(_check_stop_reachable(run_dir))
+    all_checks.extend(_check_gate_feasible(run_dir))
+    # C-01 / item 3.3: a run that claims to be running while nothing has written
+    # its state for hours is not running; nothing was asking.
+    all_checks.extend(_check_liveness(run_dir))
 
     failed = [c for c in all_checks if not c.ok]
     ok = len(failed) == 0

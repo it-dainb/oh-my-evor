@@ -2,6 +2,140 @@
 
 All notable changes to Evor. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.2.1] — 2026-09-02 — the affordance release
+
+v1.2.0's first real field deployment ran 19 hours across three missions and
+produced **1 tick of 200 in each, 0 promotions**, ending when the operator killed
+it. An 18-lane trace, 8 root causes and 6 affordance lanes established that most
+of what looked like agent misbehaviour was the system unable to express something
+real — so a human or an agent improvised outside it, and the improvisation was
+later catalogued as a defect.
+
+**58 of 60 planned items ship.** The two that do not are named below: the key
+rotation, which is an operator action, and the `iir-scan-binnet-02` re-score,
+which needs a GPU. Phase 8 — the tier re-measurement, listed as outstanding in
+the first cut of this entry — has now run, and its result is stated below rather
+than resolved: it did not confirm the tiers, it unseated two of them.
+
+### The principle this release is built on
+
+> Any obligation stated in prose to an agent is an obligation the system has
+> decided not to have. **For every invariant, name the writer. If the writer is
+> the agent that benefits from violating it, it is not an invariant.**
+
+That pattern existed correctly in the codebase exactly once — `record.ts:162`,
+*"absence of a failure verdict is not evidence of integrity"*. This release
+applies it to the other twelve places.
+
+### Fixed — guards that could not fail
+
+- `_check_no_label_contamination` was `return True`: three lines of docstring and
+  an unconditional pass, reported beside four checks that can fail. It now
+  compares hashes, and with none supplied returns **`None` = not evaluated**,
+  which is not the same as clean.
+- `.evor/.deps-ok` was a 24-byte timestamp whose mere existence satisfied the
+  dependency check. It now attests the interpreter and package set and
+  revalidates against them.
+- The evaluator sanity gate (new): a trivial all-ones predictor scoring **94.7 F**
+  is now unsealable. An unrun gate reports unsealable rather than passing.
+- `evor doctor` gained a plugin-tree drift check. 17 files in the installed tree
+  were modified in place — including `hooks/stop.mjs` — with 26 `.bak-*` files
+  beside them, unreported for 19 hours.
+
+### Fixed — guards that were disarmed, and what arming them revealed
+
+Retiring `run-state.status` armed three `stop.mjs` gates that had been silently
+false. That exposed three further defects underneath: the drift guard was **never
+scoped to the orchestrator** and had been blocking sub-agents for not producing
+artifacts they were spawned to produce; check (c) duplicated Guard 3 with a worse
+message; and **two independent test suites' fixtures had drifted** behind the same
+inert gate.
+
+### Fixed — the guards checked roles and command text, never paths
+
+Every realized harm in the field run came through a path no guard looked at.
+Verdicts are now made on the **resolved absolute write target**, through `cd` and
+variable expansion, identically for every caller — an identical edit re-issued as
+`subagent_type: "claude"` no longer succeeds 51 seconds after being refused.
+`runsTraining` was **narrowed**, not widened: 54 of 82 training denials were false
+positives, and broad textual denial trains evasion rather than compliance.
+
+### Fixed — data that was wrong about itself
+
+- **`freeze-splits` was freezing the corpus's metadata files as the eval set.**
+  `dataset_card.yaml`, `manifest.json`, `test.txt` — 7 files split 80/20, exit 0,
+  `test_item_count: 5`, and every fitness number in a 19-hour run computed against
+  them. The corpus had declared all 132 items with domains and per-file hashes
+  four weeks earlier; nothing read it. Items now resolve by **declared sha256**, so
+  the manifest survives the corpus being reorganised — and an edited sample is
+  reported missing rather than silently frozen in its place.
+- A node with **12,000 valid telemetry records** was failed by a directory-naming
+  mismatch: the trainer wrote `nodes/<slug>/`, the gate read `nodes/<uuid>/`.
+  Neither writer was wrong; nothing owned the mapping.
+- Three missions read `running` concurrently for 15.6 hours. A successor now
+  closes out its predecessor in the same write that creates it.
+
+### Added — affordances, because a guard over a missing affordance breaks things
+
+`docs/credentials.md` (there was no secure path; chat was the only channel) ·
+`evor_scaffold_evaluator` (the server owns the harness, the mission owns
+`score(pred, gt)` — every field failure lived in the hand-written column) ·
+`evor_await_artifact` (agents were told to wait on `job_complete` /
+`self_heal_event`, which have **zero producers**) · a `capability-gap` consumer
+(`evor-tick` emitted one honestly and nothing read it) · authority expressed as
+**operations, not tool names** (`Write` denied, `Bash` granted, 21 writes happened
+anyway).
+
+### Added — a state machine, as data three languages read
+
+`contracts/state-machines.json` with a reader in Python, TypeScript and
+JavaScript. An FSM in one language is invisible to the others, and `stop.mjs` —
+whose wrong predicate caused C-02 — is in a third. Every state carries
+`max_dwell_s`, so *"is this still alive?"* becomes arithmetic any reader can do
+from the file alone.
+
+### Migrated
+
+The three field mission trees (~242 MB) to the v1.2.1 shape, gated on a verified
+revert point, dry-run reviewed, with **every node artifact hashed byte-identical
+before and after**.
+
+### Not shipping, and why
+
+- **The Semantic Scholar key is not rotated.** The value in `.env` is
+  byte-identical to the one exposed on 2026-08-23. Relocating it changed where it
+  is stored, not whether it is compromised. Revocation is an operator action.
+- **Source-page leakage (M-03) is NOT EVALUATED, not clean.** The check ships and
+  is correct in all three states; `corpora/v10` declares no per-item lineage, so it
+  abstains. Two RED tests are left failing deliberately — adjusting them would hide
+  the gap. One `group` key in the corpus builder closes it. See `KNOWN_GAPS.md`.
+- **Two shipped retiers are no longer supported by their own evidence.** Phase 8
+  re-measured every role through the fixed instrument (930 calls, $274.44, 0
+  harness errors) and corrected the arithmetic: v1.2.0's CIs used n = CALLS, so
+  `36/36` was twelve cases run three times. Repeats of one case are not
+  independent observations of a role. On n = cases, **all seven adopted rows fail
+  the 10pp gate they were published as clearing** (`ci/recompute-v1-cis.mjs`
+  reproduces the published intervals to the decimal, then recomputes them).
+
+  Re-measured, three of nine roles clear the margin. `evor-sage` (haiku, 92.3%,
+  also below the 95% absolute floor) and `evor-mutagen` (haiku, 96.0%, interval
+  touching the margin exactly) do not, and both ship. Neither is *worse* — the
+  gaps are +3.1pp and +4.0pp — but neither is established. Moving the other way,
+  `evor-forge-architect`'s recorded −10.0pp regression **does not reproduce**,
+  and `evor-tick` is benchmarked for the first time (sonnet 80.0% vs haiku
+  20.0%). `evor-selector`, `evor-forge` and `evor-forge-junior` have no
+  `spec.json` and were **not** re-measured. See §3 of
+  `docs/v1-cost-and-verification.md` for the per-role table, `KNOWN_GAPS.md` for
+  what closing it needs, and `docs/evidence/matrix-81.json` for the 930 calls.
+
+- **Agent output carries prose the parser forgives.** 22 of 131 calls emit text
+  before their JSON — 28.8% on `evor-probe`. All 131 still parsed, because
+  `parseContractOutput` strips fences and hunts for the first object, so the rate
+  is a live dependency on that leniency rather than a property of the roles.
+  Nobody declared the tolerance and nobody owns it. The earlier report of this as
+  absent came from n=15; P(zero | 29%, n=15) is under 1%, so that run did not
+  fail to reach significance, it failed to look.
+
 ## [1.2.0] — 2026-08-22 — model-tier optimization
 
 Six tier/effort changes ship, chosen by a gate both angles must clear:
@@ -25,6 +159,14 @@ is written. Thirteen times out of thirteen. Zero times was it a model failing to
 reason.
 
 ### Changed — tiers that ship
+
+> **Corrected by 1.2.1 (item 8.3). The evidence column below is wrong and is
+> left standing as published history.** Every CI in it uses n = CALLS, not
+> cases: `36/36` is twelve cases run three times, `116/120` is ten cases run
+> twelve times, and repeats of one case are not independent observations of a
+> role. Recomputed on cases, all seven adopted rows fail the 10pp gate they are
+> shown clearing. The arms were also measured with no MCP tools attached. See §3
+> of `docs/v1-cost-and-verification.md` for the re-measurement.
 
 | agent | from | to | evidence | saving |
 |---|---|---|---|---|

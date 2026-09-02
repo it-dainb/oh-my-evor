@@ -35,6 +35,26 @@ function runStop(tickState: unknown, payload: Record<string, unknown> = {}) {
   writeFileSync(join(runDir, "run-state.json"), JSON.stringify({ run_id: "r1", tick: 1, pending_node_ids: [] }));
   writeFileSync(join(runDir, "mission-state.json"), JSON.stringify({ status: "running", tick: 1 }));
   if (tickState !== undefined) writeFileSync(join(runDir, "tick-state.json"), JSON.stringify(tickState));
+
+  // FIXTURE COMPLETION (item 1.9d, not an assertion change).
+  //
+  // These cases are about the CONTINUATION guard — whether main may end its turn
+  // with a tick in flight. They are not about the drift guard. The fixture used
+  // to omit the tick's sub-agent artifacts and pass anyway, because the drift
+  // gates keyed on `run-state.status === "running"` and this fixture's run-state
+  // has no status at all, so those gates were silently inert.
+  //
+  // 1.9c re-homes them onto mission liveness, which this fixture DOES declare, so
+  // they now evaluate and correctly object to a tick with no mutagen or selector
+  // output. Supplying it keeps these cases measuring the guard they name.
+  //
+  // This is the SECOND suite whose fixture had drifted behind the same disarmed
+  // gate — which is the argument for arming it, not against.
+  const tickNo = (tickState as { tick?: number } | undefined)?.tick ?? 1;
+  mkdirSync(join(runDir, "ticks", String(tickNo), "mutagen"), { recursive: true });
+  mkdirSync(join(runDir, "ticks", String(tickNo), "selector"), { recursive: true });
+  writeFileSync(join(runDir, "ticks", String(tickNo), "mutagen", "proposals.json"), JSON.stringify({ proposals: [] }));
+  writeFileSync(join(runDir, "ticks", String(tickNo), "selector", "verdict.json"), JSON.stringify({ approved: [] }));
   const r = spawnSync("node", [join(HOOKS, "stop.mjs")], {
     input: JSON.stringify({ stop_hook_active: false, ...payload }),
     encoding: "utf8",

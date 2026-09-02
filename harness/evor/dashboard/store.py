@@ -22,6 +22,8 @@ import json
 from pathlib import Path
 from typing import Any
 
+from ..node_identity import resolve_node_artifact_by_ref
+
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -81,14 +83,24 @@ class RunStore:
     # ── Per-node data ─────────────────────────────────────────────────────────
 
     def node_result(self, node_id: str) -> dict[str, Any] | None:
-        return _read_json(self.run_dir / "nodes" / node_id / "results.json")
+        # O-01 (item 1.5): a node is written under its UUID by some writers and
+        # under its slug by others. The dashboard holds only whichever string was
+        # in the URL, so it asks the registry rather than guessing.
+        path = resolve_node_artifact_by_ref(self.run_dir, node_id, "results.json")
+        return _read_json(path) if path else None
 
     def integrity_report(self, node_id: str) -> dict[str, Any] | None:
         return _read_json(self.run_dir / "evaluations" / f"{node_id}.json")
 
     def telemetry_path(self, node_id: str) -> Path:
-        """Absolute path to the node's telemetry.jsonl (may not exist yet)."""
-        return self.run_dir / "nodes" / node_id / "telemetry.jsonl"
+        """Absolute path to the node's telemetry.jsonl (may not exist yet).
+
+        Resolved across both node identities (item 1.5). Falls back to the UUID
+        path when the file exists under neither, so a caller that reports "not
+        yet written" keeps reporting exactly that.
+        """
+        resolved = resolve_node_artifact_by_ref(self.run_dir, node_id, "telemetry.jsonl")
+        return resolved or (self.run_dir / "nodes" / node_id / "telemetry.jsonl")
 
     # ── Eval suites ───────────────────────────────────────────────────────────
 

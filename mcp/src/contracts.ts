@@ -276,7 +276,9 @@ export const MutationProposalSchema = z.object({
   hypothesis: HypothesisSchema,
   citations: z.array(z.string()),
   wildness: z.number().min(0).max(1),
-  critic_approved: z.boolean(),
+  // `critic_approved` REMOVED (item 2b.2): the contract required the PROPOSER to
+  // assert the REVIEWER's verdict, and nothing read it. A self-report standing in
+  // for a review is the self-approval vector the review gates exist to prevent.
   // Server-owned: evor_validate_proposals computes gate codes deterministically.
   // Agent must NOT supply internal gate codes; the server populates critic_review.
   critic_review: z.object({
@@ -403,6 +405,19 @@ export const LessonEntrySchema = z.object({
   citations: z.array(z.string()),
   telemetry_evidence: z.string().optional(),
   tags: z.array(z.string()),
+  // ── Item 5.3: a lesson refuted by measurement must be markable ──────────
+  //
+  // N-02. The r1 entry claiming a latency figure was falsified TWICE — measured
+  // at 81.4ms and 74.85ms — and was never retracted. It was then cited 23 times
+  // across the tree. Overwriting in place is not enough: the refutation needs a
+  // POINTER to the evidence, or the next reader cannot tell a stale claim from a
+  // live one, and the history of having believed it is lost.
+  superseded_by: z.string().optional().describe(
+    "Node or lesson id whose measurement refutes this entry. Set => not a confirmed lesson.",
+  ),
+  superseded_reason: z.string().optional().describe(
+    "Why it was superseded, recorded when it was, not reconstructed afterwards.",
+  ),
   // Server-owned: filled via now(); defaults to "" to keep stored type as string.
   created_at: ISODate.optional().default(""),
 });
@@ -478,6 +493,12 @@ export const DecisionLogEntrySchema = z.object({
     "prune",
     "stop",
     "meta-evolve",
+    // Item 9.4 / L-02: when no monotonic move exists, the system must be able
+    // to SAY so. The charter asserts "a monotonic move always exists" in prose
+    // on AutonomyCharter.invariant, with no code branch — so the one
+    // representable part is the vocabulary: an agent that has proved the
+    // contract unsatisfiable records that, instead of silently asking a human.
+    "contract-infeasible",
   ]),
   rationale: z.string(),
   node_ids: z.array(z.string()),
@@ -789,6 +810,209 @@ export type Signal = z.infer<typeof SignalSchema>;
 // Schema registry (all 27 schemas, for validation tooling)
 // ────────────────────────────────────────────────────────────────────────────
 
+// ────────────────────────────────────────────────────────────────────────────
+// Lifecycle domain model (plan item 1.1)
+//
+// AF6: 58 contract models and not one of them was a `Mission`, a `Run` or a
+// `Tick`. The three things this system actually IS had no type — they lived as
+// untyped keys in JSON blobs written by a merge-patch that accepted anything.
+// "~25 enumerated fixes collapse into 7 once one writer owns run state."
+//
+// Statuses are enums rather than `z.string()` because every one of them is
+// compared against a string literal somewhere in three languages, and a typo in
+// any of those comparisons fails silently in the permissive direction.
+// ────────────────────────────────────────────────────────────────────────────
+
+/**
+ * A run's lifecycle. `initialized` is what a run reports before it has recorded
+ * anything — including when its state file is missing or unreadable (1.4).
+ * Absence is not liveness, so there is deliberately no state here meaning
+ * "probably running".
+ */
+export const RunStatusSchema = z.enum([
+  "initialized",
+  "running",
+  "paused",
+  "completed",
+  "failed",
+]);
+export type RunStatus = z.infer<typeof RunStatusSchema>;
+
+/**
+ * A mission's lifecycle. `locked` IS included here, unlike the patch schema in
+ * `state.ts`, because this is the domain model — the mission genuinely occupies
+ * that state, and `stop.mjs` records that it stays `locked` for the whole of an
+ * active run. What `state.ts` withholds is the ability to PATCH into it, which
+ * is an ownership rule, not a claim that the state does not exist. Conflating
+ * the two is what left `locked` undescribable by the only model we had.
+ */
+export const MissionStatusSchema = z.enum([
+  "draft",
+  "locked",
+  "running",
+  "paused",
+  "completed",
+  "failed",
+  "superseded",
+]);
+export type MissionStatus = z.infer<typeof MissionStatusSchema>;
+
+/** A tick's step lifecycle. Distinct from run status; the two were often confused. */
+export const StepStatusSchema = z.enum(["pending", "running", "done", "failed"]);
+export type StepStatus = z.infer<typeof StepStatusSchema>;
+
+/** The 9-step tick loop. One definition of where the end is. */
+export const TICK_FINAL_STEP = 9;
+
+/**
+ * A Campaign is one goal pursued across attempts.
+ *
+ * r1 -> r2 -> r3 were three attempts at a single objective and the model had no
+ * word for that, so each looked like an unrelated mission that happened to share
+ * a name. Every question worth asking about the field run — did it improve, what
+ * did attempt 2 learn from attempt 1, which attempt holds the node worth
+ * re-scoring — is a question about a campaign.
+ */
+export const CampaignSchema = z.object({
+  campaign_id: z.string(),
+  objective: z.string(),
+  created_at: ISODate,
+  /** Attempt ids in the order they were made. */
+  attempt_ids: z.array(z.string()),
+  status: MissionStatusSchema,
+});
+export type Campaign = z.infer<typeof CampaignSchema>;
+
+/** One attempt at a campaign's objective — what r1, r2 and r3 each were. */
+export const MissionAttemptSchema = z.object({
+  attempt_id: z.string(),
+  campaign_id: z.string(),
+  mission_id: z.string(),
+  /** 1-based; r3 is attempt 3. */
+  ordinal: z.number().int().positive(),
+  started_at: ISODate,
+  ended_at: ISODate.nullable().default(null),
+  /**
+   * Why this attempt ended, recorded WHEN it ended. K-08's supersession reason
+   * was reconstructed afterwards by a human editing JSON in vim, because there
+   * was no field to write it into at the time.
+   */
+  outcome_reason: z.string().nullable().default(null),
+  supersedes_attempt_id: z.string().nullable().default(null),
+});
+export type MissionAttempt = z.infer<typeof MissionAttemptSchema>;
+
+export const MissionSchema = z.object({
+  mission_id: z.string(),
+  campaign_id: z.string().nullable().default(null),
+  status: MissionStatusSchema,
+  created_at: ISODate,
+  updated_at: ISODate,
+  /** Set when status is `paused` — the origin the pause is walked back to (0.7). */
+  paused_from: MissionStatusSchema.nullable().default(null),
+  paused_at: ISODate.nullable().default(null),
+  paused_by: z.string().nullable().default(null),
+});
+export type Mission = z.infer<typeof MissionSchema>;
+
+export const RunSchema = z.object({
+  run_id: z.string(),
+  mission_id: z.string(),
+  status: RunStatusSchema,
+  tick_count: z.number().int().min(0),
+  frontier_ids: z.array(z.string()),
+  best_score: z.number().nullable().default(null),
+  current_eval_version: z.string().default("v1"),
+  pending_node_ids: z.array(z.string()).default([]),
+  /**
+   * The validated state root, established once at lock time (1.3). Every hook
+   * re-derived this independently from `CLAUDE_PLUGIN_ROOT ?? process.cwd()`,
+   * and when both were wrong all 14 of them read a different project's `.evor/`
+   * for 19 hours without one noticing (Q-01).
+   */
+  state_root: z.string().nullable().default(null),
+  started_at: ISODate.nullable().default(null),
+  ended_at: ISODate.nullable().default(null),
+});
+export type Run = z.infer<typeof RunSchema>;
+
+export const TickSchema = z.object({
+  tick: z.number().int().min(0),
+  run_id: z.string(),
+  current_step: z.number().int().min(0).max(TICK_FINAL_STEP),
+  step_status: StepStatusSchema,
+  pending_subagent_ids: z.array(z.string()).default([]),
+  /** Set while the tick waits on something it does not own (2b.3). */
+  blocked: z
+    .object({ on: z.string(), since: ISODate })
+    .nullable()
+    .default(null),
+  started_at: ISODate.nullable().default(null),
+});
+export type Tick = z.infer<typeof TickSchema>;
+
+/**
+ * Is this tick finished? (Plan item 1.2.)
+ *
+ * ONE definition, owned here. The predicate was re-derived in five places across
+ * three languages: `stop.mjs:379` had `const finished = step >= 9` while
+ * `tree.py:894` defaulted the other way, and you cannot tune your way out of two
+ * disagreeing defaults.
+ *
+ * Reaching the last step is not the same as finishing it. The final r3 tick sat
+ * at step 9 with `step_status: "running"` and a failed integrity verdict, and
+ * `step >= 9` alone called that done.
+ */
+export function isTickFinished(tick: Pick<Tick, "current_step" | "step_status">): boolean {
+  return tick.current_step >= TICK_FINAL_STEP && tick.step_status === "done";
+}
+
+/** Is this run live — may a governance check still hold on its behalf? */
+export function isRunActive(run: Pick<Run, "status">): boolean {
+  return run.status === "running";
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+
+// ────────────────────────────────────────────────────────────────────────────
+// Concurrency semantics (plan item 1.9)
+//
+// Never decided, therefore settled by whoever wrote last. O-09: three missions
+// in one workspace overlapping in time, with no statement anywhere about whether
+// that was legal — so nothing could be called a violation, and nothing was.
+//
+// Mirrors `SINGLETON_PER_PARENT` in harness/evor/contracts.py. Both halves must
+// change together; a concurrency rule that holds in one language is not a rule.
+// ────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Entities of which at most one may be live at a time, per parent.
+ *
+ *   tick    -> run       one `tick-state.json` per run; a second concurrent tick
+ *                        has nowhere to record itself
+ *   run     -> mission   `active-run.json` is singular, and two runs advancing
+ *                        one frontier each compute what the other invalidates
+ *   mission -> campaign  r1 -> r2 -> r3 were sequential ATTEMPTS; two live
+ *                        attempts at one objective are two campaigns
+ */
+export const SINGLETON_PER_PARENT: Record<string, string> = {
+  tick: "run",
+  run: "mission",
+  mission: "campaign",
+};
+
+/**
+ * The one deliberate plural: sub-agents within a tick overlap, because that
+ * fan-out is what the design exists for. `Tick.pending_subagent_ids` is plural
+ * for this reason and is the only plural here.
+ */
+export const CONCURRENT_WITHIN_TICK = ["subagent"] as const;
+
+/** Is more than one live `entity` legal under its parent? Ask; do not assume. */
+export function mayOverlap(entity: string): boolean {
+  return !(entity in SINGLETON_PER_PARENT);
+}
+
 export const ALL_SCHEMAS = {
   // Base 11 (+ Hypothesis)
   GoalContract: GoalContractSchema,
@@ -829,4 +1053,10 @@ export const ALL_SCHEMAS = {
   CapabilityProfile: CapabilityProfileSchema,
   // Signal bus
   Signal: SignalSchema,
+  // Lifecycle domain model (1.1)
+  Campaign: CampaignSchema,
+  MissionAttempt: MissionAttemptSchema,
+  Mission: MissionSchema,
+  Run: RunSchema,
+  Tick: TickSchema,
 } as const;

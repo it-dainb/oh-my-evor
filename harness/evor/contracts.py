@@ -45,7 +45,26 @@ class BaseEvorModel(BaseModel):
 
     The exclude_none default can still be overridden by passing
     ``model_dump(exclude_none=False)`` explicitly.
+
+    ``extra="forbid"`` (plan item 1.6) makes every unknown key loud. Pydantic v2
+    merges ``model_config`` across bases — a subclass that sets its own
+    ``ConfigDict`` without naming ``extra`` still inherits this — so one line here
+    reaches all 58 contract models, of which exactly two (``SelectorReview``,
+    ``SelectorVerdict``) had set it for themselves.
+
+    The default was ``ignore``: a key an agent supplied that the contract did not
+    know about was silently dropped, and the agent was told nothing. RC6's
+    prediction 3 is that this is how a contract and its callers drift without
+    either side learning it — the write succeeds, the field vanishes, and the
+    reader later sees an absence it cannot distinguish from "never sent". Round
+    -tripping through a model became lossy in a way no test could see.
+
+    This is the release's §2 pattern in miniature: the obligation to send only
+    known keys was stated in prose to the agent, and prose is an obligation the
+    system has decided not to have.
     """
+
+    model_config = ConfigDict(extra="forbid")
 
     def model_dump(self, *, exclude_none: bool = True, **kwargs) -> dict:  # type: ignore[override]
         return super().model_dump(exclude_none=exclude_none, **kwargs)
@@ -80,6 +99,26 @@ class MetricConstraint(BaseEvorModel):
     threshold: float
     """Threshold value for the constraint."""
 
+    # ── Item 2.8: gates are contract DATA, not evaluator code ───────────────
+    scope: Literal["all", "per_domain"] = "all"
+    """Does this constraint bind on the aggregate, or on every domain separately?
+
+    A latency gate that binds per-domain and one that binds on the mean are
+    different requirements, and the evaluator was the only place that could tell
+    them apart — so changing which one you meant meant rewriting the evaluator.
+    That is why the seal kept breaking: every gate change was an evaluator change,
+    and every evaluator change broke the hash the contract had pinned.
+    """
+
+    purpose: Literal["floor", "goal"] = "floor"
+    """Is missing this a DISQUALIFICATION or a shortfall?
+
+    A floor is a gameability guard — violate it and fitness is 0.0 regardless of
+    the formula. A goal is a target the mission is trying to reach, and scoring
+    below it is a low score, not a void one. Both were expressed as the same
+    thing, so a target the mission had not yet met read as a violated guard.
+    """
+
 
 class MetricSpec(BaseEvorModel):
     """Specification for a single tracked metric.
@@ -102,6 +141,19 @@ class MetricSpec(BaseEvorModel):
     # Sensible default so a spec is never rejected for omitting it; macro_avg
     # weights every domain equally (override for weighted/min/max aggregation).
     aggregation_rule: Literal["macro_avg", "weighted_avg", "min", "max"] = "macro_avg"
+    """How this metric aggregates across domains.
+
+    ITEM 2.9 — RESOLVED IN FAVOUR OF ``GoalContract.fitness_mode``.
+
+    Two live declarations of how fitness aggregates existed: this field and
+    ``GoalContract.fitness_mode``. ``fitness_mode`` has readers; this field had
+    NONE — AF2's GAP-3. 2.2 makes domains real without saying which wins, so it
+    is said here: ``fitness_mode`` is authoritative for FITNESS, and this field
+    describes how the metric itself is summarised for REPORTING. They are no
+    longer two answers to one question.
+
+    ``validate_fitness_aggregation`` below enforces that they do not contradict.
+    """
     role: Literal["primary_fitness", "secondary_reported"]
     sota_bar: Optional[float] = None
 
@@ -349,6 +401,43 @@ class GoalContract(BaseEvorModel):
     created_at: Optional[str] = None
 
     # ── P0-7: metric scale ────────────────────────────────────────────────────
+    corpus_version: Optional[str] = None
+    """The corpus version this mission is measured against (item 2.4 / G-6).
+
+    ``dataset_ref`` is a PATH. `corpora/` holds 18 sibling versions, and
+    `dataset_card.yaml` maintains a real semver with a documented convention —
+    "MINOR for offline augmentation recipes, MAJOR for a change to raw split
+    composition" — plus a `derived_from` lineage chain. **The corpus has a richer
+    versioning model than evor does**, and evor recorded a directory name.
+    """
+    corpus_derived_from: Optional[str] = None
+    """The corpus this one was derived from, mirroring `dataset_card.yaml`'s lineage."""
+
+    supervision: Literal["labeled", "unlabeled", "partially-labeled", "unspecified"] = "unspecified"
+    """Whether this data carries labels (item 2.4 / G-7).
+
+    Asked where the in-house 4k data was, the operator answered **"its
+    unlabeled."** That answer was not representable anywhere:
+    `AcquisitionProvenance` has `sample_count` and `license_identifier` but no
+    label status, and `DetectedDataset.kind` describes a CONTAINER FORMAT
+    (`images-dir|csv|parquet|…`), not a supervision level. A fact the operator
+    stated in plain words had nowhere to go.
+    """
+
+    label_semantics: Literal["foreground_is_1", "foreground_is_0", "unspecified"] = "unspecified"
+    """Which pixel value means "ink" (item 2.8).
+
+    POLARITY WAS EVALUATOR CODE. Every polarity change was an evaluator rewrite,
+    which broke the ``eval_script_hash`` the contract had pinned — so the seal
+    kept breaking for a reason that was never about the seal. r1 and r2 both
+    failed on this. A convention the data has is data; encoding it in the scorer
+    made a property of the corpus into a property of the program.
+
+    ``unspecified`` is deliberately the default and deliberately not a guess: an
+    evaluator that needs polarity and is not told must say so, rather than assume
+    one and silently score the inverse image.
+    """
+
     metric_scale: float = 1.0
     """Divisor to normalise reported scores to [0,1] before integrity ceiling checks.
     Default 1.0 = scores already in [0,1] (accuracy, F1, …).
@@ -637,8 +726,12 @@ class MutationProposal(BaseEvorModel):
     hypothesis: Hypothesis
     citations: list[str]
     wildness: float
-    critic_approved: bool
-    # Server-owned: evor_validate_proposals computes gate codes deterministically.
+    # `critic_approved` REMOVED (item 2b.2). The contract required the PROPOSER
+    # to assert the REVIEWER's verdict — a self-report standing in for a review —
+    # and nothing ever read it. `tree.py:410` hard-coded it to True on every
+    # proposal it built, so the field's only possible value was "approved".
+    # `agents/evor-selector.md:236` already told agents not to add it, which is
+    # the shape of a field nobody wanted and everybody had to carry.
     critic_review: Optional[CriticReview] = None
 
 
@@ -702,7 +795,37 @@ class IntegrityChecks(BaseEvorModel):
     no_test_leakage: bool
     near_dup_leakage: bool
     data_provenance_valid: bool
-    no_label_contamination: bool
+    no_source_page_leakage: Optional[bool] = None
+    """True = clean, False = leaked, None = NOT EVALUATED (items 2.3 / 9.1, M-03).
+
+    A test item whose SOURCE PAGE also appears in training data is leaked, however
+    different the degraded bytes are. `None` means the corpus declares no per-item
+    lineage, so the question cannot be answered — which is not the same as clean,
+    and saying so is the whole point. See KNOWN_GAPS.md.
+    """
+
+    trainer_completed: Optional[bool] = None
+    """Did the trainer run to the step budget the node declared? (Item 6.4 / R-11.)
+
+    True = completed, False = truncated, None = NOT EVALUATED (the node declares
+    no step budget, so there is nothing to compare against).
+
+    A job killed mid-training leaves a checkpoint behind, and a checkpoint from a
+    killed trainer scores like any other — it is simply a worse model, and
+    nothing in the gate could tell the difference between "this approach did not
+    work" and "this run was cut off at step 254 of 450". The second is not
+    evidence about the approach at all.
+    """
+
+    no_label_contamination: Optional[bool] = None
+    """True = clean, False = contaminated, None = NOT EVALUATED (item 2.11).
+
+    It was ``bool`` and the check behind it was ``return True`` — so the only
+    value it ever carried was a pass the check could not have withheld. Making
+    "not evaluated" representable is the point: ``record.ts:162`` — "absence of a
+    failure verdict is not evidence of integrity" — cannot be expressed by a type
+    with no way to say *I did not look*.
+    """
     no_eval_shift: bool
     eval_version_consistent: bool
     telemetry_sane: bool
@@ -846,7 +969,18 @@ class DecisionLogEntry(BaseEvorModel):
         "prune",
         "stop",
         "meta-evolve",
+        "contract-infeasible",
     ]
+    """Kinds of decision the log can record.
+
+    ``contract-infeasible`` is item 9.4 / L-02. The autonomy charter states that
+    "a monotonic move ALWAYS exists" — as prose on ``AutonomyCharter.invariant``,
+    with no code branch anywhere. When it is FALSE, as it was for a run whose
+    per-domain precision floor zeroed every candidate's fitness, the agent had no
+    vocabulary for saying so, and the only remaining move was to stop and ask a
+    human — which the same charter forbids. Naming the state is what lets the
+    system report it instead of stalling between two contradictory rules.
+    """
     rationale: str
     node_ids: list[str]
     strategy_delta: Optional[dict[str, Any]] = None
@@ -915,13 +1049,65 @@ class FrozenSplit(BaseEvorModel):
 
     split_id: str
     mission_id: str
-    split_type: Literal["test", "val"]
+    split_type: Literal["test", "val", "train"]
+    """Which split this is (item 2.4 / G-4).
+
+    ``train`` was absent. `freeze_splits` returned only test and val, and
+    `GoalContract.locked_split_hash` anchored the test hash alone — **train was
+    never hashed, never anchored, never recorded.** So the training set could
+    change between ticks with no anchor violation: fitness stayed comparable by
+    the contract's own definition while the denominator of LEARNING moved
+    underneath it.
+
+    `IntegrityGate.lock_splits` already computed a three-way anchor and had ZERO
+    production callers — the richer affordance was built and never wired, which
+    is the shape of half these findings.
+    """
     split_hash: str
     per_sample_hashes: dict[str, str]
     item_count: int
     frozen_at: str
     storage_path: str
     eval_version: str
+
+    # ── Item 2.2: domains attach to DATA ────────────────────────────────────
+    # Fitness on this mission is min-over-22-domains and the contract could not
+    # name a domain, so the aggregation it declared was not expressible over the
+    # split it was given. `eval_manifest_test.json` — written four weeks before
+    # the mission — already carried a domain per item; nothing read it.
+    per_sample_domains: dict[str, str] = Field(default_factory=dict)
+    """domain_id keyed by the same sample index as ``per_sample_hashes``."""
+
+    domain_counts: dict[str, int] = Field(default_factory=dict)
+    """Samples per domain, COMPUTED AT FREEZE from the items actually frozen.
+
+    Server-computed, never supplied. A count an agent asserts is a claim about
+    the split; a count derived from the split is a property of it — the
+    ``record.ts:162`` pattern ("absence of a failure verdict is not evidence of
+    integrity") applied to coverage.
+    """
+
+    per_sample_files: dict[str, list[str]] = Field(default_factory=dict)
+    """Item 2.4 / G-5 — the files that make up each sample, when a sample is not one file.
+
+    Segmentation ``(image, mask)``, detection ``(image, annotation)``, ASR
+    ``(audio, transcript)``: none of these had a representation. One sample, one
+    file, one hash was the only shape available.
+
+    The field workaround hashed both files under SEPARATE KEYS, which forced
+    ``item_count`` to be overridden to N while ``per_sample_hashes`` held 2N
+    entries — breaking the ``item_count == len(per_sample_hashes)`` invariant
+    every consumer assumed. This keeps one entry per SAMPLE and records its parts
+    here, so the invariant holds and multi-file samples stop being an
+    improvisation.
+    """
+
+    # ── Item 2.3: per-item source-page lineage ──────────────────────────────
+    # A group key, so a leakage check can ask whether the same SOURCE PAGE
+    # appears in train and test. Mask-sha is not a substitute: it collides within
+    # a split legitimately (132 test items, 128 unique masks). Empty when the
+    # corpus does not declare one — 9.1 is gated on it being populated.
+    per_sample_groups: dict[str, str] = Field(default_factory=dict)
 
 
 # ────────────────────────────────────────────────────────────────────────────
@@ -1162,10 +1348,65 @@ class GotchaEntry(BaseEvorModel):
     last_seen: str
     """ISO 8601 timestamp of most recent occurrence."""
 
+    # ── Item 5.2: a gotcha must be able to say it has been invalidated ──────
+    #
+    # Without a field for it the only two representations available were DELETE
+    # (which loses the history) and LEAVE STANDING (which is what happened). A
+    # gotcha encoding a latency gate that the r3 contract relaxed tenfold — 0.1s
+    # to 1s CPU, 10ms to 500ms GPU — stayed at confidence 1.0 and was handed
+    # verbatim to five r3 agents as current fact.
+    superseded_at: Optional[str] = None
+    """When this gotcha stopped being true. None = still standing."""
+    superseded_reason: Optional[str] = None
+    """WHY it stopped being true, recorded when it stopped, not reconstructed."""
+    superseded_by: Optional[str] = None
+    """Signature of the gotcha that replaces this one, when there is one."""
+
+    contradictions: list[str] = Field(default_factory=list)
+    """Evidence recorded AGAINST this gotcha.
+
+    ``add_gotcha`` halves the gap to 1.0 on every repeat, so confidence was
+    monotonically increasing: a fact measured to be wrong twice kept its 1.0.
+    r2 and r3 both recorded that kMAC/px is a poor predictor of measured
+    latency, and nothing moved.
+    """
+
+    @property
+    def is_superseded(self) -> bool:
+        return self.superseded_at is not None
+
+    @property
+    def is_unresolved(self) -> bool:
+        """Is this an open problem rather than a diagnosed one? (Item 5.2 / N-10.)
+
+        Confidence measures certainty of the DIAGNOSIS. An unresolved problem is
+        low-confidence precisely BECAUSE it needs attention, so a confidence
+        floor filters out exactly the entries most worth surfacing.
+        ``private-dataloader-test-leakage-iir-binnet-01`` sat at 0.5, every r3
+        query used a floor of 0.6 or 0.8, and a live test-leakage defect was
+        hidden from all five retrievals.
+        """
+        text = (self.resolution or "").strip().lower()
+        if not text:
+            return True
+        return any(
+            marker in text
+            for marker in ("not yet resolved", "unresolved", "unknown", "tbd", "todo", "under investigation")
+        )
+
 
 # Signal facet vocabularies — the ONLY closed sets in the signal system.
 # Signal `kind` stays free-text/open; facets are how lenses subscribe.
 SignalShape = Literal["limit", "opportunity", "failure", "trend"]
+
+#: Item 2b.1 — the kind that names "I was asked to do something I cannot do".
+#:
+#: The channel already worked. `evor-tick` emitted
+#: `forge-cannot-spawn-forge-junior-tool-gap` onto the bus, honestly and at the
+#: right moment, and NOTHING READ IT — so a human restarted the mission. The
+#: missing half was never transport; it was a name for the event and someone
+#: listening for it.
+CAPABILITY_GAP_KIND = "capability-gap"
 SignalAxis = Literal[
     "memory", "compute", "accuracy", "stability", "data", "generalization", "cost"
 ]
@@ -1226,11 +1467,42 @@ class CapabilityProfile(BaseEvorModel):
     gpu_name: Optional[str] = None
     """GPU device name, e.g. 'NVIDIA A100 80GB PCIe'."""
     vram_gb: Optional[float] = None
-    """Total VRAM in GB. None on CPU-only box."""
+    """TOTAL VRAM in GB. None on CPU-only box.
+
+    Total, not usable. See ``free_vram_gb`` — recording only this number on a
+    shared-tenant box is R-04.
+    """
+    free_vram_gb: Optional[float] = None
+    """VRAM actually FREE at probe time, from ``torch.cuda.mem_get_info`` (R-04).
+
+    ``capability.json`` recorded 79.25 GB total on a shared-tenant A100 where
+    ~40 GB was free. Agents independently learned to distrust the artifact, and
+    the next agent that does not will oversize a candidate and OOM. Total and
+    free are different numbers answering different questions, and only one of
+    them was being asked.
+    """
     supported_dtypes: list[str]
     """Confirmed supported dtypes, e.g. ['fp32', 'fp16', 'bf16']."""
+
     available_libs: list[str]
-    """Confirmed importable GPU-acceleration libs, e.g. ['flash-attn', 'xformers']."""
+    """Libs that are importable AND permitted AND exercised — usable (R-09).
+
+    This advertised flash-attn, xformers and triton on the strength of a bare
+    ``__import__``, while the goal contract FORBADE all three and the
+    verification artifact recorded "no flash_attn" as a PASS. Importable is not
+    the same as permitted, and neither is the same as working.
+    """
+    importable_libs: list[str] = Field(default_factory=list)
+    """What merely imported. Still useful, but labelled as what it is."""
+
+    source: Literal["probe", "policy-pin", "unknown"] = "unknown"
+    """Where these numbers came from (R-05).
+
+    A hand-authored ``capability.json`` sat in the plugin root and was read by
+    two agents as "the capability profile" — one treating it as a measurement,
+    one as a policy ceiling. A profile that cannot say which it is invites both
+    readings, and both were taken.
+    """
     cuda_version: Optional[str] = None
     """CUDA runtime version string, e.g. '12.1'. None if CUDA unavailable."""
     cpu_only: bool
@@ -1243,6 +1515,37 @@ class CapabilityProfile(BaseEvorModel):
 # ────────────────────────────────────────────────────────────────────────────
 # CitationBackedFinding (math-fidelity schema, v0.4.0)
 # ────────────────────────────────────────────────────────────────────────────
+
+
+class CitationVerification(BaseEvorModel):
+    """What the server found when it resolved a finding's citations (item 5.4).
+
+    Written by the resolver, never by the emitting agent. The distinction is the
+    whole point: the only signal of citation integrity in the pipeline was a
+    junior asserting `urls_verified: true` about its own work, and 3 of 20
+    sampled citations were misattributed.
+    """
+
+    model_config = ConfigDict(strict=True, exclude_none=True)
+
+    resolved_at: str
+    """When the resolution ran."""
+    resolver: str
+    """What did the resolving, e.g. 'arxiv-api' — so a reader can judge it."""
+    resolved_titles: dict[str, str] = Field(default_factory=dict)
+    """url -> the title that URL actually resolves to.
+
+    This is what catches misattribution. A citation whose resolved title has
+    nothing to do with the claim it supports is visible here and nowhere else.
+    """
+    unresolved: list[str] = Field(default_factory=list)
+    """URLs the resolver could not reach. NOT the same as refuted."""
+    mismatches: list[str] = Field(default_factory=list)
+    """URLs whose resolved title contradicts the finding's own title."""
+
+    @property
+    def all_verified(self) -> bool:
+        return not self.unresolved and not self.mismatches
 
 
 class CitationBackedFinding(BaseEvorModel):
@@ -1275,6 +1578,25 @@ class CitationBackedFinding(BaseEvorModel):
     """Numeric SOTA threshold this finding implies, if applicable."""
     applicable_families: list[ApproachFamily]
     """Which ApproachFamily tags this finding applies to."""
+
+    # ── Item 5.4: verification is SERVER-FILLED, never agent-asserted ───────
+    #
+    # N-04. `evor-sage-junior.md` tells the junior to emit `"urls_verified":
+    # true` — about its own work, with nothing checking it. The field was not in
+    # this contract at all, so pydantic silently dropped it: the agent believed
+    # it had declared verification, the store recorded nothing, and the pipeline
+    # treated the finding exactly as it treated a checked one. Three of twenty
+    # sampled citations were misattributed; CBAM was cited to arXiv 2006.05595,
+    # which is "Fitted Q-Learning for Relational Domains".
+    #
+    # `extra="forbid"` (item 1.6) now REJECTS the self-assertion rather than
+    # swallowing it. This field is what replaces it: it is written by the
+    # resolver, and an agent that tries to supply it is refused for the same
+    # reason. `None` means not resolved yet — which is not the same as failed,
+    # and is deliberately distinguishable from both.
+    citation_verification: Optional["CitationVerification"] = None
+    """Server-filled record of what each cited URL actually resolved to."""
+
     quorum_met: bool
     """True iff >=2 independent sources with <=5% divergence confirmed the finding."""
     junior_sources: list[str] = Field(default_factory=list)
@@ -1453,3 +1775,247 @@ ALL_MODELS: dict[str, type[BaseModel]] = {
     "BaselineCandidate": BaselineCandidate,
     "StartingPointReport": StartingPointReport,
 }
+
+
+# ────────────────────────────────────────────────────────────────────────────
+# Lifecycle domain model (plan item 1.1)
+#
+# AF6: 58 contract models and not one of them was a Mission, a Run or a Tick.
+# The three things this system actually IS had no type — they lived as untyped
+# keys in JSON blobs written by a merge-patch that accepted anything.
+#
+# Field names and enum members match mcp/src/contracts.ts exactly. They are the
+# same entities read from two languages, and a divergence here is a divergence
+# nobody would see until a run behaved differently depending on which side wrote
+# last.
+# ────────────────────────────────────────────────────────────────────────────
+
+#: The 9-step tick loop. One definition of where the end is.
+TICK_FINAL_STEP = 9
+
+RunStatus = Literal["initialized", "running", "paused", "completed", "failed"]
+"""A run's lifecycle.
+
+``initialized`` is what a run reports before it has recorded anything, including
+when its state file is missing or unreadable (1.4). There is deliberately no
+member meaning "probably running": absence is not liveness.
+"""
+
+MissionStatus = Literal[
+    "draft", "locked", "running", "paused", "completed", "failed", "superseded"
+]
+"""A mission's lifecycle.
+
+``locked`` is included because the mission genuinely occupies that state for the
+whole of an active run. What the MCP patch schema withholds is the ability to
+*patch* into it, which is an ownership rule rather than a claim the state does
+not exist — conflating the two left ``locked`` undescribable.
+"""
+
+StepStatus = Literal["pending", "running", "done", "failed"]
+"""A tick's step lifecycle. Distinct from run status; the two were often confused."""
+
+
+class Campaign(BaseEvorModel):
+    """One goal pursued across attempts.
+
+    r1 -> r2 -> r3 were three attempts at a single objective and the model had no
+    word for that, so each looked like an unrelated mission that happened to
+    share a name. Every question worth asking about the field run is a question
+    about a campaign.
+    """
+
+    model_config = ConfigDict(strict=True, exclude_none=True)
+
+    campaign_id: str
+    objective: str
+    created_at: str
+    attempt_ids: list[str] = Field(default_factory=list)
+    status: MissionStatus
+
+
+class MissionAttempt(BaseEvorModel):
+    """One attempt at a campaign's objective — what r1, r2 and r3 each were."""
+
+    model_config = ConfigDict(strict=True, exclude_none=True)
+
+    attempt_id: str
+    campaign_id: str
+    mission_id: str
+    ordinal: int
+    """1-based; r3 is attempt 3."""
+    started_at: str
+    ended_at: Optional[str] = None
+    outcome_reason: Optional[str] = None
+    """Why this attempt ended, recorded WHEN it ended.
+
+    K-08's supersession reason was reconstructed afterwards by a human editing
+    JSON in vim, because there was no field to write it into at the time.
+    """
+    supersedes_attempt_id: Optional[str] = None
+
+
+class Mission(BaseEvorModel):
+    model_config = ConfigDict(strict=True, exclude_none=True)
+
+    mission_id: str
+    campaign_id: Optional[str] = None
+    status: MissionStatus
+    created_at: str
+    updated_at: str
+    paused_from: Optional[MissionStatus] = None
+    """Set when status is ``paused`` — the origin the pause is walked back to (0.7)."""
+    paused_at: Optional[str] = None
+    paused_by: Optional[str] = None
+
+
+class Run(BaseEvorModel):
+    model_config = ConfigDict(strict=True, exclude_none=True)
+
+    run_id: str
+    mission_id: str
+    status: RunStatus
+    tick_count: int = 0
+    frontier_ids: list[str] = Field(default_factory=list)
+    best_score: Optional[float] = None
+    current_eval_version: str = "v1"
+    pending_node_ids: list[str] = Field(default_factory=list)
+    state_root: Optional[str] = None
+    """The validated state root, established once at lock time (1.3).
+
+    Every hook re-derived this independently from ``CLAUDE_PLUGIN_ROOT or
+    cwd``, and when both were wrong all 14 read a different project's ``.evor/``
+    for 19 hours without one noticing (Q-01).
+    """
+    started_at: Optional[str] = None
+    ended_at: Optional[str] = None
+
+
+class Tick(BaseEvorModel):
+    model_config = ConfigDict(strict=True, exclude_none=True)
+
+    tick: int = Field(ge=0)
+    run_id: str
+    current_step: int = Field(default=0, ge=0, le=TICK_FINAL_STEP)
+    """Bounded, to match ``TickSchema.current_step`` in contracts.ts.
+
+    Without the bound the two languages disagreed about what a valid tick is —
+    the TypeScript side rejected step 10 and the Python side accepted it, so the
+    same object was valid or invalid depending on which half validated it.
+    """
+    step_status: StepStatus = "pending"
+    pending_subagent_ids: list[str] = Field(default_factory=list)
+    blocked_on: Optional[str] = None
+    """Set while the tick waits on something it does not own (2b.3)."""
+    blocked_since: Optional[str] = None
+    started_at: Optional[str] = None
+
+
+def is_tick_finished(current_step: int, step_status: str) -> bool:
+    """Is this tick finished? (Plan item 1.2.)
+
+    ONE definition. The predicate was re-derived in five places across three
+    languages: ``stop.mjs:379`` had ``finished = step >= 9`` while
+    ``tree.py:894`` defaulted the other way, and you cannot tune your way out of
+    two disagreeing defaults.
+
+    Reaching the last step is not finishing it. The final r3 tick sat at step 9
+    with ``step_status="running"`` and a failed integrity verdict, and
+    ``step >= 9`` alone called that done.
+    """
+    return current_step >= TICK_FINAL_STEP and step_status == "done"
+
+
+def is_run_active(status: Optional[str]) -> bool:
+    """Is this run live — may a governance check still hold on its behalf?"""
+    return status == "running"
+
+
+# ────────────────────────────────────────────────────────────────────────────
+# Concurrency semantics (plan item 1.9)
+#
+# These were never decided, so they were settled by whoever wrote last. O-09 is
+# the consequence: three missions in one workspace, overlapping in time, with no
+# statement anywhere about whether that was legal — so nothing could be called a
+# violation and nothing was.
+#
+# Decided here, in the model, rather than in a comment in one of the three
+# languages that read it:
+#
+#   TICKS OF ONE RUN DO NOT OVERLAP. A run has exactly one `tick-state.json`.
+#     The tick is the unit of the loop, and a second concurrent tick would have
+#     nowhere to record itself — the existing storage already assumes this and
+#     nothing enforced it.
+#
+#   RUNS OF ONE MISSION DO NOT OVERLAP. `active-run.json` is singular, and a
+#     mission's frontier is a single evolving object; two runs advancing it
+#     concurrently would each compute a frontier the other invalidates.
+#
+#   MISSIONS OF ONE CAMPAIGN DO NOT OVERLAP. r1 -> r2 -> r3 were sequential
+#     ATTEMPTS, which is what `MissionAttempt.ordinal` records. Two live attempts
+#     at one objective are two campaigns, not one.
+#
+#   SUB-AGENTS WITHIN A TICK DO OVERLAP, deliberately — that is the fan-out the
+#     whole design exists for. `Tick.pending_subagent_ids` is the plural, and it
+#     is the only plural here.
+#
+# ENFORCEMENT belongs to the writer (the MCP state path), not the readers. AF3's
+# risk 2: `stop.mjs` has five deliberate fail-open catches, so a guard evaluated
+# in a hook is a suggestion. Guards are enforced at the writer and advisory at
+# the readers; these predicates are what both sides ask.
+# ────────────────────────────────────────────────────────────────────────────
+
+#: Entities of which at most one may be live at a time, per parent.
+SINGLETON_PER_PARENT = {
+    "tick": "run",
+    "run": "mission",
+    "mission": "campaign",
+}
+
+#: The one deliberate plural.
+CONCURRENT_WITHIN_TICK = ("subagent",)
+
+
+def may_overlap(entity: str) -> bool:
+    """Is more than one live ``entity`` legal under its parent?
+
+    Ask this instead of assuming. The assumption went both ways in the field:
+    the tick loop assumed no, the mission layer allowed yes, and neither said so.
+    """
+    return entity not in SINGLETON_PER_PARENT
+
+
+def validate_fitness_aggregation(contract: "GoalContract") -> list[str]:
+    """Item 2.9 — the two declarations of aggregation must not contradict.
+
+    ``GoalContract.fitness_mode`` is authoritative for fitness;
+    ``MetricSpec.aggregation_rule`` describes how a metric is summarised for
+    reporting. Before this they were two live answers to one question, and the
+    one with no readers could say anything at all without consequence.
+
+    Returns a list of contradictions; empty means consistent.
+    """
+    problems: list[str] = []
+    mode = getattr(contract, "fitness_mode", None)
+    for spec in getattr(contract, "metric_specs", []) or []:
+        rule = getattr(spec, "aggregation_rule", None)
+        if rule is None:
+            continue
+        name = getattr(spec, "metric_name", "?")
+        role = getattr(spec, "role", None)
+        if role != "primary_fitness":
+            continue
+        if mode == "worst-domain" and rule not in ("min", "worst", "min_domain"):
+            problems.append(
+                f"metric {name!r} is the primary fitness metric and declares "
+                f"aggregation_rule={rule!r}, but the contract's fitness_mode is "
+                f"{mode!r}. Fitness is the minimum over domains; a metric that "
+                f"reports a mean cannot be the thing being minimised."
+            )
+        if mode == "aggregate" and rule in ("min", "worst", "min_domain"):
+            problems.append(
+                f"metric {name!r} declares aggregation_rule={rule!r} while "
+                f"fitness_mode is {mode!r}. One of the two is describing a "
+                f"different quantity than the mission is optimising."
+            )
+    return problems

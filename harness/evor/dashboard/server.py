@@ -26,6 +26,8 @@ import threading
 from pathlib import Path
 from typing import Any
 
+from ..run_status import read_run_status
+
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import FileResponse, StreamingResponse
 
@@ -89,7 +91,7 @@ def create_app(evor_root: str | Path) -> FastAPI:
                     {
                         "mission_id": mission_dir.name,
                         "run_id": run_dir.name,
-                        "status": state.get("status"),
+                        "status": read_run_status(state),
                         "tick_count": state.get("tick_count", 0),
                         "best_score": state.get("best_score"),
                         "baseline_value": gc.get("baseline_value") if gc else None,

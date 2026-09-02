@@ -87,7 +87,7 @@
     ],
     "SubagentStart": [
       {
-        "matcher": "^oh-my-evor:evor-.*",
+        "matcher": "*",
         "hooks": [
           {
             "type": "command",

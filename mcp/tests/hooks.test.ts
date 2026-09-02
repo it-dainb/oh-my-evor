@@ -706,7 +706,17 @@ describe("stop hook — drift-guard (Phase 2)", () => {
     });
     expect(result.status).toBe(2);
     expect(result.stdout).toMatch(/EVOR DRIFT GUARD/);
-    expect(result.stdout).toMatch(/tick.*mid-flight|current_step.*5/i);
+    // 1.2/1.9c: the "mid-flight" wording belonged to drift-guard check (c), which
+    // is REMOVED. It reported the same condition as Guard 3's continuation check —
+    // a tick short of step 9 — one guard earlier and with a strictly worse
+    // message: Guard 3 tells the agent HOW to wait, check (c) only said something
+    // was wrong. Two predicates over one condition, and the vaguer one won by
+    // ordering; §1.2 collapses exactly that.
+    //
+    // The BEHAVIOUR this test names is unchanged and still asserted above: a run
+    // with a mid-flight tick still exits 2. Only the claim about which guard says
+    // so has moved, deliberately.
+    expect(result.stdout).toMatch(/behavioral debt|mid-flight|current_step/i);
   });
 
   it("exits 2 (check c) even without mission-state.json when run-state is running", () => {

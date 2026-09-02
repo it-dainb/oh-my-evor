@@ -249,7 +249,6 @@ describe("MutationProposal", () => {
     },
     citations: ["https://arxiv.org/abs/1711.05101"],
     wildness: 0.3,
-    critic_approved: true,
     critic_review: {
       h001_one_hypothesis: "pass",
       h002_family_streak: "pass",

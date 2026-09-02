@@ -18,6 +18,7 @@
  * checked the artifact that actually runs.
  */
 
+import { spawnSync } from "child_process";
 import { describe, it, expect } from "vitest";
 import { statSync, existsSync, readdirSync } from "fs";
 import { join, dirname, resolve } from "path";
@@ -53,4 +54,28 @@ describe("the built server is not older than the source it is built from", () =>
         `contain them — run \`npm run build\` in mcp/:\n  ${stale.join("\n  ")}`,
     ).toEqual([]);
   });
+  // ── The check that was missing, and it cost the whole Phase 8 run ─────────
+  //
+  // `fsm.ts` used `import.meta.url`, which esbuild rewrites to `undefined` in a
+  // CJS bundle, so `fileURLToPath(undefined)` threw at module load and the
+  // shipped MCP server could not start AT ALL. Every test passed throughout:
+  // vitest runs the TypeScript source as ESM, and the two checks above only
+  // assert the bundle EXISTS and is not stale. Nothing executed it.
+  //
+  // Same class as the hook that passed `node --check` and threw at load —
+  // validating a property of the artifact is not the same as running it.
+  it("the shipped bundle actually starts", () => {
+    const r = spawnSync(process.execPath, [DIST], {
+      input: "",                      // empty stdin: the server should exit cleanly
+      encoding: "utf8",
+      timeout: 30_000,
+      env: { PATH: process.env.PATH ?? "/usr/bin:/bin", HOME: process.env.HOME ?? "/tmp" },
+    });
+    const stderr = r.stderr ?? "";
+    expect(
+      /ERR_INVALID_ARG_TYPE|ReferenceError|TypeError|Cannot find module|SyntaxError/.test(stderr),
+      `mcp/dist/index.cjs failed at load:\n${stderr.slice(0, 800)}`,
+    ).toBe(false);
+  });
+
 });

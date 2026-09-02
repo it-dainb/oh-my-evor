@@ -313,14 +313,47 @@ function loadCorpus(indexPath: string): WikiCache {
  * replaces the existing entry rather than appending.
  * Cap: at most EVOR_WIKI_MAX_ENTRIES (default 500) entries kept.
  */
+/** What a citation resolver reports back about one identifier (item 5.4). */
+export type CitationResolution = {
+  resolved: boolean;
+  title?: string;
+  /** False when the resolved work does not support the claim it is cited for. */
+  supports_claim?: boolean;
+};
+
 export function wikiAdd(
   runId: string,
   entry: LessonEntry,
-  missionId?: string
-): { lessonId: string; indexPath: string } {
+  missionId?: string,
+  opts?: { resolveCitation?: (citation: string) => CitationResolution }
+): { lessonId: string; indexPath: string; citation_status?: Record<string, CitationResolution> } {
   const paths = resolveRunPaths(runId, missionId);
   const evorRoot = getEvorRoot();
   const wikiRoot = join(evorRoot, "wiki");
+
+  // ── Item 5.4 (N-01/N-04): resolve citations BEFORE persisting ───────────
+  //
+  // The only signal of citation identity in the whole pipeline was the junior's
+  // own `urls_verified: true`, asserted about its own work, checked by nothing.
+  // Three of twenty sampled citations were misattributed: CBAM was credited to
+  // arXiv 2006.05595, which is "Fitted Q-Learning for Relational Domains".
+  //
+  // The resolver is INJECTED rather than called directly, so this path is
+  // testable without a network and so the server — not the agent — owns the
+  // verdict. No resolver supplied means no verification was performed, and the
+  // result says so rather than defaulting to verified: absence of a failure
+  // verdict is not evidence of integrity.
+  let citation_status: Record<string, CitationResolution> | undefined;
+  if (opts?.resolveCitation) {
+    citation_status = {};
+    for (const citation of entry.citations ?? []) {
+      try {
+        citation_status[citation] = opts.resolveCitation(citation);
+      } catch (err) {
+        citation_status[citation] = { resolved: false, title: `resolver error: ${String(err)}` };
+      }
+    }
+  }
 
   const rendered = renderLesson(entry);
 
@@ -335,7 +368,7 @@ export function wikiAdd(
   mkdirSync(runWikiDir, { recursive: true });
   writeFileSync(join(runWikiDir, `${entry.lesson_id}.md`), rendered, "utf8");
 
-  return { lessonId: entry.lesson_id, indexPath };
+  return { lessonId: entry.lesson_id, indexPath , citation_status };
 }
 
 /**
@@ -385,6 +418,11 @@ export function wikiQuery(
     // Filters
     if (opts?.family && entry.approach_family !== opts.family) continue;
     if (opts?.confirmedOnly && entry.hypothesis_verdict !== "confirmed") continue;
+    // Item 5.3: a superseded entry is not a confirmed lesson, whatever its
+    // verdict field still says. The r1 latency claim was falsified twice and
+    // then cited 23 times across the tree, because nothing on the retrieval path
+    // could tell a refuted entry from a standing one.
+    if (opts?.confirmedOnly && (entry as { superseded_by?: string }).superseded_by) continue;
 
     // Keyword scoring
     if (keywords.length === 0) {
