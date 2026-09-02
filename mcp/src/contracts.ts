@@ -493,7 +493,13 @@ export const DecisionLogEntrySchema = z.object({
     "prune",
     "stop",
     "meta-evolve",
-  ]),
+  ,
+    // Item 9.4 / L-02: when no monotonic move exists, the system must be able
+    // to SAY so. The charter asserts "a monotonic move always exists" in prose
+    // on AutonomyCharter.invariant, with no code branch — so the one
+    // representable part is the vocabulary: an agent that has proved the
+    // contract unsatisfiable records that, instead of silently asking a human.
+    "contract-infeasible"]),
   rationale: z.string(),
   node_ids: z.array(z.string()),
   strategy_delta: StrategyStateSchema.partial().optional(),

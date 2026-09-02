@@ -790,8 +790,37 @@ def check_stop_condition(
     # ── Budget remaining ──────────────────────────────────────────────────────
     budget_remaining: dict[str, Any] = {
         "iterations_left": max(0, budget.max_iterations - tick),
-        "cost_left_usd": (max(0.0, budget.max_cost_usd - total_cost) if budget.max_cost_usd else None),
+        "cost_left_usd": (
+            max(0.0, budget.max_cost_usd - total_cost)
+            if budget.max_cost_usd is not None else None
+        ),
     }
+
+    # ── Cost ceiling (item 6.6, K-07) — applies to EVERY stop_type ───────────
+    #
+    # Two defects in one line. The ceiling lived inside the
+    # `maximize-under-budget` branch, so a run with `stop_type: "target"` had no
+    # spend limit at all — $217.70 went out under a contract that declared one.
+    # And the guard was `if budget.max_cost_usd and ...`, so a ceiling of ZERO is
+    # falsy and the check was skipped: 0 meant UNLIMITED, the exact opposite of
+    # what an operator setting it to zero means, in a three-way doc/code/type
+    # collision the plan calls out by name.
+    #
+    # It now runs before the stop_type branch, like the circuit breaker, and 0 is
+    # read as "no spend permitted". `validate_run` rejects a zero ceiling at init
+    # (item 9.3) so this is the second line of defence, not the only one.
+    if budget.max_cost_usd is not None and total_cost >= budget.max_cost_usd:
+        return StopVerdict(
+            should_stop=True,
+            reason=(
+                f"cost ceiling: ${total_cost:.2f} spent >= max_cost_usd "
+                f"${budget.max_cost_usd:.2f}"
+                + (" (a ceiling of 0 permits no spend; it does not mean unlimited)"
+                   if budget.max_cost_usd == 0 else "")
+            ),
+            tick_count=tick, best_score=best_score,
+            frontier_count=frontier_count, budget_remaining=budget_remaining,
+        )
 
     # ── Circuit-breaker override (always wins) ─────────────────────────────────
     if tick >= budget.circuit_breaker:
@@ -843,13 +872,8 @@ def check_stop_condition(
                 tick_count=tick, best_score=best_score,
                 frontier_count=frontier_count, budget_remaining=budget_remaining,
             )
-        if budget.max_cost_usd and total_cost >= budget.max_cost_usd:
-            return StopVerdict(
-                should_stop=True,
-                reason=f"maximize-under-budget: cost ${total_cost:.2f} >= max_cost_usd ${budget.max_cost_usd:.2f}",
-                tick_count=tick, best_score=best_score,
-                frontier_count=frontier_count, budget_remaining=budget_remaining,
-            )
+        # The cost ceiling is checked above, for every stop_type. Leaving a copy
+        # here would be a second predicate over one condition — §1.2's shape.
 
     elif stop_type == "evolve-until-plateau":
         # Delegate to the same plateau logic used by evor_check_plateau.

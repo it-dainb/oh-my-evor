@@ -21366,7 +21366,14 @@ var DecisionLogEntrySchema = external_exports.object({
     "record",
     "prune",
     "stop",
-    "meta-evolve"
+    "meta-evolve",
+    ,
+    // Item 9.4 / L-02: when no monotonic move exists, the system must be able
+    // to SAY so. The charter asserts "a monotonic move always exists" in prose
+    // on AutonomyCharter.invariant, with no code branch — so the one
+    // representable part is the vocabulary: an agent that has proved the
+    // contract unsatisfiable records that, instead of silently asking a human.
+    "contract-infeasible"
   ]),
   rationale: external_exports.string(),
   node_ids: external_exports.array(external_exports.string()),

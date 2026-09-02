@@ -924,7 +924,18 @@ class DecisionLogEntry(BaseEvorModel):
         "prune",
         "stop",
         "meta-evolve",
+        "contract-infeasible",
     ]
+    """Kinds of decision the log can record.
+
+    ``contract-infeasible`` is item 9.4 / L-02. The autonomy charter states that
+    "a monotonic move ALWAYS exists" — as prose on ``AutonomyCharter.invariant``,
+    with no code branch anywhere. When it is FALSE, as it was for a run whose
+    per-domain precision floor zeroed every candidate's fitness, the agent had no
+    vocabulary for saying so, and the only remaining move was to stop and ask a
+    human — which the same charter forbids. Naming the state is what lets the
+    system report it instead of stalling between two contradictory rules.
+    """
     rationale: str
     node_ids: list[str]
     strategy_delta: Optional[dict[str, Any]] = None
