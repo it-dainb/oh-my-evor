@@ -16,14 +16,39 @@
  */
 
 import { readFileSync } from "fs";
-import { dirname, join } from "path";
-import { fileURLToPath } from "url";
+import { dirname, join, resolve as resolvePath } from "path";
 
 export type Edge = { to: string; guard?: string };
 export type StateDef = { max_dwell_s: number | null; on: Record<string, Edge> };
 export type Machine = { initial: string; terminal: string[]; states: Record<string, StateDef> };
 
-const TABLE_PATH = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "contracts", "state-machines.json");
+/**
+ * Locate `contracts/state-machines.json` from BOTH module systems.
+ *
+ * This was `dirname(fileURLToPath(import.meta.url))`, which is ESM-only. The
+ * shipped artifact is a CJS bundle, where esbuild rewrites `import.meta.url` to
+ * `undefined` — so `fileURLToPath(undefined)` threw at module load and **the MCP
+ * server could not start at all**.
+ *
+ * Nothing caught it: vitest runs the TypeScript source as ESM, and
+ * `dist-freshness.test.ts` only checks the bundle is not older than its sources.
+ * The artifact that actually ships was never executed by any test — the same
+ * class as the hook that passed `node --check` and threw at load.
+ *
+ * `__dirname` exists in the CJS bundle and not in the ESM source, so it is
+ * probed rather than referenced directly.
+ */
+function locateContractsDir(): string {
+  const here =
+    typeof __dirname !== "undefined"
+      ? __dirname                                  // CJS bundle: mcp/dist
+      : dirname(new URL(".", import.meta.url).pathname); // ESM source: mcp/src
+
+  // Both layouts sit two levels below the repo root.
+  return resolvePath(here, "..", "..", "contracts");
+}
+
+const TABLE_PATH = join(locateContractsDir(), "state-machines.json");
 
 let cached: { version: number; machines: Record<string, Machine> } | null = null;
 

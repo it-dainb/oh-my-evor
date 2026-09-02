@@ -1,0 +1,21 @@
+{
+  "$comment": [
+    "MCP config for role evals (item 7.1). Only the evor server.",
+    "",
+    "The full .mcp.json also starts semantic-scholar, arxiv and hf-mcp. Those are",
+    "network-bound, rate-limited and irrelevant to what a tier eval measures \u2014 a",
+    "flaky third-party server would show up as a model failure, which is the",
+    "confound class this whole phase exists to remove.",
+    "",
+    "Every evor_* tool is what the roles are graded on calling.",
+    "Absolute path: --mcp-config resolves the command relative to the CLI's cwd, not to the config file, and a relative path silently produced a session with NO evor tools that still reported turns."
+  ],
+  "mcpServers": {
+    "evor": {
+      "command": "node",
+      "args": [
+        "/home/dainb_1/research/oh-my-evor/mcp/dist/index.cjs"
+      ]
+    }
+  }
+}

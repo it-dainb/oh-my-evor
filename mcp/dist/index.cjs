@@ -22985,9 +22985,12 @@ var import_path9 = require("path");
 // src/fsm.ts
 var import_fs7 = require("fs");
 var import_path8 = require("path");
-var import_url = require("url");
 var import_meta = {};
-var TABLE_PATH = (0, import_path8.join)((0, import_path8.dirname)((0, import_url.fileURLToPath)(import_meta.url)), "..", "..", "contracts", "state-machines.json");
+function locateContractsDir() {
+  const here = typeof __dirname !== "undefined" ? __dirname : (0, import_path8.dirname)(new URL(".", import_meta.url).pathname);
+  return (0, import_path8.resolve)(here, "..", "..", "contracts");
+}
+var TABLE_PATH = (0, import_path8.join)(locateContractsDir(), "state-machines.json");
 var cached2 = null;
 function loadTable() {
   if (!cached2) cached2 = JSON.parse((0, import_fs7.readFileSync)(TABLE_PATH, "utf8"));

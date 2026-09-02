@@ -194,7 +194,18 @@ export function neutraliseToolMandates(block) {
       (_m, tool) => `the inlined \`${tool}\` result`);
 }
 
-export function buildRolePrompt(agentPromptBlock, contract, caseObj) {
+export function buildRolePrompt(agentPromptBlock, contract, caseObj, opts = {}) {
+  // ── The two correct states are ALTERNATIVES, not layers (item 7.1) ─────────
+  //
+  // With tools ATTACHED, the agent's own mandates must stand: it is supposed to
+  // call `evor_capability()`, and grading whether it did is the point. Rewriting
+  // them here while also handing it a live MCP server would give it tools and
+  // then tell it to use inlined results instead — incoherent in a new way, and
+  // the arm would measure neither state.
+  //
+  // With tools ABSENT, the mandates are neutralised and the results inlined,
+  // which is the state that shipped first.
+  const withTools = opts.withTools === true;
   const payload = {};
   for (const [k, v] of Object.entries(caseObj)) {
     if (!RESERVED_CASE_KEYS.has(k)) payload[k] = v;
@@ -214,12 +225,20 @@ export function buildRolePrompt(agentPromptBlock, contract, caseObj) {
     // (`--mcp-config`, see role-eval.mjs), or NEUTRALISE the mandate. This is
     // the second — the mandates are rewritten to point at the inlined result, so
     // the prompt no longer orders something it forbids.
-    neutraliseToolMandates(agentPromptBlock),
+    withTools ? agentPromptBlock : neutraliseToolMandates(agentPromptBlock),
     '',
     '---',
     '',
-    'The tool results you would normally fetch are inlined below. Treat them as',
-    'authoritative and do not call any tool; reason from them directly.',
+    ...(withTools
+      ? [
+          'The evor MCP tools are available. Call the ones your instructions above',
+          'require. The scenario state is inlined below; where a tool would return',
+          'run-specific data, prefer the tool and fall back to this payload.',
+        ]
+      : [
+          'The tool results you would normally fetch are inlined below. Treat them as',
+          'authoritative and do not call any tool; reason from them directly.',
+        ]),
     '',
     '```json',
     JSON.stringify(payload, null, 2),

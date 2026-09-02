@@ -18,7 +18,7 @@
 import { execFileSync } from 'child_process';
 import { createHash } from 'crypto';
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'fs';
-import { dirname, resolve } from 'path';
+import { dirname, join, resolve } from 'path';
 import { fileURLToPath } from 'url';
 
 import {
@@ -33,16 +33,30 @@ import {
 import { buildRolePrompt, parseContractOutput, scoreByContract } from './eval-core.mjs';
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const MCP_CONFIG_PATH = join(REPO_ROOT, 'ci', 'eval-mcp-config.json');
 const tierName = (t) => `${t.model}-${t.effort}`;
 
 function runOneCall({ agentPromptBlock, contract, caseObj, tier, maxTurns, timeoutMs }) {
-  const prompt = buildRolePrompt(agentPromptBlock, contract, caseObj);
+  const withTools = process.env.EVOR_EVAL_TOOLS !== '0';
+  const prompt = buildRolePrompt(agentPromptBlock, contract, caseObj, { withTools });
+  // ── Item 7.1, the FIRST correct state: ATTACH THE TOOLS ────────────────────
+  //
+  // v1.2.0's entire tier claim rests on a corpus with zero tool_use blocks, in a
+  // system where every role's job is to call tools. RC7: the numbers were right
+  // about a narrower thing than they were quoted for — judgement quality on a
+  // prompt, cited as role capability.
+  //
+  // The RED test names two correct states: neutralise the mandate, or attach the
+  // server and grade the call. Only the first shipped. This is the second, and
+  // Phase 8 needs it: a re-measurement without tools would reproduce the exact
+  // confound it exists to remove.
   const args = [
     '-p', prompt,
     '--model', tier.model,
     '--effort', tier.effort,
     '--output-format', 'json',
     '--max-turns', String(maxTurns),
+    ...(withTools ? ['--mcp-config', MCP_CONFIG_PATH] : []),
   ];
   const t0 = Date.now();
   let raw;
@@ -71,10 +85,18 @@ function runOneCall({ agentPromptBlock, contract, caseObj, tier, maxTurns, timeo
   if (!tierCheck.ok) throw new Error(tierCheck.error);
 
   const recon = costReconciliation(envelope);
+  // Tool use is observable from `num_turns`: a text-only answer is 1 turn, and
+  // every tool call adds one. Verified against a live no-tool call, which
+  // returned exactly 1.
+  const turns = typeof envelope.num_turns === 'number' ? envelope.num_turns : 1;
+  const toolCallsObserved = Math.max(0, turns - 1);
+
   const text = String(envelope.result ?? '');
   const scored = scoreByContract(contract, caseObj, parseContractOutput(text, contract));
 
   return {
+    mcp_tools_attached: withTools,
+    tool_calls_observed: toolCallsObserved,
     status: scored.status,
     wall_ms,
     cost_usd: recon.modeled_usd,
