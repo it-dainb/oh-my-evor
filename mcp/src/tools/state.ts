@@ -8,14 +8,15 @@
  * evor_check_stop        — server-side stop verdict by StopCondition type (Area 4)
  */
 
-import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "fs";
-import { join } from "path";
+import { homedir } from "os";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, unlinkSync, writeFileSync } from "fs";
+import { dirname, join, resolve, sep } from "path";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { GoalContractSchema, StrategyStateSchema } from "../contracts.js";
 import { resolveRunPaths, ensureRunDirs, getActiveRunPath, getEvorRoot } from "../run-store.js";
 import { readRunState, writeRunState } from "./record.js";
-import { assertReachable, initialState, isStale, maxDwellSeconds } from "../fsm.js";
+import { assertReachable, initialState, isStale, isTerminal, maxDwellSeconds } from "../fsm.js";
 import { callPythonModule } from "../subprocess-bridge.js";
 
 // ── Tick-state schema (spec §15B) ──────────────────────────────────────────
@@ -64,6 +65,22 @@ export const RunStatePatchSchema = z.object({
     .describe(
       "Mission lifecycle state (draft, locked, running, paused, completed, failed). " +
       "If set, patches the mission's status (gate: draft→locked requires contract validation).",
+    ),
+  mission_status_reason: z
+    .string()
+    .optional()
+    .describe(
+      "Why a mission reached this status. Recorded with the transition. The field " +
+      "run's reason was typed into the artifact by hand 14h39m later, because the " +
+      "tool surface had no way to express it (I-11).",
+    ),
+  superseded_by: z
+    .string()
+    .optional()
+    .describe(
+      "Mission id that supersedes this one. r1 -> r2 -> r3 were three attempts at " +
+      "one goal and there was no supported way to link them, so the link was " +
+      "hand-written into the state file after the fact.",
     ),
   reason: z
     .string()
@@ -192,6 +209,98 @@ export function stateRead(runId: string, missionId?: string): Record<string, unk
 }
 
 /**
+ * Take the root's exclusive "running" claim for `missionId` (O-09, item 1.9).
+ *
+ * THREE missions read status "running" concurrently for 15.6 hours. Nothing in
+ * the writer referred to any other mission in the root, so "only one at a time"
+ * was true of nothing.
+ *
+ * A CLAIM RECORD rather than a scan of sibling `mission-state.json` files. The
+ * scan was written first and is the wrong shape: those files are ordinary state
+ * that anything can write, so a scan cannot tell the mission legitimately
+ * holding the claim from one that merely says it does — which is exactly the
+ * failure, three missions each asserting `running` and every assertion equally
+ * unbacked. A claim has an owner, and the owner is this writer.
+ *
+ * Stale claims self-heal: if the holder's own state no longer says running, its
+ * claim is void and reclaimable. A crashed run must not lock the root forever —
+ * that would be F6's un-drawn edge with a different name.
+ */
+function claimRunningMission(runDir: string, missionId: string): void {
+  const runsRoot = dirname(dirname(runDir));
+  const claimPath = join(runsRoot, "running-mission.json");
+
+  let holder: string | null = null;
+  if (existsSync(claimPath)) {
+    try { holder = String(JSON.parse(readFileSync(claimPath, "utf8"))?.mission_id ?? "") || null; }
+    catch { holder = null; }
+  }
+
+  if (holder && holder !== missionId && missionStillRunning(runsRoot, holder)) {
+    throw new Error(
+      `refusing to mark '${missionId}' running: '${holder}' already holds the running ` +
+      `claim in this .evor/ root. Two missions advancing concurrently each compute a ` +
+      `frontier the other invalidates. Complete, fail or pause '${holder}' first.`,
+    );
+  }
+
+  try {
+    writeFileSync(
+      claimPath,
+      JSON.stringify({ mission_id: missionId, claimed_at: new Date().toISOString() }, null, 2),
+      "utf8",
+    );
+  } catch { /* unwritable root — the state write itself still stands */ }
+}
+
+/** Release the claim when a mission stops running, so the next one can take it. */
+function releaseRunningMission(runDir: string, missionId: string): void {
+  const claimPath = join(dirname(dirname(runDir)), "running-mission.json");
+  try {
+    if (!existsSync(claimPath)) return;
+    if (String(JSON.parse(readFileSync(claimPath, "utf8"))?.mission_id ?? "") !== missionId) return;
+    unlinkSync(claimPath);
+  } catch { /* best effort */ }
+}
+
+/** Does the claimed holder's own state still say running? */
+function missionStillRunning(runsRoot: string, missionId: string): boolean {
+  try {
+    const missionDir = join(runsRoot, missionId);
+    for (const run of readdirSync(missionDir, { withFileTypes: true })) {
+      if (!run.isDirectory()) continue;
+      const msPath = join(missionDir, run.name, "mission-state.json");
+      if (!existsSync(msPath)) continue;
+      try {
+        if (String(JSON.parse(readFileSync(msPath, "utf8"))?.status ?? "") === "running") return true;
+      } catch { /* unreadable — not evidence the holder is alive */ }
+    }
+  } catch { /* the holder's directory is gone; the claim is void */ }
+  return false;
+}
+
+
+/**
+ * Append one line to `decision-log.md` — item I-01.
+ *
+ * Four classes of materially significant action never reached this file, and a
+ * mission transition is the largest single event a run can record. It survived
+ * only as a mutated field with no history: the log is what a human reads to
+ * reconstruct what a 19-hour run did, and it said nothing about the run ending.
+ *
+ * Best-effort. An unwritable log must not fail the write it describes — the log
+ * is evidence, not a gate.
+ */
+function appendDecision(runDir: string, what: string, why: string): void {
+  try {
+    const line = `- \`${new Date().toISOString()}\` **${what}** — ${why}\n`;
+    appendFileSync(join(runDir, "decision-log.md"), line);
+  } catch {
+    // best-effort by design — see above
+  }
+}
+
+/**
  * Append one transition to `<runDir>/transitions.jsonl` — the audit layer of 3.1.
  *
  * Best-effort: an unwritable audit log must not fail the write it describes. The
@@ -218,12 +327,58 @@ function appendTransition(runDir: string, record: Record<string, unknown>): void
  *   - active_run     → write active-run.json atomically
  *   - tick_state     → write tick-state.json atomically
  */
+/**
+ * Refuse to write run state into the plugin's own install tree (item 1.3 / P-02).
+ *
+ * The field run wrote `active-run.json` and a whole
+ * `runs/frontier-1ms/run-live-01/` into BOTH the plugin cache and the
+ * marketplace clone. A run recorded there is destroyed by the next
+ * `claude plugin update`, and it leaks into every future project that installs
+ * the plugin — which is exactly how Q-01's decoy `.evor/` came to exist for the
+ * hooks to find.
+ *
+ * The hook-side resolver stopped RESOLVING there; this stops the MCP side
+ * WRITING there. Both were needed: fixing only the reader leaves the writer
+ * free to keep creating the thing the reader must now avoid.
+ */
+function assertStateRootOutsidePlugin(runDir: string): void {
+  const resolved = resolve(runDir);
+
+  // Structural first: a plugin install is recognised by the SHAPE of its path,
+  // `.../plugins/cache/...` or `.../plugins/marketplaces/...`, wherever it is
+  // rooted. Keying on `homedir()` alone would miss a plugin tree anywhere else —
+  // and the shape is the thing that makes it a plugin tree.
+  const parts = resolved.split(sep);
+  const pluginsAt = parts.lastIndexOf("plugins");
+  if (pluginsAt >= 0 && ["cache", "marketplaces"].includes(parts[pluginsAt + 1] ?? "")) {
+    throw new Error(
+      `refusing to write run state inside the plugin install (${parts.slice(0, pluginsAt + 2).join(sep)}). ` +
+      `A run recorded there is destroyed by the next plugin update and leaks into ` +
+      `every project that installs the plugin — which is how the decoy .evor/ that ` +
+      `Q-01's hooks read for 19 hours came to exist. Set EVOR_ROOT to a directory in ` +
+      `the PROJECT, or run from the project directory.`,
+    );
+  }
+
+  // Then the roots we are explicitly told about.
+  for (const root of [process.env.CLAUDE_PLUGIN_ROOT, process.env.EVOR_PLUGIN_ROOT].filter(Boolean) as string[]) {
+    const r = resolve(root);
+    if (resolved === r || resolved.startsWith(r + sep)) {
+      throw new Error(
+        `refusing to write run state inside the plugin install (${r}). ` +
+        `Set EVOR_ROOT to a directory in the PROJECT, or run from the project directory.`,
+      );
+    }
+  }
+}
+
 export function stateWrite(
   runId: string,
   patch: z.infer<typeof RunStatePatchSchema>,
   missionId?: string
 ): Record<string, unknown> {
   const paths = ensureRunDirs(runId, missionId);
+  assertStateRootOutsidePlugin(paths.runDir);
 
   // Destructure extended fields so they don't pollute run-state.json.
   const {
@@ -232,6 +387,8 @@ export function stateWrite(
     // Destructured so the reason lands in transitions.jsonl and NOT in
     // run-state.json — it explains one edge, it is not run state.
     reason: patchReason,
+    mission_status_reason: missionStatusReason,
+    superseded_by: supersededBy,
     active_run: activeRun,
     tick_state: tickState,
     prediction_bias_sample: biasSample,
@@ -309,12 +466,46 @@ export function stateWrite(
     const from = String(ms.status ?? initialState("mission"));
     assertReachable("mission", from, missionStatus);
 
+    // ── O-09 (item 1.9): runs of one mission do not overlap, and neither do
+    // missions of one campaign. THREE missions read status "running"
+    // concurrently for 15.6 hours: nothing in the writer referred to any other
+    // mission in the root, so "only one at a time" was true of nothing.
+    //
+    // 1.9 decided the semantics; this is the writer enforcing them, which is
+    // where AF3 risk 2 says enforcement has to live.
+    const thisMission = missionId ?? String(ms.mission_id ?? "");
+    if (missionStatus === "running") {
+      claimRunningMission(paths.runDir, thisMission);
+    } else if (isTerminal("mission", missionStatus) || missionStatus === "paused") {
+      releaseRunningMission(paths.runDir, thisMission);
+    }
+
+    // ── I-11: an APPEND-ONLY trail on the entity itself ──────────────────
+    //
+    // `mission-state.json` recorded only the CURRENT status, so a running→paused
+    // transition was overwritten by paused→failed and simply gone. Two writes,
+    // zero surviving history. `transitions.jsonl` (3.1) is the run-level audit;
+    // this is the same fact carried by the object a reader already has open,
+    // which is what makes it survive being copied, archived or inspected alone.
+    const now = new Date().toISOString();
+    const history = Array.isArray(ms.status_history) ? ms.status_history : [];
+    history.push({
+      at: now,
+      from,
+      to: missionStatus,
+      actor: "evor_state_write",
+      reason: (missionStatusReason ?? patchReason) ?? null,
+    });
+    ms.status_history = history;
+
     ms.status = missionStatus;
-    ms.updated_at = new Date().toISOString();
+    ms.updated_at = now;
+    if (missionStatusReason !== undefined) ms.status_reason = missionStatusReason;
+    if (supersededBy !== undefined) ms.superseded_by = supersededBy;
     // 3.3: every state carries when it was entered, so "is this still alive?"
     // becomes arithmetic any reader in any language can do from the file alone.
     // That one field is what makes C-01, K-09 and C-03 observable at all.
-    ms.entered_at = ms.updated_at;
+    ms.entered_at = now;
     const msTmp = `${missionStatePath}.tmp`;
     writeFileSync(msTmp, JSON.stringify(ms, null, 2), "utf8");
     renameSync(msTmp, missionStatePath);
@@ -322,6 +513,8 @@ export function stateWrite(
     // 3.1 audit: append-only, with a CONTEMPORANEOUS reason. K-08's supersession
     // reason had to be reconstructed afterwards by a human editing JSON in vim,
     // because nothing recorded why a transition happened when it happened.
+    appendDecision(paths.runDir, `mission ${from} -> ${missionStatus}`,
+      String(missionStatusReason ?? patchReason ?? "(no reason given)"));
     appendTransition(paths.runDir, {
       entity: "mission",
       entity_id: missionId ?? String(ms.mission_id ?? ""),

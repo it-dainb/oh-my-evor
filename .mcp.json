@@ -2,22 +2,27 @@
   "mcpServers": {
     "evor": {
       "command": "node",
-      "args": ["${CLAUDE_PLUGIN_ROOT}/mcp/dist/index.cjs"]
+      "args": [
+        "${CLAUDE_PLUGIN_ROOT}/mcp/dist/index.cjs"
+      ]
     },
     "semantic-scholar": {
       "command": "node",
-      "args": ["${CLAUDE_PLUGIN_ROOT}/mcp/bin/py-mcp.cjs", "semantic-scholar-mcp"]
+      "args": [
+        "${CLAUDE_PLUGIN_ROOT}/mcp/bin/py-mcp.cjs",
+        "semantic-scholar-mcp"
+      ]
     },
     "arxiv": {
       "command": "node",
-      "args": ["${CLAUDE_PLUGIN_ROOT}/mcp/bin/py-mcp.cjs", "arxiv-mcp-server"]
+      "args": [
+        "${CLAUDE_PLUGIN_ROOT}/mcp/bin/py-mcp.cjs",
+        "arxiv-mcp-server"
+      ]
     },
     "hf-mcp": {
       "type": "http",
-      "url": "https://huggingface.co/mcp",
-      "headers": {
-        "Authorization": "Bearer ${user_config.hf_token}"
-      }
+      "url": "https://huggingface.co/mcp"
     }
   }
 }

@@ -17,7 +17,7 @@
  *   - Python wiki unavailable   → skip priming, still emit env JSON
  */
 
-import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync, statSync } from 'fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, unlinkSync, writeFileSync } from 'fs';
 import { join, dirname, delimiter } from 'path';
 import { spawnSync } from 'child_process';
 import { fileURLToPath } from 'url';
@@ -84,19 +84,86 @@ function checkHarnessDeps(pRoot, eRoot) {
     const harness = process.env.EVOR_HARNESS_DIR ?? join(pRoot, 'harness');
     if (!existsSync(harness)) return '';            // not our layout — say nothing
     const sentinel = join(eRoot, '.deps-ok');
-    if (existsSync(sentinel)) return '';            // already verified this install
     const py = process.env.EVOR_PYTHON ?? 'python3';
+
+    // ── Item 6.2 (R-07): a sentinel that RECORDS WHAT IT VERIFIED ──────────
+    //
+    // `.deps-ok` was a bare 24-byte ISO timestamp, and its mere existence
+    // short-circuited the check. That records nothing falsifiable: it cannot say
+    // WHICH interpreter was verified or WHICH packages were present, so an
+    // environment that changed underneath it — a different conda env, a package
+    // uninstalled — was indistinguishable from one that had not. A sentinel that
+    // cannot fail is not a check, which is `integrity.py:404` in another file.
+    //
+    // It now attests the interpreter and the package set, and is revalidated
+    // whenever either no longer matches.
+    let attested = null;
+    if (existsSync(sentinel)) {
+      try { attested = JSON.parse(readFileSync(sentinel, 'utf8')); } catch { attested = null; }
+    }
+    const shapeValid =
+      attested &&
+      typeof attested === 'object' &&
+      attested.python === py &&
+      attested.packages &&
+      Object.keys(attested.packages).length > 0;
+
+    // A sentinel that names packages must be checked AGAINST them. Matching the
+    // interpreter alone would still accept an attestation listing a package that
+    // has since been uninstalled — which is the same "cannot fail" defect one
+    // level in, and exactly what R-07's third case pins.
+    let stillValid = false;
+    if (shapeValid) {
+      const names = Object.keys(attested.packages);
+      const verify = [
+        'import sys',
+        'from importlib.metadata import version, PackageNotFoundError',
+        `names = ${JSON.stringify(names)}`,
+        'missing = []',
+        'for n in names:',
+        '    try: version(n)',
+        '    except PackageNotFoundError: missing.append(n)',
+        'sys.exit(1 if missing else 0)',
+      ].join('\n');
+      const check = spawnSync(py, ['-c', verify], { encoding: 'utf8', timeout: 5000 });
+      stillValid = check.status === 0;
+    }
+    if (stillValid) return '';
+
     const env = {
       ...process.env,
       PYTHONPATH: process.env.PYTHONPATH ? `${harness}${delimiter}${process.env.PYTHONPATH}` : harness,
     };
-    // evor.contracts imports pydantic; also probe pyyaml — covers path + both deps.
-    const res = spawnSync(py, ['-c', 'import evor.contracts, yaml'], { encoding: 'utf8', timeout: 3000, env });
+    // Report the versions actually imported, so the sentinel attests a fact
+    // about this environment rather than the fact that a check once ran.
+    const probe = [
+      'import json, sys',
+      'import evor.contracts, yaml, pydantic',
+      'print(json.dumps({"python": sys.executable,',
+      '  "packages": {"pydantic": pydantic.VERSION, "pyyaml": yaml.__version__}}))',
+    ].join('\n');
+    const res = spawnSync(py, ['-c', probe], { encoding: 'utf8', timeout: 5000, env });
+
     if (res.status === 0) {
-      try { mkdirSync(dirname(sentinel), { recursive: true }); writeFileSync(sentinel, new Date().toISOString()); } catch { /* read-only .evor — fine, we just re-check next time */ }
+      let reported = {};
+      try { reported = JSON.parse((res.stdout ?? '').trim().split('\n').pop() ?? '{}'); } catch { /* fall through */ }
+      try {
+        mkdirSync(dirname(sentinel), { recursive: true });
+        writeFileSync(sentinel, JSON.stringify({
+          // The interpreter AS INVOKED, so the next session compares like with
+          // like — `sys.executable` resolves symlinks and would never match.
+          python: py,
+          interpreter_path: reported.python ?? null,
+          packages: reported.packages ?? {},
+          verified_at: new Date().toISOString(),
+        }, null, 2));
+      } catch { /* read-only .evor — fine, we re-check next time */ }
       return '';
     }
-    const missing = (res.stderr ?? '').split('\n').find(l => l.includes('ModuleNotFoundError')) ?? '';
+
+    // Revalidation failed. Remove a stale sentinel rather than leaving one that
+    // attests an environment that no longer exists.
+    if (attested) { try { unlinkSync(sentinel); } catch { /* best effort */ } }
     return `[oh-my-evor] Python harness dependencies are not installed — run the plugin install script to set up dependencies before using evor tools.`;
   } catch {
     return '';                                       // never break session start

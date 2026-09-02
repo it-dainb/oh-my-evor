@@ -2981,7 +2981,7 @@ var require_compile = __commonJS({
       const schOrFunc = root.refs[ref];
       if (schOrFunc)
         return schOrFunc;
-      let _sch = resolve3.call(this, root, ref);
+      let _sch = resolve4.call(this, root, ref);
       if (_sch === void 0) {
         const schema = (_a = root.localRefs) === null || _a === void 0 ? void 0 : _a[ref];
         const { schemaId } = this.opts;
@@ -3008,7 +3008,7 @@ var require_compile = __commonJS({
     function sameSchemaEnv(s1, s2) {
       return s1.schema === s2.schema && s1.root === s2.root && s1.baseId === s2.baseId;
     }
-    function resolve3(root, ref) {
+    function resolve4(root, ref) {
       let sch;
       while (typeof (sch = this.refs[ref]) == "string")
         ref = sch;
@@ -3583,7 +3583,7 @@ var require_fast_uri = __commonJS({
       }
       return uri;
     }
-    function resolve3(baseURI, relativeURI, options) {
+    function resolve4(baseURI, relativeURI, options) {
       const schemelessOptions = options ? Object.assign({ scheme: "null" }, options) : { scheme: "null" };
       const resolved = resolveComponent(parse3(baseURI, schemelessOptions), parse3(relativeURI, schemelessOptions), schemelessOptions, true);
       schemelessOptions.skipEscape = true;
@@ -3810,7 +3810,7 @@ var require_fast_uri = __commonJS({
     var fastUri = {
       SCHEMES,
       normalize,
-      resolve: resolve3,
+      resolve: resolve4,
       resolveComponent,
       equal,
       serialize,
@@ -18889,7 +18889,7 @@ var Protocol = class {
           return;
         }
         const pollInterval = task2.pollInterval ?? this._options?.defaultTaskPollInterval ?? 1e3;
-        await new Promise((resolve3) => setTimeout(resolve3, pollInterval));
+        await new Promise((resolve4) => setTimeout(resolve4, pollInterval));
         options?.signal?.throwIfAborted();
       }
     } catch (error2) {
@@ -18906,7 +18906,7 @@ var Protocol = class {
    */
   request(request, resultSchema, options) {
     const { relatedRequestId, resumptionToken, onresumptiontoken, task, relatedTask } = options ?? {};
-    return new Promise((resolve3, reject) => {
+    return new Promise((resolve4, reject) => {
       const earlyReject = (error2) => {
         reject(error2);
       };
@@ -18984,7 +18984,7 @@ var Protocol = class {
           if (!parseResult.success) {
             reject(parseResult.error);
           } else {
-            resolve3(parseResult.data);
+            resolve4(parseResult.data);
           }
         } catch (error2) {
           reject(error2);
@@ -19245,12 +19245,12 @@ var Protocol = class {
       }
     } catch {
     }
-    return new Promise((resolve3, reject) => {
+    return new Promise((resolve4, reject) => {
       if (signal.aborted) {
         reject(new McpError(ErrorCode.InvalidRequest, "Request cancelled"));
         return;
       }
-      const timeoutId = setTimeout(resolve3, interval);
+      const timeoutId = setTimeout(resolve4, interval);
       signal.addEventListener("abort", () => {
         clearTimeout(timeoutId);
         reject(new McpError(ErrorCode.InvalidRequest, "Request cancelled"));
@@ -20350,7 +20350,7 @@ var McpServer = class {
     let task = createTaskResult.task;
     const pollInterval = task.pollInterval ?? 5e3;
     while (task.status !== "completed" && task.status !== "failed" && task.status !== "cancelled") {
-      await new Promise((resolve3) => setTimeout(resolve3, pollInterval));
+      await new Promise((resolve4) => setTimeout(resolve4, pollInterval));
       const updatedTask = await extra.taskStore.getTask(taskId);
       if (!updatedTask) {
         throw new McpError(ErrorCode.InternalError, `Task ${taskId} not found during polling`);
@@ -20999,12 +20999,12 @@ var StdioServerTransport = class {
     this.onclose?.();
   }
   send(message) {
-    return new Promise((resolve3) => {
+    return new Promise((resolve4) => {
       const json = serializeMessage(message);
       if (this._stdout.write(json)) {
-        resolve3();
+        resolve4();
       } else {
-        this._stdout.once("drain", resolve3);
+        this._stdout.once("drain", resolve4);
       }
     });
   }
@@ -22985,6 +22985,9 @@ function machine(entity) {
 function initialState(entity) {
   return machine(entity).initial;
 }
+function isTerminal2(entity, state) {
+  return machine(entity).terminal.includes(state);
+}
 function nextState(entity, state, event) {
   return machine(entity).states[state]?.on?.[event]?.to;
 }
@@ -23048,6 +23051,12 @@ var RunStatePatchSchema = external_exports.object({
   ).optional().describe(
     "Mission lifecycle state (draft, locked, running, paused, completed, failed). If set, patches the mission's status (gate: draft\u2192locked requires contract validation)."
   ),
+  mission_status_reason: external_exports.string().optional().describe(
+    "Why a mission reached this status. Recorded with the transition. The field run's reason was typed into the artifact by hand 14h39m later, because the tool surface had no way to express it (I-11)."
+  ),
+  superseded_by: external_exports.string().optional().describe(
+    "Mission id that supersedes this one. r1 -> r2 -> r3 were three attempts at one goal and there was no supported way to link them, so the link was hand-written into the state file after the fact."
+  ),
   reason: external_exports.string().optional().describe(
     "Why this transition is being made. Recorded in transitions.jsonl at the moment of the write, never backfilled. K-08's supersession reason had to be reconstructed afterwards by a human editing JSON in vim, because nothing captured it when it happened."
   ),
@@ -23104,6 +23113,64 @@ function stateRead(runId, missionId) {
   }
   return state;
 }
+function claimRunningMission(runDir, missionId) {
+  const runsRoot = (0, import_path9.dirname)((0, import_path9.dirname)(runDir));
+  const claimPath = (0, import_path9.join)(runsRoot, "running-mission.json");
+  let holder = null;
+  if ((0, import_fs8.existsSync)(claimPath)) {
+    try {
+      holder = String(JSON.parse((0, import_fs8.readFileSync)(claimPath, "utf8"))?.mission_id ?? "") || null;
+    } catch {
+      holder = null;
+    }
+  }
+  if (holder && holder !== missionId && missionStillRunning(runsRoot, holder)) {
+    throw new Error(
+      `refusing to mark '${missionId}' running: '${holder}' already holds the running claim in this .evor/ root. Two missions advancing concurrently each compute a frontier the other invalidates. Complete, fail or pause '${holder}' first.`
+    );
+  }
+  try {
+    (0, import_fs8.writeFileSync)(
+      claimPath,
+      JSON.stringify({ mission_id: missionId, claimed_at: (/* @__PURE__ */ new Date()).toISOString() }, null, 2),
+      "utf8"
+    );
+  } catch {
+  }
+}
+function releaseRunningMission(runDir, missionId) {
+  const claimPath = (0, import_path9.join)((0, import_path9.dirname)((0, import_path9.dirname)(runDir)), "running-mission.json");
+  try {
+    if (!(0, import_fs8.existsSync)(claimPath)) return;
+    if (String(JSON.parse((0, import_fs8.readFileSync)(claimPath, "utf8"))?.mission_id ?? "") !== missionId) return;
+    (0, import_fs8.unlinkSync)(claimPath);
+  } catch {
+  }
+}
+function missionStillRunning(runsRoot, missionId) {
+  try {
+    const missionDir = (0, import_path9.join)(runsRoot, missionId);
+    for (const run of (0, import_fs8.readdirSync)(missionDir, { withFileTypes: true })) {
+      if (!run.isDirectory()) continue;
+      const msPath = (0, import_path9.join)(missionDir, run.name, "mission-state.json");
+      if (!(0, import_fs8.existsSync)(msPath)) continue;
+      try {
+        if (String(JSON.parse((0, import_fs8.readFileSync)(msPath, "utf8"))?.status ?? "") === "running") return true;
+      } catch {
+      }
+    }
+  } catch {
+  }
+  return false;
+}
+function appendDecision(runDir, what, why) {
+  try {
+    const line = `- \`${(/* @__PURE__ */ new Date()).toISOString()}\` **${what}** \u2014 ${why}
+`;
+    (0, import_fs8.appendFileSync)((0, import_path9.join)(runDir, "decision-log.md"), line);
+  } catch {
+  }
+}
 function appendTransition(runDir, record2) {
   try {
     (0, import_fs8.appendFileSync)(
@@ -23113,14 +23180,35 @@ function appendTransition(runDir, record2) {
   } catch {
   }
 }
+function assertStateRootOutsidePlugin(runDir) {
+  const resolved = (0, import_path9.resolve)(runDir);
+  const parts = resolved.split(import_path9.sep);
+  const pluginsAt = parts.lastIndexOf("plugins");
+  if (pluginsAt >= 0 && ["cache", "marketplaces"].includes(parts[pluginsAt + 1] ?? "")) {
+    throw new Error(
+      `refusing to write run state inside the plugin install (${parts.slice(0, pluginsAt + 2).join(import_path9.sep)}). A run recorded there is destroyed by the next plugin update and leaks into every project that installs the plugin \u2014 which is how the decoy .evor/ that Q-01's hooks read for 19 hours came to exist. Set EVOR_ROOT to a directory in the PROJECT, or run from the project directory.`
+    );
+  }
+  for (const root of [process.env.CLAUDE_PLUGIN_ROOT, process.env.EVOR_PLUGIN_ROOT].filter(Boolean)) {
+    const r = (0, import_path9.resolve)(root);
+    if (resolved === r || resolved.startsWith(r + import_path9.sep)) {
+      throw new Error(
+        `refusing to write run state inside the plugin install (${r}). Set EVOR_ROOT to a directory in the PROJECT, or run from the project directory.`
+      );
+    }
+  }
+}
 function stateWrite(runId, patch, missionId) {
   const paths = ensureRunDirs(runId, missionId);
+  assertStateRootOutsidePlugin(paths.runDir);
   const {
     strategy: strategyDelta,
     mission_status: missionStatus,
     // Destructured so the reason lands in transitions.jsonl and NOT in
     // run-state.json — it explains one edge, it is not run state.
     reason: patchReason,
+    mission_status_reason: missionStatusReason,
+    superseded_by: supersededBy,
     active_run: activeRun,
     tick_state: tickState,
     prediction_bias_sample: biasSample,
@@ -23170,12 +23258,35 @@ function stateWrite(runId, patch, missionId) {
     }
     const from = String(ms.status ?? initialState("mission"));
     assertReachable("mission", from, missionStatus);
+    const thisMission = missionId ?? String(ms.mission_id ?? "");
+    if (missionStatus === "running") {
+      claimRunningMission(paths.runDir, thisMission);
+    } else if (isTerminal2("mission", missionStatus) || missionStatus === "paused") {
+      releaseRunningMission(paths.runDir, thisMission);
+    }
+    const now = (/* @__PURE__ */ new Date()).toISOString();
+    const history = Array.isArray(ms.status_history) ? ms.status_history : [];
+    history.push({
+      at: now,
+      from,
+      to: missionStatus,
+      actor: "evor_state_write",
+      reason: missionStatusReason ?? patchReason ?? null
+    });
+    ms.status_history = history;
     ms.status = missionStatus;
-    ms.updated_at = (/* @__PURE__ */ new Date()).toISOString();
-    ms.entered_at = ms.updated_at;
+    ms.updated_at = now;
+    if (missionStatusReason !== void 0) ms.status_reason = missionStatusReason;
+    if (supersededBy !== void 0) ms.superseded_by = supersededBy;
+    ms.entered_at = now;
     const msTmp = `${missionStatePath}.tmp`;
     (0, import_fs8.writeFileSync)(msTmp, JSON.stringify(ms, null, 2), "utf8");
     (0, import_fs8.renameSync)(msTmp, missionStatePath);
+    appendDecision(
+      paths.runDir,
+      `mission ${from} -> ${missionStatus}`,
+      String(missionStatusReason ?? patchReason ?? "(no reason given)")
+    );
     appendTransition(paths.runDir, {
       entity: "mission",
       entity_id: missionId ?? String(ms.mission_id ?? ""),
@@ -24599,20 +24710,38 @@ function verifyArtifacts(runId, nodeRef, missionId) {
   const has_telemetry = present("telemetry.jsonl", 0);
   return { ok: has_results && has_telemetry, node_name: nodeRef, has_results, has_telemetry };
 }
+function appendDecision2(runDir, what, why) {
+  try {
+    (0, import_fs16.appendFileSync)(
+      `${runDir}/decision-log.md`,
+      `- \`${(/* @__PURE__ */ new Date()).toISOString()}\` **${what}** \u2014 ${why}
+`
+    );
+  } catch {
+  }
+}
 function patchGoalContract(runDir, patch) {
   const contractPath = `${runDir}/goal-contract.json`;
   if (!(0, import_fs16.existsSync)(contractPath)) return;
   try {
     const contract = JSON.parse((0, import_fs16.readFileSync)(contractPath, "utf8"));
-    let changed = false;
+    const changes = [];
     for (const [k, v] of Object.entries(patch)) {
       if (v && contract[k] !== v) {
+        const previous = contract[k];
         contract[k] = v;
-        changed = true;
+        changes.push(
+          previous === void 0 ? `${k} set to ${String(v).slice(0, 24)}` : `${k} ${String(previous).slice(0, 24)} -> ${String(v).slice(0, 24)}`
+        );
       }
     }
-    if (changed) {
+    if (changes.length) {
       (0, import_fs16.writeFileSync)(contractPath, JSON.stringify(contract, null, 2), "utf8");
+      appendDecision2(
+        runDir,
+        `sealed goal-contract mutated: ${changes.join(", ")}`,
+        Object.keys(patch).includes("eval_script_hash") ? "the evaluator anchor moved; scores recorded under the previous anchor are no longer reproducible" : "contract field rewritten through evor_seal_eval_script"
+      );
     }
   } catch {
   }

@@ -380,20 +380,70 @@ export function verifyArtifacts(
  * every other field is preserved, and failures are non-fatal (the gate still
  * fails closed if the anchor is missing).
  */
+/**
+ * Append one line to `decision-log.md` (item I-01).
+ *
+ * Best-effort: an unwritable log must not fail the write it describes. The log
+ * is evidence, not a gate.
+ */
+function appendDecision(runDir: string, what: string, why: string): void {
+  try {
+    appendFileSync(
+      `${runDir}/decision-log.md`,
+      `- \`${new Date().toISOString()}\` **${what}** — ${why}\n`,
+    );
+  } catch {
+    // best-effort by design
+  }
+}
+
+/**
+ * Rewrite fields of a sealed goal contract — and SAY SO (item I-01).
+ *
+ * This is the only code path in the MCP server that rewrites a sealed
+ * `goal-contract.json`, and it was best-effort and silent by construction. Gate
+ * and threshold changes were made through it — GPU 10ms→500ms, CPU 0.1s→1.0s,
+ * LAT_CPU_THREADS 32→8 — and left no trace anywhere.
+ *
+ * The `eval_script_hash` case is the sharpest: when the contract already anchors
+ * a DIFFERENT hash, this is not a first seal, it is an evaluator REPLACEMENT
+ * that silently overwrites the anchor making the previous scores reproducible.
+ * In the field the anchor moved three times (8d7107cf → 3dc2f7da → f123d17c →
+ * a3776de4) and f123d17c's evaluator now exists nowhere on disk. Every number
+ * scored under it is unreproducible, and nothing recorded that it changed.
+ *
+ * `harness/evor/benchmark.py` already gets this right — it appends a
+ * "## BenchmarkUpgrade" block for every eval-suite upgrade. This is that,
+ * applied to the writer that needed it.
+ */
 function patchGoalContract(runDir: string, patch: Record<string, string>): void {
   const contractPath = `${runDir}/goal-contract.json`;
   if (!existsSync(contractPath)) return;
   try {
     const contract = JSON.parse(readFileSync(contractPath, "utf8")) as Record<string, unknown>;
-    let changed = false;
+    const changes: string[] = [];
     for (const [k, v] of Object.entries(patch)) {
       if (v && contract[k] !== v) {
+        const previous = contract[k];
         contract[k] = v;
-        changed = true;
+        // The PREVIOUS value is what makes the entry useful: it is the only
+        // surviving record of an anchor whose evaluator may no longer exist.
+        changes.push(
+          previous === undefined
+            ? `${k} set to ${String(v).slice(0, 24)}`
+            : `${k} ${String(previous).slice(0, 24)} -> ${String(v).slice(0, 24)}`,
+        );
       }
     }
-    if (changed) {
+    if (changes.length) {
       writeFileSync(contractPath, JSON.stringify(contract, null, 2), "utf8");
+      appendDecision(
+        runDir,
+        `sealed goal-contract mutated: ${changes.join(", ")}`,
+        Object.keys(patch).includes("eval_script_hash")
+          ? "the evaluator anchor moved; scores recorded under the previous anchor are no longer reproducible"
+          : "contract field rewritten through evor_seal_eval_script",
+      );
     }
   } catch {
     // Best-effort: the integrity gate still fails closed if the anchor is absent.

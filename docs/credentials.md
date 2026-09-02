@@ -38,7 +38,24 @@ HF_TOKEN=...
 project-root `.env` was **not** ignored until this release — it sat one
 `git add -A` away from history, which is its own instance of the same gap.
 
-### 2. The host's own config, for host-level tools
+### 2. The environment, for MCP servers
+
+`.mcp.json` used to carry:
+
+```json
+"headers": { "Authorization": "Bearer ${user_config.hf_token}" }
+```
+
+If `hf_token` is unset, that placeholder does not disappear — the header goes on
+the wire as the literal string `"Bearer "`. A malformed credential is worse than
+no credential: the request is not anonymous, it is broken, and the server's
+rejection describes a problem that is not the real one. Finding **R-14**.
+
+It is removed. `HF_TOKEN` belongs in `.env`, where the harness reads it and
+nothing echoes it — which is this document's whole point. A config placeholder
+that silently degrades to a broken value is not a credential path.
+
+### 3. The host's own config, for host-level tools
 
 MCP servers configured in `settings.json` take their secrets through the `env`
 block of their own server definition. That file is read by the host, not by an
