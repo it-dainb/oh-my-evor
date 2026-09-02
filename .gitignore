@@ -41,6 +41,22 @@ mcp/.uv/
 
 # runtime state anywhere in the tree (not source) — nested .omc/.evor
 **/.omc/
+# ── P-02 / Q-01: the installed plugin must ship NO run state ────────────────
+#
+# The repo tracked `.evor/active-run.json` and a whole
+# `.evor/runs/frontier-1ms/run-live-01/` tree — a CIFAR-10 self-test mission —
+# so every install carried a fake ACTIVE RUN inside the plugin root. That is the
+# decoy Q-01's hooks resolved to for 19 hours: they were not finding stale state
+# left by the user's own run, they were finding state the package shipped.
+#
+# 1.3 stopped the hooks resolving there, 6.x stopped the MCP server writing
+# there, and P-02 stopped the harness writing there. This stops it being SHIPPED,
+# which is the only one of the four that removes the thing rather than avoiding it.
+#
+# Anchored (`/.evor/`) and unanchored (`**/.evor/`) both: `mcp/.evor/` had a
+# tracked `signals-inbox.jsonl` too.
+/.evor/
+**/.evor/
 .evor/runs/
 .evor/active-run.json
 
