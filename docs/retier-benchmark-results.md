@@ -37,10 +37,17 @@ evals ran with **no MCP tools attached**, so they measured judgement quality on 
 prompt, and were then cited for a claim about role capability in a system where
 every role's job is to call tools.
 
-Phase 7 fixes the instrument — `ci/role-eval.mjs` passes `--mcp-config`, the
+Phase 7 fixed the instrument — `ci/role-eval.mjs` passes `--mcp-config`, the
 harness refuses to score a role-eval where a mandated tool was never called, and
-each run records whether tools were attached. Phase 8 re-measures with it.
+each run records whether tools were attached.
 
-Until 8.1 lands, **no tier on this page is claimed to be measured**. The page
-states what ships, which is a fact about the frontmatter, not a claim about
-quality.
+**Item 8.1 has now re-measured every role through it**: 9 specs, both arms per
+spec, 5 repeats, 930 calls, 0 harness errors. Three of nine clear the 10pp
+non-inferiority margin. **Two SHIPPED retiers do not** — `evor-sage` and
+`evor-mutagen`, both on haiku. See §3 of `docs/v1-cost-and-verification.md`
+for the per-role table and `docs/evidence/matrix-81.json` for the underlying
+calls.
+
+This page still states only what ships, which is a fact about the frontmatter.
+It is not the evidence page, and a tier appearing here has never meant the tier
+is justified — 8.1 is why that distinction matters.

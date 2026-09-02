@@ -2,7 +2,7 @@
 
 All notable changes to Evor. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
-## [1.2.1] — 2026-09-01 — the affordance release
+## [1.2.1] — 2026-09-02 — the affordance release
 
 v1.2.0's first real field deployment ran 19 hours across three missions and
 produced **1 tick of 200 in each, 0 promotions**, ending when the operator killed
@@ -11,7 +11,11 @@ of what looked like agent misbehaviour was the system unable to express somethin
 real — so a human or an agent improvised outside it, and the improvisation was
 later catalogued as a defect.
 
-**57 of 60 planned items ship.** The three that do not are named below with why.
+**58 of 60 planned items ship.** The two that do not are named below: the key
+rotation, which is an operator action, and the `iir-scan-binnet-02` re-score,
+which needs a GPU. Phase 8 — the tier re-measurement, listed as outstanding in
+the first cut of this entry — has now run, and its result is stated below rather
+than resolved: it did not confirm the tiers, it unseated two of them.
 
 ### The principle this release is built on
 
@@ -105,13 +109,32 @@ before and after**.
   is correct in all three states; `corpora/v10` declares no per-item lineage, so it
   abstains. Two RED tests are left failing deliberately — adjusting them would hide
   the gap. One `group` key in the corpus builder closes it. See `KNOWN_GAPS.md`.
-- **The tier re-measurement has not run.** Phase 7 fixed the instrument —
-  v1.2.0's numbers were measured with **no MCP tools attached**, in a system where
-  every role's job is to call tools. They were right about a narrower thing than
-  they were quoted for. Until Phase 8 runs, no tier on
-  `docs/retier-benchmark-results.md` is claimed to be measured; that page is now
-  generated from agent frontmatter and states what ships, which is a fact about
-  the build.
+- **Two shipped retiers are no longer supported by their own evidence.** Phase 8
+  re-measured every role through the fixed instrument (930 calls, $274.44, 0
+  harness errors) and corrected the arithmetic: v1.2.0's CIs used n = CALLS, so
+  `36/36` was twelve cases run three times. Repeats of one case are not
+  independent observations of a role. On n = cases, **all seven adopted rows fail
+  the 10pp gate they were published as clearing** (`ci/recompute-v1-cis.mjs`
+  reproduces the published intervals to the decimal, then recomputes them).
+
+  Re-measured, three of nine roles clear the margin. `evor-sage` (haiku, 92.3%,
+  also below the 95% absolute floor) and `evor-mutagen` (haiku, 96.0%, interval
+  touching the margin exactly) do not, and both ship. Neither is *worse* — the
+  gaps are +3.1pp and +4.0pp — but neither is established. Moving the other way,
+  `evor-forge-architect`'s recorded −10.0pp regression **does not reproduce**,
+  and `evor-tick` is benchmarked for the first time (sonnet 80.0% vs haiku
+  20.0%). `evor-selector`, `evor-forge` and `evor-forge-junior` have no
+  `spec.json` and were **not** re-measured. See §3 of
+  `docs/v1-cost-and-verification.md`; the calls are committed at
+  `docs/evidence/matrix-81.json`.
+
+- **Agent output carries prose the parser forgives.** 22 of 131 calls emit text
+  before their JSON — 28.8% on `evor-probe`. All 131 still parsed, because
+  `parseContractOutput` strips fences and hunts for the first object, so the rate
+  is a live dependency on that leniency rather than a property of the roles.
+  Nobody declared the tolerance and nobody owns it. The earlier report of this as
+  absent came from n=15; P(zero | 29%, n=15) is under 1%, so that run did not
+  fail to reach significance, it failed to look.
 
 ## [1.2.0] — 2026-08-22 — model-tier optimization
 
@@ -136,6 +159,14 @@ is written. Thirteen times out of thirteen. Zero times was it a model failing to
 reason.
 
 ### Changed — tiers that ship
+
+> **Corrected by 1.2.1 (item 8.3). The evidence column below is wrong and is
+> left standing as published history.** Every CI in it uses n = CALLS, not
+> cases: `36/36` is twelve cases run three times, `116/120` is ten cases run
+> twelve times, and repeats of one case are not independent observations of a
+> role. Recomputed on cases, all seven adopted rows fail the 10pp gate they are
+> shown clearing. The arms were also measured with no MCP tools attached. See §3
+> of `docs/v1-cost-and-verification.md` for the re-measurement.
 
 | agent | from | to | evidence | saving |
 |---|---|---|---|---|
