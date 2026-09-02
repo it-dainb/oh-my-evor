@@ -2,6 +2,117 @@
 
 All notable changes to Evor. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.2.1] — 2026-09-01 — the affordance release
+
+v1.2.0's first real field deployment ran 19 hours across three missions and
+produced **1 tick of 200 in each, 0 promotions**, ending when the operator killed
+it. An 18-lane trace, 8 root causes and 6 affordance lanes established that most
+of what looked like agent misbehaviour was the system unable to express something
+real — so a human or an agent improvised outside it, and the improvisation was
+later catalogued as a defect.
+
+**57 of 60 planned items ship.** The three that do not are named below with why.
+
+### The principle this release is built on
+
+> Any obligation stated in prose to an agent is an obligation the system has
+> decided not to have. **For every invariant, name the writer. If the writer is
+> the agent that benefits from violating it, it is not an invariant.**
+
+That pattern existed correctly in the codebase exactly once — `record.ts:162`,
+*"absence of a failure verdict is not evidence of integrity"*. This release
+applies it to the other twelve places.
+
+### Fixed — guards that could not fail
+
+- `_check_no_label_contamination` was `return True`: three lines of docstring and
+  an unconditional pass, reported beside four checks that can fail. It now
+  compares hashes, and with none supplied returns **`None` = not evaluated**,
+  which is not the same as clean.
+- `.evor/.deps-ok` was a 24-byte timestamp whose mere existence satisfied the
+  dependency check. It now attests the interpreter and package set and
+  revalidates against them.
+- The evaluator sanity gate (new): a trivial all-ones predictor scoring **94.7 F**
+  is now unsealable. An unrun gate reports unsealable rather than passing.
+- `evor doctor` gained a plugin-tree drift check. 17 files in the installed tree
+  were modified in place — including `hooks/stop.mjs` — with 26 `.bak-*` files
+  beside them, unreported for 19 hours.
+
+### Fixed — guards that were disarmed, and what arming them revealed
+
+Retiring `run-state.status` armed three `stop.mjs` gates that had been silently
+false. That exposed three further defects underneath: the drift guard was **never
+scoped to the orchestrator** and had been blocking sub-agents for not producing
+artifacts they were spawned to produce; check (c) duplicated Guard 3 with a worse
+message; and **two independent test suites' fixtures had drifted** behind the same
+inert gate.
+
+### Fixed — the guards checked roles and command text, never paths
+
+Every realized harm in the field run came through a path no guard looked at.
+Verdicts are now made on the **resolved absolute write target**, through `cd` and
+variable expansion, identically for every caller — an identical edit re-issued as
+`subagent_type: "claude"` no longer succeeds 51 seconds after being refused.
+`runsTraining` was **narrowed**, not widened: 54 of 82 training denials were false
+positives, and broad textual denial trains evasion rather than compliance.
+
+### Fixed — data that was wrong about itself
+
+- **`freeze-splits` was freezing the corpus's metadata files as the eval set.**
+  `dataset_card.yaml`, `manifest.json`, `test.txt` — 7 files split 80/20, exit 0,
+  `test_item_count: 5`, and every fitness number in a 19-hour run computed against
+  them. The corpus had declared all 132 items with domains and per-file hashes
+  four weeks earlier; nothing read it. Items now resolve by **declared sha256**, so
+  the manifest survives the corpus being reorganised — and an edited sample is
+  reported missing rather than silently frozen in its place.
+- A node with **12,000 valid telemetry records** was failed by a directory-naming
+  mismatch: the trainer wrote `nodes/<slug>/`, the gate read `nodes/<uuid>/`.
+  Neither writer was wrong; nothing owned the mapping.
+- Three missions read `running` concurrently for 15.6 hours. A successor now
+  closes out its predecessor in the same write that creates it.
+
+### Added — affordances, because a guard over a missing affordance breaks things
+
+`docs/credentials.md` (there was no secure path; chat was the only channel) ·
+`evor_scaffold_evaluator` (the server owns the harness, the mission owns
+`score(pred, gt)` — every field failure lived in the hand-written column) ·
+`evor_await_artifact` (agents were told to wait on `job_complete` /
+`self_heal_event`, which have **zero producers**) · a `capability-gap` consumer
+(`evor-tick` emitted one honestly and nothing read it) · authority expressed as
+**operations, not tool names** (`Write` denied, `Bash` granted, 21 writes happened
+anyway).
+
+### Added — a state machine, as data three languages read
+
+`contracts/state-machines.json` with a reader in Python, TypeScript and
+JavaScript. An FSM in one language is invisible to the others, and `stop.mjs` —
+whose wrong predicate caused C-02 — is in a third. Every state carries
+`max_dwell_s`, so *"is this still alive?"* becomes arithmetic any reader can do
+from the file alone.
+
+### Migrated
+
+The three field mission trees (~242 MB) to the v1.2.1 shape, gated on a verified
+revert point, dry-run reviewed, with **every node artifact hashed byte-identical
+before and after**.
+
+### Not shipping, and why
+
+- **The Semantic Scholar key is not rotated.** The value in `.env` is
+  byte-identical to the one exposed on 2026-08-23. Relocating it changed where it
+  is stored, not whether it is compromised. Revocation is an operator action.
+- **Source-page leakage (M-03) is NOT EVALUATED, not clean.** The check ships and
+  is correct in all three states; `corpora/v10` declares no per-item lineage, so it
+  abstains. Two RED tests are left failing deliberately — adjusting them would hide
+  the gap. One `group` key in the corpus builder closes it. See `KNOWN_GAPS.md`.
+- **The tier re-measurement has not run.** Phase 7 fixed the instrument —
+  v1.2.0's numbers were measured with **no MCP tools attached**, in a system where
+  every role's job is to call tools. They were right about a narrower thing than
+  they were quoted for. Until Phase 8 runs, no tier on
+  `docs/retier-benchmark-results.md` is claimed to be measured; that page is now
+  generated from agent frontmatter and states what ships, which is a fact about
+  the build.
+
 ## [1.2.0] — 2026-08-22 — model-tier optimization
 
 Six tier/effort changes ship, chosen by a gate both angles must clear:
