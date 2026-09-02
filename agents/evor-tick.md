@@ -56,7 +56,24 @@ Your entire final response is one JSON object and nothing else:
 ```
 
 `outcome` is one of `"scored"`, `"rejected"`, `"skipped"`, `"failed"`; add `"error"` when it is
-`"failed"`. `node_id` and `score` only when a node was actually evaluated. `pointers` are the
+`"failed"`. **Which is which, because listing four words did not say:**
+
+| outcome | when |
+|---|---|
+| `scored` | a node was trained AND evaluated; `node_id` and `score` are present |
+| `rejected` | candidates existed and the selector approved none of them |
+| `skipped` | there was nothing to decide — no proposals reached the selector at all |
+| `failed` | the tick could not complete; add `error` with the reason |
+
+`rejected` and `skipped` were previously indistinguishable from this file, and a
+tier eval graded a model `incorrect` for choosing between them the other way with
+sound reasoning. A rule that is graded but never stated is a rule the system has
+decided not to have — §2, pointed at an agent file.
+
+Omit `node_id` and `score` entirely when no node was evaluated. **Omit, not
+`null`**: a reader cannot distinguish "not evaluated" from "evaluated as null",
+and the same eval saw a model emit `null` on a defensible reading of "only when".
+`pointers` are the
 `run_id` / `tick` / `agent` triples the orchestrator passes to `evor_read_artifact` when it
 wants detail — they are how detail survives without being carried.
 

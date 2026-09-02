@@ -121,7 +121,15 @@ async function main() {
     ? parseTiers(process.env.ROLE_EVAL_TIERS)
     : spec.arms.map((a) => ({ model: a.model, effort: a.effort }));
   const repeats = Number(process.env.ROLE_EVAL_REPEATS ?? 3);
-  const maxTurns = Number(process.env.ROLE_EVAL_MAX_TURNS ?? 6);
+  // 6 was chosen when evals ran with NO TOOLS, where one turn is the whole
+  // answer. With the server attached (7.1) each tool call costs a turn, and a
+  // pilot found a sonnet run pinned at the ceiling and scored `incorrect` — the
+  // cap failing, recorded as the model failing. That is the confound that ate
+  // the first forge-junior matrix in another form: measuring the scheduler.
+  //
+  // 20 leaves headroom over the most tool-hungry role. Runs that approach it are
+  // reported, so a future binding cap is visible rather than inferred.
+  const maxTurns = Number(process.env.ROLE_EVAL_MAX_TURNS ?? 20);
   const timeoutMs = Number(process.env.ROLE_EVAL_TIMEOUT_MS ?? 600000);
   const outPath = resolve(REPO_ROOT, process.env.ROLE_EVAL_OUT ?? `ci/out/${spec.role}-report.json`);
 
