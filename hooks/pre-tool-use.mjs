@@ -31,6 +31,7 @@
 import { readFileSync } from 'fs';
 import { resolveActiveRun } from './lib/active-run.mjs';
 import { resolveWriteTargets } from './lib/write-targets.mjs';
+import { mayPerform, operationFor } from './lib/operations.mjs';
 import { classifyWriteTarget, selfPatchAllowed } from './lib/protected-paths.mjs';
 import { emitDenialSignal, logDecision, logError, logSkip } from './lib/audit.mjs';
 
@@ -392,6 +393,69 @@ try {
         );
       }
     }
+  }
+
+  // ── §4.2: authority as OPERATIONS, checked against the resolved act ───────
+  //
+  // AF4 §6: the unit of authority was the TOOL, and the tool is the wrong noun.
+  // `Write` was denied, `Bash` was granted, and 21 writes happened anyway across
+  // 6 roles — two of them the roles' own deliverables, staged to /tmp in exactly
+  // the manner the denylist existed to prevent. The denylist named a tool; the
+  // intent was an operation, and `Bash` satisfies the operation while evading
+  // the name.
+  //
+  // This runs BEFORE the tool-shaped rules below and subsumes them for the
+  // authoring case: `resolveWriteTargets` (§0.2) reduces a heredoc, a redirect
+  // and an `Edit` to the same answer, so the grant means the same thing however
+  // the act is performed. The rules below stay because they carry role-specific
+  // guidance the model can act on, and a denial the model cannot act on stalls
+  // the run (PM3).
+  try {
+    const { targets: opTargets } = resolveWriteTargets({
+      tool,
+      toolInput: ti,
+      cwd: process.env.CLAUDE_PROJECT_DIR || process.cwd(),
+    });
+    const operation = operationFor({ tool, targets: opTargets, runsTraining });
+
+    // Only ROLES the system knows are judged here. A generic agent type has no
+    // grant of its own by design — 4.3 hands it the spawner's constraints,
+    // because authority attached to who you ARE is defeated by who you can
+    // CREATE, and the path rules (§0.2/0.3) already bind it regardless.
+    const known = agentType === '' || /^evor-/.test(agentType);
+    if (operation && known && !mayPerform(agentType, operation)) {
+      const who = agentType || 'Evor (orchestrator)';
+      // Main's explanation is that it is orchestrator-only — the same phrase the
+      // tool-shaped rule used, because it is the right explanation and PM3 says
+      // a denial the model cannot act on stalls the run.
+      const roleNote = agentType
+        ? ''
+        : ' Evor is orchestrator-only: it spawns agents and records results.';
+      const ADVICE = {
+        'author-code': 'Only evor-forge-junior authors candidate code, and only on its own surface. ' +
+                       'Emit your JSON artifact instead, or delegate the code to forge-junior.',
+        'run-training': 'Only evor-forge-junior runs candidate code. Launch evaluation with evor_run_start.',
+        'write-run-state': 'Run state is written through evor_state_write / evor_record_node / ' +
+                           'evor_record_eval, never by hand.',
+        'write-artifact': 'Write your deliverable with evor_write_artifact(agent="…"), which puts it ' +
+                          'in the slot your role owns.',
+        'discover-evidence': 'Searching for evidence is Sage\'s job. Emit investigation_queries[] ' +
+                             'and let the orchestrator route them to Sage.',
+        'retrieve-cited-source': 'You may not fetch sources. Read the finding your upstream ' +
+                                 'stage already produced.',
+      };
+      deny(
+        `[EVOR GOVERNOR] ${who} may not perform the operation "${operation}"` +
+          (opTargets[0] ? ` (target: ${opTargets[0]})` : '') + '.' + roleNote + ' ' +
+          (ADVICE[operation] ?? '') +
+          ' This rule is scoped to the OPERATION, not to a tool name: the same act through ' +
+          'Bash, a heredoc or a redirect is the same act, which is why naming the tool did ' +
+          'not hold.',
+        { rule: `operation:${operation}`, tool, agentType, target: opTargets[0] },
+      );
+    }
+  } catch (err) {
+    logError('operation-authority', err);  // fail-open, but recorded
   }
 
   if (isMain) {
