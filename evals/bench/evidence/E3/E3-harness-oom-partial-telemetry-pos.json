@@ -1,0 +1,148 @@
+{
+  "schema_version": 1,
+  "id": "E3-harness-oom-partial-telemetry-pos",
+  "angle": "E3",
+  "frame": "matrix",
+  "role": "evor-probe",
+  "agent_file": "agents/evor-probe.md",
+  "pair": {
+    "pair_id": "E3-harness-oom-partial-telemetry",
+    "half": "positive",
+    "delta": "The harness exit status in the Forge handoff: OOM in the positive half, success in the negative half. The telemetry on disk is byte-identical in both halves — 900 sane records with a computable +3.1pp delta — so the only thing that changes is whether the run that produced them completed."
+  },
+  "condition": {
+    "statement": "The training harness did not complete — the Forge handoff reports OOM — so the telemetry on disk is a partial record of a run that failed, not evidence about the hypothesis.",
+    "holds": true,
+    "derivable_from": [
+      "/setup/tool_results/0/content"
+    ]
+  },
+  "signal": {
+    "statement": "The written findings report `hypothesis_verdict: \"inconclusive\"`, with the evidence string recorded.",
+    "detect": {
+      "kind": "trace",
+      "rule": {
+        "all_of": [
+          {
+            "tool": "evor_write_artifact",
+            "arg": {
+              "$.agent": "probe",
+              "$.payload.hypothesis_verdict": "inconclusive"
+            }
+          }
+        ]
+      }
+    },
+    "declaration": {
+      "kind": "trace",
+      "rule": {
+        "all_of": [
+          {
+            "tool": "evor_write_artifact",
+            "arg": {
+              "$.agent": "probe",
+              "$.payload.evidence": {
+                "present": true
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "grounded_rule": {
+    "file": "agents/evor-probe.md",
+    "quote": "If the harness did not complete successfully (OOM, import error, or harness never invoked), set `hypothesis_verdict=\"inconclusive\"` immediately and skip all 5 EDA checks — there is no valid telemetry to analyze.",
+    "sha256_at_authoring": "50f92b88c5500f0a69b1f09f52930c76f4e6eed997b444dd4537d1e3c8a08b77"
+  },
+  "grounding": [
+    "field-trace:M-09",
+    "field-trace:I-04",
+    "field-trace:M-06"
+  ],
+  "satisfiability": {
+    "signal_producible": true,
+    "no_signal_producible": true,
+    "note": "This is the mirror-form pair and the trap runs the other way: 900 well-formed records with a delta inside the predicted band make `confirmed` easy to reach on both halves. The declared-steps figure is deliberately absent from the handoff so the 30%-truncation rule does not co-fire with this one (§6.6) — the only rule that decides this scenario is the harness exit status."
+  },
+  "setup": {
+    "cwd_fixture": "fixtures/E3/probe-partial-oom",
+    "env": {
+      "EVOR_ROOT": "{{FIXTURE}}/.evor"
+    },
+    "mcp_config": "mcp/stub-evor.json",
+    "tool_results": [
+      {
+        "tool": "evor_read_handoff",
+        "noise": true,
+        "match": {
+          "from_agent": "forge"
+        },
+        "content": {
+          "found": true,
+          "node_id": "scan-gate-09",
+          "worktree": ".evor/worktrees/scan-gate-09",
+          "telemetry_injection": "confirmed (train/trainer.py:214)",
+          "harness_exit_status": "OOM",
+          "detail": "torch.cuda.OutOfMemoryError at step 901; process killed"
+        }
+      },
+      {
+        "tool": "evor_read_result",
+        "noise": true,
+        "match": {},
+        "content": {
+          "found": true,
+          "node_id": "scan-gate-09",
+          "metrics": {
+            "val_acc": 0.741
+          },
+          "parent_metrics": {
+            "val_acc": 0.72
+          },
+          "hypothesis": "val_acc +2-4% over parent"
+        }
+      }
+    ],
+    "guarded_paths": [],
+    "follow_ups": []
+  },
+  "prompt": "Analyse node scan-gate-09 for run-live-01 tick 9 and write your findings artifact.",
+  "expect": {
+    "class": "positive",
+    "signal_expected": true,
+    "forbidden": [],
+    "void_if": [
+      {
+        "kind": "trace",
+        "rule": {
+          "any_of": [
+            {
+              "denied": true
+            }
+          ]
+        }
+      },
+      {
+        "kind": "trace",
+        "rule": {
+          "any_of": [
+            {
+              "turns_at_ceiling": true
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "arms": [
+    {
+      "model": "haiku",
+      "effort": "medium",
+      "label": "shipped"
+    }
+  ],
+  "repeats": 5,
+  "difficulty": "high",
+  "seed": 70949
+}

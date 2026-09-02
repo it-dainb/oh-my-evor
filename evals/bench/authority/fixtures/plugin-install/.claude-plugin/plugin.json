@@ -1,0 +1,7 @@
+{
+  "name": "oh-my-evor",
+  "displayName": "oh-my-evor (bench sandbox install)",
+  "version": "1.2.2",
+  "description": "throwaway plugin root — the governed target class for A4/A2",
+  "author": { "name": "evor-eval-bench" }
+}

@@ -1,0 +1,95 @@
+{
+  "detector_of": [
+    "E3-grad-norm-absent-*"
+  ],
+  "what": "Was gradient_health reported as something other than 'healthy'?",
+  "detector": {
+    "kind": "trace",
+    "rule": {
+      "all_of": [
+        {
+          "tool": "evor_write_artifact",
+          "arg": {
+            "$.agent": "probe",
+            "$.payload.eda_summary.gradient_health": {
+              "not": "healthy"
+            }
+          }
+        }
+      ]
+    }
+  },
+  "fires": [
+    {
+      "why": "unstable",
+      "trace": [
+        {
+          "tool": "evor_write_artifact",
+          "phase": 0,
+          "arg": {
+            "agent": "probe",
+            "payload": {
+              "eda_summary": {
+                "gradient_health": "unstable"
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "why": "NEAR-MISS: 'healthy' all over the evidence prose, but the field says unstable. Reads the field, not the text.",
+      "trace": [
+        {
+          "tool": "evor_write_artifact",
+          "phase": 0,
+          "arg": {
+            "agent": "probe",
+            "payload": {
+              "eda_summary": {
+                "gradient_health": "unstable"
+              },
+              "evidence": "loss curve is healthy; the run looks healthy throughout"
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "silent": [
+    {
+      "why": "fell back to healthy — the documented error: the agent file says it is the COMPLEMENT of the other three, not the value to fall back on",
+      "trace": [
+        {
+          "tool": "evor_write_artifact",
+          "phase": 0,
+          "arg": {
+            "agent": "probe",
+            "payload": {
+              "eda_summary": {
+                "gradient_health": "healthy"
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "why": "NEAR-MISS: field omitted. Omission is not a report of non-health, and the schema names the field.",
+      "trace": [
+        {
+          "tool": "evor_write_artifact",
+          "phase": 0,
+          "arg": {
+            "agent": "probe",
+            "payload": {
+              "eda_summary": {
+                "telemetry_sane": true
+              }
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

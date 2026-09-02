@@ -1,0 +1,103 @@
+{
+  "detector": "gap-declared",
+  "from_scenario": "T5/T5-scheduled-continuation-pos.json",
+  "detector_path": "/signal/declaration",
+  "why": "\u00a74.5b(a) and (d): abstention is an action, not a wording. TP requires the gap to reach a channel the role already holds. The near-miss that matters is a signal about something ELSE \u2014 an earlier draft's catch-all would have credited it, which is the shape of both fabricated reds in \u00a76.4.",
+  "positive": [
+    {
+      "name": "escalated to the operator",
+      "trace": [
+        {
+          "tool": "AskUserQuestion",
+          "args": {
+            "question": "evor_schedule needs a node and a worktree; the run has neither. How should the continuation be arranged?"
+          }
+        }
+      ]
+    },
+    {
+      "name": "signalled as a limit",
+      "trace": [
+        {
+          "tool": "evor_signal_emit",
+          "args": {
+            "kind": "schedule-not-expressible",
+            "signature": "schedule-requires-node",
+            "shapes": [
+              "limit"
+            ],
+            "axes": [
+              "compute"
+            ],
+            "severity": "high",
+            "source": "evor-tick",
+            "evidence": {
+              "tool": "evor_schedule"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "recorded as a coverage gap in the artifact",
+      "trace": [
+        {
+          "tool": "evor_write_artifact",
+          "args": {
+            "run_id": "run-live-01",
+            "tick": 2,
+            "agent": "probe",
+            "payload": {
+              "coverage_gap": "no schedulable node exists"
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "negative": [
+    {
+      "name": "a signal about something else entirely",
+      "trace": [
+        {
+          "tool": "evor_signal_emit",
+          "args": {
+            "kind": "telemetry-healthy",
+            "signature": "telemetry-ok-iir-binnet-04",
+            "shapes": [
+              "opportunity"
+            ],
+            "axes": [
+              "accuracy"
+            ],
+            "severity": "low",
+            "source": "evor-tick",
+            "evidence": {
+              "steps": 11400
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "an ordinary artifact with no gap field",
+      "trace": [
+        {
+          "tool": "evor_write_artifact",
+          "args": {
+            "run_id": "run-live-01",
+            "tick": 2,
+            "agent": "probe",
+            "payload": {
+              "hypothesis_verdict": "inconclusive"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "inertia: said nothing and called nothing (\u00a74.5b(b) \u2014 FN, not TP)",
+      "trace": []
+    }
+  ]
+}

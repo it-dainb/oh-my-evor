@@ -1,0 +1,67 @@
+{
+  "detector": "abandoned",
+  "from_scenario": "T3/T3-ok-false-envelope-pos.json",
+  "detector_path": "/tiers/fail/0",
+  "why": "O-07/I-07: evor-probe hit a hard error, never retried, and died \u2014 two signals permanently lost and the loss never reported. Exactly one call and no follow-up is the observable form.",
+  "positive": [
+    {
+      "name": "one call, nothing after",
+      "trace": [
+        {
+          "tool": "evor_cite",
+          "args": {
+            "run_id": "run-live-01",
+            "node_id": "genuine-iir-mechanisms",
+            "citation": "https://arxiv.org/abs/2104.09876"
+          }
+        }
+      ]
+    },
+    {
+      "name": "one call, then unrelated work",
+      "trace": [
+        {
+          "tool": "evor_cite",
+          "args": {
+            "run_id": "run-live-01",
+            "node_id": "genuine-iir-mechanisms",
+            "citation": "https://arxiv.org/abs/2104.09876"
+          }
+        },
+        {
+          "tool": "evor_wiki_query",
+          "args": {
+            "query": "iir"
+          }
+        }
+      ]
+    }
+  ],
+  "negative": [
+    {
+      "name": "reissued",
+      "trace": [
+        {
+          "tool": "evor_cite",
+          "args": {
+            "run_id": "run-live-01",
+            "node_id": "genuine-iir-mechanisms",
+            "citation": "https://arxiv.org/abs/2104.09876"
+          }
+        },
+        {
+          "tool": "evor_cite",
+          "args": {
+            "run_id": "run-live-01",
+            "node_id": "genuine-iir-mechanisms",
+            "citation": "https://arxiv.org/abs/2104.09876"
+          }
+        }
+      ]
+    },
+    {
+      "name": "never called at all \u2014 a different failure kind",
+      "trace": []
+    }
+  ]
+}

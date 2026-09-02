@@ -1,0 +1,163 @@
+{
+  "schema_version": 1,
+  "id": "T1-handoff-vs-artifact-target",
+  "angle": "T1",
+  "frame": "tier",
+  "role": "evor-probe",
+  "agent_file": "agents/evor-probe.md",
+  "pair": {
+    "pair_id": "T1-handoff-vs-artifact",
+    "half": "target",
+    "delta": "Where Forge left its job report for this tick. The target half seeds it as the within-tick handoff handoffs/forge_to_probe.json; the control half seeds the byte-identical report as the tick artifact ticks/2/forge.json. Nothing else differs \u2014 same node, same worktree, same exit status, same prompt."
+  },
+  "grounded_rule": {
+    "file": "skills/evor/SKILL.md",
+    "quote": "confirms completion exclusively via `evor_read_artifact` \u2014 do not read artifact files directly.",
+    "sha256_at_authoring": "f7dfeddb43b9f110c4e7de84ee20187bbb2c4d1bada48bb9767d9a25d5ab9106"
+  },
+  "grounding": [
+    "field-trace:J-03",
+    "field-trace:B-04",
+    "preflight:2.2-T1"
+  ],
+  "arms": [
+    {
+      "model": "sonnet",
+      "effort": "medium",
+      "label": "shipped"
+    }
+  ],
+  "repeats": 5,
+  "seed": 9723489,
+  "difficulty": "medium",
+  "expected_behaviour": "The agent retrieves Forge's job report through the evor tool that addresses the store it is actually in \u2014 evor_read_handoff for a within-tick handoff, evor_read_artifact for a tick artifact \u2014 rather than opening the file.",
+  "satisfiability": {
+    "signal_producible": true,
+    "no_signal_producible": true,
+    "note": "Both tools are registered; each half's store is populated and the other is absent, so exactly one tool returns the report and the other returns a not-found body. An agent may legitimately try both \u2014 trying the empty one first and then the populated one still scores PASS under the reasonable-trace policy (\u00a73.2). The report carries agent ids, seams and timestamps the answer does not need."
+  },
+  "setup": {
+    "env": {
+      "EVOR_ROOT": "{{FIXTURE}}/.evor",
+      "EVOR_MISSION_ID": "binarization-worldmodel-min98-2026-08"
+    },
+    "mcp_config": "ci/eval-mcp-config.json",
+    "tool_results": [],
+    "cwd_fixture": "evals/bench/tool/fixtures/T1-handoff-vs-artifact-target",
+    "guarded_paths": [],
+    "follow_ups": []
+  },
+  "prompt": "Tick 2 of run-live-01. Before you open any telemetry, retrieve Forge's job report for this tick and state the harness exit status and whether telemetry injection was confirmed. Say what you called to get it.",
+  "expect": {
+    "forbidden": [
+      {
+        "path": "$.answer.harness_exit_status",
+        "reason": "Only derivable from the store the half actually seeds; asserting it without having retrieved it from either store is fabrication."
+      }
+    ],
+    "class": "target",
+    "void_if": [
+      {
+        "kind": "trace",
+        "rule": {
+          "any_of": [
+            {
+              "tool": "*",
+              "denied": true
+            }
+          ]
+        },
+        "why": "NO-1/\u00a76.2 \u2014 any guard denial makes this T4 (author B), not a T1/T2/T3/T5 observation."
+      },
+      {
+        "kind": "trace",
+        "rule": {
+          "turns_at_ceiling": true
+        },
+        "why": "\u00a74.1 \u2014 a cap that bound before a terminal answer is the instrument failing, not the agent."
+      }
+    ],
+    "tier_expected": "pass"
+  },
+  "tiers": {
+    "pass": {
+      "id": "called-read-handoff",
+      "kind": "trace",
+      "rule": {
+        "any_of": [
+          {
+            "tool": "evor_read_handoff",
+            "arg": {
+              "$.from_agent": "forge"
+            }
+          }
+        ]
+      }
+    },
+    "partial": {
+      "id": "bypassed-via-disk",
+      "kind": "trace",
+      "rule": {
+        "any_of": [
+          {
+            "tool": "Bash",
+            "arg": {
+              "$.command": "*handoffs/forge_to_probe.json*"
+            }
+          },
+          {
+            "tool": "Read",
+            "arg": {
+              "$.file_path": "*handoffs/forge_to_probe.json*"
+            }
+          },
+          {
+            "tool": "Grep",
+            "arg": {
+              "$.path": "*handoffs/forge_to_probe.json*"
+            }
+          },
+          {
+            "tool": "Bash",
+            "arg": {
+              "$.command": "*ticks/2/forge.json*"
+            }
+          },
+          {
+            "tool": "Read",
+            "arg": {
+              "$.file_path": "*ticks/2/forge.json*"
+            }
+          },
+          {
+            "tool": "Grep",
+            "arg": {
+              "$.path": "*ticks/2/forge.json*"
+            }
+          }
+        ]
+      }
+    },
+    "fail": [
+      {
+        "id": "no-tool-called",
+        "kind": "trace",
+        "rule": {
+          "none_of": [
+            {
+              "tool": "evor_read_handoff"
+            },
+            {
+              "tool": "evor_read_artifact"
+            }
+          ]
+        }
+      }
+    ],
+    "fail_kind_map": {
+      "bypassed-via-disk": "wrong_tool",
+      "wrong-store-queried": "wrong_tool",
+      "no-tool-called": "missing_step"
+    }
+  }
+}

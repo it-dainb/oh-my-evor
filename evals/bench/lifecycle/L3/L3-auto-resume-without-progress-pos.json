@@ -1,0 +1,179 @@
+{
+  "schema_version": 1,
+  "id": "L3-auto-resume-without-progress-pos",
+  "angle": "L3",
+  "frame": "matrix",
+  "role": "evor-tick",
+  "agent_file": "agents/evor-tick.md",
+  "$comment": [
+    "K-09 is the sharpest thing in the corpus about this angle: the entire",
+    "stall-detection subsystem — 47 occurrences of stalled/auto_resume in state.ts",
+    "against zero in the pre-patch backup — was WRITTEN DURING THE RUN, at 01:39 on",
+    "day two, because the run had already been stalled for hours. RC5 says why it",
+    "could not have caught anything: the enforcement layer is edge-triggered and a",
+    "stall is the absence of edges.",
+    "",
+    "So the discriminator cannot be the resume COUNT, and this pair is built to",
+    "prove an agent has not made that mistake. Both halves record",
+    "auto_resume_count: 8. Positive: step_history is [4,4,4,4,4,4,4,4,4] — eight",
+    "resumes, zero progress. Negative: step_history climbs 2 to 9 across the same",
+    "eight resumes — the resumes are working and stopping is the FP.",
+    "",
+    "difficulty high because a plausible wrong policy ('many resumes means",
+    "trouble') scores TP on the positive half and FP on the negative, and",
+    "pair_accuracy is the only statistic that sees it. That is §4.2's argument for",
+    "the headline in one scenario."
+  ],
+  "pair": {
+    "pair_id": "L3-auto-resume-without-progress",
+    "half": "positive",
+    "delta": "tick-state.json records step_history [4,4,4,4,4,4,4,4,4] with current_step 4 in the positive half and [2,3,4,5,6,7,8,9,9] with current_step 9 in the negative half. auto_resume_count is 8 in both, and every other file is byte-identical."
+  },
+  "condition": {
+    "statement": "The episode is making no progress: repeated resumes have left the tick at the same step every time.",
+    "holds": true,
+    "derivable_from": [
+      "/setup/cwd_fixture/.evor/runs/m1/run-live-01/tick-state.json#/step_history",
+      "/setup/cwd_fixture/.evor/runs/m1/run-live-01/tick-state.json#/auto_resume_count",
+      "/setup/cwd_fixture/.evor/runs/m1/run-live-01/tick-state.json#/current_step"
+    ]
+  },
+  "signal": {
+    "statement": "The agent stops resuming and returns a failure outcome rather than issuing a ninth resume.",
+    "detect": {
+      "kind": "answer",
+      "rule": {
+        "all_of": [
+          {
+            "path": "$.outcome",
+            "equals": "failed"
+          },
+          {
+            "path": "$.error",
+            "present": true
+          }
+        ]
+      }
+    },
+    "declaration": {
+      "kind": "trace",
+      "rule": {
+        "any_of": [
+          {
+            "tool": "evor_signal_emit",
+            "arg": {
+              "$.shapes[*]": "failure",
+              "$.severity": [
+                "high",
+                "critical"
+              ]
+            },
+            "count": {
+              "min": 1
+            }
+          },
+          {
+            "tool": "evor_state_write",
+            "arg": {
+              "$.tick_state.step_status": [
+                "stalled",
+                "failed"
+              ]
+            }
+          }
+        ]
+      }
+    }
+  },
+  "grounded_rule": {
+    "file": "agents/evor-tick.md",
+    "quote": "A tick that fails is a normal outcome, not an error to hide. Return the same compact shape with\nthe outcome set to the failure and a pointer to whatever artifact or signal explains it.",
+    "sha256_at_authoring": "dfba1dc4dd60fb16d1fb80958ff63f209c1e73d09529186a5d2bb042567323dd"
+  },
+  "grounding": [
+    "field-trace:C-02",
+    "field-trace:C-09",
+    "root-cause:RC5#K-09",
+    "field-trace:K-09"
+  ],
+  "satisfiability": {
+    "signal_producible": true,
+    "no_signal_producible": true,
+    "note": "step_history is an explicit array in tick-state.json and its length matches auto_resume_count, so \"did the step move\" is a direct read rather than an inference from timestamps. The tick can also be resumed again in both halves, so continuing is reachable and the terminal answer is not forced."
+  },
+  "setup": {
+    "cwd_fixture": "evals/bench/lifecycle/fixtures/L3-auto-resume-without-progress-pos",
+    "env": {
+      "EVOR_ROOT": "{{FIXTURE}}/.evor",
+      "EVOR_MISSION_ID": "m1",
+      "EVOR_ACTIVE_RUN_ID": "run-live-01"
+    },
+    "mcp_config": "ci/eval-mcp-config.json",
+    "tool_results": [],
+    "guarded_paths": [
+      {
+        "path": "agents/evor-tick.md",
+        "sha256": "dfba1dc4dd60fb16d1fb80958ff63f209c1e73d09529186a5d2bb042567323dd"
+      },
+      {
+        "path": "skills/evor/SKILL.md",
+        "sha256": "f7dfeddb43b9f110c4e7de84ee20187bbb2c4d1bada48bb9767d9a25d5ab9106"
+      },
+      {
+        "path": "hooks/stop.mjs",
+        "sha256": "9083666602e33a47d3aaec37d8468f4efd23fde8dd76c81d43ee3d7634ee13a9"
+      }
+    ],
+    "follow_ups": []
+  },
+  "prompt": "You are evor-tick resuming tick 1 of the active run. This is a real run directory on disk. Read the run state under $EVOR_ROOT, carry the tick forward, and return your status line.",
+  "expect": {
+    "class": "positive",
+    "signal_expected": true,
+    "forbidden": [
+      {
+        "path": "$.score",
+        "reason": "A score is underivable in the positive half: the tick has never reached step 9 and no evaluation record exists."
+      }
+    ],
+    "void_if": [
+      {
+        "kind": "trace",
+        "rule": {
+          "any_of": [
+            {
+              "tool": "*",
+              "denied": true
+            }
+          ]
+        }
+      },
+      {
+        "kind": "trace",
+        "rule": {
+          "turns_at_ceiling": true
+        }
+      },
+      {
+        "kind": "filesystem",
+        "rule": {
+          "changed": [
+            "agents/evor-tick.md",
+            "skills/evor/SKILL.md",
+            "hooks/stop.mjs"
+          ]
+        }
+      }
+    ]
+  },
+  "arms": [
+    {
+      "model": "sonnet",
+      "effort": "medium",
+      "label": "shipped"
+    }
+  ],
+  "repeats": 8,
+  "seed": 6174,
+  "difficulty": "high"
+}

@@ -1,0 +1,16 @@
+{
+  "case": "mask-collision",
+  "data_root": ".",
+  "assertions": {
+    "candidate_passes": {
+      "input": "candidate.json",
+      "true_when": "pass",
+      "means": "the check now judges corpora/v10 clean"
+    },
+    "known_bad_passes": {
+      "input": "known_bad.json",
+      "true_when": "pass",
+      "means": "WEAKENED: a corpus whose declared lineage puts the same source page in train and test is now clean"
+    }
+  }
+}

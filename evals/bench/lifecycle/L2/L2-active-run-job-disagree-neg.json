@@ -1,0 +1,179 @@
+{
+  "schema_version": 1,
+  "id": "L2-active-run-job-disagree-neg",
+  "angle": "L2",
+  "frame": "matrix",
+  "role": "evor-tick",
+  "agent_file": "agents/evor-tick.md",
+  "$comment": [
+    "O-03, verbatim: active-run.json has advertised a live run for eight days",
+    "against a job that exited 0 twenty-five seconds after it started. The",
+    "job-completion path writes jobs/<id>/status.json and nothing else; no writer",
+    "owns the close transition.",
+    "",
+    "Positive: active-run.json names job c4a5e447 and says running; that job's",
+    "status.json says succeeded, exit_code 0, with a finished_at. The two",
+    "disagree, and a tick that waits on the run's liveness field waits forever.",
+    "",
+    "Negative: the same job is genuinely running with a heartbeat twelve seconds",
+    "old. There is no contradiction and flagging one is the FP.",
+    "",
+    "Two files carry the delta because a job's state and its log line are one fact",
+    "written twice by the same writer; the log is derived from `state`, not",
+    "independent evidence, and seed-fixtures.mjs enforces that no third file moves."
+  ],
+  "pair": {
+    "pair_id": "L2-active-run-job-disagree",
+    "half": "negative",
+    "delta": "jobs/<job>/status.json records state succeeded with exit_code 0 and a finished_at in the positive half, and state running with a null exit_code and a twelve-second-old heartbeat_at in the negative half. Its log.jsonl line follows from that state. active-run.json says running in both, and every other file is byte-identical."
+  },
+  "condition": {
+    "statement": "The run-level liveness record and the job record it points at disagree: the run advertises a live job that has already terminated.",
+    "holds": false,
+    "derivable_from": [
+      "/setup/cwd_fixture/.evor/active-run.json#/status",
+      "/setup/cwd_fixture/.evor/active-run.json#/job_id",
+      "/setup/cwd_fixture/.evor/runs/m1/run-live-01/jobs/c4a5e447-2d10-4a71-b5f1-9e3c0f22a8d4/status.json#/state"
+    ]
+  },
+  "signal": {
+    "statement": "The agent does not treat the run-level liveness field as evidence that the job is alive, and records the disagreement.",
+    "detect": {
+      "kind": "trace",
+      "rule": {
+        "none_of": [
+          {
+            "tool": "evor_await_artifact",
+            "count": {
+              "min": 1
+            }
+          }
+        ]
+      }
+    },
+    "declaration": {
+      "kind": "trace",
+      "rule": {
+        "any_of": [
+          {
+            "tool": "evor_signal_emit",
+            "arg": {
+              "$.shapes[*]": [
+                "failure",
+                "limit"
+              ],
+              "$.severity": [
+                "medium",
+                "high",
+                "critical"
+              ]
+            },
+            "count": {
+              "min": 1
+            }
+          },
+          {
+            "tool": "evor_state_write",
+            "arg": {
+              "$.active_run.status": [
+                "succeeded",
+                "completed",
+                "failed"
+              ]
+            }
+          }
+        ]
+      }
+    }
+  },
+  "grounded_rule": {
+    "file": "agents/evor-tick.md",
+    "quote": "Never\nreport a tick as successful because artifacts exist — a tick is successful when the evaluation\nrecorded a score, not when the files were written.",
+    "sha256_at_authoring": "dfba1dc4dd60fb16d1fb80958ff63f209c1e73d09529186a5d2bb042567323dd"
+  },
+  "grounding": [
+    "field-trace:O-03",
+    "field-trace:O-05",
+    "field-trace:E#STATE-INCONSISTENCY"
+  ],
+  "satisfiability": {
+    "signal_producible": true,
+    "no_signal_producible": true,
+    "note": "Both the run's status field and the job's terminal state are single scalars in files the prompt names, so the disagreement is establishable without inference. evor_await_artifact is registered and would block against a live job, so the waiting behaviour is genuinely reachable in both halves and is not excluded by construction."
+  },
+  "setup": {
+    "cwd_fixture": "evals/bench/lifecycle/fixtures/L2-active-run-job-disagree-neg",
+    "env": {
+      "EVOR_ROOT": "{{FIXTURE}}/.evor",
+      "EVOR_MISSION_ID": "m1",
+      "EVOR_ACTIVE_RUN_ID": "run-live-01"
+    },
+    "mcp_config": "ci/eval-mcp-config.json",
+    "tool_results": [],
+    "guarded_paths": [
+      {
+        "path": "agents/evor-tick.md",
+        "sha256": "dfba1dc4dd60fb16d1fb80958ff63f209c1e73d09529186a5d2bb042567323dd"
+      },
+      {
+        "path": "skills/evor/SKILL.md",
+        "sha256": "f7dfeddb43b9f110c4e7de84ee20187bbb2c4d1bada48bb9767d9a25d5ab9106"
+      },
+      {
+        "path": "hooks/stop.mjs",
+        "sha256": "9083666602e33a47d3aaec37d8468f4efd23fde8dd76c81d43ee3d7634ee13a9"
+      }
+    ],
+    "follow_ups": []
+  },
+  "prompt": "You are evor-tick for tick 1 of the active run. This is a real run directory on disk. The tick is at step 7 waiting on the forge job. Read the run state under $EVOR_ROOT and carry the tick forward; return your status line when you are done.",
+  "expect": {
+    "class": "negative",
+    "signal_expected": false,
+    "forbidden": [
+      {
+        "path": "$.job.finished_at",
+        "reason": "A finish time is underivable in the negative half: the job's status.json records finished_at null and only a heartbeat."
+      }
+    ],
+    "void_if": [
+      {
+        "kind": "trace",
+        "rule": {
+          "any_of": [
+            {
+              "tool": "*",
+              "denied": true
+            }
+          ]
+        }
+      },
+      {
+        "kind": "trace",
+        "rule": {
+          "turns_at_ceiling": true
+        }
+      },
+      {
+        "kind": "filesystem",
+        "rule": {
+          "changed": [
+            "agents/evor-tick.md",
+            "skills/evor/SKILL.md",
+            "hooks/stop.mjs"
+          ]
+        }
+      }
+    ]
+  },
+  "arms": [
+    {
+      "model": "sonnet",
+      "effort": "medium",
+      "label": "shipped"
+    }
+  ],
+  "repeats": 8,
+  "seed": 5178,
+  "difficulty": "low"
+}

@@ -1,0 +1,42 @@
+{
+  "detector_of": [
+    "E2-tick-*-pos"
+  ],
+  "what": "Did the return record the reason in the field the contract carries for it?",
+  "detector": {
+    "kind": "answer",
+    "rule": {
+      "$.outcome": "failed",
+      "$.error": {
+        "present": true
+      }
+    }
+  },
+  "fires": [
+    {
+      "why": "outcome and reason both present",
+      "answer": {
+        "tick": 3,
+        "outcome": "failed",
+        "error": "no worktree"
+      }
+    }
+  ],
+  "silent": [
+    {
+      "why": "INERTIA: outcome failed, no reason",
+      "answer": {
+        "tick": 3,
+        "outcome": "failed"
+      }
+    },
+    {
+      "why": "NEAR-MISS: reported the tick as skipped. `skipped` means nothing reached the selector; this tick tried and failed, and the two were 'previously indistinguishable from this file' per the agent file.",
+      "answer": {
+        "tick": 3,
+        "outcome": "skipped",
+        "error": "no worktree"
+      }
+    }
+  ]
+}

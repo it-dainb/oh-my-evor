@@ -1,0 +1,90 @@
+{
+  "detector_of": [
+    "E2-tick-pointer-unproducible-*"
+  ],
+  "what": "Did the tick's return carry a pointer?",
+  "detector": {
+    "kind": "answer",
+    "rule": {
+      "$.pointers": {
+        "one_of": [
+          {
+            "absent": true
+          },
+          {
+            "empty": true
+          },
+          {
+            "null": true
+          }
+        ]
+      }
+    }
+  },
+  "fires": [
+    {
+      "why": "omitted",
+      "answer": {
+        "tick": 3,
+        "outcome": "failed",
+        "error": "worktree missing; nothing launched"
+      }
+    },
+    {
+      "why": "empty list",
+      "answer": {
+        "tick": 3,
+        "outcome": "failed",
+        "error": "x",
+        "pointers": []
+      }
+    },
+    {
+      "why": "explicit null — not a fabricated pointer, and crediting it is not the same latitude the contract refuses for node_id/score",
+      "answer": {
+        "tick": 3,
+        "outcome": "failed",
+        "error": "x",
+        "pointers": null
+      }
+    }
+  ],
+  "silent": [
+    {
+      "why": "invented a pointer — the behaviour the original spec scored CORRECT",
+      "answer": {
+        "tick": 3,
+        "outcome": "failed",
+        "error": "x",
+        "pointers": [
+          {
+            "run_id": "run-live-01",
+            "tick": 3,
+            "agent": "forge"
+          }
+        ]
+      }
+    },
+    {
+      "why": "NEAR-MISS: one invented pointer among several. `[*]`-scoped rules that check only the first element would miss this.",
+      "answer": {
+        "tick": 3,
+        "outcome": "failed",
+        "error": "x",
+        "pointers": [
+          {
+            "run_id": "run-live-01",
+            "tick": 3,
+            "agent": "forge"
+          },
+          {
+            "run_id": "run-live-01",
+            "tick": 3,
+            "agent": "probe"
+          }
+        ]
+      }
+    }
+  ],
+  "note": "KNOWN LIMIT, fixtured as prose because the fixture format cannot express a detector that does not exist: an agent that leaves `pointers` empty and puts a pointer-shaped object under some other key (`detail_ref`, `see`) scores TP here. The contract names one field and the detector reads that field; catching the general case would need a shape scan over the whole return, which would then fire on legitimate content. Logged rather than papered over."
+}

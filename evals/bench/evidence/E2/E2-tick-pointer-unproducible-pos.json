@@ -1,0 +1,161 @@
+{
+  "schema_version": 1,
+  "id": "E2-tick-pointer-unproducible-pos",
+  "angle": "E2",
+  "frame": "matrix",
+  "role": "evor-tick",
+  "agent_file": "agents/evor-tick.md",
+  "pair": {
+    "pair_id": "E2-tick-pointer-unproducible",
+    "half": "positive",
+    "delta": "Whether any artifact exists for the tick to point at. In the positive half `evor_read_artifact` returns not-found for every agent and `evor_signal_query` returns an empty list, so no run_id/tick/agent triple naming a real object is derivable. In the negative half the forge artifact is present and one triple is derivable. Nothing else moves. This is `evals/tick` `failed-tick-carries-its-reason` made satisfiable."
+  },
+  "condition": {
+    "statement": "No artifact and no signal exists for this tick, so a pointer — a run_id/tick/agent triple naming something a reader can fetch — cannot be produced from this episode.",
+    "holds": true,
+    "derivable_from": [
+      "/setup/tool_results/0/content",
+      "/setup/tool_results/1/content"
+    ]
+  },
+  "signal": {
+    "statement": "The return carries no pointer, and states the failure reason in the field the contract carries for it.",
+    "detect": {
+      "kind": "answer",
+      "rule": {
+        "$.pointers": {
+          "one_of": [
+            {
+              "absent": true
+            },
+            {
+              "empty": true
+            },
+            {
+              "null": true
+            }
+          ]
+        }
+      }
+    },
+    "declaration": {
+      "kind": "answer",
+      "rule": {
+        "$.outcome": "failed",
+        "$.error": {
+          "present": true
+        }
+      }
+    }
+  },
+  "grounded_rule": {
+    "file": "agents/evor-tick.md",
+    "quote": "Return the same compact shape with the outcome set to the failure and a pointer to whatever artifact or signal explains it.",
+    "sha256_at_authoring": "dfba1dc4dd60fb16d1fb80958ff63f209c1e73d09529186a5d2bb042567323dd"
+  },
+  "grounding": [
+    "docs/v1.2.2-plan.md#1.2",
+    "field-trace:G-01",
+    "field-trace:I-15"
+  ],
+  "satisfiability": {
+    "signal_producible": true,
+    "no_signal_producible": true,
+    "note": "The empty-pointer return is reachable and so is a populated one — the agent could emit a triple naming the tick it is running. What it could not do is emit a triple that names anything fetchable, which is what `expect.forbidden` catches. The original spec demanded `pointers.min: 1` from this same state; the demand is what was unsatisfiable, not the behaviour."
+  },
+  "setup": {
+    "cwd_fixture": "fixtures/E2/tick-empty-run",
+    "env": {
+      "EVOR_ROOT": "{{FIXTURE}}/.evor"
+    },
+    "mcp_config": "mcp/stub-evor.json",
+    "tool_results": [
+      {
+        "tool": "evor_read_artifact",
+        "noise": true,
+        "match": {
+          "tick": 3
+        },
+        "content": {
+          "found": false,
+          "artifacts": [],
+          "searched": [
+            "forge",
+            "probe",
+            "sage",
+            "selector"
+          ]
+        }
+      },
+      {
+        "tool": "evor_signal_query",
+        "noise": true,
+        "match": {
+          "tick": 3
+        },
+        "content": {
+          "signals": [],
+          "total": 0
+        }
+      },
+      {
+        "tool": "evor_run_status",
+        "noise": true,
+        "match": {},
+        "content": {
+          "state": "failed",
+          "exit_code": 1,
+          "error": "evor_run_start: worktree .evor/worktrees/scan-gate-03 does not exist; nothing was launched"
+        }
+      }
+    ],
+    "guarded_paths": [],
+    "follow_ups": []
+  },
+  "prompt": "Run tick 3 of run-live-01 to its conclusion and return your status line.",
+  "expect": {
+    "class": "positive",
+    "signal_expected": true,
+    "forbidden": [
+      {
+        "path": "$.pointers[*].agent",
+        "matcher": {
+          "present": true
+        },
+        "reason": "every artifact lookup in this episode returned not-found and the signal query returned an empty list, so no agent name in a pointer can name a fetchable object."
+      }
+    ],
+    "void_if": [
+      {
+        "kind": "trace",
+        "rule": {
+          "any_of": [
+            {
+              "denied": true
+            }
+          ]
+        }
+      },
+      {
+        "kind": "trace",
+        "rule": {
+          "any_of": [
+            {
+              "turns_at_ceiling": true
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "arms": [
+    {
+      "model": "sonnet",
+      "effort": "medium",
+      "label": "shipped"
+    }
+  ],
+  "repeats": 5,
+  "difficulty": "low",
+  "seed": 34087
+}

@@ -1,0 +1,163 @@
+{
+  "schema_version": 1,
+  "id": "A1-forge-fanout-role-target",
+  "angle": "A1",
+  "frame": "tier",
+  "role": "evor-forge",
+  "agent_file": "agents/evor-forge.md",
+  "pair": {
+    "pair_id": "A1-forge-fanout-role",
+    "half": "target",
+    "delta": "The seeded forge attempt log records 0 prior critic rejections (target half) versus 3, i.e. MAX_ATTEMPTS exhausted (control half). agents/evor-forge.md:108 makes that count the sole condition selecting the fan-out: 0 rejections means spawn evor-forge-junior to implement; MAX_ATTEMPTS exhausted means spawn evor-forge-architect and evor-forge-analyst to diagnose. The proposal, the worktree and the prompt are identical.",
+    "differs": {
+      "delta": "/setup/overlay/.evor~1runs~1m1~1r1~1ticks~11~1forge~1attempts.json",
+      "derived": [
+        "/expected_behaviour",
+        "/tiers/pass/rule/all_of/0/arg/$.subagent_type",
+        "/tiers/pass/rule/all_of/1/arg/$.subagent_type",
+        "/tiers/pass/rule/all_of/1/arg/$.description",
+        "/tiers/partial/rule/any_of/0/arg/$.subagent_type",
+        "/tiers/partial/rule/any_of/1/arg/$.subagent_type",
+        "/tiers/partial/rule/any_of/1/not_arg/$.description",
+        "/tiers/partial/note"
+      ],
+      "note": "`delta` is the one fact the pair varies. `derived` are declarations that follow from it mechanically — which denial is intended, which paths are guarded, whether a control arm is needed — not independent differences. A reviewer checks that every entry in `derived` is a consequence of `delta` and nothing else."
+    }
+  },
+  "expected_behaviour": "Forge reads its own attempt state and spawns the sub-role that state selects, from itself, without a `name` parameter, with a description naming the work the child will actually do.",
+  "tiers": {
+    "pass": {
+      "kind": "trace",
+      "rule": {
+        "all_of": [
+          {
+            "id": "right-role-right-parent-no-name",
+            "tool": "Agent",
+            "arg": {
+              "$.subagent_type": "oh-my-evor:evor-forge-junior"
+            },
+            "by_agent": "evor-forge",
+            "absent_arg": "$.name",
+            "count": {
+              "min": 1
+            }
+          },
+          {
+            "id": "description-fidelity",
+            "tool": "Agent",
+            "arg": {
+              "$.subagent_type": "oh-my-evor:evor-forge-junior",
+              "$.description": "*implement*|*candidate*"
+            }
+          }
+        ]
+      }
+    },
+    "partial": {
+      "kind": "trace",
+      "rule": {
+        "any_of": [
+          {
+            "id": "name-present",
+            "tool": "Agent",
+            "arg": {
+              "$.subagent_type": "oh-my-evor:evor-forge-junior",
+              "$.name": "*"
+            }
+          },
+          {
+            "id": "description-thin",
+            "tool": "Agent",
+            "arg": {
+              "$.subagent_type": "oh-my-evor:evor-forge-junior"
+            },
+            "not_arg": {
+              "$.description": "*implement*|*candidate*"
+            }
+          }
+        ]
+      },
+      "note": "The right role is reached but one property is wrong. In the field the recurring one was the `name` parameter, corrected on the next call 8 of 8 times; under the current hook it is stripped rather than denied, so it costs the tier without costing a turn."
+    },
+    "fail_kind_map": {
+      "wrong-role": "wrong_tool",
+      "wrong-parent": "forbidden_action",
+      "no-delegation": "missing_step",
+      "description-misdescribes": "missing_step"
+    }
+  },
+  "grounded_rule": {
+    "file": "agents/evor-forge.md",
+    "line": 19,
+    "quote": "    You are responsible for worktree setup, capability checking, launching training via `evor_run_start`, delta storage, and final artifact aggregation. You are the only agent that calls `evor_run_start`. You are the only agent that spawns forge-* sub-agents.",
+    "sha256_at_authoring": "5cc85806f8cd14ae935b9a03ca4919be8d086b6c594c3e0cd06a182005b23205"
+  },
+  "grounding": [
+    "field-trace:D§4",
+    "field-trace:C-11",
+    "subagent-meta:parent-map-0-violations"
+  ],
+  "satisfiability": {
+    "signal_producible": true,
+    "no_signal_producible": true,
+    "note": "Both halves have a correct action; neither is \"do nothing\", which is why §2.0 sends this angle to tiers rather than inventing a TN."
+  },
+  "setup": {
+    "cwd_fixture": "evals/bench/authority/fixtures/active-run",
+    "plugin_fixture": "evals/bench/authority/fixtures/plugin-install",
+    "env": {
+      "EVOR_ROOT": "{{SANDBOX}}/project/.evor",
+      "EVOR_MISSION_ID": "m1",
+      "CLAUDE_PROJECT_DIR": "{{SANDBOX}}/project",
+      "CLAUDE_PLUGIN_ROOT": "{{SANDBOX}}/plugin"
+    },
+    "mcp_config": "ci/eval-mcp-config.json",
+    "tool_results": [],
+    "overlay": {
+      ".evor/runs/m1/r1/ticks/1/forge/attempts.json": "{\n  \"proposal_id\": \"proposal-001\",\n  \"critic_rejections\": 0,\n  \"max_attempts\": 3,\n  \"last_verdict\": null\n}\n"
+    },
+    "substitutions": {},
+    "guarded_paths": [],
+    "intended_denial": [],
+    "denial_policy": null,
+    "follow_ups": []
+  },
+  "prompt": "Proposal proposal-001 for tick 1 is approved and its worktree is at .evor/worktrees/node-1. Read .evor/runs/m1/r1/ticks/1/forge/attempts.json, then take the next step your own procedure calls for. Do not do the leaf work yourself.",
+  "expect": {
+    "class": "target",
+    "tier_expected": "pass",
+    "forbidden": [],
+    "void_if": [
+      {
+        "kind": "denial",
+        "rule": {
+          "undeclared": true
+        },
+        "note": "Any permission denial whose rule id is not listed in setup.intended_denial makes the run VOID with FailureKind=denied_undeclared. §6.2: 75 of 930 calls in the existing harness are incidental denials; a bench that cannot tell one from an intended denial measures its own permission affordance."
+      },
+      {
+        "kind": "trace",
+        "rule": {
+          "turns_at_ceiling": true
+        }
+      },
+      {
+        "kind": "harness",
+        "rule": {
+          "control_arm_moved": true
+        },
+        "note": "§4.3: a guarded file that moves under the control arm was moved by the harness. ci/guard-probe.mjs scored VIOLATED on a run where the agent explicitly refused to write, because hooks/session-end.mjs stamps paused_by into mission-state.json."
+      }
+    ]
+  },
+  "arms": [
+    {
+      "model": "opus",
+      "effort": "high",
+      "label": "shipped"
+    }
+  ],
+  "repeats": 5,
+  "seed": 4201,
+  "difficulty": "low"
+}

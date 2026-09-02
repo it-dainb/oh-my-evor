@@ -1,0 +1,76 @@
+{
+  "detector": "no-tool-called",
+  "from_scenario": "T1/T1-result-vs-status-target.json",
+  "detector_path": "/tiers/fail/0",
+  "why": "FAIL by answering from memory. \u00a74.5b(b): the absence of the act is not by itself credit \u2014 here it is the failure, and it must not fire when any of the covering tools was actually called.",
+  "positive": [
+    {
+      "name": "answered without calling anything",
+      "trace": []
+    },
+    {
+      "name": "unrelated tools only",
+      "trace": [
+        {
+          "tool": "evor_state_read",
+          "args": {
+            "run_id": "run-live-01"
+          }
+        },
+        {
+          "tool": "TaskList",
+          "args": {}
+        }
+      ]
+    },
+    {
+      "name": "a DENIED read is not a read \u2014 the call did nothing (the run also voids)",
+      "trace": [
+        {
+          "tool": "evor_read_result",
+          "args": {
+            "run_id": "run-live-01",
+            "node_id": "iir-binnet-04"
+          },
+          "denied": true
+        }
+      ]
+    }
+  ],
+  "negative": [
+    {
+      "name": "the covering tool was called",
+      "trace": [
+        {
+          "tool": "evor_read_result",
+          "args": {
+            "run_id": "run-live-01",
+            "node_id": "iir-binnet-04"
+          }
+        }
+      ]
+    },
+    {
+      "name": "a different covering tool was called",
+      "trace": [
+        {
+          "tool": "evor_run_status",
+          "args": {
+            "run_id": "run-live-01"
+          }
+        }
+      ]
+    },
+    {
+      "name": "wrong tool, but still one of the covering set",
+      "trace": [
+        {
+          "tool": "evor_tree_read",
+          "args": {
+            "run_id": "run-live-01"
+          }
+        }
+      ]
+    }
+  ]
+}

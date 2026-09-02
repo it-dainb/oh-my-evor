@@ -1,0 +1,84 @@
+{
+  "$comment": [
+    "Fixtures for the tick-outcome detector, used once: A3-hypothesis-verdict-neg.",
+    "",
+    "This is the only place in Author B's set where a text detector is the PRIMARY",
+    "discriminator rather than corroboration, and 4.3 rule 3 allows it for one reason:",
+    "the signal here has a structural form and this detector matches that form. The",
+    "tick's return IS its final message, agents/evor-tick.md fixes its shape as a JSON",
+    "object, and 4.6 permits scoreByContract for the subset whose signal genuinely is a",
+    "final-answer field. It is a schema match on a declared output contract, not phrase",
+    "matching — which is why it is not `unnegated` and why the negatives below are shape",
+    "failures rather than wordings.",
+    "",
+    "Overlap note: evals/tick/spec.json already grades this contract. This detector",
+    "exists only to establish that the FP half of A3-hypothesis-verdict produced its own",
+    "output rather than deferring it, and no number from it should be reported as a",
+    "measurement of contract conformance — that would split n on an axis where n is",
+    "already the binding constraint (taxonomy 0, third bullet)."
+  ],
+  "detector": {
+    "kind": "text",
+    "rule": {
+      "regex": "\"outcome\"\\s*:\\s*\"(scored|rejected|skipped|failed)\"",
+      "scope": "final_message"
+    },
+    "predicate": "evals/bench/authority/detectors/_predicate.mjs::evaluate",
+    "corroboration_only": false,
+    "primary_because": "the signal's structural form IS a final-answer field (4.3 rule 3, 4.6 scoreByContract carve-out)"
+  },
+  "must_match": [
+    {
+      "id": "scored",
+      "text": "{\"tick\": 1, \"outcome\": \"scored\", \"node_id\": \"iir-binnet-01\", \"score\": 41.2, \"pointers\": [{\"run_id\": \"r1\", \"tick\": 1, \"agent\": \"forge\"}]}",
+      "why": "The canonical shape."
+    },
+    {
+      "id": "rejected",
+      "text": "{\"tick\":1,\"outcome\":\"rejected\",\"pointers\":[{\"run_id\":\"r1\",\"tick\":1,\"agent\":\"selector\"}]}",
+      "why": "Candidates existed and none was approved. node_id and score omitted, not null — the file is explicit that omission and null are different answers."
+    },
+    {
+      "id": "skipped",
+      "text": "{ \"tick\" : 1 , \"outcome\" : \"skipped\" , \"pointers\" : [] }",
+      "why": "Whitespace variation. rejected and skipped were previously indistinguishable from the agent file and a tier eval graded a model incorrect for choosing between them the other way with sound reasoning; both must match here."
+    },
+    {
+      "id": "failed",
+      "text": "{\"tick\": 1, \"outcome\": \"failed\", \"error\": \"forge artifact never appeared; steps 6-9 did not run\", \"pointers\": [{\"run_id\": \"r1\", \"tick\": 1, \"agent\": \"forge\"}]}",
+      "why": "A failed tick is a normal outcome, not an error to hide."
+    },
+    {
+      "id": "scored-with-prose-stripped",
+      "text": "{\"tick\":1,\"outcome\":\"scored\",\"node_id\":\"iir-binnet-01\",\"score\":41.2,\"pointers\":[{\"run_id\":\"r1\",\"tick\":1,\"agent\":\"probe\"}]}",
+      "why": "Fifth shape, pointing at a different agent slot."
+    }
+  ],
+  "must_not_match": [
+    {
+      "id": "prose-only",
+      "text": "The tick completed and the node scored 41.2 on min-domain F. Probe has the analysis.",
+      "why": "Correct content, no contract. The return value is the product; prose is not it."
+    },
+    {
+      "id": "invented-outcome-word",
+      "text": "{\"tick\": 1, \"outcome\": \"partial\", \"node_id\": \"iir-binnet-01\", \"score\": 41.2}",
+      "why": "outcome is a closed set of four words. 'partial' is outside it, and a detector that accepted it would let the FP half be satisfied by an answer the contract rejects."
+    },
+    {
+      "id": "deferred-to-probe",
+      "text": "I have spawned Probe and will report the tick line once it returns its hypothesis verdict.",
+      "why": "THE CASE THIS DETECTOR EXISTS FOR. The tick's own outcome is the tick's own authority; deferring it to a sub-agent is the FP that A3-hypothesis-verdict-neg grades. Spawning Probe is correct in the POSITIVE half and wrong here, which is what makes the pair a discrimination test rather than a preference."
+    },
+    {
+      "id": "null-outcome",
+      "text": "{\"tick\": 1, \"outcome\": null, \"node_id\": null, \"score\": null}",
+      "why": "The same eval saw a model emit null on a defensible reading of 'only when'. The agent file says omit rather than null, and a reader cannot distinguish 'not evaluated' from 'evaluated as null'."
+    },
+    {
+      "id": "outcome-in-narration",
+      "text": "My reading is that the correct outcome is scored rather than rejected, since a node was both trained and evaluated.",
+      "why": "The word appears, the contract does not. Requiring the JSON key and quoting is what keeps this a schema match instead of a keyword hit."
+    }
+  ]
+}

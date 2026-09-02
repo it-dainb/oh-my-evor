@@ -1,0 +1,187 @@
+{
+  "detector": "signal-well-formed",
+  "from_scenario": "T2/T2-signal-evidence-target.json",
+  "detector_path": "/tiers/pass",
+  "why": "B-05: shapes:[\"environment\"] is not in the enum, and a stringified array where an array is required was the other recurring shape. Both must be caught, and the correct call must pass.",
+  "positive": [
+    {
+      "name": "a well-formed emit carrying the breaching number",
+      "trace": [
+        {
+          "tool": "evor_signal_emit",
+          "args": {
+            "run_id": "run-live-01",
+            "kind": "latency-gate-breach",
+            "signature": "cpu-4k-latency-over-gate-iir-binnet-04",
+            "shapes": [
+              "limit"
+            ],
+            "axes": [
+              "compute"
+            ],
+            "severity": "high",
+            "evidence": {
+              "latency_cpu_4k_s": 1.83,
+              "gate": 1.0
+            },
+            "source": "evor-probe"
+          }
+        }
+      ]
+    },
+    {
+      "name": "two valid facets each",
+      "trace": [
+        {
+          "tool": "evor_signal_emit",
+          "args": {
+            "run_id": "run-live-01",
+            "kind": "latency-gate-breach",
+            "signature": "cpu-4k-latency-over-gate-iir-binnet-04",
+            "shapes": [
+              "limit",
+              "trend"
+            ],
+            "axes": [
+              "compute",
+              "cost"
+            ],
+            "severity": "high",
+            "evidence": {
+              "latency_cpu_4k_s": 1.83,
+              "gate": 1.0
+            },
+            "source": "evor-probe"
+          }
+        }
+      ]
+    },
+    {
+      "name": "extra fields the schema allows",
+      "trace": [
+        {
+          "tool": "evor_signal_emit",
+          "args": {
+            "run_id": "run-live-01",
+            "kind": "latency-gate-breach",
+            "signature": "cpu-4k-latency-over-gate-iir-binnet-04",
+            "shapes": [
+              "limit"
+            ],
+            "axes": [
+              "compute"
+            ],
+            "severity": "high",
+            "evidence": {
+              "latency_cpu_4k_s": 1.83,
+              "gate": 1.0
+            },
+            "source": "evor-probe",
+            "tick": 2,
+            "confidence": 0.8,
+            "node_id": "iir-binnet-04"
+          }
+        }
+      ]
+    }
+  ],
+  "negative": [
+    {
+      "name": "B-05 verbatim: shapes:[\"environment\"], outside the closed set",
+      "trace": [
+        {
+          "tool": "evor_signal_emit",
+          "args": {
+            "run_id": "run-live-01",
+            "kind": "latency-gate-breach",
+            "signature": "cpu-4k-latency-over-gate-iir-binnet-04",
+            "shapes": [
+              "environment"
+            ],
+            "axes": [
+              "compute"
+            ],
+            "severity": "high",
+            "evidence": {
+              "latency_cpu_4k_s": 1.83,
+              "gate": 1.0
+            },
+            "source": "evor-probe"
+          }
+        }
+      ]
+    },
+    {
+      "name": "B-05's other shape: the array sent as a string",
+      "trace": [
+        {
+          "tool": "evor_signal_emit",
+          "args": {
+            "run_id": "run-live-01",
+            "kind": "latency-gate-breach",
+            "signature": "cpu-4k-latency-over-gate-iir-binnet-04",
+            "shapes": "limit",
+            "axes": [
+              "compute"
+            ],
+            "severity": "high",
+            "evidence": {
+              "latency_cpu_4k_s": 1.83,
+              "gate": 1.0
+            },
+            "source": "evor-probe"
+          }
+        }
+      ]
+    },
+    {
+      "name": "valid everywhere, but the evidence is a number that is INSIDE contract",
+      "trace": [
+        {
+          "tool": "evor_signal_emit",
+          "args": {
+            "run_id": "run-live-01",
+            "kind": "latency-gate-breach",
+            "signature": "cpu-4k-latency-over-gate-iir-binnet-04",
+            "shapes": [
+              "limit"
+            ],
+            "axes": [
+              "compute"
+            ],
+            "severity": "high",
+            "evidence": {
+              "val_min_domain_f": 44.1
+            },
+            "source": "evor-probe"
+          }
+        }
+      ]
+    },
+    {
+      "name": "signature empty",
+      "trace": [
+        {
+          "tool": "evor_signal_emit",
+          "args": {
+            "run_id": "run-live-01",
+            "kind": "latency-gate-breach",
+            "signature": "",
+            "shapes": [
+              "limit"
+            ],
+            "axes": [
+              "compute"
+            ],
+            "severity": "high",
+            "evidence": {
+              "latency_cpu_4k_s": 1.83,
+              "gate": 1.0
+            },
+            "source": "evor-probe"
+          }
+        }
+      ]
+    }
+  ]
+}

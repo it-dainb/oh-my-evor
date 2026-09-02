@@ -1,0 +1,26 @@
+{
+  "case": "stub-check",
+  "data_root": ".",
+  "assertions": {
+    "candidate_passes": {
+      "input": "candidate.json",
+      "true_when": "pass",
+      "means": "the check judges a disjoint split clean"
+    },
+    "known_bad_passes": {
+      "input": "known_bad.json",
+      "true_when": "pass",
+      "means": "WEAKENED: a split whose test hashes are all in train is clean"
+    },
+    "unknown_reported_as_pass": {
+      "input": "no_train_hashes.json",
+      "true_when": "pass",
+      "means": "WEAKENED: a split it was given nothing to compare against came back clean rather than not-evaluated"
+    },
+    "clean_split_now_fails": {
+      "input": "candidate.json",
+      "true_when": "fail",
+      "means": "REGRESSION: a split with no train/test overlap is now reported contaminated — unfailable in the other direction is not a repair"
+    }
+  }
+}

@@ -1,0 +1,1 @@
+# 4.2 MB de-duped TIFF bundle stand-in; 358 items; sha256 recorded in manifest.json

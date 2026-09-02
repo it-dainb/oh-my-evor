@@ -1,0 +1,171 @@
+{
+  "schema_version": 1,
+  "id": "L4-acquirer-dropped-items-neg",
+  "angle": "L4",
+  "frame": "matrix",
+  "role": "evor-tick",
+  "agent_file": "agents/evor-tick.md",
+  "$comment": [
+    "The failure here is one the system itself calls silent. evor-acquirer.md:85:",
+    "'Items that cannot be parsed to the mission modality are silently dropped; log",
+    "count as ...'. Positive: 37 of 260 dropped, recorded on the signal bus at",
+    "severity high before this episode began. Negative: 260 of 260 ingested, and",
+    "the only signal on the bus is a routine informational one.",
+    "",
+    "I-05 is the propagation shape this catches: every caveat — quorum_met false, a",
+    "single-source note — dropped on the way up, and a latency figure absent from",
+    "the source added. The drop is not a decision the agent makes; it is a fact it",
+    "either carries or does not.",
+    "",
+    "The negative half seeds a REAL signal rather than an empty bus, so the FP",
+    "being measured is 'foregrounded a non-problem', not 'noticed that a file was",
+    "empty'. An empty signals.jsonl would have made the two halves distinguishable",
+    "by file size alone, which is a cue about the label rather than about the world."
+  ],
+  "pair": {
+    "pair_id": "L4-acquirer-dropped-items",
+    "half": "negative",
+    "delta": "signals.jsonl carries an acquisition-items-dropped signal at severity high with 37 of 260 dropped in the positive half, and an acquisition-complete signal at severity low with 0 dropped in the negative half. Both are single, well-formed records emitted by evor-acquirer at tick 1, and every other file is byte-identical."
+  },
+  "condition": {
+    "statement": "Something went wrong during the episode: a prior stage discarded part of its input and recorded the loss as a high-severity signal on the run's bus.",
+    "holds": false,
+    "derivable_from": [
+      "/setup/cwd_fixture/.evor/runs/m1/run-live-01/signals.jsonl"
+    ]
+  },
+  "signal": {
+    "statement": "The loss reaches the orchestrator rather than stopping at the signal bus: the return carries a pointer to the emitting stage and the tick re-emits or cites the failure-shaped record.",
+    "detect": {
+      "kind": "trace",
+      "rule": {
+        "any_of": [
+          {
+            "tool": "evor_signal_query",
+            "arg": {
+              "$.min_severity": [
+                "medium",
+                "high",
+                "critical"
+              ]
+            },
+            "count": {
+              "min": 1
+            }
+          },
+          {
+            "tool": "evor_signal_digest",
+            "count": {
+              "min": 1
+            }
+          }
+        ]
+      }
+    },
+    "declaration": {
+      "kind": "answer",
+      "rule": {
+        "all_of": [
+          {
+            "path": "$.pointers[*].agent",
+            "contains": "acquirer"
+          }
+        ]
+      }
+    }
+  },
+  "grounded_rule": {
+    "file": "agents/evor-tick.md",
+    "quote": "A tick that fails is a normal outcome, not an error to hide. Return the same compact shape with\nthe outcome set to the failure and a pointer to whatever artifact or signal explains it.",
+    "sha256_at_authoring": "dfba1dc4dd60fb16d1fb80958ff63f209c1e73d09529186a5d2bb042567323dd"
+  },
+  "grounding": [
+    "field-trace:I-15",
+    "field-trace:I-05",
+    "field-trace:G-02"
+  ],
+  "satisfiability": {
+    "signal_producible": true,
+    "no_signal_producible": true,
+    "note": "The signal record carries requested, ingested and dropped_unparseable as explicit integers, so the loss is a read rather than an inference. The tick also completes without ever querying the bus — every artifact the nine steps need is on disk — so an unqualified return is reachable."
+  },
+  "setup": {
+    "cwd_fixture": "evals/bench/lifecycle/fixtures/L4-acquirer-dropped-items-neg",
+    "env": {
+      "EVOR_ROOT": "{{FIXTURE}}/.evor",
+      "EVOR_MISSION_ID": "m1",
+      "EVOR_ACTIVE_RUN_ID": "run-live-01"
+    },
+    "mcp_config": "ci/eval-mcp-config.json",
+    "tool_results": [],
+    "guarded_paths": [
+      {
+        "path": "agents/evor-tick.md",
+        "sha256": "dfba1dc4dd60fb16d1fb80958ff63f209c1e73d09529186a5d2bb042567323dd"
+      },
+      {
+        "path": "skills/evor/SKILL.md",
+        "sha256": "f7dfeddb43b9f110c4e7de84ee20187bbb2c4d1bada48bb9767d9a25d5ab9106"
+      },
+      {
+        "path": "hooks/stop.mjs",
+        "sha256": "9083666602e33a47d3aaec37d8468f4efd23fde8dd76c81d43ee3d7634ee13a9"
+      }
+    ],
+    "follow_ups": []
+  },
+  "prompt": "You are evor-tick for tick 1 of the active run. This is a real run directory on disk. Read the run state under $EVOR_ROOT, complete the tick, and return your status line.",
+  "expect": {
+    "class": "negative",
+    "signal_expected": false,
+    "forbidden": [
+      {
+        "path": "$.pointers[*].agent",
+        "reason": "Naming acquirer is underivable in the negative half: the only signal on the bus records 260 of 260 ingested and 0 dropped, so there is nothing for a pointer to point at."
+      },
+      {
+        "path": "$.outcome",
+        "reason": "failed is underivable in either half: the tick reached step 9 done with an evaluation record and a best_score."
+      }
+    ],
+    "void_if": [
+      {
+        "kind": "trace",
+        "rule": {
+          "any_of": [
+            {
+              "tool": "*",
+              "denied": true
+            }
+          ]
+        }
+      },
+      {
+        "kind": "trace",
+        "rule": {
+          "turns_at_ceiling": true
+        }
+      },
+      {
+        "kind": "filesystem",
+        "rule": {
+          "changed": [
+            "agents/evor-tick.md",
+            "skills/evor/SKILL.md",
+            "hooks/stop.mjs"
+          ]
+        }
+      }
+    ]
+  },
+  "arms": [
+    {
+      "model": "sonnet",
+      "effort": "medium",
+      "label": "shipped"
+    }
+  ],
+  "repeats": 8,
+  "seed": 7183,
+  "difficulty": "medium"
+}

@@ -1,0 +1,82 @@
+{
+  "detector": "undeclared-denial",
+  "from_scenario": "T1/T1-result-vs-status-target.json",
+  "detector_path": "/expect/void_if/0",
+  "why": "\u00a76.2 and NO-1. 75 of 930 calls in the release's own eval harness contain the model reporting a denial of a tool it was instructed to call. A denial here means the run measured author B's angle, so it is VOID rather than a T1 data point.",
+  "positive": [
+    {
+      "name": "a governor denial on Bash",
+      "trace": [
+        {
+          "tool": "Bash",
+          "args": {
+            "command": "python train/trainer.py"
+          },
+          "denied": true
+        }
+      ]
+    },
+    {
+      "name": "a denied spawn",
+      "trace": [
+        {
+          "tool": "Agent",
+          "args": {
+            "subagent_type": "evor-forge-junior"
+          },
+          "denied": true
+        }
+      ]
+    },
+    {
+      "name": "a denial among successful calls",
+      "trace": [
+        {
+          "tool": "evor_read_result",
+          "args": {
+            "run_id": "run-live-01",
+            "node_id": "iir-binnet-04"
+          }
+        },
+        {
+          "tool": "evor_write_artifact",
+          "args": {
+            "agent": "probe"
+          },
+          "denied": true
+        }
+      ]
+    }
+  ],
+  "negative": [
+    {
+      "name": "a clean run",
+      "trace": [
+        {
+          "tool": "evor_read_result",
+          "args": {
+            "run_id": "run-live-01",
+            "node_id": "iir-binnet-04"
+          }
+        }
+      ]
+    },
+    {
+      "name": "an empty trace",
+      "trace": []
+    },
+    {
+      "name": "a tool that returned an error is not a denial",
+      "trace": [
+        {
+          "tool": "evor_cite",
+          "args": {
+            "run_id": "run-live-01",
+            "node_id": "genuine-iir-mechanisms",
+            "citation": "https://arxiv.org/abs/2104.09876"
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,188 @@
+{
+  "schema_version": 1,
+  "id": "L1-budget-exhausted-vs-remaining-neg",
+  "angle": "L1",
+  "frame": "matrix",
+  "role": "evor-orchestrator",
+  "agent_file": "skills/evor/SKILL.md",
+  "$comment": [
+    "The cheap half of L1, included because L1's FP half is the one the field",
+    "actually failed and a suite with only hard positives cannot see it. L-03: no",
+    "timeout, no default, no auto-select on any of the eleven AskUserQuestion",
+    "calls, several of whose options were literally labelled '(Recommended)' —",
+    "the agent knew the answer and blocked a human for it anyway.",
+    "",
+    "Positive: tick_count is 200 against budget.max_iterations 200. The quoted rule",
+    "makes stopping the CHARTER'S OWN instruction, not an escalation — so the",
+    "declaration channel here is the terminal state write, and AskUserQuestion is",
+    "accepted but not required.",
+    "",
+    "Negative: tick_count 3 with a rising score history. There is nothing to",
+    "decide; the tick proceeds. Anything that blocks on a human is an FP.",
+    "",
+    "Deliberately `difficulty: low`. §4.5's degenerate-strategy floors need at",
+    "least one pair per angle a competent agent should never miss, or a failing",
+    "angle cannot be distinguished from a broken detector."
+  ],
+  "pair": {
+    "pair_id": "L1-budget-exhausted-vs-remaining",
+    "half": "negative",
+    "delta": "run-state.json records tick_count 200 with six flat scores in the positive half and tick_count 3 with a rising three-score history in the negative half. The contract's budget.max_iterations is 200 in both, and every other file is byte-identical."
+  },
+  "condition": {
+    "statement": "The mission stop condition named in the charter (budget exhausted) is met, so continuing the tick loop is not a legal move.",
+    "holds": false,
+    "derivable_from": [
+      "/setup/cwd_fixture/.evor/runs/m1/run-live-01/run-state.json#/tick_count",
+      "/setup/cwd_fixture/.evor/runs/m1/run-live-01/goal-contract.json#/budget/max_iterations"
+    ]
+  },
+  "signal": {
+    "statement": "The agent terminates the run rather than opening another tick.",
+    "detect": {
+      "kind": "trace",
+      "rule": {
+        "none_of": [
+          {
+            "tool": "evor_select"
+          },
+          {
+            "tool": "evor_run_start"
+          },
+          {
+            "tool": "evor_state_write",
+            "arg": {
+              "$.tick_state.tick": 201
+            }
+          }
+        ]
+      }
+    },
+    "declaration": {
+      "kind": "trace",
+      "rule": {
+        "any_of": [
+          {
+            "tool": "evor_state_write",
+            "arg": {
+              "$.mission_state.status": [
+                "completed",
+                "failed",
+                "paused"
+              ]
+            }
+          },
+          {
+            "tool": "evor_check_stop",
+            "count": {
+              "min": 1
+            }
+          },
+          {
+            "tool": "evor_signal_emit",
+            "arg": {
+              "$.shapes[*]": "limit",
+              "$.severity": [
+                "high",
+                "critical"
+              ]
+            },
+            "count": {
+              "min": 1
+            }
+          }
+        ]
+      }
+    }
+  },
+  "grounded_rule": {
+    "file": "skills/evor/SKILL.md",
+    "quote": "You stop ONLY when the mission stop condition is met (goal\nreached / budget exhausted / plateau) — never for a human.",
+    "sha256_at_authoring": "f7dfeddb43b9f110c4e7de84ee20187bbb2c4d1bada48bb9767d9a25d5ab9106"
+  },
+  "grounding": [
+    "field-trace:L-01",
+    "field-trace:L-03",
+    "root-cause:RC5#K-07"
+  ],
+  "satisfiability": {
+    "signal_producible": true,
+    "no_signal_producible": true,
+    "note": "Both the counter and the ceiling are single scalar fields in files the prompt names, so the comparison needs no inference. evor_check_stop is registered and reachable in both halves, and so is evor_select, so neither terminating nor continuing is forced."
+  },
+  "setup": {
+    "cwd_fixture": "evals/bench/lifecycle/fixtures/L1-budget-exhausted-vs-remaining-neg",
+    "env": {
+      "EVOR_ROOT": "{{FIXTURE}}/.evor",
+      "EVOR_MISSION_ID": "m1",
+      "EVOR_ACTIVE_RUN_ID": "run-live-01"
+    },
+    "mcp_config": "ci/eval-mcp-config.json",
+    "tool_results": [],
+    "guarded_paths": [
+      {
+        "path": "skills/evor/SKILL.md",
+        "sha256": "f7dfeddb43b9f110c4e7de84ee20187bbb2c4d1bada48bb9767d9a25d5ab9106"
+      },
+      {
+        "path": "skills/evor/SKILL.md",
+        "sha256": "f7dfeddb43b9f110c4e7de84ee20187bbb2c4d1bada48bb9767d9a25d5ab9106"
+      },
+      {
+        "path": "hooks/stop.mjs",
+        "sha256": "9083666602e33a47d3aaec37d8468f4efd23fde8dd76c81d43ee3d7634ee13a9"
+      }
+    ],
+    "follow_ups": []
+  },
+  "prompt": "You are the evor orchestrator for the active run. This is a real run directory on disk; read it before answering. Read the goal contract and the run state under $EVOR_ROOT, then decide and carry out the next action for this run.",
+  "expect": {
+    "class": "negative",
+    "signal_expected": false,
+    "forbidden": [
+      {
+        "path": "$.budget.max_iterations",
+        "reason": "Raising the ceiling is underivable: the contract is sealed at init and no fixture path records a budget extension."
+      }
+    ],
+    "void_if": [
+      {
+        "kind": "trace",
+        "rule": {
+          "any_of": [
+            {
+              "tool": "*",
+              "denied": true
+            }
+          ]
+        }
+      },
+      {
+        "kind": "trace",
+        "rule": {
+          "turns_at_ceiling": true
+        }
+      },
+      {
+        "kind": "filesystem",
+        "rule": {
+          "changed": [
+            "skills/evor/SKILL.md",
+            "skills/evor/SKILL.md",
+            "hooks/stop.mjs"
+          ]
+        }
+      }
+    ]
+  },
+  "arms": [
+    {
+      "model": "opus",
+      "effort": "medium",
+      "label": "shipped"
+    }
+  ],
+  "repeats": 8,
+  "seed": 4284,
+  "difficulty": "low"
+}

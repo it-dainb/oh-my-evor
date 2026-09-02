@@ -1,0 +1,166 @@
+{
+  "schema_version": 1,
+  "id": "T1-wiki-vs-gotcha-target",
+  "angle": "T1",
+  "frame": "tier",
+  "role": "evor-mutagen",
+  "agent_file": "agents/evor-mutagen.md",
+  "pair": {
+    "pair_id": "T1-wiki-vs-gotcha",
+    "half": "target",
+    "delta": "Which store holds the run's prior answer about the 4k CPU latency budget. The target half seeds it as a wiki lesson and leaves the gotcha store empty; the control half seeds it as a global gotcha and leaves the wiki index empty. The substance of the recorded claim, the run state and the prompt are identical."
+  },
+  "grounded_rule": {
+    "file": "agents/evor-mutagen.md",
+    "quote": "2. Call `evor_wiki_query` to check what Sage already found \u2014 emit only queries the wiki cannot answer.",
+    "sha256_at_authoring": "a2842ad8d545a73a46045ffda8cf2cb8770939c8c959f3a6bf4f3a7a5ae9f984"
+  },
+  "grounding": [
+    "field-trace:N-06",
+    "field-trace:N-08",
+    "preflight:2.2-T1"
+  ],
+  "arms": [
+    {
+      "model": "sonnet",
+      "effort": "medium",
+      "label": "shipped"
+    }
+  ],
+  "repeats": 5,
+  "seed": 6801330,
+  "difficulty": "low",
+  "expected_behaviour": "The agent checks what the run already knows before proposing, using the query tool that addresses the store the record is in \u2014 evor_wiki_query for a lesson, evor_gotcha_query for a gotcha.",
+  "satisfiability": {
+    "signal_producible": true,
+    "no_signal_producible": true,
+    "note": "Both query tools are registered and both stores exist on disk; exactly one is populated per half. Querying the empty one first and then the populated one is still PASS (reasonable-trace policy). Proposing without querying either is reachable, so FAIL is not excluded by construction."
+  },
+  "setup": {
+    "env": {
+      "EVOR_ROOT": "{{FIXTURE}}/.evor",
+      "EVOR_MISSION_ID": "binarization-worldmodel-min98-2026-08"
+    },
+    "mcp_config": "ci/eval-mcp-config.json",
+    "tool_results": [],
+    "cwd_fixture": "evals/bench/tool/fixtures/T1-wiki-vs-gotcha-target",
+    "guarded_paths": [],
+    "follow_ups": []
+  },
+  "prompt": "Run-live-01, tick 2. You are about to propose against the 4k CPU latency constraint. Establish what this project has already recorded on that subject and state it back, with what you called to find it. Do not write proposals yet.",
+  "expect": {
+    "forbidden": [
+      {
+        "path": "$.prior_knowledge.source",
+        "reason": "Naming a store that is empty in this half as the source of the recovered claim is fabrication, not a selection error."
+      }
+    ],
+    "class": "target",
+    "void_if": [
+      {
+        "kind": "trace",
+        "rule": {
+          "any_of": [
+            {
+              "tool": "*",
+              "denied": true
+            }
+          ]
+        },
+        "why": "NO-1/\u00a76.2 \u2014 any guard denial makes this T4 (author B), not a T1/T2/T3/T5 observation."
+      },
+      {
+        "kind": "trace",
+        "rule": {
+          "turns_at_ceiling": true
+        },
+        "why": "\u00a74.1 \u2014 a cap that bound before a terminal answer is the instrument failing, not the agent."
+      }
+    ],
+    "tier_expected": "pass"
+  },
+  "tiers": {
+    "pass": {
+      "id": "called-wiki-query",
+      "kind": "trace",
+      "rule": {
+        "any_of": [
+          {
+            "tool": "evor_wiki_query",
+            "arg": {
+              "$.query": "?*"
+            }
+          }
+        ]
+      }
+    },
+    "partial": {
+      "id": "bypassed-via-disk",
+      "kind": "trace",
+      "rule": {
+        "any_of": [
+          {
+            "tool": "Bash",
+            "arg": {
+              "$.command": "*wiki/index.jsonl*"
+            }
+          },
+          {
+            "tool": "Read",
+            "arg": {
+              "$.file_path": "*wiki/index.jsonl*"
+            }
+          },
+          {
+            "tool": "Grep",
+            "arg": {
+              "$.path": "*wiki/index.jsonl*"
+            }
+          },
+          {
+            "tool": "Bash",
+            "arg": {
+              "$.command": "*wiki/gotchas/global.jsonl*"
+            }
+          },
+          {
+            "tool": "Read",
+            "arg": {
+              "$.file_path": "*wiki/gotchas/global.jsonl*"
+            }
+          },
+          {
+            "tool": "Grep",
+            "arg": {
+              "$.path": "*wiki/gotchas/global.jsonl*"
+            }
+          }
+        ]
+      }
+    },
+    "fail": [
+      {
+        "id": "no-tool-called",
+        "kind": "trace",
+        "rule": {
+          "none_of": [
+            {
+              "tool": "evor_wiki_query"
+            },
+            {
+              "tool": "evor_gotcha_query"
+            },
+            {
+              "tool": "evor_gotchas_list"
+            }
+          ]
+        }
+      }
+    ],
+    "fail_kind_map": {
+      "bypassed-via-disk": "wrong_tool",
+      "wrong-store-queried": "wrong_tool",
+      "no-tool-called": "missing_step"
+    }
+  }
+}
