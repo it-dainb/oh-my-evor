@@ -772,6 +772,19 @@ class IntegrityChecks(BaseEvorModel):
     no_test_leakage: bool
     near_dup_leakage: bool
     data_provenance_valid: bool
+    trainer_completed: Optional[bool] = None
+    """Did the trainer run to the step budget the node declared? (Item 6.4 / R-11.)
+
+    True = completed, False = truncated, None = NOT EVALUATED (the node declares
+    no step budget, so there is nothing to compare against).
+
+    A job killed mid-training leaves a checkpoint behind, and a checkpoint from a
+    killed trainer scores like any other — it is simply a worse model, and
+    nothing in the gate could tell the difference between "this approach did not
+    work" and "this run was cut off at step 254 of 450". The second is not
+    evidence about the approach at all.
+    """
+
     no_label_contamination: Optional[bool] = None
     """True = clean, False = contaminated, None = NOT EVALUATED (item 2.11).
 
@@ -1385,11 +1398,42 @@ class CapabilityProfile(BaseEvorModel):
     gpu_name: Optional[str] = None
     """GPU device name, e.g. 'NVIDIA A100 80GB PCIe'."""
     vram_gb: Optional[float] = None
-    """Total VRAM in GB. None on CPU-only box."""
+    """TOTAL VRAM in GB. None on CPU-only box.
+
+    Total, not usable. See ``free_vram_gb`` — recording only this number on a
+    shared-tenant box is R-04.
+    """
+    free_vram_gb: Optional[float] = None
+    """VRAM actually FREE at probe time, from ``torch.cuda.mem_get_info`` (R-04).
+
+    ``capability.json`` recorded 79.25 GB total on a shared-tenant A100 where
+    ~40 GB was free. Agents independently learned to distrust the artifact, and
+    the next agent that does not will oversize a candidate and OOM. Total and
+    free are different numbers answering different questions, and only one of
+    them was being asked.
+    """
     supported_dtypes: list[str]
     """Confirmed supported dtypes, e.g. ['fp32', 'fp16', 'bf16']."""
+
     available_libs: list[str]
-    """Confirmed importable GPU-acceleration libs, e.g. ['flash-attn', 'xformers']."""
+    """Libs that are importable AND permitted AND exercised — usable (R-09).
+
+    This advertised flash-attn, xformers and triton on the strength of a bare
+    ``__import__``, while the goal contract FORBADE all three and the
+    verification artifact recorded "no flash_attn" as a PASS. Importable is not
+    the same as permitted, and neither is the same as working.
+    """
+    importable_libs: list[str] = Field(default_factory=list)
+    """What merely imported. Still useful, but labelled as what it is."""
+
+    source: Literal["probe", "policy-pin", "unknown"] = "unknown"
+    """Where these numbers came from (R-05).
+
+    A hand-authored ``capability.json`` sat in the plugin root and was read by
+    two agents as "the capability profile" — one treating it as a measurement,
+    one as a policy ceiling. A profile that cannot say which it is invites both
+    readings, and both were taken.
+    """
     cuda_version: Optional[str] = None
     """CUDA runtime version string, e.g. '12.1'. None if CUDA unavailable."""
     cpu_only: bool

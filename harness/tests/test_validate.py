@@ -35,6 +35,32 @@ from evor.validate import (
 )
 from evor.contracts import GoalContract, MetricSpec, MetricConstraint
 
+
+# ── Item 6.1 / R-08: a run may not start before its machine is measured ──────
+#
+# `run_init_run` now refuses when `.evor/capability.json` is absent or stale:
+# the field run began 26 minutes BEFORE its own capability probe, so its sizing
+# decisions preceded the measurement they depend on.
+#
+# These tests are about what init WRITES, not about probe policy, so they get a
+# probe. Fixture migration only — no assertion changes.
+@pytest.fixture(autouse=True)
+def _seed_capability_probe(tmp_path):
+    import json as _json
+    from datetime import datetime, timezone
+
+    evor_root = tmp_path / ".evor"
+    evor_root.mkdir(parents=True, exist_ok=True)
+    (evor_root / "capability.json").write_text(_json.dumps({
+        "gpu_arch": None, "gpu_name": None, "vram_gb": None,
+        "supported_dtypes": ["fp32"], "available_libs": [],
+        "cuda_version": None, "cpu_only": True,
+        "probed_at": datetime.now(timezone.utc).isoformat(),
+        "source": "probe",
+    }))
+    return evor_root
+
+
 _PYTHON = sys.executable
 _HARNESS_DIR = Path(__file__).resolve().parent.parent
 
@@ -70,10 +96,23 @@ def _minimal_run_dir(tmp_path: Path, *, mission_type: str = "fixed") -> Path:
         "stop_condition": {"type": "target"},
         "wildness": 0.5,
         "budget": {
+            # Item 9.3 / K-06 + K-07 made both of these checkable, and the old
+            # values encoded exactly what the checks now reject:
+            #
+            #   circuit_breaker=3 with max_iterations=20 — `check_stop_condition`
+            #     tests `tick >= circuit_breaker`, so it is a hard TICK CAP, not a
+            #     consecutive-failure counter. The run stopped at tick 3 and the
+            #     other 17 iterations were budget it could never spend.
+            #
+            #   max_cost_usd=0.0 — read as UNLIMITED by the stop path, which is
+            #     the opposite of what setting a ceiling to zero means, and is why
+            #     $217.70 went out under a contract that declared one.
+            #
+            # Fixture migration only; no assertion changed.
             "max_iterations": 20,
             "plateau_window": 5,
-            "circuit_breaker": 3,
-            "max_cost_usd": 0.0,
+            "circuit_breaker": 20,
+            "max_cost_usd": 50.0,
         },
         "framework": "pytorch",
         "seed_repo_path": None,

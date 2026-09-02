@@ -219,6 +219,20 @@ class IntegrityGate:
                 "no_eval_shift: eval_script sha256 does not match GoalContract.eval_script_hash"
             )
 
+        # ── Check 5b: trainer_completed (item 6.4 / R-11) ──────────────────
+        #
+        # A killed trainer leaves a checkpoint, and that checkpoint scores like
+        # any other — it just looks like a worse model. Nothing distinguished
+        # "this approach did not work" from "this run was cut off at step 254 of
+        # 450", and only the first is evidence about the approach.
+        trainer_completed = self._check_trainer_completed(node, result)
+        if trainer_completed is False:
+            failures.append(
+                "trainer_completed: telemetry stops well short of the node's declared "
+                "step budget — the trainer did not finish, so this score is not a "
+                "measurement of the candidate"
+            )
+
         # ── Check 5: telemetry_sane ───────────────────────────────────────
         # O-01 (item 1.5): the trainer writes `nodes/<slug>/telemetry.jsonl` and
         # this gate is handed `nodes/<uuid>/telemetry.jsonl`. Neither writer was
@@ -360,6 +374,7 @@ class IntegrityGate:
             node_id=node.id,
             eval_version=result.eval_version,
             checks=IntegrityChecks(
+            trainer_completed=trainer_completed,
                 split_hash_match=split_hash_match,
                 frozen_split_read_only=frozen_split_read_only,
                 no_test_leakage=no_test_leakage,
@@ -439,6 +454,34 @@ class IntegrityGate:
             return None  # type: ignore[return-value]
         overlap = set(frozen_test.per_sample_hashes.values()) & set(train_hashes)
         return not overlap
+
+    def _check_trainer_completed(self, node, result) -> Optional[bool]:
+        """Did the trainer reach the step budget the node declared? (Item 6.4.)
+
+        Returns None when the node declares no budget: with nothing to compare
+        against, "not evaluated" is the honest answer, and reporting True would
+        be `integrity.py:404`'s mistake again.
+
+        The 90% threshold leaves room for a trainer that stops a few steps early
+        for legitimate reasons. It exists to catch 254 of 450, not to police the
+        last epoch.
+        """
+        config = getattr(node, "config", None) or {}
+        declared = None
+        for key in ("max_steps", "expected_steps", "total_steps", "steps"):
+            value = config.get(key)
+            if isinstance(value, (int, float)) and value > 0:
+                declared = int(value)
+                break
+        if declared is None:
+            return None
+
+        summary = getattr(result, "telemetry_summary", None)
+        actual = getattr(summary, "total_steps", None) if summary is not None else None
+        if not isinstance(actual, (int, float)):
+            return None
+
+        return int(actual) >= int(declared * 0.9)
 
     def _check_telemetry_sane(self, telemetry_path: Path) -> bool:
         """Check 5: parse telemetry.jsonl; validate loss + optional grad_norm.

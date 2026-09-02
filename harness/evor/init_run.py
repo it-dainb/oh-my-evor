@@ -23,6 +23,7 @@ On success:        prints {"ok": true, ...} to stdout and exits 0.
 from __future__ import annotations
 
 import json
+import sys
 import os
 from datetime import datetime, timezone
 from pathlib import Path
@@ -84,6 +85,103 @@ def _humanize_validation_error(exc: ValidationError) -> str:
 # ─────────────────────────────────────────────────────────────────────────────
 
 
+#: How old a capability profile may be before a run must re-measure.
+#:
+#: This window covers the profile's HARDWARE IDENTITY — arch, device name, total
+#: VRAM, CUDA version — which is stable across weeks on a given machine and is
+#: what dtype and architecture decisions rest on. Thirty days rejects a profile
+#: describing a box from another era while not forcing a probe before every run.
+#:
+#: It deliberately does NOT cover `free_vram_gb`, which is a point-in-time
+#: measurement that goes stale in minutes and belongs to the sizing decision at
+#: the moment it is made, not to run admission. Conflating the two would mean
+#: either re-probing before every run or trusting a months-old free-memory
+#: figure — and trusting a stale free-memory figure is R-04 itself.
+#:
+#: Ninety days is the line between "this machine" and "a machine from another
+#: era". The RED suite fixes both anchors: a profile probed years earlier must
+#: be refused, and one from the same season must not block a run.
+_PROBE_MAX_AGE_S = 90 * 24 * 3600
+
+
+def _check_capability_probe(evor_root_arg: str | None) -> str | None:
+    """Is there a fresh capability profile? Returns an error message, or None.
+
+    Item 6.1 / R-08. Both failure modes read the same way to a caller that only
+    checks for a file: absent, and present but stale.
+    """
+    from .capability import MalformedCapabilityProfile, read_capability
+
+    root = Path(evor_root_arg) if evor_root_arg else Path(".evor")
+    try:
+        profile = read_capability(root)
+    except MalformedCapabilityProfile as exc:
+        return str(exc)
+
+    if profile is None:
+        return (
+            f"no capability profile at {root / 'capability.json'}. A run sizes its "
+            "candidates against the machine, so it may not start before the machine "
+            "has been measured — the field run began 26 minutes before its own probe. "
+            "Run the preflight probe first."
+        )
+
+    try:
+        probed = datetime.fromisoformat(str(profile.probed_at).replace("Z", "+00:00"))
+        if probed.tzinfo is None:
+            probed = probed.replace(tzinfo=timezone.utc)
+    except (TypeError, ValueError):
+        return (
+            f"the capability profile at {root / 'capability.json'} has an unreadable "
+            f"probed_at ({profile.probed_at!r}), so its freshness cannot be established."
+        )
+
+    age = (datetime.now(timezone.utc) - probed).total_seconds()
+    if age > _PROBE_MAX_AGE_S:
+        return (
+            f"the capability profile was probed {age / 3600:.0f}h ago "
+            f"(limit {_PROBE_MAX_AGE_S / 3600:.0f}h). Hardware is shared and changes; "
+            "sizing this run against a stale measurement is how a candidate is built "
+            "for memory that is no longer free. Re-run the preflight probe."
+        )
+    return None
+
+
+def _env_manifest() -> dict:
+    """The interpreter and package set this run is being produced under (6.3).
+
+    Best-effort per field: a manifest that fails to write because one probe
+    raised would record nothing at all, which is worse than recording most of it.
+    """
+    manifest: dict = {
+        "python_version": sys.version.split()[0],
+        "python_executable": sys.executable,
+        "platform": sys.platform,
+        "recorded_at": _now_iso(),
+        "packages": {},
+    }
+    try:
+        from importlib.metadata import distributions
+
+        manifest["packages"] = {
+            d.metadata["Name"]: d.version
+            for d in distributions()
+            if d.metadata and d.metadata.get("Name")
+        }
+    except Exception:  # noqa: BLE001
+        manifest["packages"] = {}
+
+    # The versions that actually decide whether a number reproduces. Recorded
+    # separately so a reader does not have to know which of 400 packages mattered.
+    for name in ("torch", "numpy", "pydantic"):
+        try:
+            module = __import__(name)
+            manifest.setdefault("key_versions", {})[name] = getattr(module, "__version__", None)
+        except Exception:  # noqa: BLE001
+            continue
+    return manifest
+
+
 def run_init_run(
     answers_path: str,
     *,
@@ -125,6 +223,18 @@ def run_init_run(
         print(json.dumps({"error": "mission_id is required (supply in answers or via --mission-id)"}))
         return 1
     answers["mission_id"] = mission_id  # keep in sync for GoalContract
+
+    # ── R-08 (item 6.1): a run may not start ahead of its own measurement ────
+    #
+    # The field run started at 00:05 and the capability probe ran at 00:31 — the
+    # sizing decisions preceded the measurement they depend on by 26 minutes, and
+    # nothing objected because nothing was looking. A profile that is absent and
+    # one that is years old are both "we do not know what this machine is", which
+    # is not a state a run should begin in.
+    probe_error = _check_capability_probe(evor_root_arg)
+    if probe_error:
+        print(json.dumps({"error": probe_error}))
+        return 1
 
     # ── Validate GoalContract — ALL validation before ANY disk write ──────────
     try:
@@ -190,6 +300,15 @@ def run_init_run(
     })
 
     # ── 3. strategy.json ──────────────────────────────────────────────────────
+    # ── R-03 (item 6.3): record the environment this run was produced under ──
+    #
+    # A result is a measurement made by a specific interpreter with a specific
+    # set of packages. None of that was recorded, so after the fact it is
+    # unrecoverable — and "we cannot reproduce this number" is indistinguishable
+    # from "this number was wrong". Written at init, because afterwards the
+    # environment may already have moved.
+    _atomic_write_json(run_dir / "env-manifest.json", _env_manifest())
+
     _atomic_write_json(run_dir / "strategy.json", {
         "meta_iteration": 0,
         "selection_policy": "ucb1",

@@ -31,7 +31,18 @@ class TestRedaction:
     def test_a_known_shape_is_replaced(self, secret: str, label: str):
         out = redact(f"calling with {secret} now")
         assert secret not in out
-        assert f"[REDACTED:{label}]" in out
+        assert label in out
+
+    @pytest.mark.parametrize("secret", [FAKE_S2, FAKE_HF])
+    def test_a_four_char_preview_survives(self, secret: str):
+        # A redacted log still has to be usable: an operator needs to know WHICH
+        # key was involved. Every trace document already refers to the exposed
+        # key as `s2k-` + a length, and a redactor that erases the identity as
+        # well as the value turns a debuggable log into an undebuggable one.
+        out = redact(f"key: {secret}")
+        assert secret not in out
+        assert out.startswith(f"key: {secret[:4]}")
+        assert str(len(secret)) in out
 
     def test_the_surrounding_text_survives(self):
         out = redact(f"HTTP 401 from api.semanticscholar.org using {FAKE_S2}")

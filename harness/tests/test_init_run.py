@@ -38,6 +38,37 @@ import pytest
 from evor.contracts import AutonomyCharter, GoalContract
 from evor.init_run import run_init_run
 
+
+# ── Item 6.1 / R-08: a run may not start before its machine is measured ──────
+#
+# `run_init_run` now refuses when `.evor/capability.json` is absent or stale:
+# the field run began 26 minutes BEFORE its own capability probe, so its sizing
+# decisions preceded the measurement they depend on.
+#
+# These tests are about what init WRITES, not about probe policy, so they get a
+# probe. Fixture migration only — no assertion changes.
+@pytest.fixture(autouse=True)
+def _seed_capability_probe(tmp_path):
+    import json as _json
+    from datetime import datetime, timezone
+
+    evor_root = tmp_path / ".evor"
+    evor_root.mkdir(parents=True, exist_ok=True)
+    # This test uses a NON-default evor root, so seed both. The gate is about the
+    # root the run actually uses, not about where the default happens to be.
+    (tmp_path / "custom-evor").mkdir(parents=True, exist_ok=True)
+    _profile = _json.dumps({
+        "gpu_arch": None, "gpu_name": None, "vram_gb": None,
+        "supported_dtypes": ["fp32"], "available_libs": [],
+        "cuda_version": None, "cpu_only": True,
+        "probed_at": datetime.now(timezone.utc).isoformat(),
+        "source": "probe",
+    })
+    (evor_root / "capability.json").write_text(_profile)
+    (tmp_path / "custom-evor" / "capability.json").write_text(_profile)
+    return evor_root
+
+
 # Portable harness dir — works on host and inside container.
 _HARNESS_DIR = Path(__file__).resolve().parent.parent
 _PYTHON = sys.executable
@@ -74,7 +105,7 @@ def _minimal_answers() -> dict:
         "budget": {
             "max_iterations": 20,
             "plateau_window": 5,
-            "circuit_breaker": 3,
+            "circuit_breaker": 20,  # item 9.3: a breaker below max_iterations makes the declared budget unreachable
             "max_cost_usd": 50.0,
         },
         "framework": "pytorch",

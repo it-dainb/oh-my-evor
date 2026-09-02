@@ -63,13 +63,18 @@ def _env_secrets() -> list[str]:
     return out
 
 
-def redact(text: str, extra: Iterable[str] = ()) -> str:
+def redact_secrets(text: str, extra: Iterable[str] = ()) -> str:
     """Replace credential-shaped substrings with a labelled placeholder.
 
-    Applied at every point that emits text an operator or a log will see. The
-    replacement names the KIND and the length, so a reader can still tell which
-    credential was involved and that it was not truncated — which is what makes
-    a redacted log still useful for debugging.
+    Applied at every point that emits text an operator or a log will see.
+
+    The replacement keeps a FOUR-CHARACTER PREVIEW — `s2k-…` — because a
+    redacted log still has to be usable: an operator reading it needs to know
+    WHICH key was involved, and every trace document in
+    `docs/field-trace-v1.2.0/` already refers to the exposed key that way. A
+    redaction that erases the identity as well as the value turns a debuggable
+    log into an undebuggable one, and a redactor that makes logs useless is a
+    redactor that gets switched off.
     """
     if not text:
         return text
@@ -79,8 +84,17 @@ def redact(text: str, extra: Iterable[str] = ()) -> str:
     # shape it has, which is the only part of this that generalises.
     for value in list(extra) + _env_secrets():
         if value and value in out:
-            out = out.replace(value, f"[REDACTED:{len(value)} chars]")
+            out = out.replace(value, f"{value[:4]}…[REDACTED:{len(value)} chars]")
 
     for label, pattern in _PATTERNS:
-        out = pattern.sub(lambda m, _l=label: f"[REDACTED:{_l}]", out)
+        out = pattern.sub(
+            lambda m, _l=label: f"{m.group(0)[:4]}…[REDACTED:{_l}, {len(m.group(0))} chars]",
+            out,
+        )
     return out
+
+
+#: The original name. Kept so existing callers keep working — renaming a
+#: redaction helper and leaving a dead call site is how a surface stops being
+#: redacted.
+redact = redact_secrets

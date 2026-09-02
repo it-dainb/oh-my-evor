@@ -154,12 +154,69 @@ class ForgeStructureGate:
             self._check_forward_pass(candidate_dir),
             self._check_eval_locked(candidate_dir),
             self._check_telemetry(candidate_dir),
+            self._check_path_anchoring(candidate_dir),
         ]
         return QualityReport(candidate_dir=candidate_dir, checks=checks)
 
     # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------
+
+    def _check_path_anchoring(self, candidate_dir: Path) -> SubCheck:
+        """Candidate imports must anchor to ``__file__``, never to the cwd (R-15).
+
+        `sys.path.insert(0, os.getcwd())` in a candidate trainer resolved against
+        whatever directory the launcher happened to be in and raised
+        `ModuleNotFoundError: 'model'`. The code was correct; the assumption
+        about where it would run was not, and nothing checked that assumption
+        until launch — after the merge, after the review, at the point where the
+        run simply dies.
+
+        `__file__` is a property of the module. The cwd is a property of whoever
+        started the process, and a candidate does not get to choose that.
+        """
+        offenders: list[str] = []
+        checked = 0
+        for py in sorted(candidate_dir.rglob("*.py")):
+            try:
+                source = py.read_text(errors="replace")
+            except OSError:
+                continue
+            checked += 1
+            for lineno, line in enumerate(source.splitlines(), 1):
+                stripped = line.strip()
+                if not stripped.startswith(("sys.path.insert", "sys.path.append")):
+                    continue
+                # `os.getcwd()`, `Path.cwd()`, `"."` and `os.curdir` all resolve
+                # against the launcher rather than the file.
+                if any(marker in stripped for marker in ("getcwd()", "Path.cwd()", "os.curdir")) or \
+                        stripped.endswith(('"."\')', "'.')", '".")')):
+                    offenders.append(f"{py.relative_to(candidate_dir)}:{lineno}: {stripped}")
+
+        if not checked:
+            return SubCheck(
+                name="path_anchoring",
+                passed=True,
+                reason="no Python sources to check",
+            )
+        if offenders:
+            return SubCheck(
+                name="path_anchoring",
+                passed=False,
+                reason=(
+                    "sys.path is anchored to the process cwd, which the candidate does "
+                    "not control — imports will resolve against whatever directory the "
+                    "launcher happened to be in, and fail at launch rather than here. "
+                    "Anchor to __file__ instead, e.g. "
+                    "sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))). "
+                    + "; ".join(offenders[:3])
+                ),
+            )
+        return SubCheck(
+            name="path_anchoring",
+            passed=True,
+            reason=f"{checked} source file(s) anchor imports to __file__ or do not touch sys.path",
+        )
 
     def _read_genome_data(self, candidate_dir: Path) -> dict | None:
         """Parse genome.yaml and return the raw dict, or None on any failure."""
