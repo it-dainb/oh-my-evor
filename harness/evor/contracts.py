@@ -772,6 +772,15 @@ class IntegrityChecks(BaseEvorModel):
     no_test_leakage: bool
     near_dup_leakage: bool
     data_provenance_valid: bool
+    no_source_page_leakage: Optional[bool] = None
+    """True = clean, False = leaked, None = NOT EVALUATED (items 2.3 / 9.1, M-03).
+
+    A test item whose SOURCE PAGE also appears in training data is leaked, however
+    different the degraded bytes are. `None` means the corpus declares no per-item
+    lineage, so the question cannot be answered — which is not the same as clean,
+    and saying so is the whole point. See KNOWN_GAPS.md.
+    """
+
     trainer_completed: Optional[bool] = None
     """Did the trainer run to the step budget the node declared? (Item 6.4 / R-11.)
 

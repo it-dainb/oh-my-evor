@@ -134,10 +134,24 @@ class ContentAddressedStore:
         # Blob content is addressed by hash and written before the lock, so the
         # expensive part stays parallel and the lock covers only the counter.
         with run_lock(self._blobs):
+            # Orphan cleanup belongs to a WRITER, not a reader (O-17). Inside the
+            # lock no other writer can be mid-write, so every temp file present
+            # is by definition a leftover from a crash — which is the fact
+            # `_load_refcounts` could not establish, and why it used to delete
+            # live writers' files trying to guess.
+            self._sweep_stale_temps()
             counts = self._load_refcounts()
             counts[content_hash] = counts.get(content_hash, 0) + 1
             self._save_refcounts(counts)
         return content_hash
+
+    def _sweep_stale_temps(self) -> None:
+        """Remove leftover refcount temp files. MUST be called under the lock."""
+        try:
+            for stale in self._blobs.glob(".refcounts.json*.tmp"):
+                stale.unlink(missing_ok=True)
+        except OSError:
+            pass
 
     def get(self, content_hash: str) -> Path:
         """Return path to blob; raise FileNotFoundError if missing."""

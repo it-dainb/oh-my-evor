@@ -219,6 +219,35 @@ class IntegrityGate:
                 "no_eval_shift: eval_script sha256 does not match GoalContract.eval_script_hash"
             )
 
+        # ── Check 3b: source-page leakage (items 2.3 / 9.1, finding M-03) ───
+        #
+        # The corpus is built by DEGRADING source pages. When the same page is
+        # degraded into a train item and a test item, the two have different
+        # image bytes and a byte-identical GT mask — so every hash-based check
+        # sees two unrelated samples. The field harness counted exactly that
+        # signal ("48 benign mask-only collisions ignored") and then declared it
+        # benign, citing this corpus's own leakage count as the reason.
+        #
+        # Mask identity is NOT a usable discriminator on its own: 132 test items
+        # yield 128 unique masks, so collisions occur legitimately within a
+        # single split. What settles it is DECLARED LINEAGE — the group key 2.3
+        # put on FrozenSplit — compared against the train side's
+        # `source_sample_id`.
+        #
+        # When the corpus declares no lineage this returns None: NOT EVALUATED,
+        # not clean. See KNOWN_GAPS.md — closing M-03 for the field corpus needs
+        # a corpus-builder change, and asserting cleanliness without the evidence
+        # would be the reclassification that caused the finding.
+        no_source_page_leakage = self._check_source_page_leakage(
+            frozen_test, provenance_path
+        )
+        if no_source_page_leakage is False:
+            failures.append(
+                "no_source_page_leakage: a test item's source page also appears in "
+                "training data — the same page degraded twice, split across the two "
+                "sets, is leakage however different the bytes are"
+            )
+
         # ── Check 5b: trainer_completed (item 6.4 / R-11) ──────────────────
         #
         # A killed trainer leaves a checkpoint, and that checkpoint scores like
@@ -374,6 +403,7 @@ class IntegrityGate:
             node_id=node.id,
             eval_version=result.eval_version,
             checks=IntegrityChecks(
+            no_source_page_leakage=no_source_page_leakage,
             trainer_completed=trainer_completed,
                 split_hash_match=split_hash_match,
                 frozen_split_read_only=frozen_split_read_only,
@@ -482,6 +512,48 @@ class IntegrityGate:
             return None
 
         return int(actual) >= int(declared * 0.9)
+
+    def _check_source_page_leakage(
+        self, frozen_test: FrozenSplit, provenance_path: Path | None
+    ) -> Optional[bool]:
+        """Does any test item share a SOURCE PAGE with a training item? (M-03.)
+
+        Returns True (clean), False (leaked), or None (not evaluated — the
+        corpus declares no per-item lineage, so the question cannot be answered
+        from what is on disk).
+
+        The None case is the honest one for the field corpus and is recorded in
+        KNOWN_GAPS.md. Reporting True there would be exactly the move that
+        produced the finding: a check that cannot see a leak declaring its
+        absence.
+        """
+        test_groups = set((getattr(frozen_test, "per_sample_groups", None) or {}).values())
+        if not test_groups:
+            return None
+        if provenance_path is None or not Path(provenance_path).exists():
+            return None
+
+        train_sources: set[str] = set()
+        try:
+            for line in Path(provenance_path).read_text().splitlines():
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    record = json.loads(line)
+                except ValueError:
+                    continue
+                if str(record.get("split_type", "")) != "train":
+                    continue
+                source = record.get("source_sample_id")
+                if source:
+                    train_sources.add(str(source))
+        except OSError:
+            return None
+
+        if not train_sources:
+            return None
+        return not (test_groups & train_sources)
 
     def _check_telemetry_sane(self, telemetry_path: Path) -> bool:
         """Check 5: parse telemetry.jsonl; validate loss + optional grad_norm.
