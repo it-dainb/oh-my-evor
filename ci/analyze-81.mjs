@@ -58,9 +58,29 @@ for (const f of files.sort()) {
   const arms = [...new Set(records.map((r) => r.tier))];
   const spec = JSON.parse(readFileSync(resolve(`evals/${f.replace('-report.json', '')}/spec.json`), 'utf8'));
   const currentArm = spec.arms.find((a) => /current/i.test(a.label ?? ''));
-  const current = `${currentArm.model}-${currentArm.effort}`;
-  const candidate = arms.find((a) => a !== current);
-  if (!candidate) { console.log(`${f}: only one arm present — no comparison`); continue; }
+  const other = spec.arms.find((a) => a !== currentArm);
+  if (!other) { console.log(`${f}: only one arm — no comparison`); continue; }
+
+  // DIRECTION IS SET BY COST, NOT BY THE LABEL.
+  //
+  // "current" does not mean "expensive". `evals/acquirer` already retiered, so
+  // its current arm is haiku and the other is the pre-retier sonnet, while
+  // `evals/forge-critic` reverted, so its current arm is opus and the other is
+  // the sonnet being proposed. Testing `current - other` therefore asks the
+  // opposite question in those two specs — and it passed acquirer for the wrong
+  // reason, which is the kind of pass that never gets looked at again.
+  //
+  // The question is always the same one: does the CHEAPER tier hold up against
+  // the dearer one. So order the arms by price and subtract in that order.
+  const PRICE = { haiku: 0, sonnet: 1, opus: 2 };
+  const dear = PRICE[currentArm.model] >= PRICE[other.model] ? currentArm : other;
+  const cheap = dear === currentArm ? other : currentArm;
+  const current = `${dear.model}-${dear.effort}`;      // the dearer arm
+  const candidate = `${cheap.model}-${cheap.effort}`;  // the one under test
+  if (!arms.includes(current) || !arms.includes(candidate)) {
+    console.log(`${f}: expected arms ${current} and ${candidate}, report has ${arms.join(', ')}`);
+    continue;
+  }
 
   const byCase = new Map();
   let cliErrors = 0;
@@ -102,6 +122,7 @@ for (const f of files.sort()) {
   allDiffs.push(...diffs);
   rows.push({
     role: rep.role, cases: diffs.length, current, candidate,
+    dearModel: dear.model, cheapModel: cheap.model,
     curRate: curHit / curN, canRate: canHit / canN,
     mean, ci, within: wCount ? withinVar / wCount : NaN, between,
     cliErrors, cliErrorRate: cliErrors / Math.max(1, records.length),
@@ -110,11 +131,14 @@ for (const f of files.sort()) {
 
 console.log(`\n8.1 — paired tier matrix, clustered on cases (n = CASES, not calls)\n`);
 console.log(
-  `${'role'.padEnd(22)} ${'cases'.padStart(5)} ${'current'.padStart(8)} ${'candidate'.padStart(9)}  ${'current-candidate'.padStart(17)}  95% CI (cluster bootstrap)`,
+  `${'role'.padEnd(22)} ${'cases'.padStart(5)} ${'dearer'.padStart(8)} ${'cheaper'.padStart(9)}  ${'dear-chp'.padStart(9)}  ${'95% CI (cluster bootstrap)'.padEnd(22)} verdict`,
 );
+// THE VERDICT IS PER ROLE. Each retier is its own adoption decision, so each
+// gets its own interval and its own answer.
 for (const r of rows) {
+  r.verdict = r.ci.hi < 0.10 ? 'non-inferior' : 'NOT SHOWN';
   console.log(
-    `${r.role.padEnd(22)} ${String(r.cases).padStart(5)} ${pct(r.curRate).padStart(8)} ${pct(r.canRate).padStart(9)}  ${pp(r.mean).padStart(17)}  [${pp(r.ci.lo)}, ${pp(r.ci.hi)}]`,
+    `${r.role.padEnd(22)} ${String(r.cases).padStart(5)} ${pct(r.curRate).padStart(8)} ${pct(r.canRate).padStart(9)}  ${pp(r.mean).padStart(9)}  ${`[${pp(r.ci.lo)}, ${pp(r.ci.hi)}]`.padEnd(22)} ${r.verdict}`,
   );
 }
 
@@ -129,11 +153,25 @@ if (badRows.length) {
 
 const mean = allDiffs.reduce((x, y) => x + y, 0) / (allDiffs.length || 1);
 const ci = bootstrapCI(allDiffs);
-console.log(`\npooled over ${allDiffs.length} cases: ${pp(mean)}  95% CI [${pp(ci.lo)}, ${pp(ci.hi)}]`);
+// The pooled figure is DESCRIPTIVE and is not the adoption criterion.
+//
+// Nobody decides "is the cheap tier non-inferior on average across roles"; each
+// role is retiered on its own. Pooling lets a role that is 10pp worse be
+// carried by roles that are not, and the sentence it produces — "non-inferior,
+// 95% CI clears the margin" — is quotable and would be quoted. That is this
+// release's own finding: a number right about something narrower, or here
+// broader, than what it is used for.
+const notShown = rows.filter((r) => r.verdict === 'NOT SHOWN');
 console.log(
-  `\nNON-INFERIORITY at a 10pp margin: the candidate is non-inferior only if the\n` +
-  `UPPER bound of (current - candidate) is below +10.0pp. Upper bound = ${pp(ci.hi)} — ` +
-  `${ci.hi < 0.10 ? 'SUPPORTED' : 'NOT SUPPORTED'}.`,
+  `\npooled over ${allDiffs.length} cases: ${pp(mean)}  95% CI [${pp(ci.lo)}, ${pp(ci.hi)}] ` +
+  `— DESCRIPTIVE ONLY.\nAdoption is per role; an average cannot rescue a role that fails on its own.`,
+);
+console.log(
+  `\nADOPTION at a 10pp margin: a candidate is non-inferior only where the UPPER\n` +
+  `bound of (current - candidate) is below +10.0pp.\n` +
+  `  ${rows.length - notShown.length}/${rows.length} roles: non-inferior\n` +
+  `  ${notShown.length}/${rows.length} roles: NOT SHOWN${notShown.length ? ` — ${notShown.map((r) => `${r.role} [upper ${pp(r.ci.hi)}]`).join(', ')}` : ''}\n` +
+  `"NOT SHOWN" is not "worse". It means this evidence does not establish\nnon-inferiority for that role, which is the only claim the design supports.`,
 );
 
 const w = rows.reduce((s, r) => s + (isFinite(r.within) ? r.within : 0), 0) / rows.length;
