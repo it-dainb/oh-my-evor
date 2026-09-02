@@ -91,6 +91,74 @@ removal of `critic_approved` — a different field, same review step).
 
 ---
 
+## Items 8.1 / 8.3 — two SHIPPED tiers are not supported by their own evidence
+
+**Status: measured, stated, not resolved. Both tiers ship.**
+
+### What the finding is
+
+Phase 8 re-measured every role through the corrected instrument — tools
+attached, and `n` = cases rather than calls. Under it, `evor-sage` and
+`evor-mutagen` both fail this project's own adoption gate, and both run on haiku
+in production today.
+
+| role | ships | dearer arm | cheaper arm | difference | 95% CI (cases) |
+|---|---|---|---|---|---|
+| `evor-sage` | haiku | opus 95.4% | **haiku 92.3%** | +3.1pp | [−3.1, +10.8] |
+| `evor-mutagen` | haiku | opus 100.0% | **haiku 96.0%** | +4.0pp | [+0.0, +10.0] |
+
+The gate is: accuracy ≥95% absolute, and a difference CI clearing −10pp. sage
+misses both — 92.3% is below the floor and its upper bound is +10.8pp. mutagen
+sits on the margin exactly: an interval that touches 10.0pp has not excluded it.
+
+**Neither is evidence that haiku is worse.** The measured gaps are +3.1pp and
++4.0pp. The claim that fails is *non-inferiority*, and it fails for want of
+resolution, not because the cheap tier lost.
+
+### Why it does not close in v1.2.1
+
+More repeats cannot fix it. Across the run, within-case variance is 6.4e-3
+against between-case 5.7e-2 — repeats stopped buying precision long before this,
+and 13 and 10 cases respectively is all the resolution the specs contain. The
+interval narrows only with more CASES.
+
+Authoring cases is the work, and item 8.x found four defects in the cases that
+already existed: three specs graded rules their agent files never stated, and
+`evals/selector` scored a verdict leaving an H003 collision standing as correct.
+Writing ten more under time pressure would most likely add the same defect and
+produce a tighter interval around a worse question.
+
+### What DID ship
+
+- The corrected instrument: `ci/role-eval.mjs` attaches the MCP server, records
+  whether tools were attached, and fingerprints the bytes it actually read.
+- `ci/analyze-81.mjs`, which clusters on cases, gives a per-role verdict rather
+  than a pooled one, takes its direction from tier price rather than arm labels,
+  and refuses a verdict decided by floating-point noise at the margin.
+- `ci/recompute-v1-cis.mjs`, which reproduces the published intervals from the
+  published call counts and then recomputes them on cases.
+- The evidence itself, at `docs/evidence/matrix-81.json` — 930 calls with each
+  run's `agent_sha256` and `spec_sha256`, so the table is checkable rather than
+  quotable.
+- `mcp/tests/evidence-81.test.ts`, which fails if any agent file drifts from the
+  measurement or if §3 stops printing what the analyser computes.
+
+### To close it
+
+Author cases for `evals/sage` and `evals/mutagen` — validated against the
+grounding gate in `ci/eval-core.mjs` before measuring anything — and re-run
+`ci/tier-matrix-81.mjs` for those two roles. Roughly 20 cases each would bring
+the interval inside the margin if the true gap is near the measured +3 to +4pp.
+
+### Also not re-measured
+
+`evor-selector`, `evor-forge` and `evor-forge-junior` have no `spec.json` and run
+on the legacy `cases.json` path. Selector's shipped haiku tier and the 22.5%
+saving credited to it in §2 of `docs/v1-cost-and-verification.md` still rest on
+the original instrument — the one Phase 7 replaced.
+
+---
+
 ## Item 0.1 — the Semantic Scholar key is not rotated
 
 The value in `.env` is byte-identical (sha256 `fd48f224`, 44 chars) to the one

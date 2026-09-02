@@ -161,7 +161,40 @@ class TestAllThreeReadersAgree:
     def test_typescript_reads_the_same_file(self):
         # The TS half is exercised by mcp/tests/fsm.test.ts; here we only pin that
         # it has not been pointed at a different table.
+        #
+        # This FOLLOWS ONE INDIRECTION on purpose. It used to require the literal
+        # `"contracts"` inside the `join(...)` call, which pinned where the string
+        # sat rather than which directory was read. Extracting the resolution into
+        # a helper — a refactor that changed nothing about the path — turned it
+        # red, and it stayed red through a release because the file it guards is
+        # covered by two suites and only one of them was run.
+        #
+        # The invariant is: the table joined onto a directory whose last segment
+        # is `contracts`. Both spellings satisfy it; a different table or a
+        # different directory satisfies neither.
         src = FSM_TS.read_text()
-        m = re.search(r'join\((.*?)"state-machines\.json"\)', src, re.S)
+        m = re.search(r'join\(([^,]*),\s*"state-machines\.json"\)', src, re.S)
         assert m, "fsm.ts no longer resolves the shared table by that name"
-        assert '"contracts"' in m.group(1)
+
+        expr = m.group(1).strip()
+        if '"contracts"' not in expr:
+            # `join(locateContractsDir(), ...)` — resolve the helper it names.
+            ident = re.match(r"([A-Za-z_$][\w$]*)\s*\(\s*\)$", expr)
+            assert ident, (
+                f"fsm.ts joins the table onto `{expr}`, which is neither a path "
+                f"ending in \"contracts\" nor a no-argument helper this test can follow"
+            )
+            body = re.search(
+                r"function\s+" + re.escape(ident.group(1)) + r"\s*\([^)]*\)[^{]*\{(.*?)\n\}",
+                src,
+                re.S,
+            )
+            assert body, f"fsm.ts calls {ident.group(1)}() but does not define it"
+            expr = body.group(1)
+
+        assert '"contracts"' in expr, (
+            "fsm.ts resolves state-machines.json against a directory that is not "
+            "`contracts`. The Python, JS and TS readers must open the same file — "
+            "if they read the table differently, one of them is wrong about the "
+            "mission's state and neither reports it."
+        )

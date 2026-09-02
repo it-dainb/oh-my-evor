@@ -125,8 +125,8 @@ before and after**.
   and `evor-tick` is benchmarked for the first time (sonnet 80.0% vs haiku
   20.0%). `evor-selector`, `evor-forge` and `evor-forge-junior` have no
   `spec.json` and were **not** re-measured. See §3 of
-  `docs/v1-cost-and-verification.md`; the calls are committed at
-  `docs/evidence/matrix-81.json`.
+  `docs/v1-cost-and-verification.md` for the per-role table, `KNOWN_GAPS.md` for
+  what closing it needs, and `docs/evidence/matrix-81.json` for the 930 calls.
 
 - **Agent output carries prose the parser forgives.** 22 of 131 calls emit text
   before their JSON — 28.8% on `evor-probe`. All 131 still parsed, because
