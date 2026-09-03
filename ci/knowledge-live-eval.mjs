@@ -252,7 +252,7 @@ export function buildSelectorTask() {
  *
  * @returns {{events: object[], result: object, model: string, cost_usd: number, wall_ms: number}}
  */
-export function runLive({ prompt, model, effort, maxTurns, timeoutMs, env, mcpConfigPath, allowedTools, cwd, tolerateError = false }) {
+export function runLive({ prompt, model, effort, maxTurns, timeoutMs, env, mcpConfigPath, allowedTools, cwd, settingsPath, tolerateError = false }) {
   const args = [
     '-p', prompt,
     '--model', model,
@@ -264,6 +264,9 @@ export function runLive({ prompt, model, effort, maxTurns, timeoutMs, env, mcpCo
     '--allowedTools', allowedTools.join(','),
   ];
   if (effort) args.push('--effort', effort);
+  // The product's own PreToolUse guard, scoped to the sandbox. Without it the
+  // governance angles grade prose compliance instead of the gate they name.
+  if (settingsPath) args.push('--settings', settingsPath);
 
   const t0 = Date.now();
   let raw;

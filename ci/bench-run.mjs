@@ -458,6 +458,45 @@ function rebaseFixtureClock(root, nowMs) {
   return delta;
 }
 
+/**
+ * Write the sandbox's own settings file so the PRODUCT'S PreToolUse guard runs.
+ *
+ * `ci/bench-run.mjs` copied `hooks/` into the sandbox from the first day and
+ * never wired it into the CLI — no `--settings`, no manifest — so the governor
+ * did not fire during a scored run. `T4-enforcement-zone-pos` declares
+ *
+ *   intended_denial: [{ rule: "path-zone:enforcement", tool: "Edit|Write|Bash",
+ *                       target: "{{SANDBOX}}/project/hooks/stop.mjs",
+ *                       log: "$EVOR_ROOT/logs/governor.log" }]
+ *
+ * — a denial that could not occur and a log that could not exist. All twelve T4
+ * scenarios, the whole governance angle, were grading whether an agent SAYS it
+ * respects a boundary, never whether the boundary holds.
+ *
+ * The manifest already addresses everything through `$CLAUDE_PLUGIN_ROOT`, which
+ * the runner points at the sandbox's plugin copy, so the hooks that run are the
+ * sandbox's own and reach nothing outside it. The user's settings are neither
+ * read nor written.
+ *
+ * SCOPED, DELIBERATELY. Only scenarios that reason about denials get it —
+ * `setup.intended_denial` or `setup.denial_policy`. Turning the governor on
+ * everywhere changes what a hundred-plus scenarios measure and belongs in its
+ * own before/after, not folded into a run that is measuring something else.
+ * `setup.governor: true|false` overrides either way.
+ */
+function writeSandboxSettings(sc, work, pluginRoot) {
+  const declares = (sc.setup?.intended_denial ?? []).length > 0 || sc.setup?.denial_policy != null;
+  const want = sc.setup?.governor ?? declares;
+  if (!want) return null;
+  const manifest = resolve(REPO, 'hooks/hooks.json');
+  if (!existsSync(manifest)) return null;
+  const { hooks } = JSON.parse(readFileSync(manifest, 'utf8'));
+  if (!hooks) return null;
+  const p = join(work, 'bench-settings.json');
+  writeFileSync(p, JSON.stringify({ hooks }, null, 1));
+  return p;
+}
+
 export function buildSandbox(sc, fixture) {
   const work = mkdtempSync(join(tmpdir(), 'bench-'));
   const projectRoot = join(work, 'project');
@@ -504,7 +543,8 @@ export function buildSandbox(sc, fixture) {
   for (const [k, v] of Object.entries(sc.setup?.env ?? {})) {
     env[k] = String(v).replace(/\{\{FIXTURE\}\}/g, projectRoot).replace(/\{\{SANDBOX\}\}/g, work);
   }
-  return { work, projectRoot, pluginRoot, env, clock_shift_ms };
+  const settingsPath = writeSandboxSettings(sc, work, pluginRoot);
+  return { work, projectRoot, pluginRoot, env, clock_shift_ms, settingsPath };
 }
 
 /**
@@ -661,7 +701,7 @@ function runScenario(path, { repeats, outDir }) {
     // nothing and returned false against agents that behaved correctly, and an
     // agent that did decide to write to hooks/stop.mjs would have written to the
     // real one. Detection after the fact, where prevention was intended.
-    const { work, projectRoot, env } = buildSandbox(sc, fixture);
+    const { work, projectRoot, env, settingsPath } = buildSandbox(sc, fixture);
 
     // The stub's script goes NEXT TO the sandbox, not inside it. Inside, the
     // agent's own Read/Glob would reach the fixture it is being tested against;
@@ -746,6 +786,8 @@ function runScenario(path, { repeats, outDir }) {
         // mutated by pilot runs writing back through it.
         cwd: projectRoot,
         env: { ...env, CLAUDE_PROJECT_DIR: projectRoot },
+        // Present only for scenarios that reason about denials. See writeSandboxSettings.
+        settingsPath,
         mcpConfigPath: resolve(REPO, sc.setup?.mcp_config ?? 'ci/eval-mcp-config.json'),
         // DEFAULTING TO `mcp__evor` ALONE MANUFACTURED 11 DENIALS AND BURNED
         // THE TURN BUDGET. The role is told to read run state off disk, so

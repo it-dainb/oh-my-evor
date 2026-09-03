@@ -54,7 +54,7 @@ function invoke(args, { env, timeoutMs, cwd }) {
  *   holds every turn's, because cost and denials accumulate across turns and a
  *   caller that reads only the last one under-reports both.
  */
-export function runPhased({ prompt, followUps = [], model, effort, maxTurns, timeoutMs, env, mcpConfigPath, allowedTools, cwd }) {
+export function runPhased({ prompt, followUps = [], model, effort, maxTurns, timeoutMs, env, mcpConfigPath, allowedTools, cwd, settingsPath }) {
   const base = [
     '--model', model,
     '--output-format', 'stream-json',
@@ -65,6 +65,7 @@ export function runPhased({ prompt, followUps = [], model, effort, maxTurns, tim
     '--allowedTools', allowedTools.join(','),
   ];
   if (effort) base.push('--effort', effort);
+  if (settingsPath) base.push('--settings', settingsPath);
 
   const events = [];
   const results = [];
