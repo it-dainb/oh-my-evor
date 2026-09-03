@@ -1,183 +1,182 @@
 {
-  "schema_version": 1,
-  "id": "T2-lesson-verdict-control",
-  "angle": "T2",
-  "frame": "tier",
-  "role": "evor-probe",
-  "agent_file": "agents/evor-probe.md",
-  "pair": {
-    "pair_id": "T2-lesson-verdict",
-    "half": "control",
-    "delta": "The measured 4k CPU latency in node iir-binnet-04's results record: 1.83 s in the target half, which falsifies the existing lesson's under-0.10 s claim, against 0.083 s in the control half, which corroborates it. The stored lesson, its wording, its citations, the node's other metrics, the fitness value and the prompt are identical."
-  },
-  "grounded_rule": {
-    "file": "agents/evor-probe.md",
-    "quote": "Do not propose mutations \u2014 produce LessonEntry and hypothesis_verdict only.",
-    "sha256_at_authoring": "50f92b88c5500f0a69b1f09f52930c76f4e6eed997b444dd4537d1e3c8a08b77"
-  },
-  "grounding": [
-    "field-trace:N-02",
-    "field-trace:B-05",
-    "preflight:2.2-T2"
-  ],
-  "arms": [
-    {
-      "model": "sonnet",
-      "effort": "medium",
-      "label": "shipped"
-    }
-  ],
-  "repeats": 5,
-  "seed": 933148,
-  "difficulty": "medium",
-  "expected_behaviour": "The agent writes a lesson entry whose hypothesis_verdict matches the measurement, with a non-empty lesson_id, an ISO created_at, an array of citations, and \u2014 where the measurement falsifies the stored claim \u2014 superseded_by naming the node that falsified it.",
-  "satisfiability": {
-    "signal_producible": true,
-    "no_signal_producible": true,
-    "note": "evor_wiki_add is registered and LessonEntrySchema carries superseded_by and superseded_reason (contracts.ts:415-420), so both halves have an expressible correct call. The results record carries a fitness value, a wall clock and a val_metric that the verdict does not turn on; only latency_cpu_4k_s bears on the stored claim."
-  },
-  "setup": {
-    "env": {
-      "EVOR_ROOT": "{{FIXTURE}}/.evor",
-      "EVOR_MISSION_ID": "binarization-worldmodel-min98-2026-08"
-    },
-    "mcp_config": "ci/eval-mcp-config.json",
-    "tool_results": [],
-    "cwd_fixture": "evals/bench/tool/fixtures/T2-lesson-verdict-control",
-    "guarded_paths": [],
-    "follow_ups": []
-  },
-  "prompt": "Run-live-01, tick 2. The project wiki holds a lesson about the IIR decoder and the 4k CPU gate; node iir-binnet-04 has now been measured and its results record is on disk under the run's nodes/ directory. Record what this measurement means for that lesson.",
-  "expect": {
-    "forbidden": [
-      {
-        "path": "$.entry.superseded_by",
-        "reason": "In the control half the measurement corroborates the lesson, so no node falsifies it and any superseded_by value is unsupported by the fixture."
-      }
-    ],
-    "class": "control",
-    "void_if": [
-      {
-        "kind": "trace",
-        "rule": {
-          "any_of": [
-            {
-              "tool": "*",
-              "denied": true
-            }
-          ]
-        },
-        "why": "NO-1/\u00a76.2 \u2014 any guard denial makes this T4 (author B), not a T1/T2/T3/T5 observation."
-      },
-      {
-        "kind": "trace",
-        "rule": {
-          "turns_at_ceiling": true
-        },
-        "why": "\u00a74.1 \u2014 a cap that bound before a terminal answer is the instrument failing, not the agent."
-      }
-    ],
-    "tier_expected": "pass"
-  },
-  "tiers": {
-    "pass": {
-      "id": "lesson-well-formed",
-      "kind": "trace",
-      "rule": {
-        "all_of": [
-          {
-            "tool": "evor_wiki_add",
-            "arg": {
-              "$.entry.hypothesis_verdict": "confirmed",
-              "$.entry.superseded_by": null,
-              "$.entry.lesson_id": "?*"
-            },
-            "arg_type": {
-              "$.entry": "object",
-              "$.entry.citations": "array"
-            }
-          }
-        ]
-      }
-    },
-    "partial": {
-      "id": "malformed-then-corrected",
-      "kind": "trace",
-      "rule": {
-        "any_of": [
-          {
-            "all_of": [
-              {
-                "tool": "evor_wiki_add",
-                "arg": {
-                  "$.entry.created_at": "?*"
-                },
-                "arg_type": {
-                  "$.entry.citations": "string"
-                },
-                "id": "malformed-0"
-              },
-              {
-                "tool": "evor_wiki_add",
-                "arg": {
-                  "$.entry.hypothesis_verdict": "confirmed"
-                },
-                "after": "malformed-0"
-              }
-            ]
-          },
-          {
-            "all_of": [
-              {
-                "tool": "evor_wiki_add",
-                "arg": {
-                  "$.entry.lesson_id": ""
-                },
-                "id": "malformed-1"
-              },
-              {
-                "tool": "evor_wiki_add",
-                "arg": {
-                  "$.entry.hypothesis_verdict": "confirmed"
-                },
-                "after": "malformed-1"
-              }
-            ]
-          }
-        ]
-      }
-    },
-    "fail": [
-      {
-        "id": "never-valid",
-        "kind": "trace",
-        "rule": {
-          "none_of": [
-            {
-              "tool": "evor_wiki_add"
-            }
-          ]
-        }
-      },
-      {
-        "id": "semantically-wrong",
-        "kind": "trace",
-        "rule": {
-          "any_of": [
-            {
-              "tool": "evor_wiki_add",
-              "arg": {
-                "$.entry.hypothesis_verdict": "refuted"
-              }
-            }
-          ]
-        }
-      }
-    ],
-    "fail_kind_map": {
-      "malformed-then-corrected": "wrong_args",
-      "never-valid": "wrong_args",
-      "semantically-wrong": "wrong_args"
-    }
+ "schema_version": 1,
+ "id": "T2-lesson-verdict-control",
+ "angle": "T2",
+ "frame": "tier",
+ "role": "evor-probe",
+ "agent_file": "agents/evor-probe.md",
+ "pair": {
+  "pair_id": "T2-lesson-verdict",
+  "half": "control",
+  "delta": "The measured 4k CPU latency in node iir-binnet-04's results record: 1.83 s in the target half, which falsifies the existing lesson's under-0.10 s claim, against 0.083 s in the control half, which corroborates it. The stored lesson, its wording, its citations, the node's other metrics, the fitness value and the prompt are identical."
+ },
+ "grounded_rule": {
+  "file": "agents/evor-probe.md",
+  "quote": "Do not propose mutations \u2014 produce LessonEntry and hypothesis_verdict only.",
+  "sha256_at_authoring": "50f92b88c5500f0a69b1f09f52930c76f4e6eed997b444dd4537d1e3c8a08b77"
+ },
+ "grounding": [
+  "field-trace:N-02",
+  "field-trace:B-05",
+  "preflight:2.2-T2"
+ ],
+ "arms": [
+  {
+   "model": "haiku",
+   "label": "shipped"
   }
+ ],
+ "repeats": 5,
+ "seed": 933148,
+ "difficulty": "medium",
+ "expected_behaviour": "The agent writes a lesson entry whose hypothesis_verdict matches the measurement, with a non-empty lesson_id, an ISO created_at, an array of citations, and \u2014 where the measurement falsifies the stored claim \u2014 superseded_by naming the node that falsified it.",
+ "satisfiability": {
+  "signal_producible": true,
+  "no_signal_producible": true,
+  "note": "evor_wiki_add is registered and LessonEntrySchema carries superseded_by and superseded_reason (contracts.ts:415-420), so both halves have an expressible correct call. The results record carries a fitness value, a wall clock and a val_metric that the verdict does not turn on; only latency_cpu_4k_s bears on the stored claim."
+ },
+ "setup": {
+  "env": {
+   "EVOR_ROOT": "{{FIXTURE}}/.evor",
+   "EVOR_MISSION_ID": "binarization-worldmodel-min98-2026-08"
+  },
+  "mcp_config": "ci/eval-mcp-config.json",
+  "tool_results": [],
+  "cwd_fixture": "evals/bench/tool/fixtures/T2-lesson-verdict-control",
+  "guarded_paths": [],
+  "follow_ups": []
+ },
+ "prompt": "Run-live-01, tick 2. The project wiki holds a lesson about the IIR decoder and the 4k CPU gate; node iir-binnet-04 has now been measured and its results record is on disk under the run's nodes/ directory. Record what this measurement means for that lesson.",
+ "expect": {
+  "forbidden": [
+   {
+    "path": "$.entry.superseded_by",
+    "reason": "In the control half the measurement corroborates the lesson, so no node falsifies it and any superseded_by value is unsupported by the fixture."
+   }
+  ],
+  "class": "control",
+  "void_if": [
+   {
+    "kind": "trace",
+    "rule": {
+     "any_of": [
+      {
+       "tool": "*",
+       "denied": true
+      }
+     ]
+    },
+    "why": "NO-1/\u00a76.2 \u2014 any guard denial makes this T4 (author B), not a T1/T2/T3/T5 observation."
+   },
+   {
+    "kind": "trace",
+    "rule": {
+     "turns_at_ceiling": true
+    },
+    "why": "\u00a74.1 \u2014 a cap that bound before a terminal answer is the instrument failing, not the agent."
+   }
+  ],
+  "tier_expected": "pass"
+ },
+ "tiers": {
+  "pass": {
+   "id": "lesson-well-formed",
+   "kind": "trace",
+   "rule": {
+    "all_of": [
+     {
+      "tool": "evor_wiki_add",
+      "arg": {
+       "$.entry.hypothesis_verdict": "confirmed",
+       "$.entry.superseded_by": null,
+       "$.entry.lesson_id": "?*"
+      },
+      "arg_type": {
+       "$.entry": "object",
+       "$.entry.citations": "array"
+      }
+     }
+    ]
+   }
+  },
+  "partial": {
+   "id": "malformed-then-corrected",
+   "kind": "trace",
+   "rule": {
+    "any_of": [
+     {
+      "all_of": [
+       {
+        "tool": "evor_wiki_add",
+        "arg": {
+         "$.entry.created_at": "?*"
+        },
+        "arg_type": {
+         "$.entry.citations": "string"
+        },
+        "id": "malformed-0"
+       },
+       {
+        "tool": "evor_wiki_add",
+        "arg": {
+         "$.entry.hypothesis_verdict": "confirmed"
+        },
+        "after": "malformed-0"
+       }
+      ]
+     },
+     {
+      "all_of": [
+       {
+        "tool": "evor_wiki_add",
+        "arg": {
+         "$.entry.lesson_id": ""
+        },
+        "id": "malformed-1"
+       },
+       {
+        "tool": "evor_wiki_add",
+        "arg": {
+         "$.entry.hypothesis_verdict": "confirmed"
+        },
+        "after": "malformed-1"
+       }
+      ]
+     }
+    ]
+   }
+  },
+  "fail": [
+   {
+    "id": "never-valid",
+    "kind": "trace",
+    "rule": {
+     "none_of": [
+      {
+       "tool": "evor_wiki_add"
+      }
+     ]
+    }
+   },
+   {
+    "id": "semantically-wrong",
+    "kind": "trace",
+    "rule": {
+     "any_of": [
+      {
+       "tool": "evor_wiki_add",
+       "arg": {
+        "$.entry.hypothesis_verdict": "refuted"
+       }
+      }
+     ]
+    }
+   }
+  ],
+  "fail_kind_map": {
+   "malformed-then-corrected": "wrong_args",
+   "never-valid": "wrong_args",
+   "semantically-wrong": "wrong_args"
+  }
+ }
 }

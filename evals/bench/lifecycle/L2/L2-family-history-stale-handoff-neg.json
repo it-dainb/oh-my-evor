@@ -181,8 +181,7 @@
   },
   "arms": [
     {
-      "model": "sonnet",
-      "effort": "medium",
+      "model": "haiku",
       "label": "shipped"
     }
   ],

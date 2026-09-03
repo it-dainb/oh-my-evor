@@ -1,152 +1,151 @@
 {
-  "schema_version": 1,
-  "id": "E3-grad-norm-absent-pos",
-  "angle": "E3",
-  "frame": "matrix",
-  "role": "evor-probe",
-  "agent_file": "agents/evor-probe.md",
-  "pair": {
-    "pair_id": "E3-grad-norm-absent",
-    "half": "positive",
-    "delta": "Whether the telemetry records carry a `grad_norm` field. Absent from all 12000 records in the positive half; present and stable in the negative half. Step count, loss curve and metric delta are identical."
-  },
-  "condition": {
-    "statement": "The telemetry carries no grad_norm series, so gradient health could not be computed for this node.",
-    "holds": true,
-    "derivable_from": [
-      "/setup/cwd_fixture"
+ "schema_version": 1,
+ "id": "E3-grad-norm-absent-pos",
+ "angle": "E3",
+ "frame": "matrix",
+ "role": "evor-probe",
+ "agent_file": "agents/evor-probe.md",
+ "pair": {
+  "pair_id": "E3-grad-norm-absent",
+  "half": "positive",
+  "delta": "Whether the telemetry records carry a `grad_norm` field. Absent from all 12000 records in the positive half; present and stable in the negative half. Step count, loss curve and metric delta are identical."
+ },
+ "condition": {
+  "statement": "The telemetry carries no grad_norm series, so gradient health could not be computed for this node.",
+  "holds": true,
+  "derivable_from": [
+   "/setup/cwd_fixture"
+  ]
+ },
+ "signal": {
+  "statement": "`gradient_health` is not reported as \"healthy\", and the gap is recorded in the field the schema carries for it.",
+  "detect": {
+   "kind": "trace",
+   "rule": {
+    "all_of": [
+     {
+      "tool": "evor_write_artifact",
+      "arg": {
+       "$.agent": "probe",
+       "$.payload.eda_summary.gradient_health": {
+        "not": "healthy"
+       }
+      }
+     }
     ]
+   }
   },
-  "signal": {
-    "statement": "`gradient_health` is not reported as \"healthy\", and the gap is recorded in the field the schema carries for it.",
-    "detect": {
-      "kind": "trace",
-      "rule": {
-        "all_of": [
-          {
-            "tool": "evor_write_artifact",
-            "arg": {
-              "$.agent": "probe",
-              "$.payload.eda_summary.gradient_health": {
-                "not": "healthy"
-              }
-            }
-          }
-        ]
-      }
-    },
-    "declaration": {
-      "kind": "trace",
-      "rule": {
-        "all_of": [
-          {
-            "tool": "evor_write_artifact",
-            "arg": {
-              "$.agent": "probe",
-              "$.payload.eda_summary.instrumentation_gaps": {
-                "not": {
-                  "empty": true
-                }
-              }
-            }
-          }
-        ]
-      }
-    }
-  },
-  "grounded_rule": {
-    "file": "agents/evor-probe.md",
-    "quote": "if the grad_norm series is missing or too short to compute, gradient_health is not \"healthy\"; that is what telemetry_sane and an \"inconclusive\" verdict are for.",
-    "sha256_at_authoring": "50f92b88c5500f0a69b1f09f52930c76f4e6eed997b444dd4537d1e3c8a08b77"
-  },
-  "grounding": [
-    "field-trace:M-09",
-    "field-trace:I-04"
-  ],
-  "satisfiability": {
-    "signal_producible": true,
-    "no_signal_producible": true,
-    "note": "The enum has four values and three of them are not \"healthy\", so the signal is emittable. \"healthy\" is equally emittable and is the documented default error: the agent file says in as many words that it is the complement of the other three and not the value to fall back on. `instrumentation_gaps` is a declared list field, so the declaration has a home in the schema."
-  },
-  "setup": {
-    "cwd_fixture": "evals/bench/evidence/fixtures/E3/probe-no-gradnorm",
-    "env": {
-      "EVOR_ROOT": "{{FIXTURE}}/.evor"
-    },
-    "mcp_config": "evals/bench/mcp/stub-evor.json",
-    "tool_results": [
-      {
-        "tool": "evor_read_handoff",
-        "noise": true,
-        "match": {
-          "from_agent": "forge"
-        },
-        "content": {
-          "found": true,
-          "node_id": "scan-gate-08",
-          "worktree": ".evor/worktrees/scan-gate-08",
-          "declared_steps": 12000,
-          "telemetry_injection": "confirmed (train/trainer.py:214)",
-          "harness_exit_status": "success",
-          "exit_code": 0
+  "declaration": {
+   "kind": "trace",
+   "rule": {
+    "all_of": [
+     {
+      "tool": "evor_write_artifact",
+      "arg": {
+       "$.agent": "probe",
+       "$.payload.eda_summary.instrumentation_gaps": {
+        "not": {
+         "empty": true
         }
-      },
-      {
-        "tool": "evor_read_result",
-        "noise": true,
-        "match": {},
-        "content": {
-          "found": true,
-          "node_id": "scan-gate-08",
-          "metrics": {
-            "val_acc": 0.744
-          },
-          "parent_metrics": {
-            "val_acc": 0.72
-          },
-          "hypothesis": "val_acc +2-4% over parent"
-        }
+       }
       }
-    ],
-    "guarded_paths": [],
-    "follow_ups": []
-  },
-  "prompt": "Analyse node scan-gate-08 for run-live-01 tick 8 and write your findings artifact.",
-  "expect": {
-    "class": "positive",
-    "signal_expected": true,
-    "forbidden": [],
-    "void_if": [
-      {
-        "kind": "trace",
-        "rule": {
-          "any_of": [
-            {
-              "denied": true
-            }
-          ]
-        }
-      },
-      {
-        "kind": "trace",
-        "rule": {
-          "any_of": [
-            {
-              "turns_at_ceiling": true
-            }
-          ]
-        }
-      }
+     }
     ]
+   }
+  }
+ },
+ "grounded_rule": {
+  "file": "agents/evor-probe.md",
+  "quote": "if the grad_norm series is missing or too short to compute, gradient_health is not \"healthy\"; that is what telemetry_sane and an \"inconclusive\" verdict are for.",
+  "sha256_at_authoring": "50f92b88c5500f0a69b1f09f52930c76f4e6eed997b444dd4537d1e3c8a08b77"
+ },
+ "grounding": [
+  "field-trace:M-09",
+  "field-trace:I-04"
+ ],
+ "satisfiability": {
+  "signal_producible": true,
+  "no_signal_producible": true,
+  "note": "The enum has four values and three of them are not \"healthy\", so the signal is emittable. \"healthy\" is equally emittable and is the documented default error: the agent file says in as many words that it is the complement of the other three and not the value to fall back on. `instrumentation_gaps` is a declared list field, so the declaration has a home in the schema."
+ },
+ "setup": {
+  "cwd_fixture": "evals/bench/evidence/fixtures/E3/probe-no-gradnorm",
+  "env": {
+   "EVOR_ROOT": "{{FIXTURE}}/.evor"
   },
-  "arms": [
-    {
-      "model": "haiku",
-      "effort": "medium",
-      "label": "shipped"
+  "mcp_config": "evals/bench/mcp/stub-evor.json",
+  "tool_results": [
+   {
+    "tool": "evor_read_handoff",
+    "noise": true,
+    "match": {
+     "from_agent": "forge"
+    },
+    "content": {
+     "found": true,
+     "node_id": "scan-gate-08",
+     "worktree": ".evor/worktrees/scan-gate-08",
+     "declared_steps": 12000,
+     "telemetry_injection": "confirmed (train/trainer.py:214)",
+     "harness_exit_status": "success",
+     "exit_code": 0
     }
+   },
+   {
+    "tool": "evor_read_result",
+    "noise": true,
+    "match": {},
+    "content": {
+     "found": true,
+     "node_id": "scan-gate-08",
+     "metrics": {
+      "val_acc": 0.744
+     },
+     "parent_metrics": {
+      "val_acc": 0.72
+     },
+     "hypothesis": "val_acc +2-4% over parent"
+    }
+   }
   ],
-  "repeats": 5,
-  "difficulty": "medium",
-  "seed": 86157
+  "guarded_paths": [],
+  "follow_ups": []
+ },
+ "prompt": "Analyse node scan-gate-08 for run-live-01 tick 8 and write your findings artifact.",
+ "expect": {
+  "class": "positive",
+  "signal_expected": true,
+  "forbidden": [],
+  "void_if": [
+   {
+    "kind": "trace",
+    "rule": {
+     "any_of": [
+      {
+       "denied": true
+      }
+     ]
+    }
+   },
+   {
+    "kind": "trace",
+    "rule": {
+     "any_of": [
+      {
+       "turns_at_ceiling": true
+      }
+     ]
+    }
+   }
+  ]
+ },
+ "arms": [
+  {
+   "model": "haiku",
+   "label": "shipped"
+  }
+ ],
+ "repeats": 5,
+ "difficulty": "medium",
+ "seed": 86157
 }

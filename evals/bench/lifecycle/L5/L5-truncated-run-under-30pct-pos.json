@@ -166,7 +166,6 @@
   "arms": [
     {
       "model": "haiku",
-      "effort": "medium",
       "label": "shipped"
     }
   ],

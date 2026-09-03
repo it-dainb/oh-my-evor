@@ -23,7 +23,7 @@
  * denials, so a bench that scores them would measure its own permission
  * affordance instead of the agent.
  */
-import { execFileSync } from 'child_process';
+import { execFileSync, spawn } from 'child_process';
 import { createHash } from 'crypto';
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
@@ -366,7 +366,18 @@ function runScenario(path, { repeats, outDir }) {
   const sc = JSON.parse(readFileSync(path, 'utf8'));
   const fixture = sc.setup?.cwd_fixture ? resolve(REPO, sc.setup.cwd_fixture) : null;
   const arm = (sc.arms ?? [])[0] ?? { model: 'sonnet', effort: 'medium' };
-  const agentPromptBlock = extractAgentPromptBlock(readFileSync(resolve(REPO, sc.agent_file), 'utf8'));
+  // THE ORCHESTRATOR'S INSTRUCTIONS ARE A SKILL, NOT AN AGENT FILE.
+  //
+  // Six L1 scenarios name `skills/evor/SKILL.md` and role `evor-orchestrator`.
+  // That is correct — the orchestrator is the session running the skill, and it
+  // has no agents/*.md. `extractAgentPromptBlock` only knows <Agent_Prompt> and
+  // threw, killing the worker outright rather than failing that one scenario.
+  //
+  // A skill body IS the role's prompt, so it is used whole.
+  const agentText = readFileSync(resolve(REPO, sc.agent_file), 'utf8');
+  const agentPromptBlock = agentText.includes('<Agent_Prompt>')
+    ? extractAgentPromptBlock(agentText)
+    : agentText;
   // Once per scenario, not per repeat: the harness's footprint is a property of
   // the fixture. Skipped only when no detector asks about it.
   const needsControl = JSON.stringify(sc).includes('control_arm_moved');
@@ -674,7 +685,7 @@ function runScenario(path, { repeats, outDir }) {
 // consent to spend money is not safe to operate, and the failure is silent by
 // construction: the flag I thought made it free is the one it never read.
 const KNOWN_FLAGS = new Set([
-  'repeats', 'out', 'angle', 'max-turns', 'preflight-only', 'preflight', 'help',
+  'repeats', 'out', 'angle', 'max-turns', 'preflight-only', 'preflight', 'help', 'workers', 'mode',
 ]);
 for (const a of process.argv.slice(2)) {
   if (!a.startsWith('--')) continue;
@@ -691,11 +702,20 @@ for (const a of process.argv.slice(2)) {
 // live scenarios on every `npm test` run — the same defect as my sweeps, inside
 // the suite that checks for it.
 const preflightOnly = process.argv.includes('--preflight-only') || process.argv.includes('--preflight');
-const repeats = Number(arg('repeats', 1));
+let repeats = Number(arg('repeats', 1));
 const outDir = arg('out') ? resolve(REPO, arg('out')) : null;
 const angle = arg('angle');
+const modeName = arg('mode');
 let targets = process.argv.slice(2).filter((a) => a.endsWith('.json') && existsSync(a));
-if (angle) {
+if (modeName) {
+  // lite / normal / hard. Every mode covers every angle; the modes nest, so a
+  // scenario that passed in lite is still present in normal and hard.
+  const { selectMode } = await import('./bench-modes.mjs');
+  const sel = selectMode(modeName);
+  targets = sel.scenarios;
+  if (!process.argv.includes('--repeats')) repeats = sel.repeats;
+  console.log(`mode ${modeName}: ${sel.pairs.length} pairs, ${targets.length} scenarios, ${repeats} repeat(s)`);
+} else if (angle) {
   targets = [];
   for (const g of readdirSync(join(REPO, 'evals/bench'))) {
     const d = join(REPO, 'evals/bench', g, angle);
@@ -732,6 +752,76 @@ if (process.argv.includes('--preflight')) {
 console.log(`bench-run: ${targets.length} scenario(s) x ${repeats} repeat(s)\n`);
 const all = [];
 let failed = 0;
+// ── PARALLEL EXECUTION ───────────────────────────────────────────────────────
+//
+// Every run already builds its own throwaway sandbox and writes its own
+// per-scenario output file, so scenarios are independent by construction. What
+// was serial was only the driver loop: the pilot took ~50 minutes of wall clock
+// for 192 runs that never touched each other.
+//
+// The whole call chain is synchronous (execFileSync), so this fans out to child
+// processes rather than refactoring runLive to async — the parent becomes a
+// scheduler and each child is this same file with --workers 1.
+//
+// Default 16. The reference point is 8.1: 4 concurrent `claude` processes over
+// 930 calls, zero cli_errors — so 16 is beyond anything measured here.
+//
+// The reason that matters is that OVERSHOOTING IS SILENT. A rate-limited call
+// comes back as cli_error, and cli_error VOIDs the run under §4.1 — correctly,
+// since the model never answered. So too much concurrency does not announce
+// itself as an error; it shows up as a rising VOID rate, which reads exactly
+// like scenario trouble and would be debugged as such. The tally below breaks
+// harness-caused VOIDs out separately for that reason.
+const workers = Math.max(1, Number(arg('workers', 16)));
+if (workers > 1 && targets.length > 1 && !preflightOnly) {
+  const chunks = Array.from({ length: Math.min(workers, targets.length) }, () => []);
+  targets.sort().forEach((t, i) => chunks[i % chunks.length].push(t));
+  console.log(`${workers} workers over ${targets.length} scenarios\n`);
+  const t0 = Date.now();
+  const results = await Promise.all(chunks.filter((c) => c.length).map((chunk, i) => new Promise((done) => {
+    const args = [fileURLToPath(import.meta.url), ...chunk, '--repeats', String(repeats), '--workers', '1',
+      ...(outDir ? ['--out', outDir] : []), '--max-turns', String(arg('max-turns', 20))];
+    const child = spawn('node', args, { stdio: ['ignore', 'pipe', 'inherit'] });
+    let buf = '';
+    child.stdout.on('data', (d) => {
+      buf += d;
+      // Stream each scenario's line as it lands rather than at the end, so a
+      // long run is observable instead of silent.
+      const lines = buf.split('\n'); buf = lines.pop();
+      for (const l of lines) if (l.trim() && !/^(bench-run|total |\d+ workers)/.test(l)) console.log(`w${i} ${l}`);
+    });
+    child.on('exit', (code) => done(code));
+  })));
+  const bad = results.filter((c) => c !== 0).length;
+  const mins = ((Date.now() - t0) / 60000).toFixed(1);
+  // Merge from disk: every child wrote its own per-scenario files.
+  const merged = outDir && existsSync(outDir)
+    ? readdirSync(outDir).filter((f) => f.endsWith('.json') && f !== 'index.json')
+        .map((f) => JSON.parse(readFileSync(join(outDir, f), 'utf8')))
+    : [];
+  const recs = merged.flatMap((m) => m.records ?? []);
+  const tally = recs.reduce((m, r) => (m[r.class ?? r.status] = (m[r.class ?? r.status] ?? 0) + 1, m), {});
+  const spend = recs.reduce((s, r) => s + (r.cost_usd ?? 0), 0);
+  console.log(`\n${merged.length} scenarios, ${recs.length} runs in ${mins}m  ${JSON.stringify(tally)}  $${spend.toFixed(2)}`);
+
+  // SATURATION CHECK. Distinguishes "the endpoint pushed back" from "the
+  // scenarios are hard", which the VOID count alone cannot.
+  const harnessVoids = recs.filter((r) =>
+    r.status === 'HARNESS_ERROR' || (r.status === 'VOID' && /cli_error|abnormally|timeout|rate|529|overloaded/i.test(r.note ?? ''))).length;
+  const rate = recs.length ? harnessVoids / recs.length : 0;
+  if (rate > 0.02) {
+    console.log(
+      `\nSATURATION: ${harnessVoids}/${recs.length} runs (${(rate * 100).toFixed(1)}%) failed in the harness, not the model.\n` +
+      `At --workers ${workers} that is most likely rate limiting. These are VOID, so they are\n` +
+      `excluded from scoring rather than counted against any agent — but a high rate means the\n` +
+      `run covered less than it appears to. Re-run the affected scenarios at lower concurrency.`);
+  } else if (harnessVoids) {
+    console.log(`(${harnessVoids} harness-caused VOID of ${recs.length} — under the 2% saturation threshold)`);
+  }
+  if (bad) console.log(`${bad} worker(s) exited non-zero — results above are INCOMPLETE`);
+  process.exit(bad ? 1 : 0);
+}
+
 for (const t of targets.sort()) {
   if (preflightOnly) {
     try {
@@ -741,7 +831,19 @@ for (const t of targets.sort()) {
     } catch (e) { console.log(`FAIL  ${basename(t)}: ${String(e.message).slice(0, 160)}`); failed++; }
     continue;
   }
-  const res = runScenario(t, { repeats, outDir });
+  // ONE SCENARIO MUST NOT TAKE ITS SHARD DOWN. An unhandled throw in
+  // runScenario killed the whole worker — the six orchestrator scenarios threw
+  // on a missing <Agent_Prompt> block and every remaining scenario in that shard
+  // was lost with them. Silently: the parent saw a non-zero exit, and the
+  // missing results looked like scenarios that had simply not run yet.
+  let res;
+  try {
+    res = runScenario(t, { repeats, outDir });
+  } catch (e) {
+    console.log(`${basename(t).padEnd(46)} ${'{"SCENARIO_ERROR":1}'.padEnd(28)} ${String(e.message).slice(0, 90)}`);
+    failed++;
+    continue;
+  }
   all.push(res);
   const c = res.records.reduce((m, r) => (m[r.class ?? r.status] = (m[r.class ?? r.status] ?? 0) + 1, m), {});
   const spend = res.records.reduce((s, r) => s + (r.cost_usd ?? 0), 0);

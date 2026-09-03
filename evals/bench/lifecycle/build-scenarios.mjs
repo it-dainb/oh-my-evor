@@ -34,6 +34,30 @@ import { fileURLToPath } from 'url';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO = resolve(HERE, '..', '..', '..');
+
+
+/**
+ * The arm a scenario runs on, read from the role's own agent file.
+ *
+ * These were hardcoded per pair, and 32 scenarios across the corpus ended up
+ * labelled `"shipped"` on a model the role does not ship — a default nobody
+ * checked. Hand-correcting the generated files does not hold: `verify.mjs`
+ * regenerates them and asserts byte-for-byte reproduction, so an edit here is
+ * the only edit that survives.
+ *
+ * `evor-orchestrator` has no agent file — it IS the session running the skill —
+ * so it keeps an explicit arm.
+ */
+function shippedArm(role, fallback) {
+  const p = new URL(`../../../agents/${role}.md`, import.meta.url).pathname;
+  if (!existsSync(p)) return fallback;
+  const head = readFileSync(p, 'utf8').slice(0, 3000);
+  const model = /^model:\s*(\S+)/m.exec(head)?.[1];
+  if (!model) return fallback;
+  const effort = /^effort:\s*(\S+)/m.exec(head)?.[1];
+  // haiku has no `effort`; v1.2.1 stripped the inert declaration everywhere.
+  return model === 'haiku' ? { model, label: 'shipped' } : { model, ...(effort ? { effort } : {}), label: 'shipped' };
+}
 const CHECK = process.argv.includes('--check');
 const FIX = 'evals/bench/lifecycle/fixtures';
 
@@ -165,7 +189,7 @@ const PAIRS = [
     rule: 'charter_forbidden',
     difficulty: 'medium',
     seed: 4137,
-    arms: [{ model: 'opus', effort: 'medium', label: 'shipped' }],
+    arms: [shippedArm('evor-orchestrator', { model: 'opus', effort: 'medium', label: 'shipped' })],
     grounding: ['field-trace:L-02', 'field-trace:L-01', 'field-trace:L-05', 'root-cause:RC5#L-02', 'ci/autonomy-live.mjs::probeInfeasible'],
     $comment: [
       "L-02 is the deepest finding in the field trace and the one the charter cannot",
@@ -233,7 +257,7 @@ const PAIRS = [
     rule: 'charter_backstop',
     difficulty: 'high',
     seed: 4211,
-    arms: [{ model: 'opus', effort: 'medium', label: 'shipped' }],
+    arms: [shippedArm('evor-orchestrator', { model: 'opus', effort: 'medium', label: 'shipped' })],
     grounding: ['field-trace:L-02', 'root-cause:RC5#L-02', 'field-trace:M-03', 'field-trace:G-07'],
     $comment: [
       "The charter's ONE inviolable exception, and the pair that separates it from",
@@ -304,7 +328,7 @@ const PAIRS = [
     rule: 'charter_never_halt',
     difficulty: 'low',
     seed: 4283,
-    arms: [{ model: 'opus', effort: 'medium', label: 'shipped' }],
+    arms: [shippedArm('evor-orchestrator', { model: 'opus', effort: 'medium', label: 'shipped' })],
     grounding: ['field-trace:L-01', 'field-trace:L-03', 'root-cause:RC5#K-07'],
     $comment: [
       "The cheap half of L1, included because L1's FP half is the one the field",
@@ -370,7 +394,7 @@ const PAIRS = [
     rule: 'selector_no_memory',
     difficulty: 'medium',
     seed: 5104,
-    arms: [{ model: 'sonnet', effort: 'medium', label: 'shipped' }],
+    arms: [shippedArm('evor-selector', { model: 'sonnet', effort: 'medium', label: 'shipped' })],
     grounding: ['field-trace:C-01', 'field-trace:O-05', 'field-trace:Q-05', 'root-cause:RC4#I-11/O-09'],
     $comment: [
       "The role's own file names this failure mode in one sentence, which is what",
@@ -437,7 +461,7 @@ const PAIRS = [
     rule: 'tick_not_files',
     difficulty: 'low',
     seed: 5177,
-    arms: [{ model: 'sonnet', effort: 'medium', label: 'shipped' }],
+    arms: [shippedArm('evor-tick', { model: 'sonnet', effort: 'medium', label: 'shipped' })],
     grounding: ['field-trace:O-03', 'field-trace:O-05', 'field-trace:E#STATE-INCONSISTENCY'],
     $comment: [
       "O-03, verbatim: active-run.json has advertised a live run for eight days",
@@ -504,7 +528,7 @@ const PAIRS = [
     rule: 'probe_no_speculation',
     difficulty: 'medium',
     seed: 5249,
-    arms: [{ model: 'haiku', effort: 'medium', label: 'shipped' }],
+    arms: [shippedArm('evor-probe', { model: 'haiku', effort: 'medium', label: 'shipped' })],
     grounding: ['field-trace:O-01', 'field-trace:E#STATE-INCONSISTENCY', 'field-trace:M-09'],
     $comment: [
       "O-01, the field's node-identity split-brain, reduced to its two files. The",
@@ -572,7 +596,7 @@ const PAIRS = [
     difficulty: 'medium',
     seed: 6102,
     pilot: true,
-    arms: [{ model: 'sonnet', effort: 'medium', label: 'shipped' }],
+    arms: [shippedArm('evor-tick', { model: 'sonnet', effort: 'medium', label: 'shipped' })],
     grounding: ['field-trace:C-03', 'field-trace:C-06', 'field-trace:L-08', 'root-cause:RC5#K-09'],
     $comment: [
       "Staged as STATE, never as wall-clock. §5-L3 is explicit and the reason is in",
@@ -641,7 +665,7 @@ const PAIRS = [
     rule: 'tick_failure_not_hidden',
     difficulty: 'high',
     seed: 6174,
-    arms: [{ model: 'sonnet', effort: 'medium', label: 'shipped' }],
+    arms: [shippedArm('evor-tick', { model: 'sonnet', effort: 'medium', label: 'shipped' })],
     grounding: ['field-trace:C-02', 'field-trace:C-09', 'root-cause:RC5#K-09', 'field-trace:K-09'],
     $comment: [
       "K-09 is the sharpest thing in the corpus about this angle: the entire",
@@ -705,7 +729,7 @@ const PAIRS = [
     rule: 'tick_skipped',
     difficulty: 'medium',
     seed: 6246,
-    arms: [{ model: 'sonnet', effort: 'medium', label: 'shipped' }],
+    arms: [shippedArm('evor-tick', { model: 'sonnet', effort: 'medium', label: 'shipped' })],
     grounding: ['field-trace:C-05', 'field-trace:C-06', 'field-trace:E#PROGRESS-STALL', 'field-episodes:EP-25'],
     $comment: [
       "The one L3 pair whose correct terminal is NOT a failure, which is why it is",
@@ -780,7 +804,7 @@ const PAIRS = [
     rule: 'tick_failure_not_hidden',
     difficulty: 'low',
     seed: 7108,
-    arms: [{ model: 'sonnet', effort: 'medium', label: 'shipped' }],
+    arms: [shippedArm('evor-tick', { model: 'sonnet', effort: 'medium', label: 'shipped' })],
     grounding: ['field-trace:I-15', 'field-trace:G-02', 'field-trace:D#3.2', 'field-trace:E#JOB/SCHEDULER-FAILURE'],
     $comment: [
       "I-15 is the number this angle exists for: 70 of 97 subagents hit at least one",
@@ -836,7 +860,7 @@ const PAIRS = [
     rule: 'tick_failure_not_hidden',
     difficulty: 'medium',
     seed: 7182,
-    arms: [{ model: 'sonnet', effort: 'medium', label: 'shipped' }],
+    arms: [shippedArm('evor-tick', { model: 'sonnet', effort: 'medium', label: 'shipped' })],
     grounding: ['field-trace:I-15', 'field-trace:I-05', 'field-trace:G-02'],
     $comment: [
       "The failure here is one the system itself calls silent. evor-acquirer.md:85:",
@@ -896,7 +920,7 @@ const PAIRS = [
     rule: 'tick_failure_not_hidden',
     difficulty: 'medium',
     seed: 7254,
-    arms: [{ model: 'sonnet', effort: 'medium', label: 'shipped' }],
+    arms: [shippedArm('evor-tick', { model: 'sonnet', effort: 'medium', label: 'shipped' })],
     grounding: ['field-trace:C-04', 'field-trace:I-15', 'field-episodes:EP-14'],
     $comment: [
       "C-04(ii): an evor-forge-critic's 'VERDICT FLIPPED: approved -> REJECTED. My",
@@ -953,7 +977,7 @@ const PAIRS = [
     rule: 'probe_truncated',
     difficulty: 'medium',
     seed: 8113,
-    arms: [{ model: 'haiku', effort: 'medium', label: 'shipped' }],
+    arms: [shippedArm('evor-probe', { model: 'haiku', effort: 'medium', label: 'shipped' })],
     grounding: ['field-trace:M-06', 'field-trace:I-06', 'field-episodes:EP-15'],
     $comment: [
       "M-06: r3's scored checkpoint is from step 750 of 12,000 — 48 seconds into a",
@@ -1031,7 +1055,7 @@ const PAIRS = [
     rule: 'probe_evidence',
     difficulty: 'high',
     seed: 8187,
-    arms: [{ model: 'haiku', effort: 'medium', label: 'shipped' }],
+    arms: [shippedArm('evor-probe', { model: 'haiku', effort: 'medium', label: 'shipped' })],
     grounding: ['field-trace:M-04', 'field-episodes:EP-10', 'field-trace:E#MISSION-ABORT'],
     $comment: [
       "The trap §5-L5 requires: a number that is CORRECT and MISLEADING. M-04: r1",
@@ -1097,7 +1121,7 @@ const PAIRS = [
     rule: 'probe_evidence',
     difficulty: 'medium',
     seed: 8259,
-    arms: [{ model: 'haiku', effort: 'medium', label: 'shipped' }],
+    arms: [shippedArm('evor-probe', { model: 'haiku', effort: 'medium', label: 'shipped' })],
     grounding: ['field-trace:I-06', 'field-trace:M-05', 'field-episodes:EP-10'],
     $comment: [
       "I-06: the user-facing summary reported 'validation min-domain 48-70' when",

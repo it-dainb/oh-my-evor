@@ -24779,6 +24779,19 @@ function gotchasList(kind, scope, minConfidence, evorRoot, runDir) {
   if (runDir) args.push("--run-dir", runDir);
   return callPythonModule("evor", args, { timeout: 3e4 });
 }
+function worktreeDir(evorRoot, ...refs) {
+  const identities = refs.filter(
+    (v, i, a) => !!v && a.indexOf(v) === i
+  );
+  for (const identity of identities) {
+    const dir = (0, import_path17.join)(evorRoot, "worktrees", identity);
+    try {
+      if ((0, import_fs16.existsSync)(dir)) return dir;
+    } catch {
+    }
+  }
+  return (0, import_path17.join)(evorRoot, "worktrees", identities[0] ?? "");
+}
 function lockEvaluate(runId, nodeRef, missionId) {
   const nodeId = tryResolveNodeRef(runId, nodeRef, missionId);
   if (nodeId === null) {
@@ -24788,7 +24801,7 @@ function lockEvaluate(runId, nodeRef, missionId) {
       error: `node '${nodeRef}' is not in this run's tree \u2014 check the name with evor_tree_read.`
     };
   }
-  const worktree = (0, import_path17.join)(getEvorRoot(), "worktrees", nodeId);
+  const worktree = worktreeDir(getEvorRoot(), nodeId, nodeRef);
   const evalPath = (0, import_path17.join)(worktree, "evaluate.py");
   if (!(0, import_fs16.existsSync)(evalPath)) {
     return {
@@ -25282,7 +25295,7 @@ function registerComputeTools(server) {
       try {
         resolvedCandidates = candidates.map((c) => {
           const nodeId = resolveNodeRef(run_id, c.node_name, missionId);
-          const worktree = (0, import_path17.join)(evorRoot, "worktrees", nodeId);
+          const worktree = worktreeDir(evorRoot, nodeId, c.node_name);
           return { node_id: nodeId, worktree, eval_version: c.eval_version };
         });
       } catch (e) {
