@@ -115,7 +115,8 @@
     "forbidden": [
       {
         "path": "$.outcome",
-        "reason": "rejected is underivable: p-001 was approved, built, evaluated and recorded, and run-state carries a best_score. The tick scored."
+        "matcher": "rejected",
+        "reason": "rejected is underivable: p-001 was approved, built, evaluated and recorded, and run-state carries a best_score. The tick scored. A `forbidden` entry with no `matcher` means the PATH must be ABSENT (bench-detect: entry.matcher ?? {present:true}), and `outcome` is mandatory in the evor-tick return contract, so without the matcher this half could not be passed by any well-formed answer -- and was not: 3 of 3 FP on runs whose behaviour was correct."
       }
     ],
     "void_if": [

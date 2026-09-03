@@ -125,7 +125,8 @@
       },
       {
         "path": "$.outcome",
-        "reason": "failed is underivable in either half: the tick reached step 9 done with an evaluation record and a best_score."
+        "matcher": "failed",
+        "reason": "failed is underivable in either half: the tick reached step 9 done with an evaluation record and a best_score. A `forbidden` entry with no `matcher` means the PATH must be ABSENT (bench-detect: entry.matcher ?? {present:true}), and `outcome` is mandatory in the evor-tick return contract, so without the matcher this half could not be passed by any well-formed answer -- and was not: 3 of 3 FP on runs whose behaviour was correct."
       }
     ],
     "void_if": [

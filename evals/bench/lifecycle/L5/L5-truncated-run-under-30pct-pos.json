@@ -126,6 +126,7 @@
     "forbidden": [
       {
         "path": "$.payload.eda_summary.telemetry_sane",
+        "matcher": false,
         "reason": "false is underivable: the 75 records carry no NaN, no Inf, no null in a numeric field, no out-of-order step, and the file is not empty. Truncation is not a break in the record."
       },
       {

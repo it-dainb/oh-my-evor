@@ -133,10 +133,12 @@
     "forbidden": [
       {
         "path": "$.payload.hypothesis_verdict",
+        "matcher": "confirmed",
         "reason": "confirmed is underivable in the positive half: the reported metric is below the stated trivial-prediction ceiling on the same corpus, so the payload supports no claim that the mechanism produced it."
       },
       {
         "path": "$.payload.eda_summary.gradient_health",
+        "matcher": "healthy",
         "reason": "healthy is underivable: grad_norm decays from 0.0400 toward 0.0162 across the stream while param_norm is constant, and the role's own file states healthy is the complement of the other three, not a fallback."
       }
     ],

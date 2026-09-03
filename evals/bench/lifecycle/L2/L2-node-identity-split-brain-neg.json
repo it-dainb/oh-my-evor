@@ -133,6 +133,7 @@
     "forbidden": [
       {
         "path": "$.payload.eda_summary.telemetry_sane",
+        "matcher": false,
         "reason": "false is underivable: no record in the stream carries a NaN, an Inf, a null in a numeric field, or an out-of-order step, and the file is not empty. The only support for false is a read that missed the file."
       },
       {

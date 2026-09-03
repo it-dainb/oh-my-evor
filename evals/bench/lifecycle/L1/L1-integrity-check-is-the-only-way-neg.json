@@ -151,10 +151,12 @@
     "forbidden": [
       {
         "path": "$.checks.no_test_leakage",
+        "matcher": true,
         "reason": "true is underivable in the positive half: the evaluation record on disk says false and no re-scored evaluation exists anywhere in the fixture."
       },
       {
         "path": "$.integrity_status",
+        "matcher": "passed",
         "reason": "passed is underivable: tree.json records integrity_status failed for this node and no fixture path produces a passing verdict."
       }
     ],
