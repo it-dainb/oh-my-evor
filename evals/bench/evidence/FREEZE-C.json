@@ -25,10 +25,10 @@
     "E2/E2-analyst-param-count-opaque-pos.json": "6cc35ba7fc996275fe26a9156316830c83a7d4124a2cab66909713036b3f41ef",
     "E2/E2-analyst-vram-unavailable-neg.json": "6059700ac4494c125785909c1bf0d638bae7e111cdb62fbf9d3c31a57083a0d7",
     "E2/E2-analyst-vram-unavailable-pos.json": "78b4a088642e809bba55b2e15e7cc9dbe941908f76ea071bff3dadea2701d67b",
-    "E2/E2-tick-pointer-unproducible-neg.json": "d3e9bbda7b4eed16fc61b6628d61c196f6febaf2fcb2ff6733efcd5449b3faf3",
-    "E2/E2-tick-pointer-unproducible-pos.json": "e163c2ab23c4af50fc784d0a941536f7d41454d3e087db85c55cb92926827f6e",
-    "E2/E2-tick-score-without-evaluation-neg.json": "841c735123735892e29f98efbee5d7553fc2bf85e3a258c442eccd334099b7e9",
-    "E2/E2-tick-score-without-evaluation-pos.json": "d1dfd0da9a26b92fe587fe912be7785494bcfd43a6fb0dcd0d00ae0704b69d76",
+    "E2/E2-tick-pointer-unproducible-neg.json": "a2ecf23c82c748271bc30d7748f3009c11edf2871ff821f641a0d0f55881afae",
+    "E2/E2-tick-pointer-unproducible-pos.json": "6b3d37e61b8882a09b9a47241764b037838e9d8a16f3b844d42245a843d4939d",
+    "E2/E2-tick-score-without-evaluation-neg.json": "46927e287b1d880df2e47bc76cde2eb6006cffa209e8fb1d1aeed082594dd357",
+    "E2/E2-tick-score-without-evaluation-pos.json": "2070c9762c2531ea45cda012e1890626679095772b049969dca4096ac5b67ad8",
     "E3/E3-evaluation-did-not-complete-neg.json": "c85ee6de3b63acb8a94ca17b96b2ceae342349bbc7730e8d1507aa95c988e7d4",
     "E3/E3-evaluation-did-not-complete-pos.json": "a94ebcc83b7566c2935b7429983de74c602d3100842c7dc15b64ada1e807090f",
     "E3/E3-grad-norm-absent-neg.json": "1b8222e43ad8e2ddcdf1d552cb429eb34fd4451de7c5d05636953ac0f3a3eb07",
@@ -46,7 +46,7 @@
   },
   "agent_files": {
     "agents/evor-sage-junior.md": "3df9f95d1a1a13d694b627d98ff5cd1e299cd41da2be8f5662767a03e36486c0",
-    "agents/evor-tick.md": "e2878774370ed19730796751679cce6f0e59cf5a0b724a20247535fd809b93f6",
+    "agents/evor-tick.md": "e4d567e4b7c04d6f3a8f57cae969807b1cb93063eae746fa959331bf7b75d2a1",
     "agents/evor-forge-analyst.md": "4456d819ee75b0de9160181c3a06d131e468504cf7ddcd09755d35aae0a2a2ef",
     "agents/evor-probe.md": "50f92b88c5500f0a69b1f09f52930c76f4e6eed997b444dd4537d1e3c8a08b77",
     "skills/evor/SKILL.md": "f7dfeddb43b9f110c4e7de84ee20187bbb2c4d1bada48bb9767d9a25d5ab9106"

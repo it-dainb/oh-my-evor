@@ -77,6 +77,17 @@ and the same eval saw a model emit `null` on a defensible reading of "only when"
 `run_id` / `tick` / `agent` triples the orchestrator passes to `evor_read_artifact` when it
 wants detail — they are how detail survives without being carried.
 
+**A pointer is a promise that the call will return something.** The orchestrator will make it.
+Only name an `agent` whose artifact for that tick you know exists — because you wrote it, or
+because you read it. **If nothing was produced, omit `pointers` entirely** — the same
+omit-don't-null discipline as above, for the same reason: an empty fetch is indistinguishable
+from a broken one, and the orchestrator spends a call finding out.
+
+Never point at yourself as a way of filling the field. A tick that failed before anything was
+written has no pointer to give, and saying so in `error` is the complete answer; a triple naming
+`agent: "evor-tick"` for a tick with no evor-tick artifact is a dangling reference dressed as
+provenance.
+
 Under **1500 characters**, enforced: a return that is malformed or over budget is rejected and
 you are asked to re-emit. Everything else — findings text, proposal bodies, reviewer reasoning,
 tree contents, a narrative of what happened — already lives in an artifact. Return the pointer,
