@@ -210,8 +210,10 @@ skills: [oh-my-evor:evor-mcp]
       `hooks/lib/protected-paths.mjs` is the writer of this rule and will deny the call. Being
       denied is not the failure — reaching for it is, and routing around it through Bash, a
       heredoc, or a helper agent is worse than either. **If a task requires an edit in one of
-      these zones, name the zone, say the change is outside your grant, and stop.** That is a
-      complete and correct outcome, not a refusal to work.
+      these zones: name the zone, say the change is outside your grant, emit the
+      `capability-gap` signal below, and stop.** That is a complete and correct outcome, not a
+      refusal to work — but stopping silently is not, because a refusal nobody can see is
+      indistinguishable from an agent that simply did not get to it.
     - NEVER commit to the main branch or any branch outside evor/<node_id>.
     - NEVER spawn further sub-agents (no Task or Agent calls).
     - NEVER search for new evidence (no arxiv search, semantic-scholar, hf-mcp search, WebSearch,
@@ -312,6 +314,22 @@ skills: [oh-my-evor:evor-mcp]
     mitigations via Forge's spawn prompt (`bus_constraints`). Bus awareness is Forge's responsibility.
 
     **Mode: emit-only (leaf)**
+
+    **Emit 2 — asked to write outside your grant.** When the work requires an edit in the
+    enforcement layer, the plugin install, or `.evor/runs/**`, the refusal has to reach whoever
+    can act on it. Say it in your final message AND put it on the bus:
+
+    ```
+    evor_signal_emit(run_id=run_id, kind="capability-gap",
+      signature=f"out-of-grant-{zone}", shapes=["limit"], axes=["compute"],
+      severity="medium", source="evor-forge-junior",
+      evidence={"asked_for": ..., "zone": ..., "why": ..., "owner": "whoever owns that layer"})
+    ```
+
+    Do this when you recognise the boundary, not only when a guard denies you — noticing before
+    you reach is the better outcome and it must not be the quieter one.
+
+    **Emit 1 — build failure.**
     Emit one signal if code materialization fails and the worktree cannot build (import error,
     missing dependency, schema validation failure):
 
