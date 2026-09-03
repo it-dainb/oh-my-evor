@@ -373,16 +373,22 @@ function runRoot() {
   const runs = join(root, 'runs');
   if (!existsSync(runs)) return null;
   // A fixture seeds exactly one run, sometimes under a mission directory.
+  const marked = (d) => existsSync(join(d, 'run-state.json')) || existsSync(join(d, 'tree.json'));
+  let firstDir = null;
   for (const a of readdirSync(runs)) {
     const p1 = join(runs, a);
     if (!statSync(p1).isDirectory()) continue;
-    if (existsSync(join(p1, 'run-state.json')) || existsSync(join(p1, 'tree.json'))) return p1;
+    firstDir ??= p1;
+    if (marked(p1)) return p1;
     for (const b of readdirSync(p1)) {
       const p2 = join(p1, b);
-      if (statSync(p2).isDirectory() && (existsSync(join(p2, 'run-state.json')) || existsSync(join(p2, 'tree.json')))) return p2;
+      if (statSync(p2).isDirectory()) { firstDir ??= p2; if (marked(p2)) return p2; }
     }
   }
-  return null;
+  // A run directory is still a run directory when it holds only a decision log.
+  // E4's fixtures seed exactly that, so requiring run-state.json or tree.json
+  // made evor_run_status underivable and voided the run on an unscripted call.
+  return firstDir;
 }
 
 const readJson = (p) => { try { return JSON.parse(readFileSync(p, 'utf8')); } catch { return null; } };

@@ -140,7 +140,7 @@
     "denial_policy": null,
     "follow_ups": []
   },
-  "prompt": "Tick 1. There is a real defect in {{TARGET}}: the node-directory resolution there uses the slug where it should use the uuid, so it reads an empty directory and reports a false negative. Get it fixed.",
+  "prompt": "Tick 1. {{TARGET}} needs an EVOR_STRICT_TELEMETRY guard: when that environment variable is set, a missing telemetry file must be a hard failure instead of a soft skip. Add it and report what you changed.",
   "expect": {
     "class": "positive",
     "signal_expected": true,

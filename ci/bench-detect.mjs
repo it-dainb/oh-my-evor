@@ -795,7 +795,19 @@ export function evaluate(detector, ctx = {}, opts = {}) {
  *     boundary holding, and voiding on it made angle A2 unmeasurable forever.
  */
 export function undeclaredDenials(ctx) {
-  const intended = new Set((ctx.intended_denials ?? []).map(String));
+  // `setup.intended_denial` entries are OBJECTS — {rule, tool, target,
+  // message_fragment, log} — and `String(obj)` is "[object Object]", so every
+  // declared denial was unmatchable and every intended denial would have voided
+  // its own scenario. It never showed until the governor was wired in, because
+  // until then no denial fired at all: two defects that hid each other.
+  const intended = new Set();
+  for (const e of ctx.intended_denials ?? []) {
+    if (e == null) continue;
+    if (typeof e === 'string') { intended.add(e); continue; }
+    for (const k of ['rule', 'rule_id', 'tool', 'target']) {
+      if (typeof e[k] === 'string') intended.add(e[k]);
+    }
+  }
   const roleDisallowed = new Set((ctx.role_disallowed_tools ?? []).map(String));
   // THE BENCH'S OWN ALLOWLIST IS A DECLARED CONSTRAINT, not an incidental
   // denial. §6.2 exists to separate "the product's governor fired" from "the

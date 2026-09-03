@@ -7,7 +7,7 @@
  ],
  "groups": {
   "tool": {
-   "author": "forge-junior-channel",
+   "author": "denial-match",
    "frozen_at": "2026-09-03T11:42:05.587Z",
    "finality_confirmed_by_author": true,
    "count": 265,
@@ -280,7 +280,7 @@
    }
   },
   "lifecycle": {
-   "author": "forge-junior-channel",
+   "author": "denial-match",
    "frozen_at": "2026-09-02T18:57:24.823Z",
    "finality_confirmed_by_author": true,
    "count": 595,
@@ -883,7 +883,7 @@
    }
   },
   "authority": {
-   "author": "forge-junior-channel",
+   "author": "denial-match",
    "frozen_at": "2026-09-02T19:16:13.932Z",
    "finality_confirmed_by_author": true,
    "count": 96,
@@ -900,8 +900,8 @@
     "evals/bench/authority/A1/A1-tick-stage-owner-target.json": "64b49161848ae32fea60b8b972305fa5099027dfd7fd1727b9982d876474be21",
     "evals/bench/authority/A1/A1-verbatim-passthrough-control.json": "dd0c2cd19217c42137db02fcb5bac9c6ffe7839efe936d153a5b9a779c1fb767",
     "evals/bench/authority/A1/A1-verbatim-passthrough-target.json": "2fcb05da40d858aee44956ac1e8017ba71a4a0be272a60d1a2891776b139c0ec",
-    "evals/bench/authority/A2/A2-chain-climb-neg.json": "14f2578da3c985e3c670eb26114f20c79d032295783afd6811650f5d7dba6744",
-    "evals/bench/authority/A2/A2-chain-climb-pos.json": "cb02ef882bd46adb2b028eb195a1251768eaaee64b5955edeb99fcb7d5b89fef",
+    "evals/bench/authority/A2/A2-chain-climb-neg.json": "44f2990f4f3604738d73626f67f201e77ce537c6a50edc342cf081dc425debfc",
+    "evals/bench/authority/A2/A2-chain-climb-pos.json": "ff0b2a2d28f8b9869865e1e88ded14f08651c3d93b6103fdece0f5bdcd3b6f0b",
     "evals/bench/authority/A2/A2-mutagen-artifact-route-neg.json": "ef49bf2dae49067974c28bf764a7548455d2b7fd9baffe36e5dc685eb1d5ccb9",
     "evals/bench/authority/A2/A2-mutagen-artifact-route-pos.json": "b2dc358ce883d713cf25badd5f981a6389e8bed7a003d255347bf0d8e9820d67",
     "evals/bench/authority/A2/A2-peer-laundering-neg.json": "30426493d56a7b5dcbbc50b62b9dfb766bbe4859e8069570fb9548b6b4ce7de8",
@@ -980,14 +980,14 @@
     "evals/bench/authority/fixtures/plugin-install/hooks/.gitkeep": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "evals/bench/authority/lint.mjs": "9d08bc2a8c1a6209745141f23fda11dd835f457a43a2d1a4789f7d26ab393fe9",
     "evals/bench/authority/pairs-A1.mjs": "8625a6bb65a9c1e3b84090ae5c8614a0e3f59d0cdf5c476a5233de53bec63ac7",
-    "evals/bench/authority/pairs-A2.mjs": "ffcaccef1d3a86cb7e76279f5c634baaf7fdfc2a0e1a614a686b0080602dbbd0",
+    "evals/bench/authority/pairs-A2.mjs": "9f54709f52964aff29be7b50459fa278988b1aa9cc87ded81f31dd59d63ecc73",
     "evals/bench/authority/pairs-A3.mjs": "f8532b1bedf319fcb241c8ee843f7ca7f07ad0d40d62bfb3a8a901db14e39033",
     "evals/bench/authority/pairs-A4.mjs": "9e00d587863697f32efaa7e8a8dad5cc6ff88965d6f7a28b3b709fadad11c976",
     "evals/bench/authority/pairs-T4.mjs": "275bcf4856fe1f7560497b81346a15eec02e29704fedbac0bc9c61d734b4060c"
    }
   },
   "evidence": {
-   "author": "forge-junior-channel",
+   "author": "denial-match",
    "frozen_at": "2026-09-02T23:21:24.329Z",
    "finality_confirmed_by_author": true,
    "count": 139,
@@ -1134,14 +1134,14 @@
    }
   },
   "mcp": {
-   "author": "stub-coverage",
+   "author": "denial-match",
    "frozen_at": "2026-09-02T23:22:01.132Z",
    "finality_confirmed_by_author": true,
    "count": 4,
    "files": {
     "evals/bench/mcp/stub-evor.json": "dcc81741f3b67d2564ffb5ad0280a5f131d76f0c1648af748cbb742d99ab6e9b",
     "evals/bench/mcp/stub-research.json": "41c090aecdde609d8a00af79722cb1c7ad15896620953f8d7bd3a92c186b752d",
-    "evals/bench/mcp/stub-server.mjs": "d345862c46e03560bda8636b2616b90148cd9209ad9307bc88863c111b1befa3",
+    "evals/bench/mcp/stub-server.mjs": "18e98f92cf091dd611e75dde920af9c768719d850e5edad5fbc253df0d0cec7f",
     "evals/bench/mcp/verify-stub.mjs": "ac0b7db96e3c25948262964508c97b0dfac9e31e51b859807f8685dc4d7923fe"
    }
   }

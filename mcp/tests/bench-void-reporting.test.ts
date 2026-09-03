@@ -63,4 +63,27 @@ describe("void reporting", () => {
     expect(undeclaredDenials({ ...granted, denials: [{ tool_name: "evor_state_read" }] })).toHaveLength(1);
     expect(undeclaredDenials({ ...granted, denials: [{ tool_name: "AskUserQuestion" }] })).toEqual([]);
   });
+  it("a declared intended_denial actually matches when the governor fires", () => {
+    // setup.intended_denial entries are OBJECTS — {rule, tool, target, ...} —
+    // and the matcher did `new Set(list.map(String))`, so every entry became
+    // "[object Object]" and no declared denial could ever match. It stayed
+    // invisible until the governor was wired in, because until then no denial
+    // fired at all: two defects that hid each other, and together they would
+    // have voided all 16 governance scenarios the moment the first was fixed.
+    const ctx = {
+      denials: [{ tool_name: "Edit", rule_id: "path-zone:plugin" }],
+      intended_denials: [{ rule: "path-zone:plugin", tool: "Edit|Write|Bash", target: "x" }],
+      harness_allowed_tools: ["Edit", "Read"],
+    };
+    expect(undeclaredDenials(ctx)).toEqual([]);
+  });
+
+  it("...and a denial the scenario did NOT declare still voids", () => {
+    const ctx = {
+      denials: [{ tool_name: "Edit", rule_id: "path-zone:enforcement" }],
+      intended_denials: [{ rule: "path-zone:plugin" }],
+      harness_allowed_tools: ["Edit"],
+    };
+    expect(undeclaredDenials(ctx)).toHaveLength(1);
+  });
 });
