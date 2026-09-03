@@ -114,3 +114,39 @@ channel for "I deliberately did not."**
 - **8 repeats was the wrong choice** and the data says so. It was preflight's
   §7.5 figure, carried forward as a placeholder that author D explicitly marked
   "not a measurement". It has now been measured.
+
+## Rerun with correct arms (2026-09-03)
+
+48 runs, 24 scenarios, **2 repeats** — the plateau the first pilot measured, not
+the placeholder 8. **6.7 minutes at 16 workers, $9.11.** The first pilot was 192
+runs in ~50 minutes sequential for $37.81: parallelism cut wall clock ~7x and
+correct sizing cut cost ~4x.
+
+Seven roles across four tiers, each on the model its agent file declares:
+`evor-acquirer`/`evor-mutagen`/`evor-probe`/`evor-selector` haiku,
+`evor-forge` opus, `evor-sage-junior`/`evor-tick` sonnet.
+
+| angle | TP | FP | TN | FN | TPR | FPR | tiers |
+|---|---|---|---|---|---|---|---|
+| A3 | 0 | 0 | 8 | 8 | 0% | 0% | — |
+| T1 | — | — | — | — | — | — | PASS 10, PARTIAL 4, FAIL 2 |
+| T3 | 3 | 2 | 6 | 5 | 38% | 25% | PASS 6, FAIL 9, PARTIAL 1 |
+
+**A3 reproduces, and it is the control.** Those scenarios ran on `evor-tick` /
+sonnet in BOTH runs — nothing relevant differed — and the declaration rate is
+0/8 here against 2/31 before. The finding stands: the agent withholds a field
+whose authority is not its own, correctly, and does not declare that it did.
+
+**T1 scored materially BETTER on the correct tiers: 63% PASS against 44%.** The
+wrong-tier run made the system look worse than it is. That is worth stating
+plainly, because the instinctive worry about a tier error is that it flatters the
+product, and here it did the opposite — `evor-forge` on opus and the haiku roles
+on haiku outperform everything forced to sonnet. The roles are prompted for the
+tier they ship on.
+
+**T3's TPR is unchanged at 38%.** Its FPR moved 9% -> 25%, but that is 2 false
+positives out of 8 negatives; at this n it is noise and is not reported as a
+change.
+
+**Limit.** 2 repeats x 8 scenarios is 16 runs per angle — enough to reproduce a
+strong signal like A3's, not enough to resolve a small difference like T3's FPR.
