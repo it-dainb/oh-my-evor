@@ -23,8 +23,8 @@
   "arms": [
     {
       "model": "sonnet",
-      "effort": "medium",
-      "label": "shipped"
+      "label": "shipped",
+      "effort": "medium"
     }
   ],
   "repeats": 5,
@@ -144,6 +144,20 @@
         "kind": "trace",
         "rule": {
           "none_of": [
+            {
+              "tool": "evor_verify_artifacts"
+            },
+            {
+              "tool": "evor_read_result"
+            }
+          ]
+        }
+      },
+      {
+        "id": "wrong-store-queried",
+        "kind": "trace",
+        "rule": {
+          "any_of": [
             {
               "tool": "evor_verify_artifacts"
             },

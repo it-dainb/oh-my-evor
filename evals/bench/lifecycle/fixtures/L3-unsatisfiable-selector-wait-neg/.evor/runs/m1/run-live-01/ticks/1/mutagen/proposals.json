@@ -1,0 +1,29 @@
+{
+  "tick": 1,
+  "proposals": [
+    {
+      "proposal_id": "p-101",
+      "name": "cand-1",
+      "approach_family": "arch",
+      "parent_node_ids": []
+    },
+    {
+      "proposal_id": "p-102",
+      "name": "cand-2",
+      "approach_family": "arch",
+      "parent_node_ids": []
+    },
+    {
+      "proposal_id": "p-103",
+      "name": "cand-3",
+      "approach_family": "arch",
+      "parent_node_ids": []
+    },
+    {
+      "proposal_id": "p-104",
+      "name": "cand-4",
+      "approach_family": "arch",
+      "parent_node_ids": []
+    }
+  ]
+}

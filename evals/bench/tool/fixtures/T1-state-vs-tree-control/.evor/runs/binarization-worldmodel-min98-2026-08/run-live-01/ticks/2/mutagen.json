@@ -1,0 +1,17 @@
+{
+  "tick": 2,
+  "agent": "mutagen",
+  "validated": true,
+  "payload": {
+    "proposals": [
+      {
+        "id": "h001",
+        "approach_family": "arch"
+      },
+      {
+        "id": "h002",
+        "approach_family": "data-augmentation"
+      }
+    ]
+  }
+}

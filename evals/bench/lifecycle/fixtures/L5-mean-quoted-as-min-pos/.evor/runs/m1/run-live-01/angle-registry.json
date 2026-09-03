@@ -1,0 +1,12 @@
+{
+  "angles": [
+    {
+      "angle_id": "palmleaf_khmer",
+      "covered": true
+    },
+    {
+      "angle_id": "palmleaf_balinese",
+      "covered": false
+    }
+  ]
+}

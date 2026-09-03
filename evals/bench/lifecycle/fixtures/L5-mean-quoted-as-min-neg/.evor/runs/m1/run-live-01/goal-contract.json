@@ -1,0 +1,53 @@
+{
+  "mission_id": "m1",
+  "mode": "from-scratch",
+  "mission_type": "open_ended",
+  "task_description": "Binarize degraded palm-leaf manuscripts",
+  "dataset_ref": "/data/binarization",
+  "metric_specs": [
+    {
+      "metric_name": "fmeasure",
+      "direction": "higher",
+      "domain_applicability": "all",
+      "aggregation_rule": "macro_avg",
+      "role": "primary_fitness",
+      "constraints": [
+        {
+          "metric": "precision",
+          "op": ">=",
+          "threshold": 0.8
+        }
+      ]
+    }
+  ],
+  "fitness_mode": "aggregate",
+  "eval_version": "v1",
+  "baseline_value": 0,
+  "stop_condition": {
+    "type": "evolve-n"
+  },
+  "max_iterations": 200,
+  "wildness": 0.5,
+  "budget": {
+    "max_iterations": 200,
+    "plateau_window": 5,
+    "circuit_breaker": 200,
+    "max_cost_usd": 500
+  },
+  "locked_split_hash": "86c6462a5f1d4c0b93e7a218cd44f0e1",
+  "eval_script_hash": "a3776de4b81c47f2a0d9e6135bb27c48",
+  "allowed_licenses": [
+    "MIT"
+  ],
+  "autonomy_charter": {
+    "posture": "aggressive-never-halt",
+    "invariant": "Every autonomous decision MUST be monotonic: it may make the evaluation harder or more honest, never easier or comparability-shifting.",
+    "license_gate": false,
+    "data_acquisition_enabled": true,
+    "always_on_checks": [
+      "no-test-leakage",
+      "comparability-eval-version"
+    ]
+  },
+  "created_at": "2026-08-23T23:51:15Z"
+}

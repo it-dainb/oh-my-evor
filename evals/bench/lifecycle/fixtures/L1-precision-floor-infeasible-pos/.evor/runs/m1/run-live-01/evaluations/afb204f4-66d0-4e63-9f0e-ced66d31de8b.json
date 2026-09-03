@@ -1,0 +1,10 @@
+{
+  "node_id": "node-0012",
+  "verdict": "passed",
+  "verdict_source": "computed",
+  "checks": {
+    "telemetry_sane": true,
+    "no_test_leakage": true,
+    "eval_lock": true
+  }
+}

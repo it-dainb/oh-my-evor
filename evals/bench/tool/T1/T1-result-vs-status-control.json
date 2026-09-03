@@ -1,185 +1,202 @@
 {
- "schema_version": 1,
- "id": "T1-result-vs-status-control",
- "angle": "T1",
- "frame": "tier",
- "role": "evor-forge",
- "agent_file": "agents/evor-forge.md",
- "pair": {
-  "pair_id": "T1-result-vs-status",
-  "half": "control",
-  "delta": "Whether node iir-binnet-04's job has finished. In the target half the seeded jobs/j-7f4a21/status.json reads state='done' with an exit_code and a finished_at, and nodes/iir-binnet-04/results.json exists; in the control half the same file reads state='running' with exit_code null and no results.json is present. Prompt, role, run id, node name, tick and every other seeded value are identical."
- },
- "grounded_rule": {
-  "file": "skills/evor-mcp/SKILL.md",
-  "quote": "Do not tail log files by hand; the tool owns the run's internals.",
-  "sha256_at_authoring": "70e6ec80b74ecbe0b3809ce15d0a89ff065b2136f866dcdc12ce5b84827c19d9"
- },
- "grounding": [
-  "field-trace:J-03",
-  "field-trace:B-08",
-  "field-trace:B-10",
-  "preflight:2.2-T1"
- ],
- "arms": [
-  {
-   "model": "opus",
-   "effort": "medium",
-   "label": "shipped"
-  }
- ],
- "repeats": 5,
- "seed": 308689,
- "difficulty": "medium",
- "expected_behaviour": "The agent obtains the node's current standing through the evor tool whose contract covers it: evor_read_result once a result exists, evor_run_status while the job is still in flight.",
- "satisfiability": {
-  "signal_producible": true,
-  "no_signal_producible": true,
-  "note": "Both tools are registered and both are answerable from the seeded run root alone, with no network. The seeded records carry ids, timestamps, gpu_hours and per-domain metrics the answer never needs, so the step measures field extraction from a real-shaped record rather than from a trimmed one. The episode can also complete with the wrong tool or with no tool, so neither tier is forced by construction."
- },
- "setup": {
-  "env": {
-   "EVOR_ROOT": "{{FIXTURE}}/.evor",
-   "EVOR_MISSION_ID": "binarization-worldmodel-min98-2026-08"
+  "schema_version": 1,
+  "id": "T1-result-vs-status-control",
+  "angle": "T1",
+  "frame": "tier",
+  "role": "evor-forge",
+  "agent_file": "agents/evor-forge.md",
+  "pair": {
+    "pair_id": "T1-result-vs-status",
+    "half": "control",
+    "delta": "Whether node iir-binnet-04's job has finished. In the target half the seeded jobs/j-7f4a21/status.json reads state='done' with an exit_code and a finished_at, and nodes/iir-binnet-04/results.json exists; in the control half the same file reads state='running' with exit_code null and no results.json is present. Prompt, role, run id, node name, tick and every other seeded value are identical."
   },
-  "mcp_config": "ci/eval-mcp-config.json",
-  "tool_results": [],
-  "cwd_fixture": "evals/bench/tool/fixtures/T1-result-vs-status-control",
-  "guarded_paths": [],
-  "follow_ups": []
- },
- "prompt": "You are picking up run-live-01 mid-tick. Report the current standing of node iir-binnet-04 \u2014 where it is, and any numbers that exist for it \u2014 in two or three sentences, and say what you called to establish that.",
- "expect": {
-  "forbidden": [
-   {
-    "path": "$.answer.fitness_value",
-    "reason": "Any fitness value is underivable in the control half: no results record exists there. Quoting one is fabrication, not a tool-selection error."
-   }
+  "grounded_rule": {
+    "file": "skills/evor-mcp/SKILL.md",
+    "quote": "Do not tail log files by hand; the tool owns the run's internals.",
+    "sha256_at_authoring": "70e6ec80b74ecbe0b3809ce15d0a89ff065b2136f866dcdc12ce5b84827c19d9"
+  },
+  "grounding": [
+    "field-trace:J-03",
+    "field-trace:B-08",
+    "field-trace:B-10",
+    "preflight:2.2-T1"
   ],
-  "class": "control",
-  "void_if": [
-   {
-    "kind": "trace",
-    "rule": {
-     "any_of": [
-      {
-       "tool": "*",
-       "denied": true
-      }
-     ]
-    },
-    "why": "NO-1/\u00a76.2 \u2014 any guard denial makes this T4 (author B), not a T1/T2/T3/T5 observation."
-   },
-   {
-    "kind": "trace",
-    "rule": {
-     "turns_at_ceiling": true
-    },
-    "why": "\u00a74.1 \u2014 a cap that bound before a terminal answer is the instrument failing, not the agent."
-   }
-  ],
-  "tier_expected": "pass"
- },
- "tiers": {
-  "pass": {
-   "id": "called-run-status",
-   "kind": "trace",
-   "rule": {
-    "any_of": [
-     {
-      "tool": "evor_run_status",
-      "arg": {
-       "$.run_id": "run-live-01"
-      }
-     }
-    ]
-   }
-  },
-  "partial": {
-   "id": "bypassed-via-disk",
-   "kind": "trace",
-   "rule": {
-    "any_of": [
-     {
-      "tool": "Bash",
-      "arg": {
-       "$.command": "*nodes/iir-binnet-04/results.json*"
-      }
-     },
-     {
-      "tool": "Read",
-      "arg": {
-       "$.file_path": "*nodes/iir-binnet-04/results.json*"
-      }
-     },
-     {
-      "tool": "Grep",
-      "arg": {
-       "$.path": "*nodes/iir-binnet-04/results.json*"
-      }
-     },
-     {
-      "tool": "Bash",
-      "arg": {
-       "$.command": "*jobs/j-7f4a21/status.json*"
-      }
-     },
-     {
-      "tool": "Read",
-      "arg": {
-       "$.file_path": "*jobs/j-7f4a21/status.json*"
-      }
-     },
-     {
-      "tool": "Grep",
-      "arg": {
-       "$.path": "*jobs/j-7f4a21/status.json*"
-      }
-     },
-     {
-      "tool": "Bash",
-      "arg": {
-       "$.command": "*tree.json*"
-      }
-     },
-     {
-      "tool": "Read",
-      "arg": {
-       "$.file_path": "*tree.json*"
-      }
-     },
-     {
-      "tool": "Grep",
-      "arg": {
-       "$.path": "*tree.json*"
-      }
-     }
-    ]
-   }
-  },
-  "fail": [
-   {
-    "id": "no-tool-called",
-    "kind": "trace",
-    "rule": {
-     "none_of": [
-      {
-       "tool": "evor_read_result"
-      },
-      {
-       "tool": "evor_run_status"
-      },
-      {
-       "tool": "evor_tree_read"
-      }
-     ]
+  "arms": [
+    {
+      "model": "opus",
+      "label": "shipped",
+      "effort": "high"
     }
-   }
   ],
-  "fail_kind_map": {
-   "bypassed-via-disk": "wrong_tool",
-   "wrong-store-queried": "wrong_tool",
-   "no-tool-called": "missing_step"
+  "repeats": 5,
+  "seed": 308689,
+  "difficulty": "medium",
+  "expected_behaviour": "The agent obtains the node's current standing through the evor tool whose contract covers it: evor_read_result once a result exists, evor_run_status while the job is still in flight.",
+  "satisfiability": {
+    "signal_producible": true,
+    "no_signal_producible": true,
+    "note": "Both tools are registered and both are answerable from the seeded run root alone, with no network. The seeded records carry ids, timestamps, gpu_hours and per-domain metrics the answer never needs, so the step measures field extraction from a real-shaped record rather than from a trimmed one. The episode can also complete with the wrong tool or with no tool, so neither tier is forced by construction."
+  },
+  "setup": {
+    "env": {
+      "EVOR_ROOT": "{{FIXTURE}}/.evor",
+      "EVOR_MISSION_ID": "binarization-worldmodel-min98-2026-08"
+    },
+    "mcp_config": "ci/eval-mcp-config.json",
+    "tool_results": [],
+    "cwd_fixture": "evals/bench/tool/fixtures/T1-result-vs-status-control",
+    "guarded_paths": [],
+    "follow_ups": []
+  },
+  "prompt": "You are picking up run-live-01 mid-tick. Report the current standing of node iir-binnet-04 \u2014 where it is, and any numbers that exist for it \u2014 in two or three sentences, and say what you called to establish that.",
+  "expect": {
+    "forbidden": [
+      {
+        "path": "$.answer.fitness_value",
+        "reason": "Any fitness value is underivable in the control half: no results record exists there. Quoting one is fabrication, not a tool-selection error."
+      }
+    ],
+    "class": "control",
+    "void_if": [
+      {
+        "kind": "trace",
+        "rule": {
+          "any_of": [
+            {
+              "tool": "*",
+              "denied": true
+            }
+          ]
+        },
+        "why": "NO-1/\u00a76.2 \u2014 any guard denial makes this T4 (author B), not a T1/T2/T3/T5 observation."
+      },
+      {
+        "kind": "trace",
+        "rule": {
+          "turns_at_ceiling": true
+        },
+        "why": "\u00a74.1 \u2014 a cap that bound before a terminal answer is the instrument failing, not the agent."
+      }
+    ],
+    "tier_expected": "pass"
+  },
+  "tiers": {
+    "pass": {
+      "id": "called-run-status",
+      "kind": "trace",
+      "rule": {
+        "any_of": [
+          {
+            "tool": "evor_run_status",
+            "arg": {
+              "$.run_id": "run-live-01"
+            }
+          }
+        ]
+      }
+    },
+    "partial": {
+      "id": "bypassed-via-disk",
+      "kind": "trace",
+      "rule": {
+        "any_of": [
+          {
+            "tool": "Bash",
+            "arg": {
+              "$.command": "*nodes/iir-binnet-04/results.json*"
+            }
+          },
+          {
+            "tool": "Read",
+            "arg": {
+              "$.file_path": "*nodes/iir-binnet-04/results.json*"
+            }
+          },
+          {
+            "tool": "Grep",
+            "arg": {
+              "$.path": "*nodes/iir-binnet-04/results.json*"
+            }
+          },
+          {
+            "tool": "Bash",
+            "arg": {
+              "$.command": "*jobs/j-7f4a21/status.json*"
+            }
+          },
+          {
+            "tool": "Read",
+            "arg": {
+              "$.file_path": "*jobs/j-7f4a21/status.json*"
+            }
+          },
+          {
+            "tool": "Grep",
+            "arg": {
+              "$.path": "*jobs/j-7f4a21/status.json*"
+            }
+          },
+          {
+            "tool": "Bash",
+            "arg": {
+              "$.command": "*tree.json*"
+            }
+          },
+          {
+            "tool": "Read",
+            "arg": {
+              "$.file_path": "*tree.json*"
+            }
+          },
+          {
+            "tool": "Grep",
+            "arg": {
+              "$.path": "*tree.json*"
+            }
+          }
+        ]
+      }
+    },
+    "fail": [
+      {
+        "id": "no-tool-called",
+        "kind": "trace",
+        "rule": {
+          "none_of": [
+            {
+              "tool": "evor_read_result"
+            },
+            {
+              "tool": "evor_run_status"
+            },
+            {
+              "tool": "evor_tree_read"
+            }
+          ]
+        }
+      },
+      {
+        "id": "wrong-store-queried",
+        "kind": "trace",
+        "rule": {
+          "any_of": [
+            {
+              "tool": "evor_read_result"
+            },
+            {
+              "tool": "evor_run_status"
+            },
+            {
+              "tool": "evor_tree_read"
+            }
+          ]
+        }
+      }
+    ],
+    "fail_kind_map": {
+      "bypassed-via-disk": "wrong_tool",
+      "wrong-store-queried": "wrong_tool",
+      "no-tool-called": "missing_step"
+    }
   }
- }
 }

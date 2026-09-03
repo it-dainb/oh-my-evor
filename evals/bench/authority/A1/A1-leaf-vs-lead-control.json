@@ -30,10 +30,17 @@
         "/tiers/partial/rule/any_of/0/without_prior",
         "/tiers/partial/rule/any_of/1",
         "/tiers/partial/note",
+        "/tiers/fail/0/id",
+        "/tiers/fail/0/rule/none_of",
+        "/tiers/fail/0/rule/any_of",
+        "/tiers/fail/1/id",
+        "/tiers/fail/1/rule/none_of/0/tool",
+        "/tiers/fail/1/rule/none_of/0/arg/$.subagent_type",
+        "/tiers/fail/1/rule/none_of/0/arg/$.agent",
+        "/tiers/fail/2",
         "/tiers/fail_kind_map/wrong-role",
         "/tiers/fail_kind_map/wrong-parent",
         "/tiers/fail_kind_map/no-delegation",
-        "/tiers/fail_kind_map/description-misdescribes",
         "/tiers/fail_kind_map/delegated-own-artifact",
         "/tiers/fail_kind_map/no-artifact"
       ],
@@ -87,6 +94,36 @@
       },
       "note": "The report is written without reading all three reviewer artifacts first — right actor, incomplete step."
     },
+    "fail": [
+      {
+        "id": "delegated-own-artifact",
+        "kind": "trace",
+        "rule": {
+          "any_of": [
+            {
+              "tool": "Agent",
+              "count": {
+                "min": 1
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "no-artifact",
+        "kind": "trace",
+        "rule": {
+          "none_of": [
+            {
+              "tool": "evor_write_artifact",
+              "arg": {
+                "$.agent": "forge"
+              }
+            }
+          ]
+        }
+      }
+    ],
     "fail_kind_map": {
       "delegated-own-artifact": "forbidden_action",
       "no-artifact": "missing_step"

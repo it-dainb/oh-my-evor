@@ -1,0 +1,14 @@
+{
+  "tick": 2,
+  "step": 9,
+  "step_status": "running",
+  "integrity_verdict": "failed",
+  "updated_at": "2026-08-23T11:58:41.010Z",
+  "steps_completed": [
+    "sage",
+    "mutagen",
+    "selector",
+    "forge",
+    "probe"
+  ]
+}

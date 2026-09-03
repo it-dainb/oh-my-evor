@@ -268,7 +268,12 @@ export function registerLineageTools(server: McpServer): void {
   server.tool(
     "evor_read_handoff",
     [
-      "Read a handoff written by a prior agent. Three routing modes:",
+      "Read a MESSAGE one agent addressed to another — the context it chose to pass on,",
+      "not the work it produced. An agent's own report, findings or result for a tick is an",
+      "ARTIFACT and is read with evor_read_artifact; only reach here when you want what was",
+      "explicitly handed over. A handoff exists only if the sender wrote one; an artifact",
+      "exists whenever the agent completed its step, so prefer evor_read_artifact when you",
+      "are asking what an upstream agent did. Three routing modes:",
       "from_agent+to_agent → within-tick JSON handoff (handoffs/<from>_to_<to>.json);",
       "tick → tick-N.md markdown handoff;",
       "neither → latest tick handoff (highest tick number found).",

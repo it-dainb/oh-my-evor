@@ -24323,7 +24323,12 @@ function registerArtifactTools(server) {
   server.tool(
     "evor_read_artifact",
     [
-      "Read and validate a tick artifact written by an upstream agent.",
+      "Read and validate an agent's OWN OUTPUT for a tick \u2014 its report, findings or proposals,",
+      "stored at ticks/<tick>/<agent>.json. This is the store for 'what did Forge produce',",
+      "'what did Probe conclude', 'what did Sage-junior find'.",
+      "NOT the store for a message one agent addressed to another: that is evor_read_handoff",
+      "(handoffs/<from>_to_<to>.json). If you want an agent's job report, result or artifact",
+      "for a tick, it is here \u2014 a job report is the producing agent's artifact, not a handoff.",
       "Returns {ok:true,validated,payload}, or {ok:false,error:'not found'} when the upstream",
       "agent hasn't produced it yet \u2014 a strong signal to stop and surface the gap,",
       "not proceed on assumptions. Path mapping is identical to evor_write_artifact."
@@ -24560,7 +24565,12 @@ function registerLineageTools(server) {
   server.tool(
     "evor_read_handoff",
     [
-      "Read a handoff written by a prior agent. Three routing modes:",
+      "Read a MESSAGE one agent addressed to another \u2014 the context it chose to pass on,",
+      "not the work it produced. An agent's own report, findings or result for a tick is an",
+      "ARTIFACT and is read with evor_read_artifact; only reach here when you want what was",
+      "explicitly handed over. A handoff exists only if the sender wrote one; an artifact",
+      "exists whenever the agent completed its step, so prefer evor_read_artifact when you",
+      "are asking what an upstream agent did. Three routing modes:",
       "from_agent+to_agent \u2192 within-tick JSON handoff (handoffs/<from>_to_<to>.json);",
       "tick \u2192 tick-N.md markdown handoff;",
       "neither \u2192 latest tick handoff (highest tick number found).",

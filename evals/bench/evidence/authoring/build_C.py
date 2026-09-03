@@ -162,6 +162,7 @@ def assert_detectors(pair: dict, scenario: dict, half: str):
     todo += list(scenario.get("named_detectors", {}).values())
     if scenario.get("tiers"):
         todo += [scenario["tiers"]["pass"], scenario["tiers"]["partial"]]
+        todo += list(scenario["tiers"].get("fail", []))
     todo += [d["rule"] and d for d in scenario["expect"]["void_if"]]
     for det in todo:
         try:
@@ -241,6 +242,19 @@ def assert_declaration(pair: dict, scenario: dict):
 # ------------------------------------------------------------------- build ---
 
 
+# PATHS THE RUNNER RESOLVES ARE REPO-RELATIVE, and the pairs write them relative
+# to this group. The difference was fixed once by hand in the generated files
+# and this generator put it straight back the next time it ran — the same way
+# the model arms were silently reverted. Both spellings now come from here.
+def _repo_relative(setup):
+    for key in ("cwd_fixture", "mcp_config", "plugin_fixture"):
+        v = setup.get(key)
+        if isinstance(v, str) and not v.startswith("evals/bench/"):
+            setup[key] = "evals/bench/evidence/" + v if not v.startswith("mcp/") \
+                else "evals/bench/" + v
+    return setup
+
+
 def build_half(pair: dict, half: str, agent_sha: str) -> dict:
     positive = half == "positive"
     scenario = {
@@ -264,7 +278,7 @@ def build_half(pair: dict, half: str, agent_sha: str) -> dict:
         },
         "grounding": list(pair["grounding"]),
         "satisfiability": copy.deepcopy(pair["satisfiability"]),
-        "setup": copy.deepcopy(pair["setup"]),
+        "setup": _repo_relative(copy.deepcopy(pair["setup"])),
         "prompt": pair["prompt"],
         "expect": {
             "class": "positive" if positive else "negative",
@@ -279,7 +293,11 @@ def build_half(pair: dict, half: str, agent_sha: str) -> dict:
     if pair["frame"] == "hybrid":
         scenario["expected_behaviour"] = pair["expected_behaviour"]
         scenario["tiers"] = copy.deepcopy(pair["tiers"])
-        scenario["named_detectors"] = copy.deepcopy(pair["named_detectors"])
+        # `named_detectors` is gone: its two rules now live in `tiers.fail`,
+        # which is the only place `scoreTiers` looks. Kept optional so a pair
+        # that still carries the old key is copied rather than dropped.
+        if pair.get("named_detectors"):
+            scenario["named_detectors"] = copy.deepcopy(pair["named_detectors"])
         scenario["expect"]["tier_expected"] = "pass"
     if pair.get("control_arm"):
         scenario["expect"]["control_arm"] = {
@@ -296,6 +314,11 @@ def build_half(pair: dict, half: str, agent_sha: str) -> dict:
             if resolve_pointer(scenario, pointer) is KeyError:
                 fail(pair["pair_id"], "delta", f"neg_patch pointer {pointer} does not dereference")
             set_pointer(scenario, pointer, copy.deepcopy(value))
+        # The negative half's patch names group-relative fixtures too, and it
+        # runs AFTER `_repo_relative` did the positive half's, so it has to be
+        # rewritten again or six neg halves resolve to `fixtures/...` at the
+        # repo root and fail preflight with "does not exist".
+        _repo_relative(scenario["setup"])
 
     # Seed derived deterministically from the scenario id (§6.11: mandatory, and
     # a repeat is reproducible while two repeats genuinely differ — the runner

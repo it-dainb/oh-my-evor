@@ -1,0 +1,16 @@
+{
+  "tick": 2,
+  "agent": "selector",
+  "validated": true,
+  "payload": {
+    "verdict": "approved",
+    "winner": {
+      "id": "h001",
+      "approach_family": "arch",
+      "derives_from": "iir-binnet-02",
+      "hypothesis": {
+        "prediction": "min-domain F rises by 4 points at equal latency"
+      }
+    }
+  }
+}

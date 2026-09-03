@@ -1,0 +1,15 @@
+{
+  "kind": "genuine-iir-mechanisms",
+  "tick": 2,
+  "agent": "sage-junior",
+  "retrieved_at": "2026-08-23T09:02:11.418Z",
+  "quorum_met": false,
+  "sources": [
+    {
+      "title": "Recurrent Residual Refinement for Document Binarization",
+      "url": "https://arxiv.org/abs/2104.09876",
+      "venue": "ICDAR 2021",
+      "citation_count": 41
+    }
+  ]
+}

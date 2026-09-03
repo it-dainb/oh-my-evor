@@ -172,8 +172,8 @@
   "arms": [
     {
       "model": "sonnet",
-      "effort": "medium",
-      "label": "shipped"
+      "label": "shipped",
+      "effort": "medium"
     }
   ],
   "repeats": 5,

@@ -33,6 +33,29 @@ def no_evor_tool(tools):
                {"none_of": [called(t) for t in tools]})
 
 
+def wrong_store(tools):
+    """FAIL by querying the WRONG store: a tool in the discriminated family was
+    called, but not the one this half's seeded state makes correct.
+
+    `wrong-store-queried` was in TIER_KINDS from the first commit and no
+    detector ever carried the id, so the kind was unreachable and every
+    wrong-store run came back FAIL with `failure_kind: null`. The pilot hit it
+    live: in `T1-handoff-vs-artifact-control` evor-probe called
+    `evor_read_handoff` for a job report that lives in the artifact store, was
+    told "not found", surfaced the gap exactly as the tool description instructs
+    — and the bench could say it failed but not say why.
+
+    Ordered AFTER `no-tool-called`, so the two partition the fail space: nothing
+    called, or something in the family called and it was not the right one.
+    """
+    return det("wrong-store-queried", "trace",
+               {"any_of": [called(t) for t in tools]})
+
+
+def fails(tools):
+    return [no_evor_tool(tools), wrong_store(tools)]
+
+
 # ── T1-P1 — result vs status ────────────────────────────────────────────────
 # The same question ("what is node iir-binnet-04's state") is answered by a
 # different tool depending on whether the job has finished. B-08/J-03 shape.
@@ -109,12 +132,12 @@ emit(
         det("called-read-result", "trace",
             {"any_of": [called("evor_read_result", {"$.node_id": "iir-binnet-04"})]}),
         bypass(["nodes/iir-binnet-04/results.json", "jobs/j-7f4a21/status.json", "tree.json"]),
-        [no_evor_tool(["evor_read_result", "evor_run_status", "evor_tree_read"])])},
+        fails(["evor_read_result", "evor_run_status", "evor_tree_read"]))},
     b={"setup": {"cwd_fixture": f_running}, "tiers": tier(
         det("called-run-status", "trace",
             {"any_of": [called("evor_run_status", {"$.run_id": "run-live-01"})]}),
         bypass(["nodes/iir-binnet-04/results.json", "jobs/j-7f4a21/status.json", "tree.json"]),
-        [no_evor_tool(["evor_read_result", "evor_run_status", "evor_tree_read"])])},
+        fails(["evor_read_result", "evor_run_status", "evor_tree_read"]))},
     diff=["/setup/cwd_fixture", "/tiers/pass"],
 )
 # ── T1-P2 — handoff vs artifact ─────────────────────────────────────────────
@@ -176,12 +199,12 @@ emit(
         det("called-read-handoff", "trace",
             {"any_of": [called("evor_read_handoff", {"$.from_agent": "forge"})]}),
         bypass(["handoffs/forge_to_probe.json", "ticks/2/forge.json"]),
-        [no_evor_tool(["evor_read_handoff", "evor_read_artifact"])])},
+        fails(["evor_read_handoff", "evor_read_artifact"]))},
     b={"setup": {"cwd_fixture": f_art}, "tiers": tier(
         det("called-read-artifact", "trace",
             {"any_of": [called("evor_read_artifact", {"$.agent": "forge", "$.tick": 2})]}),
         bypass(["handoffs/forge_to_probe.json", "ticks/2/forge.json"]),
-        [no_evor_tool(["evor_read_handoff", "evor_read_artifact"])])},
+        fails(["evor_read_handoff", "evor_read_artifact"]))},
     diff=["/setup/cwd_fixture", "/tiers/pass"],
 )
 
@@ -240,12 +263,12 @@ emit(
         det("called-store-blob", "trace",
             {"any_of": [called("evor_store_blob", {"$.path": "*bundle*"})]}),
         bypass(["acquisitions/khmer-palmleaf-370", "blobs/"]),
-        [no_evor_tool(["evor_store_blob", "evor_write_artifact"])])},
+        fails(["evor_store_blob", "evor_write_artifact"]))},
     b={"setup": {"cwd_fixture": f_manifest}, "tiers": tier(
         det("called-write-artifact-acquirer", "trace",
             {"any_of": [called("evor_write_artifact", {"$.agent": "acquirer"})]}),
         bypass(["acquisitions/khmer-palmleaf-370", "blobs/"]),
-        [no_evor_tool(["evor_store_blob", "evor_write_artifact"])])},
+        fails(["evor_store_blob", "evor_write_artifact"]))},
     diff=["/setup/cwd_fixture", "/tiers/pass"],
 )
 
@@ -309,12 +332,12 @@ emit(
         det("called-verify-artifacts", "trace",
             {"any_of": [called("evor_verify_artifacts", {"$.node": "iir-binnet-04"})]}),
         bypass(["nodes/iir-binnet-04/results.json", "nodes/iir-binnet-04/telemetry.jsonl"]),
-        [no_evor_tool(["evor_verify_artifacts", "evor_read_result"])])},
+        fails(["evor_verify_artifacts", "evor_read_result"]))},
     b={"setup": {"cwd_fixture": f_fitness}, "tiers": tier(
         det("called-read-result-gate", "trace",
             {"any_of": [called("evor_read_result", {"$.node_id": "iir-binnet-04"})]}),
         bypass(["nodes/iir-binnet-04/results.json", "nodes/iir-binnet-04/telemetry.jsonl"]),
-        [no_evor_tool(["evor_verify_artifacts", "evor_read_result"])])},
+        fails(["evor_verify_artifacts", "evor_read_result"]))},
     diff=["/setup/cwd_fixture", "/tiers/pass"],
 )
 
@@ -391,12 +414,12 @@ emit(
         det("called-state-read", "trace",
             {"any_of": [called("evor_state_read", {"$.run_id": "run-live-01"})]}),
         bypass(["run-state.json", "tree.json"]),
-        [no_evor_tool(["evor_state_read", "evor_tree_read"])])},
+        fails(["evor_state_read", "evor_tree_read"]))},
     b={"setup": {"cwd_fixture": f_nostrategy}, "tiers": tier(
         det("called-tree-read", "trace",
             {"any_of": [called("evor_tree_read", {"$.run_id": "run-live-01"})]}),
         bypass(["run-state.json", "tree.json"]),
-        [no_evor_tool(["evor_state_read", "evor_tree_read"])])},
+        fails(["evor_state_read", "evor_tree_read"]))},
     diff=["/setup/cwd_fixture", "/tiers/pass"],
 )
 
@@ -468,11 +491,11 @@ emit(
         det("called-wiki-query", "trace",
             {"any_of": [called("evor_wiki_query", {"$.query": "?*"})]}),
         bypass(["wiki/index.jsonl", "wiki/gotchas/global.jsonl"]),
-        [no_evor_tool(["evor_wiki_query", "evor_gotcha_query", "evor_gotchas_list"])])},
+        fails(["evor_wiki_query", "evor_gotcha_query", "evor_gotchas_list"]))},
     b={"setup": {"cwd_fixture": f_gotcha}, "tiers": tier(
         det("called-gotcha-query", "trace",
             {"any_of": [called("evor_gotcha_query"), called("evor_gotchas_list")]}),
         bypass(["wiki/index.jsonl", "wiki/gotchas/global.jsonl"]),
-        [no_evor_tool(["evor_wiki_query", "evor_gotcha_query", "evor_gotchas_list"])])},
+        fails(["evor_wiki_query", "evor_gotcha_query", "evor_gotchas_list"]))},
     diff=["/setup/cwd_fixture", "/tiers/pass"],
 )

@@ -1,0 +1,16 @@
+{
+  "node_id": "afb204f4-66d0-4e63-9f0e-ced66d31de8b",
+  "node_name": "iir-scan-binnet-02",
+  "status": "ok",
+  "timestamp": "2026-08-24T01:30:33Z",
+  "val_metric": 68.4012,
+  "val_min_domain_f": 12.91,
+  "per_domain": {
+    "palmleaf_khmer": 12.91,
+    "palmleaf_balinese": 44.12,
+    "dibco_2017": 68.4012
+  },
+  "telemetry_summary": {
+    "total_steps": 240
+  }
+}

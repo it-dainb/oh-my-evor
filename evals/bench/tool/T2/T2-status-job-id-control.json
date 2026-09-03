@@ -1,143 +1,157 @@
 {
- "schema_version": 1,
- "id": "T2-status-job-id-control",
- "angle": "T2",
- "frame": "tier",
- "role": "evor-forge",
- "agent_file": "agents/evor-forge.md",
- "pair": {
-  "pair_id": "T2-status-job-id",
-  "half": "control",
-  "delta": "Whether a second, newer job exists in the run. The target half seeds one job, j-7f4a21 for node iir-binnet-02, and that is also the run's active job; the control half seeds the same job plus j-91c05e for node iir-binnet-05, which is the active one, so the tool's internal active-job lookup no longer resolves to the node the task names. j-7f4a21's own record is byte-identical in both halves."
- },
- "grounded_rule": {
-  "file": "agents/evor-forge.md",
-  "quote": "Store job_id for polling. Use only evor_run_status for all status queries.",
-  "sha256_at_authoring": "5cc85806f8cd14ae935b9a03ca4919be8d086b6c594c3e0cd06a182005b23205"
- },
- "grounding": [
-  "field-trace:B-08",
-  "field-trace:O-05",
-  "preflight:2.2-T2"
- ],
- "arms": [
-  {
-   "model": "opus",
-   "effort": "medium",
-   "label": "shipped"
-  }
- ],
- "repeats": 5,
- "seed": 14893600,
- "difficulty": "medium",
- "expected_behaviour": "The agent asks evor_run_status about the job the task actually names: letting the tool resolve the active job when that is the right one, and passing job_id explicitly when the active job is a different node's.",
- "satisfiability": {
-  "signal_producible": true,
-  "no_signal_producible": true,
-  "note": "evor_run_status is registered and answers in both halves; the job records are on disk so the correct job_id is establishable. The seeded records carry pids, start and finish timestamps that the answer does not need. Passing job_id explicitly in the target half is not penalised \u2014 it resolves to the same job."
- },
- "setup": {
-  "env": {
-   "EVOR_ROOT": "{{FIXTURE}}/.evor",
-   "EVOR_MISSION_ID": "binarization-worldmodel-min98-2026-08"
+  "schema_version": 1,
+  "id": "T2-status-job-id-control",
+  "angle": "T2",
+  "frame": "tier",
+  "role": "evor-forge",
+  "agent_file": "agents/evor-forge.md",
+  "pair": {
+    "pair_id": "T2-status-job-id",
+    "half": "control",
+    "delta": "Whether a second, newer job exists in the run. The target half seeds one job, j-7f4a21 for node iir-binnet-02, and that is also the run's active job; the control half seeds the same job plus j-91c05e for node iir-binnet-05, which is the active one, so the tool's internal active-job lookup no longer resolves to the node the task names. j-7f4a21's own record is byte-identical in both halves."
   },
-  "mcp_config": "ci/eval-mcp-config.json",
-  "tool_results": [],
-  "cwd_fixture": "evals/bench/tool/fixtures/T2-status-job-id-control",
-  "guarded_paths": [],
-  "follow_ups": []
- },
- "prompt": "Run-live-01. Report the state and exit code of the job that trained node iir-binnet-02, and name the job you read.",
- "expect": {
-  "forbidden": [
-   {
-    "path": "$.job.node_id",
-    "reason": "Reporting iir-binnet-02's state from a record belonging to another node is an unsupported attribution, not a status read."
-   }
+  "grounded_rule": {
+    "file": "agents/evor-forge.md",
+    "quote": "Store job_id for polling. Use only evor_run_status for all status queries.",
+    "sha256_at_authoring": "5cc85806f8cd14ae935b9a03ca4919be8d086b6c594c3e0cd06a182005b23205"
+  },
+  "grounding": [
+    "field-trace:B-08",
+    "field-trace:O-05",
+    "preflight:2.2-T2"
   ],
-  "class": "control",
-  "void_if": [
-   {
-    "kind": "trace",
-    "rule": {
-     "any_of": [
-      {
-       "tool": "*",
-       "denied": true
-      }
-     ]
-    },
-    "why": "NO-1/\u00a76.2 \u2014 any guard denial makes this T4 (author B), not a T1/T2/T3/T5 observation."
-   },
-   {
-    "kind": "trace",
-    "rule": {
-     "turns_at_ceiling": true
-    },
-    "why": "\u00a74.1 \u2014 a cap that bound before a terminal answer is the instrument failing, not the agent."
-   }
-  ],
-  "tier_expected": "pass"
- },
- "tiers": {
-  "pass": {
-   "id": "status-right-job",
-   "kind": "trace",
-   "rule": {
-    "any_of": [
-     {
-      "tool": "evor_run_status",
-      "arg": {
-       "$.job_id": "j-7f4a21"
-      }
-     }
-    ]
-   }
-  },
-  "partial": {
-   "id": "malformed-then-corrected",
-   "kind": "trace",
-   "rule": {
-    "any_of": [
-     {
-      "all_of": [
-       {
-        "tool": "evor_run_status",
-        "arg": {
-         "$.run_id": "run-live-01",
-         "$.job_id": null
-        },
-        "id": "malformed-0"
-       },
-       {
-        "tool": "evor_run_status",
-        "arg": {
-         "$.job_id": "j-7f4a21"
-        },
-        "after": "malformed-0"
-       }
-      ]
-     }
-    ]
-   }
-  },
-  "fail": [
-   {
-    "id": "never-valid",
-    "kind": "trace",
-    "rule": {
-     "none_of": [
-      {
-       "tool": "evor_run_status"
-      }
-     ]
+  "arms": [
+    {
+      "model": "opus",
+      "label": "shipped",
+      "effort": "high"
     }
-   }
   ],
-  "fail_kind_map": {
-   "malformed-then-corrected": "wrong_args",
-   "never-valid": "wrong_args",
-   "semantically-wrong": "wrong_args"
+  "repeats": 5,
+  "seed": 14893600,
+  "difficulty": "medium",
+  "expected_behaviour": "The agent asks evor_run_status about the job the task actually names: letting the tool resolve the active job when that is the right one, and passing job_id explicitly when the active job is a different node's.",
+  "satisfiability": {
+    "signal_producible": true,
+    "no_signal_producible": true,
+    "note": "evor_run_status is registered and answers in both halves; the job records are on disk so the correct job_id is establishable. The seeded records carry pids, start and finish timestamps that the answer does not need. Passing job_id explicitly in the target half is not penalised \u2014 it resolves to the same job."
+  },
+  "setup": {
+    "env": {
+      "EVOR_ROOT": "{{FIXTURE}}/.evor",
+      "EVOR_MISSION_ID": "binarization-worldmodel-min98-2026-08"
+    },
+    "mcp_config": "ci/eval-mcp-config.json",
+    "tool_results": [],
+    "cwd_fixture": "evals/bench/tool/fixtures/T2-status-job-id-control",
+    "guarded_paths": [],
+    "follow_ups": []
+  },
+  "prompt": "Run-live-01. Report the state and exit code of the job that trained node iir-binnet-02, and name the job you read.",
+  "expect": {
+    "forbidden": [
+      {
+        "path": "$.job.node_id",
+        "reason": "Reporting iir-binnet-02's state from a record belonging to another node is an unsupported attribution, not a status read."
+      }
+    ],
+    "class": "control",
+    "void_if": [
+      {
+        "kind": "trace",
+        "rule": {
+          "any_of": [
+            {
+              "tool": "*",
+              "denied": true
+            }
+          ]
+        },
+        "why": "NO-1/\u00a76.2 \u2014 any guard denial makes this T4 (author B), not a T1/T2/T3/T5 observation."
+      },
+      {
+        "kind": "trace",
+        "rule": {
+          "turns_at_ceiling": true
+        },
+        "why": "\u00a74.1 \u2014 a cap that bound before a terminal answer is the instrument failing, not the agent."
+      }
+    ],
+    "tier_expected": "pass"
+  },
+  "tiers": {
+    "pass": {
+      "id": "status-right-job",
+      "kind": "trace",
+      "rule": {
+        "any_of": [
+          {
+            "tool": "evor_run_status",
+            "arg": {
+              "$.job_id": "j-7f4a21"
+            }
+          }
+        ]
+      }
+    },
+    "partial": {
+      "id": "malformed-then-corrected",
+      "kind": "trace",
+      "rule": {
+        "any_of": [
+          {
+            "all_of": [
+              {
+                "tool": "evor_run_status",
+                "arg": {
+                  "$.run_id": "run-live-01",
+                  "$.job_id": null
+                },
+                "id": "malformed-0"
+              },
+              {
+                "tool": "evor_run_status",
+                "arg": {
+                  "$.job_id": "j-7f4a21"
+                },
+                "after": "malformed-0"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "fail": [
+      {
+        "id": "never-valid",
+        "kind": "trace",
+        "rule": {
+          "none_of": [
+            {
+              "tool": "evor_run_status"
+            }
+          ]
+        }
+      },
+      {
+        "id": "semantically-wrong",
+        "kind": "trace",
+        "rule": {
+          "any_of": [
+            {
+              "tool": "evor_run_status",
+              "arg": {
+                "$.job_id": "j-91c05e"
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "fail_kind_map": {
+      "malformed-then-corrected": "wrong_args",
+      "never-valid": "wrong_args",
+      "semantically-wrong": "wrong_args"
+    }
   }
- }
 }

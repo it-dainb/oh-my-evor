@@ -24,8 +24,8 @@
   "arms": [
     {
       "model": "sonnet",
-      "effort": "medium",
-      "label": "shipped"
+      "label": "shipped",
+      "effort": "medium"
     }
   ],
   "repeats": 5,
@@ -149,13 +149,23 @@
             }
           ]
         }
+      },
+      {
+        "id": "never-attempted",
+        "kind": "trace",
+        "rule": {
+          "none_of": [
+            {
+              "tool": "evor_cite"
+            }
+          ]
+        }
       }
     ],
     "fail_kind_map": {
-      "noticed-and-corrected": "missing_step",
       "retry-storm": "wrong_args",
       "abandoned": "missing_step",
-      "treated-success-as-failure": "wrong_args"
+      "never-attempted": "missing_step"
     }
   },
   "satisfiability": {

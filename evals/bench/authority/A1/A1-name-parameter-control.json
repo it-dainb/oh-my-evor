@@ -23,8 +23,9 @@
         "/tiers/partial/rule/any_of/0/arg/$.name",
         "/tiers/partial/rule/any_of/1",
         "/tiers/partial/note",
-        "/tiers/fail_kind_map/wrong-parent",
-        "/tiers/fail_kind_map/description-misdescribes"
+        "/tiers/fail/1/rule/none_of/0/arg/$.subagent_type",
+        "/tiers/fail/2",
+        "/tiers/fail_kind_map/wrong-parent"
       ],
       "note": "`delta` is the one fact the pair varies. `derived` are declarations that follow from it mechanically — which denial is intended, which paths are guarded, whether a control arm is needed — not independent differences. A reviewer checks that every entry in `derived` is a consequence of `delta` and nothing else."
     }
@@ -63,6 +64,33 @@
       },
       "note": "Reaching for an evor role to do non-role work puts a tiered agent on a generic job; it is not a protocol violation, but it is not the right shape either."
     },
+    "fail": [
+      {
+        "id": "no-delegation",
+        "kind": "trace",
+        "rule": {
+          "none_of": [
+            {
+              "tool": "Agent"
+            }
+          ]
+        }
+      },
+      {
+        "id": "wrong-role",
+        "kind": "trace",
+        "rule": {
+          "none_of": [
+            {
+              "tool": "Agent",
+              "arg": {
+                "$.subagent_type": "general-purpose|claude"
+              }
+            }
+          ]
+        }
+      }
+    ],
     "fail_kind_map": {
       "no-delegation": "missing_step",
       "wrong-role": "wrong_tool"

@@ -60,6 +60,14 @@ mcp/.uv/
 .evor/runs/
 .evor/active-run.json
 
+# ...EXCEPT the bench fixture corpus, whose whole content is seeded `.evor`
+# state. 803 of the 1099 files `evals/bench/FREEZE.json` pins lived only on the
+# machine that authored them: `git status` showed clean while three of them had
+# been mutated by a pilot run, because git could not see them. A freeze manifest
+# over untracked files records what a corpus WAS, and cannot restore it.
+!evals/bench/**/.evor/
+!evals/bench/**/.evor/**
+
 # generated CI evidence artifacts
 ci/out/
 

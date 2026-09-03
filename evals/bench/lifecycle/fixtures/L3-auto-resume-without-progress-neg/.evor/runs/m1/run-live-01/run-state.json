@@ -1,0 +1,13 @@
+{
+  "run_id": "run-live-01",
+  "status": "running",
+  "tick_count": 1,
+  "frontier_ids": [],
+  "pending_node_ids": [],
+  "best_score": null,
+  "best_node_id": null,
+  "tick_history_scores": [
+    0
+  ],
+  "updated_at": "2026-08-24T02:00:08Z"
+}

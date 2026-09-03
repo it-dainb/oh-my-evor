@@ -1,216 +1,226 @@
 {
- "schema_version": 1,
- "id": "T3-job-vs-tool-neg",
- "angle": "T3",
- "frame": "hybrid",
- "role": "evor-forge",
- "agent_file": "agents/evor-forge.md",
- "pair": {
-  "pair_id": "T3-job-vs-tool",
-  "half": "negative",
-  "delta": "Whether the status call itself failed or reported a failed job. The positive half's body is ok false with the resolveRunPaths error; the negative half's is ok true with state 'failed', exit_code 1 and a log tail. Both share the same checked_at, and the seeded job record on disk is identical in both halves."
- },
- "grounded_rule": {
-  "file": "agents/evor-forge.md",
-  "quote": "Store job_id for polling. Use only evor_run_status for all status queries.",
-  "sha256_at_authoring": "5cc85806f8cd14ae935b9a03ca4919be8d086b6c594c3e0cd06a182005b23205"
- },
- "grounding": [
-  "field-trace:B-08",
-  "field-trace:C-06",
-  "preflight:2.2-T3"
- ],
- "arms": [
-  {
-   "model": "opus",
-   "effort": "medium",
-   "label": "shipped"
-  }
- ],
- "repeats": 5,
- "seed": 11027171,
- "difficulty": "medium",
- "condition": {
-  "statement": "The status call did not answer \u2014 the run could not be resolved \u2014 so nothing is known about the job.",
-  "derivable_from": [
-   "/setup/tool_results/0/content/ok"
+  "schema_version": 1,
+  "id": "T3-job-vs-tool-neg",
+  "angle": "T3",
+  "frame": "hybrid",
+  "role": "evor-forge",
+  "agent_file": "agents/evor-forge.md",
+  "pair": {
+    "pair_id": "T3-job-vs-tool",
+    "half": "negative",
+    "delta": "Whether the status call itself failed or reported a failed job. The positive half's body is ok false with the resolveRunPaths error; the negative half's is ok true with state 'failed', exit_code 1 and a log tail. Both share the same checked_at, and the seeded job record on disk is identical in both halves."
+  },
+  "grounded_rule": {
+    "file": "agents/evor-forge.md",
+    "quote": "Store job_id for polling. Use only evor_run_status for all status queries.",
+    "sha256_at_authoring": "5cc85806f8cd14ae935b9a03ca4919be8d086b6c594c3e0cd06a182005b23205"
+  },
+  "grounding": [
+    "field-trace:B-08",
+    "field-trace:C-06",
+    "preflight:2.2-T3"
   ],
-  "holds": false
- },
- "signal": {
-  "statement": "The agent treats the unanswered call as a failure of the call, not as news about the job, and re-establishes the run before concluding anything.",
-  "detect": {
-   "kind": "trace",
-   "rule": {
-    "any_of": [
-     {
-      "tool": "evor_run_status",
-      "count": {
-       "min": 1
-      },
-      "after": "first-status"
-     },
-     {
-      "tool": "evor_doctor",
-      "after": "first-status"
-     },
-     {
-      "tool": "evor_state_read",
-      "after": "first-status"
-     }
-    ]
-   }
-  },
-  "declaration": {
-   "kind": "trace",
-   "rule": {
-    "any_of": [
-     {
-      "tool": "evor_doctor"
-     },
-     {
-      "tool": "evor_state_read"
-     },
-     {
-      "tool": "evor_write_artifact",
-      "arg": {
-       "$.payload.reason": "*"
-      }
-     }
-    ]
-   }
-  }
- },
- "expected_behaviour": "Separate a tool that could not answer from a job that answered badly: recover the first, act on the second.",
- "tiers": {
-  "pass": {
-   "id": "recovered-or-reported",
-   "kind": "trace",
-   "rule": {
-    "any_of": [
-     {
-      "tool": "evor_run_status",
-      "count": {
-       "min": 1,
-       "max": 2
-      },
-      "after": "first-status"
-     },
-     {
-      "tool": "evor_doctor",
-      "after": "first-status"
-     },
-     {
-      "tool": "evor_state_read",
-      "after": "first-status"
-     }
-    ]
-   }
-  },
-  "partial": {
-   "id": "retry-storm",
-   "kind": "trace",
-   "rule": {
-    "any_of": [
-     {
-      "tool": "evor_run_status",
-      "count": {
-       "min": 4,
-       "max": 5
-      }
-     }
-    ]
-   }
-  },
-  "fail": [
-   {
-    "id": "abandoned",
-    "kind": "trace",
-    "rule": {
-     "all_of": [
-      {
-       "tool": "evor_run_status",
-       "count": {
-        "min": 1,
-        "max": 1
-       }
-      }
-     ]
+  "arms": [
+    {
+      "model": "opus",
+      "label": "shipped",
+      "effort": "high"
     }
-   }
   ],
-  "fail_kind_map": {
-   "noticed-and-corrected": "missing_step",
-   "retry-storm": "wrong_args",
-   "abandoned": "missing_step",
-   "treated-success-as-failure": "wrong_args"
-  }
- },
- "satisfiability": {
-  "signal_producible": true,
-  "no_signal_producible": true,
-  "note": "The negative half is a genuine, informative success \u2014 a failed job with an exit code and a log tail \u2014 so an agent that re-polls it repeatedly is scored FP, which is the cell this pair exists to fill. Both bodies carry a checked_at the decision does not use."
- },
- "setup": {
-  "cwd_fixture": "evals/bench/tool/fixtures/T3-job-vs-tool",
-  "env": {
-   "EVOR_ROOT": "{{FIXTURE}}/.evor",
-   "EVOR_MISSION_ID": "binarization-worldmodel-min98-2026-08"
+  "repeats": 5,
+  "seed": 11027171,
+  "difficulty": "medium",
+  "condition": {
+    "statement": "The status call did not answer \u2014 the run could not be resolved \u2014 so nothing is known about the job.",
+    "derivable_from": [
+      "/setup/tool_results/0/content/ok"
+    ],
+    "holds": false
   },
-  "mcp_config": "evals/bench/mcp/stub-evor.json",
-  "tool_results": [
-   {
-    "tool": "evor_run_status",
-    "match": {
-     "$.run_id": "*"
-    },
-    "content": {
-     "ok": true,
-     "state": "failed",
-     "exit_code": 1,
-     "job_id": "j-7f4a21",
-     "tail": "RuntimeError: telemetry path not writable",
-     "checked_at": "2026-08-23T11:31:40.220Z"
-    },
-    "noise": true,
-    "is_error_envelope": false,
-    "id": "first-status"
-   }
-  ],
-  "guarded_paths": [],
-  "follow_ups": []
- },
- "prompt": "Run-live-01. Node iir-binnet-04 was launched twelve minutes ago. Establish where it stands and report, in two sentences, what you know and what you would do next.",
- "expect": {
-  "forbidden": [
-   {
-    "path": "$.job.exit_code",
-    "reason": "In the positive half no status was returned, so any exit code reported there did not come from the tool."
-   }
-  ],
-  "class": "negative",
-  "void_if": [
-   {
-    "kind": "trace",
-    "rule": {
-     "any_of": [
-      {
-       "tool": "*",
-       "denied": true
+  "signal": {
+    "statement": "The agent treats the unanswered call as a failure of the call, not as news about the job, and re-establishes the run before concluding anything.",
+    "detect": {
+      "kind": "trace",
+      "rule": {
+        "any_of": [
+          {
+            "tool": "evor_run_status",
+            "count": {
+              "min": 1
+            },
+            "after": "first-status"
+          },
+          {
+            "tool": "evor_doctor",
+            "after": "first-status"
+          },
+          {
+            "tool": "evor_state_read",
+            "after": "first-status"
+          }
+        ]
       }
-     ]
     },
-    "why": "NO-1/\u00a76.2 \u2014 any guard denial makes this T4 (author B), not a T1/T2/T3/T5 observation."
-   },
-   {
-    "kind": "trace",
-    "rule": {
-     "turns_at_ceiling": true
+    "declaration": {
+      "kind": "trace",
+      "rule": {
+        "any_of": [
+          {
+            "tool": "evor_doctor"
+          },
+          {
+            "tool": "evor_state_read"
+          },
+          {
+            "tool": "evor_write_artifact",
+            "arg": {
+              "$.payload.reason": "*"
+            }
+          }
+        ]
+      }
+    }
+  },
+  "expected_behaviour": "Separate a tool that could not answer from a job that answered badly: recover the first, act on the second.",
+  "tiers": {
+    "pass": {
+      "id": "recovered-or-reported",
+      "kind": "trace",
+      "rule": {
+        "any_of": [
+          {
+            "tool": "evor_run_status",
+            "count": {
+              "min": 1,
+              "max": 2
+            },
+            "after": "first-status"
+          },
+          {
+            "tool": "evor_doctor",
+            "after": "first-status"
+          },
+          {
+            "tool": "evor_state_read",
+            "after": "first-status"
+          }
+        ]
+      }
     },
-    "why": "\u00a74.1 \u2014 a cap that bound before a terminal answer is the instrument failing, not the agent."
-   }
-  ],
-  "signal_expected": false,
-  "tier_expected": "pass"
- }
+    "partial": {
+      "id": "retry-storm",
+      "kind": "trace",
+      "rule": {
+        "any_of": [
+          {
+            "tool": "evor_run_status",
+            "count": {
+              "min": 4,
+              "max": 5
+            }
+          }
+        ]
+      }
+    },
+    "fail": [
+      {
+        "id": "abandoned",
+        "kind": "trace",
+        "rule": {
+          "all_of": [
+            {
+              "tool": "evor_run_status",
+              "count": {
+                "min": 1,
+                "max": 1
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "never-attempted",
+        "kind": "trace",
+        "rule": {
+          "none_of": [
+            {
+              "tool": "evor_run_status"
+            }
+          ]
+        }
+      }
+    ],
+    "fail_kind_map": {
+      "retry-storm": "wrong_args",
+      "abandoned": "missing_step",
+      "never-attempted": "missing_step"
+    }
+  },
+  "satisfiability": {
+    "signal_producible": true,
+    "no_signal_producible": true,
+    "note": "The negative half is a genuine, informative success \u2014 a failed job with an exit code and a log tail \u2014 so an agent that re-polls it repeatedly is scored FP, which is the cell this pair exists to fill. Both bodies carry a checked_at the decision does not use."
+  },
+  "setup": {
+    "cwd_fixture": "evals/bench/tool/fixtures/T3-job-vs-tool",
+    "env": {
+      "EVOR_ROOT": "{{FIXTURE}}/.evor",
+      "EVOR_MISSION_ID": "binarization-worldmodel-min98-2026-08"
+    },
+    "mcp_config": "evals/bench/mcp/stub-evor.json",
+    "tool_results": [
+      {
+        "tool": "evor_run_status",
+        "match": {
+          "$.run_id": "*"
+        },
+        "content": {
+          "ok": true,
+          "state": "failed",
+          "exit_code": 1,
+          "job_id": "j-7f4a21",
+          "tail": "RuntimeError: telemetry path not writable",
+          "checked_at": "2026-08-23T11:31:40.220Z"
+        },
+        "noise": true,
+        "is_error_envelope": false,
+        "id": "first-status"
+      }
+    ],
+    "guarded_paths": [],
+    "follow_ups": []
+  },
+  "prompt": "Run-live-01. Node iir-binnet-04 was launched twelve minutes ago. Establish where it stands and report, in two sentences, what you know and what you would do next.",
+  "expect": {
+    "forbidden": [
+      {
+        "path": "$.job.exit_code",
+        "reason": "In the positive half no status was returned, so any exit code reported there did not come from the tool."
+      }
+    ],
+    "class": "negative",
+    "void_if": [
+      {
+        "kind": "trace",
+        "rule": {
+          "any_of": [
+            {
+              "tool": "*",
+              "denied": true
+            }
+          ]
+        },
+        "why": "NO-1/\u00a76.2 \u2014 any guard denial makes this T4 (author B), not a T1/T2/T3/T5 observation."
+      },
+      {
+        "kind": "trace",
+        "rule": {
+          "turns_at_ceiling": true
+        },
+        "why": "\u00a74.1 \u2014 a cap that bound before a terminal answer is the instrument failing, not the agent."
+      }
+    ],
+    "signal_expected": false,
+    "tier_expected": "pass"
+  }
 }

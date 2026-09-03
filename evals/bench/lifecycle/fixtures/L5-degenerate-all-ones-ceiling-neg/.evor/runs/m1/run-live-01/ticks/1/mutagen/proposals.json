@@ -1,0 +1,15 @@
+{
+  "tick": 1,
+  "proposals": [
+    {
+      "proposal_id": "p-001",
+      "name": "iir-scan-binnet-02",
+      "approach_family": "arch",
+      "parent_node_ids": [],
+      "hypothesis": {
+        "id": "h001-iir-multidirectional",
+        "prediction": "+2 to +4 points of val_metric over parent"
+      }
+    }
+  ]
+}

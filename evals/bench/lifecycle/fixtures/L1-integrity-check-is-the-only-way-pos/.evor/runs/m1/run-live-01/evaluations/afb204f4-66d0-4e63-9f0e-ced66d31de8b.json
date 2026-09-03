@@ -1,0 +1,10 @@
+{
+  "node_id": "afb204f4-66d0-4e63-9f0e-ced66d31de8b",
+  "verdict": "passed",
+  "verdict_source": "computed",
+  "checks": {
+    "telemetry_sane": true,
+    "no_test_leakage": false,
+    "eval_lock": true
+  }
+}

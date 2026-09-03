@@ -25,6 +25,20 @@ import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'fs';
 import { dirname, join, resolve } from 'path';
 import { fileURLToPath } from 'url';
 
+/** The tier `agents/<role>.md` declares. haiku carries no `effort`. */
+function shippedArm(agentFile, fallback) {
+  const p = new URL(`../../../${agentFile}`, import.meta.url).pathname;
+  if (!existsSync(p)) return fallback;
+  const head = readFileSync(p, 'utf8').slice(0, 3000);
+  const model = /^model:\s*(\S+)/m.exec(head)?.[1];
+  if (!model) return fallback;
+  const effort = /^effort:\s*(\S+)/m.exec(head)?.[1];
+  return model === 'haiku'
+    ? { model, label: 'shipped' }
+    : { model, ...(effort ? { effort } : {}), label: 'shipped' };
+}
+
+
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO = resolve(HERE, '..', '..', '..');
 
@@ -143,7 +157,14 @@ function emitPair(spec) {
       ...(spec.guarded_paths?.length ? { control_arm: CONTROL_ARM } : {}),
     },
 
-    arms: spec.arms ?? [{ model: spec.model, effort: spec.effort, label: 'shipped' }],
+    // ARMS COME FROM THE AGENT FILE, NEVER FROM THE PAIR'S OWN LITERAL.
+    //
+    // Every pair here carried its own `model:`/`effort:`, and several disagreed
+    // with the role they name — 32 scenarios across the corpus were labelled
+    // "shipped" on a tier that does not run. That was corrected once in the
+    // generated JSON and this generator put it straight back. The literals are
+    // left in the pair files as authoring intent and are no longer read.
+    arms: spec.arms ?? [shippedArm(spec.agent_file, { model: spec.model, effort: spec.effort, label: 'shipped' })],
     repeats: spec.repeats ?? 5,
     seed: spec.seed,
     difficulty: spec.difficulty,

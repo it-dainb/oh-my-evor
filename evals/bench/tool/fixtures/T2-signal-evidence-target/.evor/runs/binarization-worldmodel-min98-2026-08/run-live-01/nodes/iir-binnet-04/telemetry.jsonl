@@ -1,0 +1,1 @@
+{"step": 11400, "train_loss": 0.041, "val_metric": 96.32, "latency_cpu_4k_s": 1.83, "latency_gpu_ms": 41.2, "val_min_domain_f": 44.10, "ts": "2026-08-23T11:41:02.118Z", "node": "iir-binnet-04"}

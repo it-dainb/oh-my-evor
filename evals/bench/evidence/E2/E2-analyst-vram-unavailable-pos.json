@@ -159,8 +159,8 @@
   "arms": [
     {
       "model": "opus",
-      "effort": "medium",
-      "label": "shipped"
+      "label": "shipped",
+      "effort": "medium"
     }
   ],
   "repeats": 5,

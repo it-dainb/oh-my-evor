@@ -23,6 +23,21 @@ import { fileURLToPath } from "url";
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const BENCH = join(REPO_ROOT, "evals", "bench");
 
+/** Every scenario JSON in the corpus, angle directories only. */
+function scenarioFiles(): string[] {
+  const files: string[] = [];
+  for (const group of readdirSync(BENCH, { withFileTypes: true }).filter((d) => d.isDirectory())) {
+    const gdir = join(BENCH, group.name);
+    for (const angle of readdirSync(gdir, { withFileTypes: true }).filter((d) => d.isDirectory())) {
+      if (!/^[A-Z]\d$/.test(angle.name)) continue;
+      for (const f of readdirSync(join(gdir, angle.name))) {
+        if (f.endsWith(".json")) files.push(join(gdir, angle.name, f));
+      }
+    }
+  }
+  return files;
+}
+
 const run = (rel: string) => {
   try {
     return { ok: true, out: execFileSync("node", [rel], { cwd: REPO_ROOT, encoding: "utf8", timeout: 180_000 }) };
@@ -86,6 +101,78 @@ describe("evor-eval-bench — offline gates", () => {
       }
     }
     expect(orphans, `scenarios with no sibling:\n${orphans.join("\n")}`).toEqual([]);
+  });
+
+  // ── What the pilot's own logs exposed ──────────────────────────────────────
+  //
+  // Two of these are corpus gates for defects the RUNNER committed, kept here
+  // because the corpus is the thing a future author edits. The runner-side
+  // fixes are in `ci/bench-run.mjs`; these stop the corpus drifting back into a
+  // shape that hides them.
+
+  it("no scenario shows the model a placeholder it cannot bind", () => {
+    // 48 of 170 scenarios carried `{{ASK}}`, `{{FIELD}}`, `{{TARGET}}` and
+    // friends in `prompt` or `follow_ups`. The runner bound templates for
+    // detectors only, so the model was handed the literal braces — and in
+    // `A3-hypothesis-verdict-pos` it said so, refused to guess, and was scored
+    // FN for it. `bindTemplates` now throws; this keeps the corpus bindable.
+    const unbound: string[] = [];
+    for (const p of scenarioFiles()) {
+      const d = JSON.parse(readFileSync(p, "utf8"));
+      const bound = new Set([
+        "SANDBOX",
+        "FIXTURE",
+        ...Object.keys(d.setup?.templates ?? {}),
+        ...Object.keys(d.setup?.substitutions ?? {}),
+      ]);
+      const texts: string[] = [
+        String(d.prompt ?? ""),
+        ...(d.setup?.follow_ups ?? []).map((f: any) => String(typeof f === "string" ? f : f?.prompt ?? "")),
+      ];
+      for (const t of texts) {
+        for (const m of t.matchAll(/\{\{(\w+)\}\}/g)) {
+          if (!bound.has(m[1])) unbound.push(`${d.id}: {{${m[1]}}}`);
+        }
+      }
+    }
+    expect(unbound, `placeholders with no binding:\n${unbound.join("\n")}`).toEqual([]);
+  });
+
+  it("every setup path resolves from the repo root", () => {
+    // `cwd_fixture`, `mcp_config` and `plugin_fixture` are resolved against the
+    // REPO by the runner and were written group-relative by the evidence
+    // generator. Six scenarios pointed at `fixtures/E4/...` at the repo root
+    // and preflighted 0/6. It was fixed by hand in the generated JSON once and
+    // the generator reverted it — the same shape as the model-arm revert.
+    const missing: string[] = [];
+    for (const p of scenarioFiles()) {
+      const d = JSON.parse(readFileSync(p, "utf8"));
+      for (const k of ["cwd_fixture", "mcp_config", "plugin_fixture"]) {
+        const v = d.setup?.[k];
+        if (typeof v === "string" && !existsSync(join(REPO_ROOT, v))) missing.push(`${d.id}: ${k}=${v}`);
+      }
+    }
+    expect(missing, `setup paths that do not resolve:\n${missing.join("\n")}`).toEqual([]);
+  });
+
+  it("every fail_kind_map key names a rule that exists", () => {
+    // 46 of 170 tier/hybrid scenarios mapped failure kinds — `wrong-store-queried`,
+    // `treated-success-as-failure`, `no-delegation` — onto rule ids nothing
+    // declares. Every FAIL in those scenarios therefore came back with no
+    // attributable kind, which is why the pilot could say a run failed and not
+    // say why. An unreachable kind is a rule the author meant to write.
+    const orphans: string[] = [];
+    for (const p of scenarioFiles()) {
+      const d = JSON.parse(readFileSync(p, "utf8"));
+      if (!d.tiers) continue;
+      const ids = new Set<string>();
+      for (const k of ["pass", "partial"]) if (d.tiers[k]?.id) ids.add(d.tiers[k].id);
+      for (const r of d.tiers.fail ?? []) if (r?.id) ids.add(r.id);
+      for (const k of Object.keys(d.tiers.fail_kind_map ?? {})) {
+        if (!ids.has(k)) orphans.push(`${d.id}: fail_kind_map["${k}"] matches no rule id`);
+      }
+    }
+    expect(orphans, `unreachable failure kinds:\n${orphans.join("\n")}`).toEqual([]);
   });
 });
 

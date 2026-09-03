@@ -1,0 +1,10 @@
+{
+  "tick": 2,
+  "from": "evor",
+  "to": "selector",
+  "winning_families_snapshot": {
+    "arch": 0,
+    "data-augmentation": 2
+  },
+  "snapshot_taken_at": "2026-08-23T18:00:00Z"
+}

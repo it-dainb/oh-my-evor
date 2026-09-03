@@ -27,6 +27,36 @@ import json
 import os
 import shutil
 import sys
+import os
+_REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", ".."))
+
+# ARMS COME FROM THE AGENT FILE, NEVER FROM A LITERAL HERE.
+#
+# A hardcoded arm was corrected once in the generated JSON and this generator
+# put it straight back on the next build: 32 scenarios were labelled "shipped"
+# on a model their role does not run, so every number they produced described a
+# configuration that does not exist. `mcp/tests/bench-arms.test.ts` is the gate;
+# this is the source of truth it checks against.
+def shipped_arm(role, fallback=None):
+    import re as _re
+    path = os.path.join(_REPO, "agents", "%s.md" % role)
+    if not os.path.exists(path):
+        return fallback or {"model": "sonnet", "effort": "medium", "label": "shipped"}
+    head = open(path, encoding="utf-8").read()[:3000]
+    m = _re.search(r"^model:\s*(\S+)", head, _re.M)
+    if not m:
+        return fallback or {"model": "sonnet", "effort": "medium", "label": "shipped"}
+    model = m.group(1)
+    # haiku carries no `effort`; v1.2.1 stripped the inert declaration everywhere.
+    if model == "haiku":
+        return {"model": model, "label": "shipped"}
+    e = _re.search(r"^effort:\s*(\S+)", head, _re.M)
+    arm = {"model": model, "label": "shipped"}
+    if e:
+        arm["effort"] = e.group(1)
+    return arm
+
+
 
 REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", ".."))
 OUT = os.path.join(REPO, "evals", "bench", "tool")
@@ -173,7 +203,7 @@ def emit(angle, pair_id, frame, role, agent_file, rule, grounding, difficulty,
         "pair": {"pair_id": pair_id, "half": None, "delta": common.pop("delta")},
         "grounded_rule": rule,
         "grounding": grounding,
-        "arms": arms or [{"model": "sonnet", "effort": "medium", "label": "shipped"}],
+        "arms": arms or [shipped_arm(role)],
         "repeats": repeats,
         "seed": seed if seed is not None else (int(hashlib.sha256(pair_id.encode()).hexdigest()[:6], 16)),
         "difficulty": difficulty,

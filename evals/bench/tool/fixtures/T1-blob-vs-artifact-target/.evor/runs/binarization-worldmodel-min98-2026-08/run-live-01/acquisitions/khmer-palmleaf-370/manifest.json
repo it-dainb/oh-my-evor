@@ -1,0 +1,10 @@
+{
+  "source": "hf://cattleya/khmer-palmleaf-370",
+  "target": "enrich-train",
+  "license": "CC-BY-4.0",
+  "fetched_at": "2026-08-23T10:02:41.554Z",
+  "items_fetched": 370,
+  "items_after_dedupe": 358,
+  "dropped_for_collision": 12,
+  "forbidden_split_sha256": "9b1d0e7c4a2f8536d1c0b9a8e7f6543210fedcba9876543210abcdef01234567"
+}

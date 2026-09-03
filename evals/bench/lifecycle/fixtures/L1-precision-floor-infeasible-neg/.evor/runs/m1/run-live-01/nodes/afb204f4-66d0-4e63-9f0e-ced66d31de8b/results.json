@@ -1,0 +1,11 @@
+{
+  "node_id": "node-0012",
+  "status": "ok",
+  "timestamp": "2026-08-24T01:30:33Z",
+  "val_metric": 41.6,
+  "val_min_domain_f": 0.64,
+  "per_domain": {},
+  "telemetry_summary": {
+    "total_steps": 240
+  }
+}

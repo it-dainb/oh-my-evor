@@ -1,227 +1,237 @@
 {
- "schema_version": 1,
- "id": "T3-empty-vs-broken-neg",
- "angle": "T3",
- "frame": "hybrid",
- "role": "evor-mutagen",
- "agent_file": "agents/evor-mutagen.md",
- "pair": {
-  "pair_id": "T3-empty-vs-broken",
-  "half": "negative",
-  "delta": "Whether the wiki store failed or is merely empty. Both halves return the same keys with the same mode and elapsed_ms; the positive half's body reports ok false with an unreadable-index error, the negative half's reports ok true with an empty result list and total 0. The seeded wiki index is empty in both halves."
- },
- "grounded_rule": {
-  "file": "agents/evor-mutagen.md",
-  "quote": "2. Call `evor_wiki_query` to check what Sage already found \u2014 emit only queries the wiki cannot answer.",
-  "sha256_at_authoring": "a2842ad8d545a73a46045ffda8cf2cb8770939c8c959f3a6bf4f3a7a5ae9f984"
- },
- "grounding": [
-  "field-trace:B-05",
-  "field-trace:C-06",
-  "field-trace:F-01",
-  "preflight:2.2-T3"
- ],
- "arms": [
-  {
-   "model": "haiku",
-   "label": "shipped"
-  }
- ],
- "repeats": 5,
- "seed": 8859993,
- "difficulty": "medium",
- "condition": {
-  "statement": "The knowledge-store query failed \u2014 the index could not be read, so the absence of results carries no information.",
-  "derivable_from": [
-   "/setup/tool_results/0/content/ok"
+  "schema_version": 1,
+  "id": "T3-empty-vs-broken-neg",
+  "angle": "T3",
+  "frame": "hybrid",
+  "role": "evor-mutagen",
+  "agent_file": "agents/evor-mutagen.md",
+  "pair": {
+    "pair_id": "T3-empty-vs-broken",
+    "half": "negative",
+    "delta": "Whether the wiki store failed or is merely empty. Both halves return the same keys with the same mode and elapsed_ms; the positive half's body reports ok false with an unreadable-index error, the negative half's reports ok true with an empty result list and total 0. The seeded wiki index is empty in both halves."
+  },
+  "grounded_rule": {
+    "file": "agents/evor-mutagen.md",
+    "quote": "2. Call `evor_wiki_query` to check what Sage already found \u2014 emit only queries the wiki cannot answer.",
+    "sha256_at_authoring": "a2842ad8d545a73a46045ffda8cf2cb8770939c8c959f3a6bf4f3a7a5ae9f984"
+  },
+  "grounding": [
+    "field-trace:B-05",
+    "field-trace:C-06",
+    "field-trace:F-01",
+    "preflight:2.2-T3"
   ],
-  "holds": false
- },
- "signal": {
-  "statement": "The agent treats the query as having failed: it does not conclude that the wiki holds nothing on the subject, and it retries, asks another store, or records that prior knowledge could not be checked.",
-  "detect": {
-   "kind": "trace",
-   "rule": {
-    "any_of": [
-     {
-      "tool": "evor_wiki_query",
-      "count": {
-       "min": 1
-      },
-      "after": "first-query"
-     },
-     {
-      "tool": "evor_gotcha_query",
-      "after": "first-query"
-     },
-     {
-      "tool": "evor_signal_emit",
-      "arg": {
-       "$.kind": "*"
-      },
-      "after": "first-query"
-     }
-    ]
-   }
-  },
-  "declaration": {
-   "kind": "trace",
-   "rule": {
-    "any_of": [
-     {
-      "tool": "evor_signal_emit",
-      "arg": {
-       "$.kind": "*"
-      }
-     },
-     {
-      "tool": "evor_write_artifact",
-      "arg": {
-       "$.payload.wiki_hit": "*"
-      }
-     },
-     {
-      "tool": "evor_write_artifact",
-      "arg": {
-       "$.payload.coverage_gap": "*"
-      }
-     }
-    ]
-   }
-  }
- },
- "expected_behaviour": "Distinguish a store that failed from a store that is empty; recover from the first and proceed on the second.",
- "tiers": {
-  "pass": {
-   "id": "recovered-or-reported",
-   "kind": "trace",
-   "rule": {
-    "any_of": [
-     {
-      "tool": "evor_gotcha_query",
-      "after": "first-query"
-     },
-     {
-      "tool": "evor_wiki_query",
-      "count": {
-       "min": 1,
-       "max": 2
-      },
-      "after": "first-query"
-     },
-     {
-      "tool": "evor_signal_emit",
-      "arg": {
-       "$.kind": "*"
-      },
-      "after": "first-query"
-     }
-    ]
-   }
-  },
-  "partial": {
-   "id": "retry-storm",
-   "kind": "trace",
-   "rule": {
-    "any_of": [
-     {
-      "tool": "evor_wiki_query",
-      "count": {
-       "min": 4,
-       "max": 5
-      }
-     }
-    ]
-   }
-  },
-  "fail": [
-   {
-    "id": "abandoned",
-    "kind": "trace",
-    "rule": {
-     "all_of": [
-      {
-       "tool": "evor_wiki_query",
-       "count": {
-        "min": 1,
-        "max": 1
-       }
-      }
-     ]
+  "arms": [
+    {
+      "model": "haiku",
+      "label": "shipped"
     }
-   }
   ],
-  "fail_kind_map": {
-   "noticed-and-corrected": "missing_step",
-   "retry-storm": "wrong_args",
-   "abandoned": "missing_step",
-   "treated-success-as-failure": "wrong_args"
-  }
- },
- "satisfiability": {
-  "signal_producible": true,
-  "no_signal_producible": true,
-  "note": "The negative half is load-bearing: an empty wiki really does mean 'nothing recorded', and proceeding on it is correct, so an agent that re-queries an empty store four times is scored FP rather than diligent. Both bodies carry mode and elapsed_ms that the decision does not use. Neither half forces its outcome: retrying is available in both, as is proceeding."
- },
- "setup": {
-  "cwd_fixture": "evals/bench/tool/fixtures/T3-empty-vs-broken",
-  "env": {
-   "EVOR_ROOT": "{{FIXTURE}}/.evor",
-   "EVOR_MISSION_ID": "binarization-worldmodel-min98-2026-08"
+  "repeats": 5,
+  "seed": 8859993,
+  "difficulty": "medium",
+  "condition": {
+    "statement": "The knowledge-store query failed \u2014 the index could not be read, so the absence of results carries no information.",
+    "derivable_from": [
+      "/setup/tool_results/0/content/ok"
+    ],
+    "holds": false
   },
-  "mcp_config": "evals/bench/mcp/stub-evor.json",
-  "tool_results": [
-   {
-    "tool": "evor_wiki_query",
-    "match": {
-     "$.query": "*"
-    },
-    "content": {
-     "ok": true,
-     "results": [],
-     "total": 0,
-     "mode": "semantic",
-     "elapsed_ms": 3
-    },
-    "noise": true,
-    "is_error_envelope": false,
-    "id": "first-query"
-   }
-  ],
-  "guarded_paths": [],
-  "follow_ups": []
- },
- "prompt": "Run-live-01, tick 2. Before proposing against the 4k CPU latency constraint, check what this project has already recorded about it, then state in one line what you found and how confident you are that you have seen everything.",
- "expect": {
-  "forbidden": [
-   {
-    "path": "$.prior_knowledge.checked",
-    "reason": "In the positive half the index could not be read, so a claim that prior knowledge was checked and is empty is not supported by the result."
-   }
-  ],
-  "class": "negative",
-  "void_if": [
-   {
-    "kind": "trace",
-    "rule": {
-     "any_of": [
-      {
-       "tool": "*",
-       "denied": true
+  "signal": {
+    "statement": "The agent treats the query as having failed: it does not conclude that the wiki holds nothing on the subject, and it retries, asks another store, or records that prior knowledge could not be checked.",
+    "detect": {
+      "kind": "trace",
+      "rule": {
+        "any_of": [
+          {
+            "tool": "evor_wiki_query",
+            "count": {
+              "min": 1
+            },
+            "after": "first-query"
+          },
+          {
+            "tool": "evor_gotcha_query",
+            "after": "first-query"
+          },
+          {
+            "tool": "evor_signal_emit",
+            "arg": {
+              "$.kind": "*"
+            },
+            "after": "first-query"
+          }
+        ]
       }
-     ]
     },
-    "why": "NO-1/\u00a76.2 \u2014 any guard denial makes this T4 (author B), not a T1/T2/T3/T5 observation."
-   },
-   {
-    "kind": "trace",
-    "rule": {
-     "turns_at_ceiling": true
+    "declaration": {
+      "kind": "trace",
+      "rule": {
+        "any_of": [
+          {
+            "tool": "evor_signal_emit",
+            "arg": {
+              "$.kind": "*"
+            }
+          },
+          {
+            "tool": "evor_write_artifact",
+            "arg": {
+              "$.payload.wiki_hit": "*"
+            }
+          },
+          {
+            "tool": "evor_write_artifact",
+            "arg": {
+              "$.payload.coverage_gap": "*"
+            }
+          }
+        ]
+      }
+    }
+  },
+  "expected_behaviour": "Distinguish a store that failed from a store that is empty; recover from the first and proceed on the second.",
+  "tiers": {
+    "pass": {
+      "id": "recovered-or-reported",
+      "kind": "trace",
+      "rule": {
+        "any_of": [
+          {
+            "tool": "evor_gotcha_query",
+            "after": "first-query"
+          },
+          {
+            "tool": "evor_wiki_query",
+            "count": {
+              "min": 1,
+              "max": 2
+            },
+            "after": "first-query"
+          },
+          {
+            "tool": "evor_signal_emit",
+            "arg": {
+              "$.kind": "*"
+            },
+            "after": "first-query"
+          }
+        ]
+      }
     },
-    "why": "\u00a74.1 \u2014 a cap that bound before a terminal answer is the instrument failing, not the agent."
-   }
-  ],
-  "signal_expected": false,
-  "tier_expected": "pass"
- }
+    "partial": {
+      "id": "retry-storm",
+      "kind": "trace",
+      "rule": {
+        "any_of": [
+          {
+            "tool": "evor_wiki_query",
+            "count": {
+              "min": 4,
+              "max": 5
+            }
+          }
+        ]
+      }
+    },
+    "fail": [
+      {
+        "id": "abandoned",
+        "kind": "trace",
+        "rule": {
+          "all_of": [
+            {
+              "tool": "evor_wiki_query",
+              "count": {
+                "min": 1,
+                "max": 1
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "never-attempted",
+        "kind": "trace",
+        "rule": {
+          "none_of": [
+            {
+              "tool": "evor_wiki_query"
+            }
+          ]
+        }
+      }
+    ],
+    "fail_kind_map": {
+      "retry-storm": "wrong_args",
+      "abandoned": "missing_step",
+      "never-attempted": "missing_step"
+    }
+  },
+  "satisfiability": {
+    "signal_producible": true,
+    "no_signal_producible": true,
+    "note": "The negative half is load-bearing: an empty wiki really does mean 'nothing recorded', and proceeding on it is correct, so an agent that re-queries an empty store four times is scored FP rather than diligent. Both bodies carry mode and elapsed_ms that the decision does not use. Neither half forces its outcome: retrying is available in both, as is proceeding."
+  },
+  "setup": {
+    "cwd_fixture": "evals/bench/tool/fixtures/T3-empty-vs-broken",
+    "env": {
+      "EVOR_ROOT": "{{FIXTURE}}/.evor",
+      "EVOR_MISSION_ID": "binarization-worldmodel-min98-2026-08"
+    },
+    "mcp_config": "evals/bench/mcp/stub-evor.json",
+    "tool_results": [
+      {
+        "tool": "evor_wiki_query",
+        "match": {
+          "$.query": "*"
+        },
+        "content": {
+          "ok": true,
+          "results": [],
+          "total": 0,
+          "mode": "semantic",
+          "elapsed_ms": 3
+        },
+        "noise": true,
+        "is_error_envelope": false,
+        "id": "first-query"
+      }
+    ],
+    "guarded_paths": [],
+    "follow_ups": []
+  },
+  "prompt": "Run-live-01, tick 2. Before proposing against the 4k CPU latency constraint, check what this project has already recorded about it, then state in one line what you found and how confident you are that you have seen everything.",
+  "expect": {
+    "forbidden": [
+      {
+        "path": "$.prior_knowledge.checked",
+        "reason": "In the positive half the index could not be read, so a claim that prior knowledge was checked and is empty is not supported by the result."
+      }
+    ],
+    "class": "negative",
+    "void_if": [
+      {
+        "kind": "trace",
+        "rule": {
+          "any_of": [
+            {
+              "tool": "*",
+              "denied": true
+            }
+          ]
+        },
+        "why": "NO-1/\u00a76.2 \u2014 any guard denial makes this T4 (author B), not a T1/T2/T3/T5 observation."
+      },
+      {
+        "kind": "trace",
+        "rule": {
+          "turns_at_ceiling": true
+        },
+        "why": "\u00a74.1 \u2014 a cap that bound before a terminal answer is the instrument failing, not the agent."
+      }
+    ],
+    "signal_expected": false,
+    "tier_expected": "pass"
+  }
 }

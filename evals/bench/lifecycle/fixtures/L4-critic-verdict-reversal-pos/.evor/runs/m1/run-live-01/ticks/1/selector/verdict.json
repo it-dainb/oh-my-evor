@@ -1,0 +1,19 @@
+{
+  "tick": 1,
+  "reviews": [
+    {
+      "proposal_id": "p-001",
+      "critic_review": {
+        "verdict": "approved"
+      }
+    },
+    {
+      "proposal_id": "p-002",
+      "critic_review": {
+        "verdict": "rejected",
+        "superseded_verdict": "approved",
+        "reversal_reason": "genome.yaml edited after the 09:30 review; the reviewed artifact is not the built artifact"
+      }
+    }
+  ]
+}

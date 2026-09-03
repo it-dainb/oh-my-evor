@@ -14,6 +14,11 @@
       "derived": [
         "/tiers/pass/rule/all_of/0/description_matches",
         "/tiers/partial/note",
+        "/tiers/fail/1/id",
+        "/tiers/fail/1/rule/any_of/0/arg/$.description",
+        "/tiers/fail/1/rule/any_of/0/arg/$.subagent_type",
+        "/tiers/fail/2/rule/any_of/0/arg/$.subagent_type",
+        "/tiers/fail/2/rule/any_of/0/arg/$.description",
         "/tiers/fail_kind_map/description-noop-placeholder",
         "/tiers/fail_kind_map/description-overstates"
       ],
@@ -54,6 +59,48 @@
       },
       "note": "Verbatim description strings taken from the field corpus's own .meta.json files. They are not wrong, they are uninformative — a supervisor reading only the roster cannot tell these three apart, and two of them were commissioned by sibling agents that did not know about each other."
     },
+    "fail": [
+      {
+        "id": "no-delegation",
+        "kind": "trace",
+        "rule": {
+          "none_of": [
+            {
+              "tool": "Agent"
+            }
+          ]
+        }
+      },
+      {
+        "id": "description-noop-placeholder",
+        "kind": "trace",
+        "rule": {
+          "any_of": [
+            {
+              "tool": "Agent",
+              "arg": {
+                "$.description": "*noop*|*placeholder*|*wait*|*TBD*|*stub*"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "description-misdescribes",
+        "kind": "trace",
+        "rule": {
+          "any_of": [
+            {
+              "tool": "Agent",
+              "arg": {
+                "$.subagent_type": "oh-my-evor:evor-forge-junior",
+                "$.description": "*constant*|*default*|*one line*|*single line*|*width*"
+              }
+            }
+          ]
+        }
+      }
+    ],
     "fail_kind_map": {
       "description-misdescribes": "missing_step",
       "description-noop-placeholder": "missing_step",

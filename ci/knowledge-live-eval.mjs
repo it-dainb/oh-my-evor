@@ -252,7 +252,7 @@ export function buildSelectorTask() {
  *
  * @returns {{events: object[], result: object, model: string, cost_usd: number, wall_ms: number}}
  */
-export function runLive({ prompt, model, effort, maxTurns, timeoutMs, env, mcpConfigPath, allowedTools, tolerateError = false }) {
+export function runLive({ prompt, model, effort, maxTurns, timeoutMs, env, mcpConfigPath, allowedTools, cwd, tolerateError = false }) {
   const args = [
     '-p', prompt,
     '--model', model,
@@ -272,6 +272,13 @@ export function runLive({ prompt, model, effort, maxTurns, timeoutMs, env, mcpCo
       encoding: 'utf8',
       timeout: timeoutMs ?? 600000,
       maxBuffer: 64 * 1024 * 1024,
+      // THE SANDBOX IS ONLY A SANDBOX IF THE PROCESS RUNS IN IT. Without this
+      // the child inherits the repo root, so every relative Read/Glob/Bash the
+      // agent issues addresses the LIVE TREE. `A3-best-score-pos` said so in
+      // its answer — "no file matching iir-binnet-01 exists in the repo" — and
+      // three bench fixtures were mutated by pilot runs writing through it.
+      // Callers that want the repo pass nothing and inherit, as before.
+      ...(cwd ? { cwd } : {}),
       env: { ...process.env, ...env },
     });
   } catch (e) {

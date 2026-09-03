@@ -1,0 +1,10 @@
+{
+  "tick": 1,
+  "from": "forge",
+  "to": "probe",
+  "node_id": "afb204f4-66d0-4e63-9f0e-ced66d31de8b",
+  "node_name": "iir-scan-binnet-02",
+  "harness_exit": 0,
+  "telemetry_confirmed": true,
+  "planned_total_steps": 200
+}

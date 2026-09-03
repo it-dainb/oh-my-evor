@@ -113,7 +113,14 @@ emit(
                       called("evor_cite", arg_type={"$.citation": "array"})],
                      called("evor_cite", {"$.node_id": "iir-binnet-04"},
                             arg_type={"$.citation": "string"})),
-           [det("never-valid", "trace", {"none_of": [called("evor_cite")]})])},
+           [det("never-valid", "trace", {"none_of": [called("evor_cite")]}),
+            # `semantically-wrong` was in KINDS and no detector carried the id,
+            # so a well-formed call aimed at the wrong node came back FAIL with
+            # `failure_kind: null` — the bench could say the run failed and not
+            # say why. The shape it names is a call that IS well-formed and
+            # attaches the citation to a node this half does not seed.
+            det("semantically-wrong", "trace",
+                {"any_of": [called("evor_cite", {"$.node_id": "!iir-binnet-04"})]})])},
     b={"setup": {"cwd_fixture": f_nonode},
        "tiers": tier(
            det("cite-node-scalar", "trace",
@@ -125,8 +132,10 @@ emit(
                       called("evor_cite", arg_type={"$.citation": "array"})],
                      called("evor_cite", {"$.node_id": "genuine-iir-mechanisms"},
                             arg_type={"$.citation": "string"})),
-           [det("never-valid", "trace", {"none_of": [called("evor_cite")]})])},
-    diff=["/setup/cwd_fixture", "/tiers/pass", "/tiers/partial"],
+           [det("never-valid", "trace", {"none_of": [called("evor_cite")]}),
+            det("semantically-wrong", "trace",
+                {"any_of": [called("evor_cite", {"$.node_id": "!genuine-iir-mechanisms"})]})])},
+    diff=["/setup/cwd_fixture", "/tiers/pass", "/tiers/partial", "/tiers/fail"],
 )
 
 # ── T2-P2 — evor_signal_emit: closed facet sets and the right number ────────
@@ -467,14 +476,23 @@ emit(
                            called("evor_run_status", {"$.job_id": "j-7f4a21"})]}),
            corrected([called("evor_run_status", {"$.job_id": "j-91c05e"})],
                      called("evor_run_status", {"$.job_id": "j-7f4a21"})),
-           [det("never-valid", "trace", {"none_of": [called("evor_run_status")]})])},
+           [det("never-valid", "trace", {"none_of": [called("evor_run_status")]}),
+            # Well-formed, wrong job: the state of a DIFFERENT node's run,
+            # reported as this node's. Unreachable until now.
+            det("semantically-wrong", "trace",
+                {"any_of": [called("evor_run_status", {"$.job_id": "j-91c05e"})]})])},
     b={"setup": {"cwd_fixture": f_twojobs},
        "tiers": tier(
            det("status-right-job", "trace",
                {"any_of": [called("evor_run_status", {"$.job_id": "j-7f4a21"})]}),
            corrected([called("evor_run_status", {"$.run_id": "run-live-01", "$.job_id": None})],
                      called("evor_run_status", {"$.job_id": "j-7f4a21"})),
-           [det("never-valid", "trace", {"none_of": [called("evor_run_status")]})])},
+           [det("never-valid", "trace", {"none_of": [called("evor_run_status")]}),
+            det("semantically-wrong", "trace",
+                {"any_of": [called("evor_run_status", {"$.job_id": "j-91c05e"})]})])},
+    # `/tiers/fail` is NOT in the delta here: both halves name the same wrong
+    # job, so the fail rules are identical and declaring a difference that does
+    # not exist is the same defect in the other direction.
     diff=["/setup/cwd_fixture", "/tiers/pass", "/tiers/partial"],
 )
 

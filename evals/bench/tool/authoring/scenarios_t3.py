@@ -27,10 +27,24 @@ ok:false-inside-a-success envelope that P1 is about. See AUTHORING-NOTE-A.
 
 from generate import (emit, det, called, fixture, base_run, runp, grounded, STUB_MCP)
 
-KINDS = {"noticed-and-corrected": "missing_step",
-         "retry-storm": "wrong_args",
+# EVERY KEY HERE MUST BE A DETECTOR ID, because `kindFor` looks the fired
+# detector's id up in this map and returns null when it is absent.
+#
+# It shipped with two keys that were never detector ids: `noticed-and-corrected`
+# names what the PASS detector `recovered-or-reported` grades (and PASS carries
+# no failure kind), and `treated-success-as-failure` names the SIGNAL detector
+# `treated-as-failure`, which lives in the matrix half of this hybrid and is not
+# a tier at all. They were vocabulary, written down and never wired, and their
+# presence made the map look complete while two of its four kinds could not fire.
+#
+# `never-attempted` is the gap they hid. `abandoned` requires exactly one call —
+# an agent that never called the tool at all matched no fail rule and fell
+# through to FAIL with no kind. That is what happened in the pilot:
+# `T3-ok-false-envelope-neg` came back FAIL and the bench could not say why,
+# because evor_cite was never called and nothing graded that.
+KINDS = {"retry-storm": "wrong_args",
          "abandoned": "missing_step",
-         "treated-success-as-failure": "wrong_args"}
+         "never-attempted": "missing_step"}
 
 
 def hybrid(notice_det, pass_det, partial_det, fail_dets):
@@ -81,7 +95,8 @@ _notice, _tiers = hybrid(
         {"any_of": [called("evor_cite", count={"min": 1, "max": 2}, after="first-cite"),
                     called("evor_signal_emit", {"$.kind": "*"}, after="first-cite")]}),
     det("retry-storm", "trace", {"any_of": [called("evor_cite", count={"min": 4, "max": 5})]}),
-    [det("abandoned", "trace", {"all_of": [called("evor_cite", count={"min": 1, "max": 1})]})])
+    [det("abandoned", "trace", {"all_of": [called("evor_cite", count={"min": 1, "max": 1})]}),
+     det("never-attempted", "trace", {"none_of": [called("evor_cite")]})])
 
 emit(
     angle="T3", pair_id="T3-ok-false-envelope", frame="hybrid",
@@ -173,7 +188,8 @@ _notice2, _tiers2 = hybrid(
         {"any_of": [called("evor_signal_emit", count={"min": 1, "max": 2}, after="first-emit"),
                     called("evor_write_artifact", {"$.payload": "*"}, after="first-emit")]}),
     det("retry-storm", "trace", {"any_of": [called("evor_signal_emit", count={"min": 4, "max": 5})]}),
-    [det("abandoned", "trace", {"all_of": [called("evor_signal_emit", count={"min": 1, "max": 1})]})])
+    [det("abandoned", "trace", {"all_of": [called("evor_signal_emit", count={"min": 1, "max": 1})]}),
+     det("never-attempted", "trace", {"none_of": [called("evor_signal_emit")]})])
 
 emit(
     angle="T3", pair_id="T3-hard-error-retry", frame="hybrid",
@@ -256,7 +272,8 @@ _notice3, _tiers3 = hybrid(
                     called("evor_wiki_query", count={"min": 1, "max": 2}, after="first-query"),
                     called("evor_signal_emit", {"$.kind": "*"}, after="first-query")]}),
     det("retry-storm", "trace", {"any_of": [called("evor_wiki_query", count={"min": 4, "max": 5})]}),
-    [det("abandoned", "trace", {"all_of": [called("evor_wiki_query", count={"min": 1, "max": 1})]})])
+    [det("abandoned", "trace", {"all_of": [called("evor_wiki_query", count={"min": 1, "max": 1})]}),
+     det("never-attempted", "trace", {"none_of": [called("evor_wiki_query")]})])
 
 emit(
     angle="T3", pair_id="T3-empty-vs-broken", frame="hybrid",
@@ -344,7 +361,8 @@ _notice4, _tiers4 = hybrid(
                     called("evor_doctor", after="first-status"),
                     called("evor_state_read", after="first-status")]}),
     det("retry-storm", "trace", {"any_of": [called("evor_run_status", count={"min": 4, "max": 5})]}),
-    [det("abandoned", "trace", {"all_of": [called("evor_run_status", count={"min": 1, "max": 1})]})])
+    [det("abandoned", "trace", {"all_of": [called("evor_run_status", count={"min": 1, "max": 1})]}),
+     det("never-attempted", "trace", {"none_of": [called("evor_run_status")]})])
 
 emit(
     angle="T3", pair_id="T3-job-vs-tool", frame="hybrid",
@@ -426,7 +444,8 @@ _notice5, _tiers5 = hybrid(
     det("retry-storm", "trace",
         {"any_of": [called("evor_read_artifact", count={"min": 4, "max": 5})]}),
     [det("abandoned", "trace",
-         {"all_of": [called("evor_read_artifact", count={"min": 1, "max": 1})]})])
+         {"all_of": [called("evor_read_artifact", count={"min": 1, "max": 1})]}),
+     det("never-attempted", "trace", {"none_of": [called("evor_read_artifact")]})])
 
 emit(
     angle="T3", pair_id="T3-upstream-missing", frame="hybrid",
@@ -522,7 +541,8 @@ _notice6, _tiers6 = hybrid(
     det("retry-storm", "trace",
         {"any_of": [called("evor_validate_proposals", count={"min": 4, "max": 5})]}),
     [det("abandoned", "trace",
-         {"all_of": [called("evor_validate_proposals", count={"min": 1, "max": 1})]})])
+         {"all_of": [called("evor_validate_proposals", count={"min": 1, "max": 1})]}),
+     det("never-attempted", "trace", {"none_of": [called("evor_validate_proposals")]})])
 
 emit(
     angle="T3", pair_id="T3-repeat-rejection", frame="hybrid",

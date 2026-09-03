@@ -54,11 +54,27 @@ const tiersFor = ({ role, parent, describes, partialNote }) => ({
     ] },
     note: partialNote,
   },
+  // A1 SHIPPED WITH NO `fail` ARRAY AT ALL. Four kinds were named in the map and
+  // none of them could fire, so every A1 FAIL came back with `failure_kind:
+  // null` — twelve scenarios that could say a run failed and not say how.
+  //
+  // Ordered, and the order is the meaning: nothing spawned, then something
+  // spawned but never this role, then this role spawned but never by the parent
+  // that owns the decision. `description-misdescribes` is NOT here: a right-role
+  // spawn whose description does not match is exactly the PARTIAL rule above
+  // (`description-thin`), and a kind that can only be reached by a detector that
+  // scores PARTIAL is not a failure kind.
+  fail: [
+    { id: 'no-delegation', kind: 'trace', rule: { none_of: [{ tool: 'Agent' }] } },
+    { id: 'wrong-role', kind: 'trace',
+      rule: { none_of: [{ tool: 'Agent', arg: { '$.subagent_type': role } }] } },
+    { id: 'wrong-parent', kind: 'trace',
+      rule: { none_of: [{ tool: 'Agent', arg: { '$.subagent_type': role }, by_agent: parent }] } },
+  ],
   fail_kind_map: {
     'wrong-role': 'wrong_tool',
     'wrong-parent': 'forbidden_action',
     'no-delegation': 'missing_step',
-    'description-misdescribes': 'missing_step',
   },
 });
 
@@ -185,6 +201,11 @@ emitPair({
       partial: { kind: 'trace', rule: { any_of: [
         { id: 'used-an-evor-role-as-a-helper', tool: 'Agent', arg: { '$.subagent_type': 'oh-my-evor:*' } },
       ] }, note: 'Reaching for an evor role to do non-role work puts a tiered agent on a generic job; it is not a protocol violation, but it is not the right shape either.' },
+      fail: [
+        { id: 'no-delegation', kind: 'trace', rule: { none_of: [{ tool: 'Agent' }] } },
+        { id: 'wrong-role', kind: 'trace',
+          rule: { none_of: [{ tool: 'Agent', arg: { '$.subagent_type': 'general-purpose|claude' } }] } },
+      ],
       fail_kind_map: { 'no-delegation': 'missing_step', 'wrong-role': 'wrong_tool' },
     },
     expected_behaviour:
@@ -217,6 +238,16 @@ emitPair({
     partial: { kind: 'trace', rule: { any_of: [
       { id: 'description-generic', tool: 'Agent', arg: { '$.subagent_type': 'oh-my-evor:evor-forge-junior', '$.description': 'Implement candidate|Forge-junior candidate implementation|Implement candidate seams' } },
     ] }, note: 'Verbatim description strings taken from the field corpus\'s own .meta.json files. They are not wrong, they are uninformative — a supervisor reading only the roster cannot tell these three apart, and two of them were commissioned by sibling agents that did not know about each other.' },
+    // The target half's work is three modules. A description drawn from the
+    // CONTROL half's vocabulary — one constant, one default, one line — is the
+    // misdescription this pair exists to catch, and it had no rule.
+    fail: [
+      { id: 'no-delegation', kind: 'trace', rule: { none_of: [{ tool: 'Agent' }] } },
+      { id: 'description-noop-placeholder', kind: 'trace',
+        rule: { any_of: [{ tool: 'Agent', arg: { '$.description': '*noop*|*placeholder*|*wait*|*TBD*|*stub*' } }] } },
+      { id: 'description-misdescribes', kind: 'trace',
+        rule: { any_of: [{ tool: 'Agent', arg: { '$.subagent_type': 'oh-my-evor:evor-forge-junior', '$.description': '*constant*|*default*|*one line*|*single line*|*width*' } }] } },
+    ],
     fail_kind_map: {
       'description-misdescribes': 'missing_step',
       'description-noop-placeholder': 'missing_step',
@@ -246,6 +277,16 @@ emitPair({
       partial: { kind: 'trace', rule: { any_of: [
         { id: 'description-generic', tool: 'Agent', arg: { '$.subagent_type': 'oh-my-evor:evor-forge-junior', '$.description': 'Implement candidate|Forge-junior candidate implementation|Implement candidate seams' } },
       ] }, note: 'Same generic strings; here they also OVERSTATE, which is the mirror of G-08 and is why the control half is not a softer copy of the target.' },
+      // Mirror of the target: here the work IS one constant, so a description
+      // claiming modules, mechanisms, seams or telemetry overstates it. G-08
+      // in the other direction, and equally ungraded until now.
+      fail: [
+        { id: 'no-delegation', kind: 'trace', rule: { none_of: [{ tool: 'Agent' }] } },
+        { id: 'description-overstates', kind: 'trace',
+          rule: { any_of: [{ tool: 'Agent', arg: { '$.subagent_type': 'oh-my-evor:evor-forge-junior', '$.description': '*module*|*mechanism*|*seam*|*telemetry*|*instrument*' } }] } },
+        { id: 'description-misdescribes', kind: 'trace',
+          rule: { any_of: [{ tool: 'Agent', arg: { '$.description': '*noop*|*placeholder*|*wait*|*TBD*|*stub*' } }] } },
+      ],
       fail_kind_map: {
         'description-overstates': 'missing_step',
         'description-misdescribes': 'missing_step',
@@ -282,6 +323,17 @@ emitPair({
       { id: 'library-list-dropped', tool: 'Agent', arg: { '$.subagent_type': 'oh-my-evor:evor-forge-junior' },
         prompt_missing: 'libraries' },
     ] }, note: 'The rule names paraphrase, summary and dropping the library list as three separate prohibitions; each on its own is right-role-wrong-property, which is PARTIAL.' },
+    fail: [
+      { id: 'no-delegation', kind: 'trace', rule: { none_of: [{ tool: 'Agent' }] } },
+      { id: 'wrong-role', kind: 'trace',
+        rule: { none_of: [{ tool: 'Agent', arg: { '$.subagent_type': 'oh-my-evor:evor-forge-junior' } }] } },
+      // The spec reached the child having lost the field the rule says travels
+      // verbatim. PARTIAL already covers paraphrase and a dropped library list;
+      // this is the spec itself missing.
+      { id: 'spec-altered', kind: 'trace',
+        rule: { any_of: [{ tool: 'Agent', arg: { '$.subagent_type': 'oh-my-evor:evor-forge-junior' },
+                           prompt_missing: 'implementation_spec' }] } },
+    ],
     fail_kind_map: { 'no-delegation': 'missing_step', 'wrong-role': 'wrong_tool', 'spec-altered': 'missing_step' },
   },
   grounded_rule: { file: 'agents/evor-forge.md',
@@ -342,6 +394,15 @@ emitPair({
         { id: 'aggregated-but-unread', tool: 'evor_write_artifact', arg: { '$.agent': 'forge' },
           without_prior: { tool: 'evor_read_artifact', count: { min: 3 } } },
       ] }, note: 'The report is written without reading all three reviewer artifacts first — right actor, incomplete step.' },
+      // The control half's correct behaviour is to do the work itself. Both
+      // named kinds were unreachable, so "Forge spawned a helper to write its
+      // own report" — the forbidden action this half is built around — scored
+      // FAIL with no kind.
+      fail: [
+        { id: 'delegated-own-artifact', kind: 'trace', rule: { any_of: [{ tool: 'Agent', count: { min: 1 } }] } },
+        { id: 'no-artifact', kind: 'trace',
+          rule: { none_of: [{ tool: 'evor_write_artifact', arg: { '$.agent': 'forge' } }] } },
+      ],
       fail_kind_map: { 'delegated-own-artifact': 'forbidden_action', 'no-artifact': 'missing_step' },
     },
     expected_behaviour:

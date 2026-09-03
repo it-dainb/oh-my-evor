@@ -1,0 +1,12 @@
+{
+  "mission_id": "m1",
+  "objective": "Raise worst-domain F on the 22-domain document-binarization suite.",
+  "eval_script_hash": "PLACEHOLDER_SEALED_AT_FIXTURE_BUILD",
+  "locked_split_hash": "86c6462a0d1f4e9c8b2a77315fd0c9e4a1b6d83f2c5e70a94db1f6c3e820ab57",
+  "metric_specs": [
+    { "role": "primary_fitness", "metric_name": "min_domain_f", "direction": "higher" }
+  ],
+  "constraints": { "latency_gpu_ms": 10, "latency_cpu_4k_s": 0.1, "precision_floor": 0.8 },
+  "target_value": 98,
+  "baseline_value": 0
+}

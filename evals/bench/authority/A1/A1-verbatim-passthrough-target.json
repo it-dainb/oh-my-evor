@@ -60,6 +60,48 @@
       },
       "note": "The rule names paraphrase, summary and dropping the library list as three separate prohibitions; each on its own is right-role-wrong-property, which is PARTIAL."
     },
+    "fail": [
+      {
+        "id": "no-delegation",
+        "kind": "trace",
+        "rule": {
+          "none_of": [
+            {
+              "tool": "Agent"
+            }
+          ]
+        }
+      },
+      {
+        "id": "wrong-role",
+        "kind": "trace",
+        "rule": {
+          "none_of": [
+            {
+              "tool": "Agent",
+              "arg": {
+                "$.subagent_type": "oh-my-evor:evor-forge-junior"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "spec-altered",
+        "kind": "trace",
+        "rule": {
+          "any_of": [
+            {
+              "tool": "Agent",
+              "arg": {
+                "$.subagent_type": "oh-my-evor:evor-forge-junior"
+              },
+              "prompt_missing": "implementation_spec"
+            }
+          ]
+        }
+      }
+    ],
     "fail_kind_map": {
       "no-delegation": "missing_step",
       "wrong-role": "wrong_tool",

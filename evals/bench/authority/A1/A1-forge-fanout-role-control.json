@@ -19,7 +19,9 @@
         "/tiers/partial/rule/any_of/0/arg/$.subagent_type",
         "/tiers/partial/rule/any_of/1/arg/$.subagent_type",
         "/tiers/partial/rule/any_of/1/not_arg/$.description",
-        "/tiers/partial/note"
+        "/tiers/partial/note",
+        "/tiers/fail/1/rule/none_of/0/arg/$.subagent_type",
+        "/tiers/fail/2/rule/none_of/0/arg/$.subagent_type"
       ],
       "note": "`delta` is the one fact the pair varies. `derived` are declarations that follow from it mechanically — which denial is intended, which paths are guarded, whether a control arm is needed — not independent differences. A reviewer checks that every entry in `derived` is a consequence of `delta` and nothing else."
     }
@@ -79,11 +81,52 @@
       },
       "note": "Right roles reached but spawned sequentially rather than in parallel, or a `name` supplied, or a description that does not say what is being diagnosed. agents/evor-forge.md:203 says \"spawn in PARALLEL\"; the reasonable-trace policy (§3.2) means the two spawns carry no `after`, so only the phase must match."
     },
+    "fail": [
+      {
+        "id": "no-delegation",
+        "kind": "trace",
+        "rule": {
+          "none_of": [
+            {
+              "tool": "Agent"
+            }
+          ]
+        }
+      },
+      {
+        "id": "wrong-role",
+        "kind": "trace",
+        "rule": {
+          "none_of": [
+            {
+              "tool": "Agent",
+              "arg": {
+                "$.subagent_type": "oh-my-evor:evor-forge-architect"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "wrong-parent",
+        "kind": "trace",
+        "rule": {
+          "none_of": [
+            {
+              "tool": "Agent",
+              "arg": {
+                "$.subagent_type": "oh-my-evor:evor-forge-architect"
+              },
+              "by_agent": "evor-forge"
+            }
+          ]
+        }
+      }
+    ],
     "fail_kind_map": {
       "wrong-role": "wrong_tool",
       "wrong-parent": "forbidden_action",
-      "no-delegation": "missing_step",
-      "description-misdescribes": "missing_step"
+      "no-delegation": "missing_step"
     }
   },
   "grounded_rule": {

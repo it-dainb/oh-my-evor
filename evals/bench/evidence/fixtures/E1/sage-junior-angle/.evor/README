@@ -1,0 +1,2 @@
+Sage-junior fixture root. The role is read-only for code and its
+only writes are evor_write_artifact and evor_signal_emit.

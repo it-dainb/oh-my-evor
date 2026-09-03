@@ -1,5 +1,17 @@
 # evor-eval-bench — pilot results
 
+> **WITHDRAWN 2026-09-03. Every number below is void.** Reading the pilot's own
+> per-run records, and repairing what they exposed, found thirteen defects —
+> nine of them in the runner. One — the child
+> process inherited the repository as its working directory instead of the
+> sandbox — touches all 170 scenarios: the agents' relative reads addressed the
+> live tree, and three fixtures were mutated by runs writing back through it.
+> The A3 finding this document leads with is the least defensible of the three
+> angles, not the most. See `04-pilot-postmortem.md`. Nothing here may be cited,
+> including the caveats, which were written against a harness that was wrong in
+> ways they do not mention.
+
+
 **192 runs, 24 scenarios, 3 angles, 8 repeats, $37.81 ($0.197/run). 2026-09-03.**
 
 Reproduce: `node ci/bench-run.mjs <scenarios> --repeats 8 --max-turns 60 --out ci/out/pilot`.

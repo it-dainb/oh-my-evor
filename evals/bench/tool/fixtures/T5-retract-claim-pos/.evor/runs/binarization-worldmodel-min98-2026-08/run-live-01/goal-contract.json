@@ -1,0 +1,8 @@
+{
+  "eval_version": "v10",
+  "primary_metric": "val_metric",
+  "target": 98.0,
+  "latency_cpu_4k_s": 1.0,
+  "latency_gpu_ms": 500.0,
+  "authored_at": "2026-08-23T23:04:11.900Z"
+}

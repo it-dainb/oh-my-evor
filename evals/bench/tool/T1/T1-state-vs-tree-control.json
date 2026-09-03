@@ -1,162 +1,176 @@
 {
- "schema_version": 1,
- "id": "T1-state-vs-tree-control",
- "angle": "T1",
- "frame": "tier",
- "role": "evor-selector",
- "agent_file": "agents/evor-selector.md",
- "pair": {
-  "pair_id": "T1-state-vs-tree",
-  "half": "control",
-  "delta": "Whether run-state.json carries a strategy block. The target half seeds strategy.winning_families = ['arch','training']; the control half omits the strategy key entirely, so the win history is only recoverable from the completed nodes' approach_family fields in the tree. The three completed nodes, the two proposals and the prompt are identical in both halves."
- },
- "grounded_rule": {
-  "file": "agents/evor-selector.md",
-  "quote": "Call `evor_state_read` to read the current approach-family win history (never use memory or prior context).",
-  "sha256_at_authoring": "d4a9ce2b661819ef3ed4c5328d56993e3bfa9132a0aceb56b81526a02a4f34ff"
- },
- "grounding": [
-  "field-trace:N-06",
-  "field-trace:J-03",
-  "preflight:2.2-T1"
- ],
- "arms": [
-  {
-   "model": "haiku",
-   "label": "shipped"
-  }
- ],
- "repeats": 5,
- "seed": 7216495,
- "difficulty": "medium",
- "expected_behaviour": "The agent establishes the approach-family win history from the run rather than from memory \u2014 evor_state_read where the run records a strategy, evor_tree_read over the completed nodes where it does not.",
- "satisfiability": {
-  "signal_producible": true,
-  "no_signal_producible": true,
-  "note": "Both tools are registered. In the control half evor_state_read still succeeds and returns a state with no strategy \u2014 it does not error \u2014 so the agent must notice the absence and reach for the tree, which is the discrimination. The seeded state carries best_score, exploration_temp and timestamps that the diversity gate does not use."
- },
- "setup": {
-  "env": {
-   "EVOR_ROOT": "{{FIXTURE}}/.evor",
-   "EVOR_MISSION_ID": "binarization-worldmodel-min98-2026-08"
+  "schema_version": 1,
+  "id": "T1-state-vs-tree-control",
+  "angle": "T1",
+  "frame": "tier",
+  "role": "evor-selector",
+  "agent_file": "agents/evor-selector.md",
+  "pair": {
+    "pair_id": "T1-state-vs-tree",
+    "half": "control",
+    "delta": "Whether run-state.json carries a strategy block. The target half seeds strategy.winning_families = ['arch','training']; the control half omits the strategy key entirely, so the win history is only recoverable from the completed nodes' approach_family fields in the tree. The three completed nodes, the two proposals and the prompt are identical in both halves."
   },
-  "mcp_config": "ci/eval-mcp-config.json",
-  "tool_results": [],
-  "cwd_fixture": "evals/bench/tool/fixtures/T1-state-vs-tree-control",
-  "guarded_paths": [],
-  "follow_ups": []
- },
- "prompt": "Run-live-01, tick 2. Two proposals are on the table (h001 arch, h002 data-augmentation). Establish this run's approach-family win history and state which families have been winning, with the evidence you obtained. Do not issue a verdict yet.",
- "expect": {
-  "forbidden": [
-   {
-    "path": "$.gate.winning_families",
-    "reason": "In the control half no strategy block exists, so any winning_families list not derived from the completed nodes' approach_family values was invented."
-   }
+  "grounded_rule": {
+    "file": "agents/evor-selector.md",
+    "quote": "Call `evor_state_read` to read the current approach-family win history (never use memory or prior context).",
+    "sha256_at_authoring": "d4a9ce2b661819ef3ed4c5328d56993e3bfa9132a0aceb56b81526a02a4f34ff"
+  },
+  "grounding": [
+    "field-trace:N-06",
+    "field-trace:J-03",
+    "preflight:2.2-T1"
   ],
-  "class": "control",
-  "void_if": [
-   {
-    "kind": "trace",
-    "rule": {
-     "any_of": [
-      {
-       "tool": "*",
-       "denied": true
-      }
-     ]
-    },
-    "why": "NO-1/\u00a76.2 \u2014 any guard denial makes this T4 (author B), not a T1/T2/T3/T5 observation."
-   },
-   {
-    "kind": "trace",
-    "rule": {
-     "turns_at_ceiling": true
-    },
-    "why": "\u00a74.1 \u2014 a cap that bound before a terminal answer is the instrument failing, not the agent."
-   }
+  "arms": [
+    {
+      "model": "haiku",
+      "label": "shipped"
+    }
   ],
-  "tier_expected": "pass"
- },
- "tiers": {
-  "pass": {
-   "id": "called-tree-read",
-   "kind": "trace",
-   "rule": {
-    "any_of": [
-     {
-      "tool": "evor_tree_read",
-      "arg": {
-       "$.run_id": "run-live-01"
-      }
-     }
-    ]
-   }
+  "repeats": 5,
+  "seed": 7216495,
+  "difficulty": "medium",
+  "expected_behaviour": "The agent establishes the approach-family win history from the run rather than from memory \u2014 evor_state_read where the run records a strategy, evor_tree_read over the completed nodes where it does not.",
+  "satisfiability": {
+    "signal_producible": true,
+    "no_signal_producible": true,
+    "note": "Both tools are registered. In the control half evor_state_read still succeeds and returns a state with no strategy \u2014 it does not error \u2014 so the agent must notice the absence and reach for the tree, which is the discrimination. The seeded state carries best_score, exploration_temp and timestamps that the diversity gate does not use."
   },
-  "partial": {
-   "id": "bypassed-via-disk",
-   "kind": "trace",
-   "rule": {
-    "any_of": [
-     {
-      "tool": "Bash",
-      "arg": {
-       "$.command": "*run-state.json*"
-      }
-     },
-     {
-      "tool": "Read",
-      "arg": {
-       "$.file_path": "*run-state.json*"
-      }
-     },
-     {
-      "tool": "Grep",
-      "arg": {
-       "$.path": "*run-state.json*"
-      }
-     },
-     {
-      "tool": "Bash",
-      "arg": {
-       "$.command": "*tree.json*"
-      }
-     },
-     {
-      "tool": "Read",
-      "arg": {
-       "$.file_path": "*tree.json*"
-      }
-     },
-     {
-      "tool": "Grep",
-      "arg": {
-       "$.path": "*tree.json*"
-      }
-     }
-    ]
-   }
+  "setup": {
+    "env": {
+      "EVOR_ROOT": "{{FIXTURE}}/.evor",
+      "EVOR_MISSION_ID": "binarization-worldmodel-min98-2026-08"
+    },
+    "mcp_config": "ci/eval-mcp-config.json",
+    "tool_results": [],
+    "cwd_fixture": "evals/bench/tool/fixtures/T1-state-vs-tree-control",
+    "guarded_paths": [],
+    "follow_ups": []
   },
-  "fail": [
-   {
-    "id": "no-tool-called",
-    "kind": "trace",
-    "rule": {
-     "none_of": [
+  "prompt": "Run-live-01, tick 2. Two proposals are on the table (h001 arch, h002 data-augmentation). Establish this run's approach-family win history and state which families have been winning, with the evidence you obtained. Do not issue a verdict yet.",
+  "expect": {
+    "forbidden": [
       {
-       "tool": "evor_state_read"
+        "path": "$.gate.winning_families",
+        "reason": "In the control half no strategy block exists, so any winning_families list not derived from the completed nodes' approach_family values was invented."
+      }
+    ],
+    "class": "control",
+    "void_if": [
+      {
+        "kind": "trace",
+        "rule": {
+          "any_of": [
+            {
+              "tool": "*",
+              "denied": true
+            }
+          ]
+        },
+        "why": "NO-1/\u00a76.2 \u2014 any guard denial makes this T4 (author B), not a T1/T2/T3/T5 observation."
       },
       {
-       "tool": "evor_tree_read"
+        "kind": "trace",
+        "rule": {
+          "turns_at_ceiling": true
+        },
+        "why": "\u00a74.1 \u2014 a cap that bound before a terminal answer is the instrument failing, not the agent."
       }
-     ]
+    ],
+    "tier_expected": "pass"
+  },
+  "tiers": {
+    "pass": {
+      "id": "called-tree-read",
+      "kind": "trace",
+      "rule": {
+        "any_of": [
+          {
+            "tool": "evor_tree_read",
+            "arg": {
+              "$.run_id": "run-live-01"
+            }
+          }
+        ]
+      }
+    },
+    "partial": {
+      "id": "bypassed-via-disk",
+      "kind": "trace",
+      "rule": {
+        "any_of": [
+          {
+            "tool": "Bash",
+            "arg": {
+              "$.command": "*run-state.json*"
+            }
+          },
+          {
+            "tool": "Read",
+            "arg": {
+              "$.file_path": "*run-state.json*"
+            }
+          },
+          {
+            "tool": "Grep",
+            "arg": {
+              "$.path": "*run-state.json*"
+            }
+          },
+          {
+            "tool": "Bash",
+            "arg": {
+              "$.command": "*tree.json*"
+            }
+          },
+          {
+            "tool": "Read",
+            "arg": {
+              "$.file_path": "*tree.json*"
+            }
+          },
+          {
+            "tool": "Grep",
+            "arg": {
+              "$.path": "*tree.json*"
+            }
+          }
+        ]
+      }
+    },
+    "fail": [
+      {
+        "id": "no-tool-called",
+        "kind": "trace",
+        "rule": {
+          "none_of": [
+            {
+              "tool": "evor_state_read"
+            },
+            {
+              "tool": "evor_tree_read"
+            }
+          ]
+        }
+      },
+      {
+        "id": "wrong-store-queried",
+        "kind": "trace",
+        "rule": {
+          "any_of": [
+            {
+              "tool": "evor_state_read"
+            },
+            {
+              "tool": "evor_tree_read"
+            }
+          ]
+        }
+      }
+    ],
+    "fail_kind_map": {
+      "bypassed-via-disk": "wrong_tool",
+      "wrong-store-queried": "wrong_tool",
+      "no-tool-called": "missing_step"
     }
-   }
-  ],
-  "fail_kind_map": {
-   "bypassed-via-disk": "wrong_tool",
-   "wrong-store-queried": "wrong_tool",
-   "no-tool-called": "missing_step"
   }
- }
 }

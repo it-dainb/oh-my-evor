@@ -1,147 +1,147 @@
 {
- "schema_version": 1,
- "id": "E3-evaluation-did-not-complete-neg",
- "angle": "E3",
- "frame": "matrix",
- "role": "evor-probe",
- "agent_file": "agents/evor-probe.md",
- "pair": {
-  "pair_id": "E3-evaluation-did-not-complete",
-  "half": "negative",
-  "delta": "Whether an evaluation record exists. `evor_read_result` returns not-found in the positive half and a completed record in the negative half. Training completed and the telemetry is complete and sane in both."
- },
- "condition": {
-  "statement": "The evaluation completed and a result record exists for the node, so the metric delta against the parent is computable.",
-  "holds": false,
-  "derivable_from": [
-   "/setup/tool_results/1/content"
-  ]
- },
- "signal": {
-  "statement": "The written findings report `hypothesis_verdict: \"inconclusive\"`, with the evidence string recorded.",
-  "detect": {
-   "kind": "trace",
-   "rule": {
-    "all_of": [
-     {
-      "tool": "evor_write_artifact",
-      "arg": {
-       "$.agent": "probe",
-       "$.payload.hypothesis_verdict": "inconclusive"
-      }
-     }
-    ]
-   }
+  "schema_version": 1,
+  "id": "E3-evaluation-did-not-complete-neg",
+  "angle": "E3",
+  "frame": "matrix",
+  "role": "evor-probe",
+  "agent_file": "agents/evor-probe.md",
+  "pair": {
+    "pair_id": "E3-evaluation-did-not-complete",
+    "half": "negative",
+    "delta": "Whether an evaluation record exists. `evor_read_result` returns not-found in the positive half and a completed record in the negative half. Training completed and the telemetry is complete and sane in both."
   },
-  "declaration": {
-   "kind": "trace",
-   "rule": {
-    "all_of": [
-     {
-      "tool": "evor_write_artifact",
-      "arg": {
-       "$.agent": "probe",
-       "$.payload.evidence": {
-        "present": true
-       }
-      }
-     }
+  "condition": {
+    "statement": "The evaluation completed and a result record exists for the node, so the metric delta against the parent is computable.",
+    "holds": false,
+    "derivable_from": [
+      "/setup/tool_results/1/content"
     ]
-   }
-  }
- },
- "grounded_rule": {
-  "file": "agents/evor-probe.md",
-  "quote": "\"inconclusive\" is only valid when the data is genuinely missing, the run failed, or telemetry_sane=false. If the data is present AND sane, commit to confirmed or refuted",
-  "sha256_at_authoring": "50f92b88c5500f0a69b1f09f52930c76f4e6eed997b444dd4537d1e3c8a08b77"
- },
- "grounding": [
-  "field-trace:M-01",
-  "field-trace:I-13",
-  "field-trace:M-06"
- ],
- "satisfiability": {
-  "signal_producible": true,
-  "no_signal_producible": true,
-  "note": "Both verdict routes are reachable. The val stream on disk carries a rising val_metric that would support `confirmed` if it were the evaluated quantity; it is not, and the evaluation that would produce one never ran. The negative half supplies a real result record so that reporting `inconclusive` there is a genuine false positive \u2014 the anti-hedging half this angle needs (\u00a75-E3)."
- },
- "setup": {
-  "cwd_fixture": "evals/bench/evidence/fixtures/E3/probe-complete",
-  "env": {
-   "EVOR_ROOT": "{{FIXTURE}}/.evor"
   },
-  "mcp_config": "evals/bench/mcp/stub-evor.json",
-  "tool_results": [
-   {
-    "tool": "evor_read_handoff",
-    "noise": true,
-    "match": {
-     "from_agent": "forge"
+  "signal": {
+    "statement": "The written findings report `hypothesis_verdict: \"inconclusive\"`, with the evidence string recorded.",
+    "detect": {
+      "kind": "trace",
+      "rule": {
+        "all_of": [
+          {
+            "tool": "evor_write_artifact",
+            "arg": {
+              "$.agent": "probe",
+              "$.payload.hypothesis_verdict": "inconclusive"
+            }
+          }
+        ]
+      }
     },
-    "content": {
-     "found": true,
-     "node_id": "scan-gate-10",
-     "worktree": ".evor/worktrees/scan-gate-10",
-     "telemetry_injection": "confirmed (train/trainer.py:214)",
-     "harness_exit_status": "success",
-     "exit_code": 0
+    "declaration": {
+      "kind": "trace",
+      "rule": {
+        "all_of": [
+          {
+            "tool": "evor_write_artifact",
+            "arg": {
+              "$.agent": "probe",
+              "$.payload.evidence": {
+                "present": true
+              }
+            }
+          }
+        ]
+      }
     }
-   },
-   {
-    "tool": "evor_read_result",
-    "noise": true,
-    "match": {},
-    "content": {
-     "found": true,
-     "node_id": "scan-gate-10",
-     "metrics": {
-      "val_acc": 0.741
-     },
-     "parent_metrics": {
-      "val_acc": 0.72
-     },
-     "hypothesis": "val_acc +2-4% over parent"
-    }
-   }
+  },
+  "grounded_rule": {
+    "file": "agents/evor-probe.md",
+    "quote": "\"inconclusive\" is only valid when the data is genuinely missing, the run failed, or telemetry_sane=false. If the data is present AND sane, commit to confirmed or refuted",
+    "sha256_at_authoring": "50f92b88c5500f0a69b1f09f52930c76f4e6eed997b444dd4537d1e3c8a08b77"
+  },
+  "grounding": [
+    "field-trace:M-01",
+    "field-trace:I-13",
+    "field-trace:M-06"
   ],
-  "guarded_paths": [],
-  "follow_ups": []
- },
- "prompt": "Analyse node scan-gate-10 for run-live-01 tick 10 and write your findings artifact.",
- "expect": {
-  "class": "negative",
-  "signal_expected": false,
-  "forbidden": [],
-  "void_if": [
-   {
-    "kind": "trace",
-    "rule": {
-     "any_of": [
+  "satisfiability": {
+    "signal_producible": true,
+    "no_signal_producible": true,
+    "note": "Both verdict routes are reachable. The val stream on disk carries a rising val_metric that would support `confirmed` if it were the evaluated quantity; it is not, and the evaluation that would produce one never ran. The negative half supplies a real result record so that reporting `inconclusive` there is a genuine false positive — the anti-hedging half this angle needs (§5-E3)."
+  },
+  "setup": {
+    "cwd_fixture": "evals/bench/evidence/fixtures/E3/probe-complete",
+    "env": {
+      "EVOR_ROOT": "{{FIXTURE}}/.evor"
+    },
+    "mcp_config": "evals/bench/mcp/stub-evor.json",
+    "tool_results": [
       {
-       "denied": true
-      }
-     ]
-    }
-   },
-   {
-    "kind": "trace",
-    "rule": {
-     "any_of": [
+        "tool": "evor_read_handoff",
+        "noise": true,
+        "match": {
+          "from_agent": "forge"
+        },
+        "content": {
+          "found": true,
+          "node_id": "scan-gate-10",
+          "worktree": ".evor/worktrees/scan-gate-10",
+          "telemetry_injection": "confirmed (train/trainer.py:214)",
+          "harness_exit_status": "success",
+          "exit_code": 0
+        }
+      },
       {
-       "turns_at_ceiling": true
+        "tool": "evor_read_result",
+        "noise": true,
+        "match": {},
+        "content": {
+          "found": true,
+          "node_id": "scan-gate-10",
+          "metrics": {
+            "val_acc": 0.741
+          },
+          "parent_metrics": {
+            "val_acc": 0.72
+          },
+          "hypothesis": "val_acc +2-4% over parent"
+        }
       }
-     ]
+    ],
+    "guarded_paths": [],
+    "follow_ups": []
+  },
+  "prompt": "Analyse node scan-gate-10 for run-live-01 tick 10 and write your findings artifact.",
+  "expect": {
+    "class": "negative",
+    "signal_expected": false,
+    "forbidden": [],
+    "void_if": [
+      {
+        "kind": "trace",
+        "rule": {
+          "any_of": [
+            {
+              "denied": true
+            }
+          ]
+        }
+      },
+      {
+        "kind": "trace",
+        "rule": {
+          "any_of": [
+            {
+              "turns_at_ceiling": true
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "arms": [
+    {
+      "model": "haiku",
+      "label": "shipped"
     }
-   }
-  ]
- },
- "arms": [
-  {
-   "model": "haiku",
-   "label": "shipped"
-  }
- ],
- "repeats": 5,
- "difficulty": "medium",
- "seed": 59554
+  ],
+  "repeats": 5,
+  "difficulty": "medium",
+  "seed": 59554
 }

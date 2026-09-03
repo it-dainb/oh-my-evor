@@ -27,12 +27,13 @@ function parseEvents(raw) {
   return out;
 }
 
-function invoke(args, { env, timeoutMs }) {
+function invoke(args, { env, timeoutMs, cwd }) {
   try {
     return execFileSync('claude', args, {
       encoding: 'utf8',
       timeout: timeoutMs ?? 900_000,
       maxBuffer: 64 * 1024 * 1024,
+      ...(cwd ? { cwd } : {}),
       env: { ...process.env, ...env },
     });
   } catch (e) {
@@ -53,7 +54,7 @@ function invoke(args, { env, timeoutMs }) {
  *   holds every turn's, because cost and denials accumulate across turns and a
  *   caller that reads only the last one under-reports both.
  */
-export function runPhased({ prompt, followUps = [], model, effort, maxTurns, timeoutMs, env, mcpConfigPath, allowedTools }) {
+export function runPhased({ prompt, followUps = [], model, effort, maxTurns, timeoutMs, env, mcpConfigPath, allowedTools, cwd }) {
   const base = [
     '--model', model,
     '--output-format', 'stream-json',
@@ -78,7 +79,7 @@ export function runPhased({ prompt, followUps = [], model, effort, maxTurns, tim
       ? ['-p', turns[phase], ...base]
       : ['-p', turns[phase], '--resume', sessionId, ...base];
 
-    const raw = invoke(args, { env, timeoutMs });
+    const raw = invoke(args, { env, timeoutMs, cwd });
     const turnEvents = parseEvents(raw);
     if (!turnEvents.length) throw new Error(`turn ${phase} produced no parseable stream-json`);
 
