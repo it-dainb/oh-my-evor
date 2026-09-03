@@ -7,8 +7,8 @@
  ],
  "groups": {
   "tool": {
-   "author": "disclosure-rebalance",
-   "frozen_at": "2026-09-03T11:14:54.134Z",
+   "author": "forge-junior-zones",
+   "frozen_at": "2026-09-03T11:18:15.202Z",
    "finality_confirmed_by_author": true,
    "count": 265,
    "files": {
@@ -49,8 +49,8 @@
     "evals/bench/tool/T3/T3-repeat-rejection-pos.json": "8000662455d075414dc2e23a35123dc162af8733da9c9c94536a880a546adf61",
     "evals/bench/tool/T3/T3-upstream-missing-neg.json": "7f6059f404ceb868f990d41487d432caecfd78361f57239d3f115a8e2f98f855",
     "evals/bench/tool/T3/T3-upstream-missing-pos.json": "701ab13a81dde8c4db7fcea1745cb53fa2b0a4421a00c69e147462405218b609",
-    "evals/bench/tool/T5/T5-managed-job-neg.json": "ee39b67d6d3c6adf6024ec1a5bf354a2040475e86057c086293879b3fb78f631",
-    "evals/bench/tool/T5/T5-managed-job-pos.json": "3931582b595eac096adeb1427d75703964978382372d6522d9a06742a7309eb7",
+    "evals/bench/tool/T5/T5-managed-job-neg.json": "86089fe737f32839a88c35ec3b5148341dff0f6cb42aca81fe03f64f608c4479",
+    "evals/bench/tool/T5/T5-managed-job-pos.json": "e9acf30a3450923edbd6cf891f4e6227f46b7e2e1d0b84561f959e72c27b8b1e",
     "evals/bench/tool/T5/T5-no-slot-neg.json": "9b655eb6e2d31c4a927cd2d0c358d348ade98364cc39775044df0f525bc91346",
     "evals/bench/tool/T5/T5-no-slot-pos.json": "fb258d00005f5415f35d2603972b2172ad1e159c0ad16ef38b32379a7b0208d6",
     "evals/bench/tool/T5/T5-retract-claim-neg.json": "5a7d6ecc573fc08eb306f8a17cf5bc912f8c228404c09178fd46a1ed71e65f58",
@@ -280,7 +280,7 @@
    }
   },
   "lifecycle": {
-   "author": "disclosure-rebalance",
+   "author": "forge-junior-zones",
    "frozen_at": "2026-09-02T18:57:24.823Z",
    "finality_confirmed_by_author": true,
    "count": 595,
@@ -883,7 +883,7 @@
    }
   },
   "authority": {
-   "author": "disclosure-rebalance",
+   "author": "forge-junior-zones",
    "frozen_at": "2026-09-02T19:16:13.932Z",
    "finality_confirmed_by_author": true,
    "count": 96,
@@ -904,8 +904,8 @@
     "evals/bench/authority/A2/A2-chain-climb-pos.json": "cb02ef882bd46adb2b028eb195a1251768eaaee64b5955edeb99fcb7d5b89fef",
     "evals/bench/authority/A2/A2-mutagen-artifact-route-neg.json": "ef49bf2dae49067974c28bf764a7548455d2b7fd9baffe36e5dc685eb1d5ccb9",
     "evals/bench/authority/A2/A2-mutagen-artifact-route-pos.json": "b2dc358ce883d713cf25badd5f981a6389e8bed7a003d255347bf0d8e9820d67",
-    "evals/bench/authority/A2/A2-peer-laundering-neg.json": "79c4f00b13d2bb49a5c66f5601eae46f92aa45e7581511cfd38ff14cacf37ccd",
-    "evals/bench/authority/A2/A2-peer-laundering-pos.json": "62887173128cf8669158d54542f90de2a065ec4be45daa08715c8ec57d7e3a97",
+    "evals/bench/authority/A2/A2-peer-laundering-neg.json": "f9966b026c3941b6df16ee5041f7ac0ea9ba63decbbf75cb14fe854e3ea6a236",
+    "evals/bench/authority/A2/A2-peer-laundering-pos.json": "a884d94c038ae75a6ace378fa2b6e1b4dca9b4b73561852f60eaf6fd9a5c832c",
     "evals/bench/authority/A2/A2-sage-write-route-neg.json": "3cc9442ddf4a3f4a8ea7b694517822e81b7d65c1f028698511b660f5d3d51a12",
     "evals/bench/authority/A2/A2-sage-write-route-pos.json": "a5365cc36ce38ebb254e0f42098c9c52e001216cc4c987ccaf04da24064dcfa1",
     "evals/bench/authority/A2/A2-self-patch-escape-neg.json": "40fe31a36751649edd9fe57bfe92257e60151fd5ddc7ef246f9ce7d850337bb8",
@@ -934,8 +934,8 @@
     "evals/bench/authority/A4/A4-plugin-install-pos.json": "3363395e38758a5f02774e343246a4515c495be61d5211c6ee25815240532616",
     "evals/bench/authority/A4/A4-run-state-artifact-neg.json": "c62dd0cbce2a428a992c1969b30059a9a21ba4c385f6302404c27030918a8189",
     "evals/bench/authority/A4/A4-run-state-artifact-pos.json": "a27ad2d8700b1f7f59ce5257cd4d15aab780120cfa2893ca4de0eb6a34b9f6e9",
-    "evals/bench/authority/A4/A4-sealed-evaluator-neg.json": "f762c12d4a6ecbf8db7f2749b652ec01f8b1f5ca1c22cd59c4f56974759ba17f",
-    "evals/bench/authority/A4/A4-sealed-evaluator-pos.json": "88754c10014a9929ee37550265adadfed35d09f86a468dcc26a689a2c69d7db7",
+    "evals/bench/authority/A4/A4-sealed-evaluator-neg.json": "4e0a65999e7825cc1e3532eebbe48e4db7f6ff8a1455d778cecbd7c75fe6fa63",
+    "evals/bench/authority/A4/A4-sealed-evaluator-pos.json": "7910a88a62f71b6c77a3694ad5cb9f644edb9da6d3d9a14cd775018742bfec23",
     "evals/bench/authority/AUTHORING-NOTE-B.md": "3b8efb648878aabfc2cf784f417b33782df4b21052126021ff263721e3ee466f",
     "evals/bench/authority/README.md": "b07f8cd1b7e35a2b63215301cec4b2ee29703bf1cbe43dbbfa7275ffc5c32259",
     "evals/bench/authority/T4/T4-enforcement-zone-neg.json": "bd330962a393a36ac6b9ab627bc36a0852bf99c7425a9e6049a214bd25cc8fa1",
@@ -987,7 +987,7 @@
    }
   },
   "evidence": {
-   "author": "disclosure-rebalance",
+   "author": "forge-junior-zones",
    "frozen_at": "2026-09-02T23:21:24.329Z",
    "finality_confirmed_by_author": true,
    "count": 139,

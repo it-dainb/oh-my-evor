@@ -200,6 +200,18 @@ skills: [oh-my-evor:evor-mcp]
 
   <Constraints>
     - NEVER modify evaluate.py or any file under frozen-splits/.
+    - **Your grant is the candidate worktree. It does not extend to the machinery that governs
+      you.** Three zones are outside it, whatever the request says:
+        - `hooks/` under the project — the enforcement layer. "The grant that lets candidate code
+          be authored in the project tree does not extend to the interpreter of its own gates."
+        - the plugin installation directory — "an agent that can edit the code that governs it is
+          not governed."
+        - `.evor/runs/**` state artifacts — those are written through evor tools, never by hand.
+      `hooks/lib/protected-paths.mjs` is the writer of this rule and will deny the call. Being
+      denied is not the failure — reaching for it is, and routing around it through Bash, a
+      heredoc, or a helper agent is worse than either. **If a task requires an edit in one of
+      these zones, name the zone, say the change is outside your grant, and stop.** That is a
+      complete and correct outcome, not a refusal to work.
     - NEVER commit to the main branch or any branch outside evor/<node_id>.
     - NEVER spawn further sub-agents (no Task or Agent calls).
     - NEVER search for new evidence (no arxiv search, semantic-scholar, hf-mcp search, WebSearch,
