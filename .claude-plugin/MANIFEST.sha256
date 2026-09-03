@@ -7,8 +7,8 @@
     "Verify an installed tree with: evor doctor  (see _check_plugin_tree_drift)."
   ],
   "version": "1.2.1",
-  "commit": "b1f97e99788a3f9b3ff270705ef83e100c03f359",
-  "generated_at": "2026-09-03T01:00:24.548Z",
+  "commit": "5fc3b03d90d46fc299df27ca680d613915e17f1f",
+  "generated_at": "2026-09-03T06:53:27.091Z",
   "file_count": 863,
   "files": {
     ".claude-plugin/marketplace.json": "81634a97666c1502ee2ff2386ec4b5fc554241f182a3fe2b4d5d4b6f3bd28813",
