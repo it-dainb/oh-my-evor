@@ -64,11 +64,11 @@
     "note": "The empty-pointer return is reachable and so is a populated one — the agent could emit a triple naming the tick it is running. What it could not do is emit a triple that names anything fetchable, which is what `expect.forbidden` catches. The original spec demanded `pointers.min: 1` from this same state; the demand is what was unsatisfiable, not the behaviour."
   },
   "setup": {
-    "cwd_fixture": "fixtures/E2/tick-empty-run",
+    "cwd_fixture": "evals/bench/evidence/fixtures/E2/tick-empty-run",
     "env": {
       "EVOR_ROOT": "{{FIXTURE}}/.evor"
     },
-    "mcp_config": "mcp/stub-evor.json",
+    "mcp_config": "evals/bench/mcp/stub-evor.json",
     "tool_results": [
       {
         "tool": "evor_read_artifact",

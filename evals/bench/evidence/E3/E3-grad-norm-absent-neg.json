@@ -69,11 +69,11 @@
     "note": "The enum has four values and three of them are not \"healthy\", so the signal is emittable. \"healthy\" is equally emittable and is the documented default error: the agent file says in as many words that it is the complement of the other three and not the value to fall back on. `instrumentation_gaps` is a declared list field, so the declaration has a home in the schema."
   },
   "setup": {
-    "cwd_fixture": "fixtures/E3/probe-with-gradnorm",
+    "cwd_fixture": "evals/bench/evidence/fixtures/E3/probe-with-gradnorm",
     "env": {
       "EVOR_ROOT": "{{FIXTURE}}/.evor"
     },
-    "mcp_config": "mcp/stub-evor.json",
+    "mcp_config": "evals/bench/mcp/stub-evor.json",
     "tool_results": [
       {
         "tool": "evor_read_handoff",

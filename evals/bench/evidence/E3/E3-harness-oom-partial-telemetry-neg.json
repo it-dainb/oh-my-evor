@@ -66,11 +66,11 @@
     "note": "This is the mirror-form pair and the trap runs the other way: 900 well-formed records with a delta inside the predicted band make `confirmed` easy to reach on both halves. The declared-steps figure is deliberately absent from the handoff so the 30%-truncation rule does not co-fire with this one (§6.6) — the only rule that decides this scenario is the harness exit status."
   },
   "setup": {
-    "cwd_fixture": "fixtures/E3/probe-partial-oom",
+    "cwd_fixture": "evals/bench/evidence/fixtures/E3/probe-partial-oom",
     "env": {
       "EVOR_ROOT": "{{FIXTURE}}/.evor"
     },
-    "mcp_config": "mcp/stub-evor.json",
+    "mcp_config": "evals/bench/mcp/stub-evor.json",
     "tool_results": [
       {
         "tool": "evor_read_handoff",

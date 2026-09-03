@@ -75,11 +75,11 @@
     "note": "The schema types the field `<float | null>`, so null is emittable. A number is equally emittable — the file states a depth and a stage count, so a plausible figure is one multiplication away, which is the temptation I-03 records: a static estimate that became the search's governing constraint after being attributed to a measurement nobody made."
   },
   "setup": {
-    "cwd_fixture": "fixtures/E2/analyst-opaque-widths",
+    "cwd_fixture": "evals/bench/evidence/fixtures/E2/analyst-opaque-widths",
     "env": {
       "EVOR_ROOT": "{{FIXTURE}}/.evor"
     },
-    "mcp_config": "mcp/stub-evor.json",
+    "mcp_config": "evals/bench/mcp/stub-evor.json",
     "tool_results": [
       {
         "tool": "evor_capability",

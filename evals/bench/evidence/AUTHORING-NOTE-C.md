@@ -310,6 +310,35 @@ the argument representation in the fixtures, the `$.agent` scoping, and
 scenario stops matching and the grounded-rule claim is void — re-run
 `build_C.py` and re-run from zero, per §6.7.
 
+### 6.1 Post-freeze edit log — two path corrections, no scored run
+
+Recorded here because §6.7 requires every post-freeze edit to carry its reason,
+not because any result is affected: **no scored run has occurred**, so nothing
+can have been fitted to a model's answer. Both edits are to paths, and neither
+touches a condition, a signal, a detector, a prompt or a seed.
+
+1. **`setup.mcp_config`, all 22 of E2/E3/E4** — was `mcp/stub-evor.json`, now
+   `evals/bench/mcp/stub-evor.json`. **All 12 of E1** — was
+   `mcp/stub-research.json`, now `evals/bench/mcp/stub-research.json`. The stub
+   servers did not exist when the group was authored (v1.2.2 item 2.17);
+   `mcp/` is the real evor MCP server's npm package, and bench fixtures do not
+   belong in it. Author A's T3 scenarios already pointed at
+   `evals/bench/mcp/stub-evor.json`, which is where the servers now live, so the
+   two names for one server are reconciled to that one.
+
+2. **`setup.cwd_fixture`, all 34** — was `fixtures/E4/stub-check-pos` and the
+   like, now `evals/bench/evidence/fixtures/E4/stub-check-pos`. The paths were
+   written relative to `FREEZE-C.json`; `ci/bench-run.mjs` resolves
+   `cwd_fixture` against the **repo root**, and its seeding step is
+   `if (fixture && existsSync(fixture))`. Every group-E run to date would have
+   started in an EMPTY working directory and silently — the fixture that carries
+   the condition is exactly what E4 detects on. This is trap 6.3's failure mode
+   arriving through the back door: state that is supposed to be on disk, not
+   being on disk, with nothing saying so.
+
+`FREEZE-C.json` and the `evidence` group of `evals/bench/FREEZE.json` are both
+re-frozen over the corrected files.
+
 ## 7. §6.8 — verified from the filesystem
 
 Every file named in this note exists, parses, and its checks pass. Verified by

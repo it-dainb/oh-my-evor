@@ -36,7 +36,19 @@ const sha = (p) => createHash('sha256').update(readFileSync(p)).digest('hex');
 function walk(dir, out = []) {
   for (const e of readdirSync(dir, { withFileTypes: true })) {
     const p = join(dir, e.name);
-    if (e.isDirectory()) walk(p, out);
+    // `.omc/` IS OPERATIONAL STATE THE HARNESS WRITES, NOT CORPUS.
+    //
+    // Running the bench caused an OMC hook to write
+    // `.omc/state/sessions/<id>/pre-tool-advisory-throttle.json` INTO a frozen
+    // fixture in the repo. The freeze correctly reported UNFROZEN — the bench
+    // was mutating its own corpus by being run. Excluding it here keeps the
+    // manifest about authored content; the write itself is recorded as a defect
+    // (plan item 2.18) because a fixture that changes when you look at it is not
+    // a fixture.
+    // `.omc/` is harness state; `__pycache__/` is bytecode a postcondition run
+    // leaves behind. Neither is authored corpus, and both appeared inside frozen
+    // fixtures purely by being executed.
+    if (e.isDirectory()) { if (e.name !== '.omc' && e.name !== '__pycache__') walk(p, out); }
     // The manifest cannot hash itself, and a per-author manifest is superseded.
     else if (!/FREEZE.*\.json$/.test(e.name)) out.push(p);
   }
@@ -48,6 +60,16 @@ const load = () => (existsSync(MANIFEST) ? JSON.parse(readFileSync(MANIFEST, 'ut
 if (has('check')) {
   const m = load();
   let bad = 0, n = 0;
+
+  // A GROUP THAT IS NOT IN THE MANIFEST IS NOT VERIFIED BY IT. `evals/bench/mcp/`
+  // appeared with the stub servers and the check reported "all match" while an
+  // entire directory sat outside its view — the freeze inspecting only what it
+  // already knew about, which is exactly what cannot detect new files.
+  for (const d of readdirSync(BENCH, { withFileTypes: true })) {
+    if (!d.isDirectory() || d.name in (m.groups ?? {})) continue;
+    console.log(`UNFROZEN-GROUP  evals/bench/${d.name}/ (${walk(join(BENCH, d.name)).length} files) — freeze it or exclude it deliberately`);
+    bad++;
+  }
   for (const [group, g] of Object.entries(m.groups ?? {})) {
     for (const [rel, want] of Object.entries(g.files ?? {})) {
       const p = join(REPO, rel);

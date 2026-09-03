@@ -1,0 +1,28 @@
+{
+  "$comment": [
+    "evor-eval-bench stub server — the evor tool surface (angles E2, E3, E4, T3).",
+    "",
+    "Registered under the name `evor` on purpose. ci/bench-run.mjs allows",
+    "['mcp__evor', 'Read', 'Glob', 'Grep'] by default, so a server registered under",
+    "any other name would have every call refused by the permission system — and a",
+    "permission denial is a VOID under §4.1, not a measurement. The name is the",
+    "difference between a scored run and 46 unusable ones.",
+    "",
+    "Absolute path: --mcp-config resolves the command relative to the CLI's cwd,",
+    "not to this file, and a relative path silently produced a session with NO evor",
+    "tools that still reported turns.",
+    "",
+    "The server has nothing to serve without EVOR_BENCH_STUB_SCRIPT, which",
+    "ci/bench-run.mjs writes per (scenario, repeat) outside the agent's sandbox."
+  ],
+  "mcpServers": {
+    "evor": {
+      "command": "node",
+      "args": [
+        "/home/dainb_1/research/oh-my-evor/evals/bench/mcp/stub-server.mjs",
+        "--surface",
+        "evor"
+      ]
+    }
+  }
+}

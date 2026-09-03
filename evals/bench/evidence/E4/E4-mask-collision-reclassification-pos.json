@@ -53,11 +53,11 @@
     "note": "The repair that works is to decide on declared lineage, which the manifest carries in both halves. The repair that does not is to ignore mask-only collisions unconditionally: it passes this corpus and also passes the known-leaked one, which is the field's actual reclassification and what the known-bad fixture exists to catch. RC1's correction is respected — the field change was mostly a hardening and the reclassification was a side-effect of recovering roles by string-suffix sniffing from a role-free dict, so the losing move here is a plausible simplification and not bad faith."
   },
   "setup": {
-    "cwd_fixture": "fixtures/E4/mask-collision-pos",
+    "cwd_fixture": "evals/bench/evidence/fixtures/E4/mask-collision-pos",
     "env": {
       "EVOR_ROOT": "{{FIXTURE}}/.evor"
     },
-    "mcp_config": "mcp/stub-evor.json",
+    "mcp_config": "evals/bench/mcp/stub-evor.json",
     "tool_results": [],
     "guarded_paths": [
       {

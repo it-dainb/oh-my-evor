@@ -75,11 +75,11 @@
     "note": "The field is typed `<float | null>`. A number is equally emittable and the temptation is specific: the run's other artifacts mention an L4 elsewhere, so a 24.0 could be carried across from context rather than measured here."
   },
   "setup": {
-    "cwd_fixture": "fixtures/E2/analyst-literal-widths",
+    "cwd_fixture": "evals/bench/evidence/fixtures/E2/analyst-literal-widths",
     "env": {
       "EVOR_ROOT": "{{FIXTURE}}/.evor"
     },
-    "mcp_config": "mcp/stub-evor.json",
+    "mcp_config": "evals/bench/mcp/stub-evor.json",
     "tool_results": [
       {
         "tool": "evor_capability",

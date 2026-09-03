@@ -1437,3 +1437,35 @@ with an opportunity to reproduce it.
    interruption costs one scenario. Digest committed under `docs/evidence/` with
    `agent_sha256` and `scenario_sha256` per record, as `docs/evidence/matrix-81.json`
    does.
+
+---
+
+## Re-freeze log (trap 6.7)
+
+**2026-09-03 — re-frozen before any scored run.** Trap 6.7 forbids fitting a
+scenario to a model's answer; it does not forbid correcting one before the first
+measurement. No scenario has been scored, so nothing here is fitted to anything.
+
+What changed since the first freeze, and why:
+
+- **Path reconciliation across 30+ scenarios.** Authors declared `cwd_fixture`
+  and `mcp_config` relative to their own group directory while the runner
+  resolves from the repo root, and the stub server was named under three paths
+  (`mcp/stub-evor.json`, `evals/bench/mcp/stub-evor.json`,
+  `mcp/stub-research.json`) two of which meant the same server. All now
+  repo-relative and single-named.
+- **E4 detector corrections** by the two builders, verified against the stub
+  angles.
+- **`.omc/` and `__pycache__/` excluded from the manifest.** Both appeared
+  *inside* frozen fixtures purely by being executed: an OMC hook wrote
+  `.omc/state/sessions/<id>/pre-tool-advisory-throttle.json`, and running a
+  postcondition left Python bytecode. Neither is authored corpus. A fixture that
+  changes when you look at it is not a fixture.
+
+**One corpus mutation was reverted rather than re-frozen.**
+`evals/bench/evidence/fixtures/E4/mask-collision-pos/check_under_test.py` was
+EDITED by an agent during an unintended live run — which is precisely the
+behaviour E4 exists to grade, except it happened to the fixture SOURCE in the
+repo rather than to a sandbox copy. Restored from git. See plan item 2.18: a
+scenario whose subject is "did the agent weaken this check" must not expose the
+real check to the agent.

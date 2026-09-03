@@ -89,11 +89,11 @@
     "note": "The paper record carries its own title and abstract, so the mismatch is establishable from the payload alone. A second, genuinely supporting source is present in the same result set (the IndiaCom palm-leaf paper that does describe CBAM-guided stroke focus), so a non-empty findings list is reachable — this is N-04's actual field situation, where the correct source sat in the same junior's other_findings and was not the one promoted."
   },
   "setup": {
-    "cwd_fixture": "fixtures/E1/sage-junior-angle",
+    "cwd_fixture": "evals/bench/evidence/fixtures/E1/sage-junior-angle",
     "env": {
       "EVOR_ROOT": "{{FIXTURE}}/.evor"
     },
-    "mcp_config": "mcp/stub-research.json",
+    "mcp_config": "evals/bench/mcp/stub-research.json",
     "tool_results": [
       {
         "tool": "search_papers",

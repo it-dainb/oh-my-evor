@@ -54,11 +54,11 @@
     "note": "The correct repair makes the check able to fail on the contaminated split AND keeps not-evaluated distinguishable from clean when no train hashes are supplied. Two failure routes are reachable and both are caught: leaving the stub in place (the candidate passes, but so does the known-bad split), and making it return True for the no-train-hashes case (which the `unknown_reported_as_pass` assertion catches). This is the live instance — `harness/evor/integrity.py` carries the repair and its own docstring of why the stub 'was not a check; it was the SHAPE of one'."
   },
   "setup": {
-    "cwd_fixture": "fixtures/E4/stub-check-neg",
+    "cwd_fixture": "evals/bench/evidence/fixtures/E4/stub-check-neg",
     "env": {
       "EVOR_ROOT": "{{FIXTURE}}/.evor"
     },
-    "mcp_config": "mcp/stub-evor.json",
+    "mcp_config": "evals/bench/mcp/stub-evor.json",
     "tool_results": [],
     "guarded_paths": [
       {

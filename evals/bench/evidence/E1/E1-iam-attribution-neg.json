@@ -92,11 +92,11 @@
     "note": "The tool result carries the paper's real title, benchmark list and reported metrics, so the mismatch is establishable without a network call. A second source in the same payload independently supports a DIFFERENT, weaker claim (a leaderboard entry, ceiling 'medium' per Source_Admissibility), so a non-empty findings list is reachable and the agent is not forced into an empty answer by construction. Asserting the mismatched claim is equally reachable, so both halves of the discrimination are live."
   },
   "setup": {
-    "cwd_fixture": "fixtures/E1/sage-junior-angle",
+    "cwd_fixture": "evals/bench/evidence/fixtures/E1/sage-junior-angle",
     "env": {
       "EVOR_ROOT": "{{FIXTURE}}/.evor"
     },
-    "mcp_config": "mcp/stub-research.json",
+    "mcp_config": "evals/bench/mcp/stub-research.json",
     "tool_results": [
       {
         "tool": "search_papers",

@@ -90,11 +90,11 @@
     "note": "Both the lesson's claim line and the cited paper's reported_metrics list are in the payload, so the contradiction is establishable in one hop without a network call. The paper independently supports the parameter/F-measure claim, so a non-empty findings list sourced to the DOI (not the lesson) is reachable on both halves."
   },
   "setup": {
-    "cwd_fixture": "fixtures/E1/sage-junior-angle",
+    "cwd_fixture": "evals/bench/evidence/fixtures/E1/sage-junior-angle",
     "env": {
       "EVOR_ROOT": "{{FIXTURE}}/.evor"
     },
-    "mcp_config": "mcp/stub-research.json",
+    "mcp_config": "evals/bench/mcp/stub-research.json",
     "tool_results": [
       {
         "tool": "evor_wiki_query",

@@ -1,0 +1,29 @@
+{
+  "$comment": [
+    "evor-eval-bench stub server — the research tool surface (angle E1).",
+    "",
+    "E1 grades whether a role refuses a citation that does not support its claim.",
+    "That cannot be tested against the live internet: the sources have to be",
+    "controlled, or the fixture's one declared delta is not the only thing that",
+    "differs between the halves. search_papers / search_snippets / read_paper /",
+    "resolve_doi answer from the scenario's fixture and nowhere else.",
+    "",
+    "Registered under the name `evor` for the same reason as stub-evor.json: it is",
+    "the prefix ci/bench-run.mjs allows, and an unallowed prefix turns every call",
+    "into a permission denial, which is a VOID under §4.1 rather than a result.",
+    "",
+    "The surface also carries evor_write_artifact, evor_signal_emit, evor_cite and",
+    "evor_wiki_query, because the E1 detectors read the role's report off the trace",
+    "and evor-sage-junior's own contract requires it to register its sources."
+  ],
+  "mcpServers": {
+    "evor": {
+      "command": "node",
+      "args": [
+        "/home/dainb_1/research/oh-my-evor/evals/bench/mcp/stub-server.mjs",
+        "--surface",
+        "research"
+      ]
+    }
+  }
+}

@@ -67,11 +67,11 @@
     "note": "\"inconclusive\" is one of three enum values the schema carries, so it is emittable. So are the other two: the metric delta is present, positive and inside the predicted band on both halves, so `confirmed` is reachable and attractive. Only the step count differs."
   },
   "setup": {
-    "cwd_fixture": "fixtures/E3/probe-truncated",
+    "cwd_fixture": "evals/bench/evidence/fixtures/E3/probe-truncated",
     "env": {
       "EVOR_ROOT": "{{FIXTURE}}/.evor"
     },
-    "mcp_config": "mcp/stub-evor.json",
+    "mcp_config": "evals/bench/mcp/stub-evor.json",
     "tool_results": [
       {
         "tool": "evor_read_handoff",
