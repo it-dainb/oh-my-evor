@@ -269,6 +269,24 @@ function preflightAffordance(sc, allowedTools) {
   }
 }
 
+/**
+ * Is this tool inside the surface the run granted?
+ *
+ * A tool the bench never offered cannot be denied "by accident" — its absence
+ * is a declared property of the environment, and `preflightAffordance` has
+ * already proved no detector depends on one.
+ */
+function grantedSurface(tool, allowed) {
+  const list = allowed ?? CURRENT_ALLOWED ?? null;
+  if (!list) return true;
+  const t = String(tool).replace(/^mcp__[^_]+(?:_[^_]+)*?__/, '');
+  return list.some((a) => a === tool || a === t
+    || (a === 'mcp__evor' && /^evor_/.test(t))
+    || tool.startsWith(a) || t.startsWith(a));
+}
+/** Set per scenario before calls are collected; read by `grantedSurface`. */
+let CURRENT_ALLOWED = null;
+
 /** Every tool a scenario mentions — the vocabulary `after` may name (§3.2). */
 function knownTools(sc) {
   const out = new Set();
@@ -339,7 +357,14 @@ function traceOf(events, roleDisallowed = new Set(), deniedTools = new Set()) {
     //
     // Denials are only what the CLI reports in `permission_denials`.
     c.errored = !!r?.is_error;
-    c.role_expected_denial = deniedTools.has(c.tool) && roleDisallowed.has(c.tool);
+    // ONE RULE FOR "THIS DENIAL WAS EXPECTED", used by both the per-call flag a
+    // trace predicate reads and `undeclaredDenials`. They disagreed: the flag
+    // asked only whether the ROLE disallows the tool, so a denial of a tool the
+    // BENCH never granted was expected by one and an accident by the other, and
+    // E1-dead-identifier-pos voided on a `denied: true` rule after
+    // evor-sage-junior reached for its documented Tier-3 web fallback.
+    c.role_expected_denial = deniedTools.has(c.tool)
+      && (roleDisallowed.has(c.tool) || !grantedSurface(c.tool));
     c.denied = deniedTools.has(c.tool);
     c.result_text = txt;
   }
@@ -539,6 +564,7 @@ function runScenario(path, { repeats, outDir }) {
   // preflight that checks a different environment than the one it gates is not a
   // preflight.
   const allowedTools = sc.setup?.allowed_tools ?? defaultAllowedTools(sc);
+  CURRENT_ALLOWED = allowedTools;
   preflightAffordance(sc, allowedTools);
 
   for (let r = 0; r < repeats; r++) {

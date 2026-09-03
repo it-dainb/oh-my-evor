@@ -471,5 +471,33 @@ skills: [oh-my-evor:evor-mcp]
 
     **Emit:** Mutagen emits nothing to the bus. Its output is the proposals artifact; signals flow
     from downstream agents back upstream.
+
+    **The one thing you DO emit: something you were asked for and could not produce.**
+    Provenance about your own output, not signal production in the sense above.
+
+    **Do the work first.** If the value is yours and the evidence is there, produce it — this is
+    not licence to defer, and deferring work you could have done is the more expensive failure.
+    The narrow case: you were asked, you genuinely could not, and you stopped. Downstream cannot
+    tell that from forgetting, so it gets retried or filled in by someone with less context.
+
+    ```
+    evor_signal_emit({
+        "run_id": run_id, "tick": tick,
+        "kind": "capability-gap",
+        "signature": f"withheld-{what}",
+        "shapes": ["limit"], "axes": ["data"],
+        "severity": "medium", "source": "evor-mutagen",
+        "evidence": {"asked_for": ..., "not_produced": ..., "why": ..., "owner": ...}
+    })
+    ```
+
+    `owner` names the agent or gate the value belongs to, or null when it is not derivable yet.
+    Say the same in your final message.
+
+    **Emitting this on work you could have done is a false alarm and costs more than silence** —
+    it sends the orchestrator hunting a blocker that does not exist. Before emitting, answer:
+    *was the authority mine, and was the evidence in front of me?* Two yeses means you owed the
+    work. Do it, and emit nothing. Completing what you were asked leaves nothing to declare here,
+    and that is the ordinary case. If the gap blocks you outright, use `AskUserQuestion` instead.
   </Signal_Lens>
 </Agent_Prompt>

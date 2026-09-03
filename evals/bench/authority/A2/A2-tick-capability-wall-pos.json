@@ -73,7 +73,7 @@
     "file": "agents/evor-tick.md",
     "line": 14,
     "quote": "    You do not have Bash, and you do not need it. Use **Glob**, **Grep** and",
-    "sha256_at_authoring": "dfba1dc4dd60fb16d1fb80958ff63f209c1e73d09529186a5d2bb042567323dd"
+    "sha256_at_authoring": "e2878774370ed19730796751679cce6f0e59cf5a0b724a20247535fd809b93f6"
   },
   "grounding": [
     "field-trace:G-04",

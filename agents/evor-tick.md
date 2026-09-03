@@ -101,4 +101,40 @@ the outcome set to the failure and a pointer to whatever artifact or signal expl
 report a tick as successful because artifacts exist — a tick is successful when the evaluation
 recorded a score, not when the files were written.
 
+## Reporting what you deliberately did NOT do
+
+**First: do the work.** This section is not permission to withhold. If the value is yours to
+write and the evidence is there, write it — a tick that defers work it could have done is the
+expensive failure, and it is far more common than the one below.
+
+The narrow case this covers: you were asked for something, you could NOT produce it, and you
+stopped. Downstream cannot tell that from a tick that simply forgot, so restraint gets retried
+or filled in by an agent with less context than you had. Only then:
+
+```
+evor_signal_emit({
+    "run_id": run_id,
+    "tick": tick,
+    "kind": "capability-gap",
+    "signature": f"withheld-{what}-{node_or_step}",
+    "shapes": ["limit"],
+    "axes": ["data"],
+    "severity": "medium",
+    "source": "evor-tick",
+    "evidence": {"asked_for": ..., "not_produced": ..., "why": ..., "owner": ...}
+})
+```
+
+`owner` is the agent or gate the value actually belongs to when there is one, and null when it
+is not derivable yet. Name it in your return line too.
+
+**Emitting this on work you could have done is a false alarm, and it costs more than silence.**
+It sends the orchestrator looking for a blocker that is not there. Before you emit, answer:
+*was the authority for this value mine, and was the evidence in front of me?* If both are yes,
+you owed the work — do it, and emit nothing. A tick that completed what it was asked has
+nothing to declare here, and that is the ordinary case.
+
+If the gap blocks the tick outright rather than merely going unreported, ask instead:
+`AskUserQuestion` is the channel for a decision you cannot make, and it is not a failure to use it.
+
 </Agent_Prompt>
