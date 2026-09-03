@@ -84,7 +84,14 @@ export function selectMode(mode) {
   return { mode, ...cfg, pairs: out, scenarios: out.flatMap((p) => p.files) };
 }
 
-const mode = (process.argv[process.argv.indexOf('--mode') + 1]) || 'lite';
+// GUARDED, and `indexOf` is checked. Unguarded, the CLI ran on every import —
+// including `bench-run.mjs`'s own `await import('./bench-modes.mjs')`. And with
+// no `--mode` on the line, `indexOf(...) + 1` is 0, so the mode became
+// `process.argv[0]`: the path to the node binary, reported as an unknown mode.
+const i = process.argv.indexOf('--mode');
+const mode = i > -1 ? process.argv[i + 1] : 'lite';
+const IS_CLI = process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+if (!IS_CLI) { /* imported for selectMode only */ } else {
 const sel = selectMode(mode);
 if (process.argv.includes('--json')) {
   console.log(JSON.stringify({ mode: sel.mode, repeats: sel.repeats, scenarios: sel.scenarios }, null, 1));
@@ -97,4 +104,5 @@ if (process.argv.includes('--json')) {
   for (const p of sel.pairs) (byAngle[p.angle] ??= []).push(p.difficulty);
   console.log(`angles covered: ${Object.keys(byAngle).length}/18`);
   for (const [a, d] of Object.entries(byAngle)) console.log(`   ${a}: ${d.length} pair(s) [${d.join(', ')}]`);
+}
 }

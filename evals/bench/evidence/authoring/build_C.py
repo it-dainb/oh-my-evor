@@ -246,6 +246,38 @@ def assert_declaration(pair: dict, scenario: dict):
 # to this group. The difference was fixed once by hand in the generated files
 # and this generator put it straight back the next time it ran — the same way
 # the model arms were silently reverted. Both spellings now come from here.
+# A LITERATURE SEARCH THAT MATCHES NOTHING IS AN EMPTY RESULT, NOT AN OUTAGE.
+#
+# Each E1 pair scripts the searches its own angle expects (`*IAM*`, `*DIBCO*`,
+# `*palm-leaf*`). A role that widens its query — "binarization", "palm leaf",
+# "Isuru document binarization competition" — fell off the end and the stub
+# refused the call, which VOIDed the run and told the agent the research backend
+# was down. That is an outage the scenario never declared, and it is the exact
+# confusion group E1 measures: a tool failure is not "there is none".
+#
+# The catch-all is appended LAST, so every authored entry still wins, and it
+# answers with an empty result set — truthful for a fixture whose corpus is
+# exactly what the entries above describe. It cannot manufacture a citation.
+# `resolve_doi` is deliberately NOT given one: identifier resolution is the
+# condition these pairs turn on, and it stays exactly as authored.
+_SEARCH_CATCHALL = {
+    "search_papers": {"papers": []},
+    "search_snippets": {"snippets": []},
+}
+
+
+def _serve_widened_searches(setup):
+    if "stub-research" not in str(setup.get("mcp_config", "")):
+        return setup
+    results = setup.setdefault("tool_results", [])
+    for tool, empty in _SEARCH_CATCHALL.items():
+        if any(e.get("tool") == tool and e.get("match", {}).get("query") == "*" for e in results):
+            continue
+        results.append({"tool": tool, "noise": False, "match": {"query": "*"},
+                        "content": dict(empty, no_match_for_query=True)})
+    return setup
+
+
 def _repo_relative(setup):
     for key in ("cwd_fixture", "mcp_config", "plugin_fixture"):
         v = setup.get(key)
@@ -278,7 +310,7 @@ def build_half(pair: dict, half: str, agent_sha: str) -> dict:
         },
         "grounding": list(pair["grounding"]),
         "satisfiability": copy.deepcopy(pair["satisfiability"]),
-        "setup": _repo_relative(copy.deepcopy(pair["setup"])),
+        "setup": _serve_widened_searches(_repo_relative(copy.deepcopy(pair["setup"]))),
         "prompt": pair["prompt"],
         "expect": {
             "class": "positive" if positive else "negative",

@@ -797,12 +797,27 @@ export function evaluate(detector, ctx = {}, opts = {}) {
 export function undeclaredDenials(ctx) {
   const intended = new Set((ctx.intended_denials ?? []).map(String));
   const roleDisallowed = new Set((ctx.role_disallowed_tools ?? []).map(String));
+  // THE BENCH'S OWN ALLOWLIST IS A DECLARED CONSTRAINT, not an incidental
+  // denial. §6.2 exists to separate "the product's governor fired" from "the
+  // harness's permissions fired"; a tool the run never granted is the second,
+  // and it is a deliberate surface that `preflightAffordance` has already
+  // validated — every tool a detector needs is granted, so a denial out here
+  // can never satisfy a detector for free.
+  //
+  // Without this, both T2-artifact-slot runs voided because evor-sage-junior
+  // reached for WebFetch and WebSearch — the Tier-3 research fallback its OWN
+  // agent file tells it to use — and the bench, which deliberately grants no
+  // live network, called its own refusal an undeclared denial.
+  const granted = ctx.harness_allowed_tools ?? null;
+  const inSurface = (t) => granted === null
+    || granted.some((a) => a === t || (a === 'mcp__evor' && /^(mcp__evor__)?evor_/.test(t)) || t.startsWith(a));
   return (ctx.denials ?? []).filter((d) => {
     const tool = String(d.tool_name ?? d.tool ?? '');
     const ruleId = d.rule_id ?? d.rule ?? null;
     if (ruleId !== null && intended.has(String(ruleId))) return false;
     if (intended.has(tool)) return false;
     if (roleDisallowed.has(tool) || roleDisallowed.has(normTool(tool))) return false;
+    if (!inSurface(tool) && !inSurface(normTool(tool))) return false;
     return true;
   });
 }

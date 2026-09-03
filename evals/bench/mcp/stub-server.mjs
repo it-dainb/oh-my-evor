@@ -47,8 +47,8 @@
  * was tried.
  */
 import { createHash } from 'crypto';
-import { appendFileSync, mkdirSync, readFileSync } from 'fs';
-import { dirname } from 'path';
+import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, statSync } from 'fs';
+import { dirname, join } from 'path';
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
@@ -226,8 +226,15 @@ export function globMatch(pattern, value) {
   const s = typeof value === 'object' && value !== null ? JSON.stringify(value) : String(value);
   if (typeof pattern !== 'string') return String(pattern) === s;
   if (!pattern.includes('*')) return s === pattern;
+  // CASE-INSENSITIVE. Entries are authored from the corpus's own vocabulary
+  // (`*IAM*`, `*DIBCO*`, `*palm-leaf*`) and agents type natural language, so a
+  // case-sensitive match refused calls the scenario HAD scripted an answer for:
+  // 8 of the lite calibration's 31 refused calls were an entry that existed and
+  // never fired. Broadening the match is not loosening a detector — it serves
+  // the answer the author already wrote.
   const rx = new RegExp(
     '^' + pattern.split('*').map((p) => p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('[\\s\\S]*') + '$',
+    'i',
   );
   return rx.test(s);
 }
@@ -327,6 +334,146 @@ function sinkResult(tool, args, ctx) {
   return base;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Fixture-derived reads
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Pure reads answered FROM THE SEEDED RUN ROOT, when the scenario scripts no
+ * entry for them.
+ *
+ * The lite calibration voided 6 of 6 stub-backed runs. 23 of the 31 refused
+ * calls were orientation reads no scenario had scripted — `evor_state_read`,
+ * `evor_run_status`, `evor_doctor` — the calls a role makes to find out where
+ * it is before it touches the thing under test. Corpus-wide, 46 scenarios are
+ * stub-backed and not one scripts more than three distinct tools, so the corpus
+ * scripts the subject and blinds the agent to everything else.
+ *
+ * Hand-authoring those answers would put a second, drifting copy of the fixture
+ * in the scenario files. Reading the fixture is truthful by construction: it
+ * reports what was actually seeded, which is what the real server would say.
+ *
+ * THIS CANNOT FABRICATE A SUCCESS. Every branch reports what is on disk, and a
+ * missing file produces the same not-found the real server produces — which is
+ * frequently the condition under test (E2's whole positive half is an artifact
+ * that was never written). An explicit `tool_results` entry is matched FIRST
+ * and always wins, so a scripted failure, an injected error and the tool under
+ * test are all untouched by this.
+ */
+const DERIVABLE = new Set([
+  'evor_state_read', 'evor_run_status', 'evor_read_artifact', 'evor_read_handoff',
+  'evor_read_result', 'evor_tree_read', 'evor_signal_query', 'evor_gotcha_query',
+  'evor_gotchas_list', 'evor_capability', 'evor_doctor', 'evor_wiki_query',
+  'evor_check_plateau',
+]);
+
+function runRoot() {
+  const root = process.env.EVOR_ROOT;
+  if (!root || !existsSync(root)) return null;
+  const runs = join(root, 'runs');
+  if (!existsSync(runs)) return null;
+  // A fixture seeds exactly one run, sometimes under a mission directory.
+  for (const a of readdirSync(runs)) {
+    const p1 = join(runs, a);
+    if (!statSync(p1).isDirectory()) continue;
+    if (existsSync(join(p1, 'run-state.json')) || existsSync(join(p1, 'tree.json'))) return p1;
+    for (const b of readdirSync(p1)) {
+      const p2 = join(p1, b);
+      if (statSync(p2).isDirectory() && (existsSync(join(p2, 'run-state.json')) || existsSync(join(p2, 'tree.json')))) return p2;
+    }
+  }
+  return null;
+}
+
+const readJson = (p) => { try { return JSON.parse(readFileSync(p, 'utf8')); } catch { return null; } };
+const readLines = (p) => {
+  try {
+    return readFileSync(p, 'utf8').split('\n').filter(Boolean).flatMap((l) => {
+      try { return [JSON.parse(l)]; } catch { return []; }
+    });
+  } catch { return []; }
+};
+
+/** @returns {object|null} null means "not derivable — stay loud". */
+export function deriveFromFixture(tool, args = {}) {
+  if (!DERIVABLE.has(tool)) return null;
+  const dir = runRoot();
+  if (!dir) return null;
+  const notFound = (what) => ({ ok: false, error: `${what} not found`, derived_from_fixture: true });
+
+  switch (tool) {
+    case 'evor_state_read': {
+      const st = readJson(join(dir, 'run-state.json'));
+      return st ? { ok: true, state: st, derived_from_fixture: true } : notFound('run-state.json');
+    }
+    case 'evor_tree_read': {
+      const t = readJson(join(dir, 'tree.json'));
+      return t ? { ok: true, tree: t, derived_from_fixture: true } : notFound('tree.json');
+    }
+    case 'evor_run_status': {
+      const st = readJson(join(dir, 'run-state.json')) ?? {};
+      const jobsDir = join(dir, 'jobs');
+      const jobs = existsSync(jobsDir)
+        ? readdirSync(jobsDir).map((j) => readJson(join(jobsDir, j, 'status.json')) ?? readJson(join(jobsDir, j))).filter(Boolean)
+        : [];
+      const wanted = args.job_id ? jobs.filter((j) => j?.job_id === args.job_id) : jobs;
+      if (args.job_id && !wanted.length) return notFound(`job ${args.job_id}`);
+      return { ok: true, run_state: st, jobs: wanted, derived_from_fixture: true };
+    }
+    case 'evor_read_result': {
+      const p = join(dir, 'nodes', String(args.node_id ?? ''), 'results.json');
+      const r = readJson(p);
+      return r ? { ok: true, result: r, derived_from_fixture: true } : notFound(`evaluation record for ${args.node_id}`);
+    }
+    case 'evor_read_artifact': {
+      const tick = String(args.tick ?? 0);
+      const agent = String(args.agent ?? '');
+      const cands = [join(dir, 'ticks', tick, `${agent}.json`)];
+      if (args.kind) cands.unshift(join(dir, 'ticks', tick, agent, `${args.kind}.json`));
+      for (const c of cands) { const j = readJson(c); if (j) return { ok: true, validated: false, payload: j, derived_from_fixture: true }; }
+      return notFound(`artifact ticks/${tick}/${agent}`);
+    }
+    case 'evor_read_handoff': {
+      const f = args.from_agent && args.to_agent
+        ? join(dir, 'handoffs', `${args.from_agent}_to_${args.to_agent}.json`)
+        : null;
+      const j = f ? readJson(f) : null;
+      return j ? { ok: true, handoff: j, derived_from_fixture: true } : notFound('handoff');
+    }
+    case 'evor_signal_query': {
+      let sig = readLines(join(dir, 'signals.jsonl'));
+      if (args.since_tick !== undefined) sig = sig.filter((s) => (s.tick ?? 0) >= Number(args.since_tick));
+      if (args.kind) sig = sig.filter((s) => s.kind === args.kind);
+      return { ok: true, signals: sig, count: sig.length, derived_from_fixture: true };
+    }
+    case 'evor_gotcha_query':
+    case 'evor_gotchas_list': {
+      let g = readLines(join(dir, 'gotchas.jsonl'));
+      if (args.kind) g = g.filter((x) => x.kind === args.kind);
+      return { ok: true, gotchas: g, count: g.length, derived_from_fixture: true };
+    }
+    case 'evor_wiki_query': {
+      const w = readLines(join(dir, 'wiki.jsonl'));
+      return { ok: true, results: w, count: w.length, derived_from_fixture: true };
+    }
+    case 'evor_capability': {
+      const c = readJson(join(dir, 'capability.json')) ?? readJson(join(dir, '..', '..', 'capability.json'));
+      return c ? { ok: true, capability: c, derived_from_fixture: true } : notFound('capability profile');
+    }
+    case 'evor_check_plateau': {
+      const t = readJson(join(dir, 'tree.json')) ?? { nodes: {} };
+      const n = Object.keys(t.nodes ?? {}).length;
+      return { ok: true, plateaued: false, nodes_considered: n, derived_from_fixture: true };
+    }
+    case 'evor_doctor': {
+      const has = (f) => existsSync(join(dir, f));
+      return { ok: true, run_dir: dir, checks: { run_state: has('run-state.json'), tree: has('tree.json'), signals: has('signals.jsonl'), jobs: has('jobs') }, derived_from_fixture: true };
+    }
+    default:
+      return null;
+  }
+}
+
 function appendTrace(script, row) {
   const p = script?.trace_path;
   if (!p) return;
@@ -350,6 +497,10 @@ export function serve(tool, args, script, state) {
 
   if (!entry) {
     if (SINKS.has(tool)) return { body: sinkResult(tool, args ?? {}, ctx), isError: false, kind: 'sink' };
+    // Orientation reads are answered from the seeded fixture — truthfully, and
+    // only when the scenario scripted nothing for them. See `deriveFromFixture`.
+    const derived = deriveFromFixture(tool, args ?? {});
+    if (derived) return { body: derived, isError: false, kind: 'derived' };
     // LOUD. A plausible empty result here would teach the agent its call
     // succeeded, and every downstream judgement would be about a world the
     // fixture never described.

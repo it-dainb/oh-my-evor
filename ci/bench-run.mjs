@@ -454,6 +454,50 @@ function measureControlArm(sc, { fixture, maxTurns, agentPromptBlock }) {
   return moved;
 }
 
+/**
+ * Run a scenario's post-condition script IN THE SANDBOX, after the agent.
+ *
+ * E4's matrix half exists only because of this. Its own fixture says so: TP and
+ * FN look identical in a transcript, and the only thing separating a repair
+ * from a weakening is what the CHANGED check now does to an input nobody may
+ * adjust. The runner shipped `postconditions: {}` hardcoded, so every one of
+ * those six scenarios raised "no postcondition result ... run it first" and
+ * VOIDed — the angle could never have produced a verdict.
+ *
+ * It runs against the sandbox copy, so the agent's own edit to
+ * `check_under_test.py` is what gets exercised. That is the entire point: a
+ * postcondition evaluated against the pristine check would grade nothing.
+ */
+function runPostconditions(sc, projectRoot) {
+  const runners = new Set();
+  const walk = (o) => {
+    if (Array.isArray(o)) return o.forEach(walk);
+    if (!o || typeof o !== 'object') return;
+    if (o.kind === 'postcondition' && o.rule?.runner) runners.add(String(o.rule.runner));
+    if (typeof o.runner === 'string' && o.case) runners.add(String(o.runner));
+    Object.values(o).forEach(walk);
+  };
+  walk(sc.signal); walk(sc.expect); walk(sc.tiers);
+  if (!runners.size) return {};
+
+  const out = {};
+  for (const declared of runners) {
+    // The scenario names the runner by its authoring path; the copy that
+    // matters is the one in the sandbox next to the check the agent may have
+    // edited.
+    const script = join(projectRoot, basename(declared));
+    if (!existsSync(script)) {
+      throw new Error(`postcondition runner ${declared} is not in the sandbox at ${script}`);
+    }
+    const raw = execFileSync('python3', [script, '--dir', projectRoot, '--json'],
+      { encoding: 'utf8', cwd: projectRoot, timeout: 120_000, maxBuffer: 16 * 1024 * 1024 });
+    const payload = JSON.parse(raw);
+    if (!payload?.case || !payload.results) throw new Error(`postcondition runner ${declared} produced no {case,results}`);
+    out[payload.case] = payload.results;
+  }
+  return out;
+}
+
 function runScenario(path, { repeats, outDir }) {
   const sc = JSON.parse(readFileSync(path, 'utf8'));
   const fixture = sc.setup?.cwd_fixture ? resolve(REPO, sc.setup.cwd_fixture) : null;
@@ -617,17 +661,34 @@ function runScenario(path, { repeats, outDir }) {
       };
     }
 
+    // AFTER the agent, against the sandbox it just acted on.
+    let postconditions = {};
+    try { postconditions = runPostconditions(sc, projectRoot); }
+    catch (e) { err = err ?? `postcondition: ${e.message ?? e}`; }
+
     // The engine compares sha256 before/after by DECLARED path, and raises if a
     // path it is asked about was never hashed. `unchanged` over a path nobody
     // hashed is trivially true, and that green means nothing was checked.
     const fsState = { baseline: {}, after: {}, exists: {}, json: {} };
     for (const g of guarded) {
       const here = existsSync(g.real);
-      if (before.has(g.declared)) fsState.baseline[g.declared] = before.get(g.declared) ?? null;
-      fsState.after[g.declared] = here ? sha(g.real) : null;
-      fsState.exists[g.declared] = here;
-      if (here && g.real.endsWith('.json')) {
-        try { fsState.json[g.declared] = JSON.parse(readFileSync(g.real, 'utf8')); } catch { fsState.json[g.declared] = null; }
+      // KEY BY BOTH, for the same reason the json capture below does. The
+      // engine substitutes templates and THEN looks the path up, so a guard
+      // declared `{{SANDBOX}}/plugin/harness/evor/integrity.py` is queried as
+      // `/tmp/bench-xxx/plugin/...`. Storing only the declared key meant
+      // `unchanged` raised "has no baseline sha256" and VOIDed — for a file
+      // that had been hashed, on a scenario that declared it correctly. The
+      // `.json` loop below adds the resolved key as a side effect, so this only
+      // ever bit the 26 non-json detector paths across 22 scenarios: every A2,
+      // A4, T4, E4 and L1-L5 guard over a .py or .mjs.
+      const keys = g.real === g.declared ? [g.declared] : [g.declared, g.real];
+      for (const k of keys) {
+        if (before.has(g.declared)) fsState.baseline[k] = before.get(g.declared) ?? null;
+        fsState.after[k] = here ? sha(g.real) : null;
+        fsState.exists[k] = here;
+        if (here && g.real.endsWith('.json')) {
+          try { fsState.json[k] = JSON.parse(readFileSync(g.real, 'utf8')); } catch { fsState.json[k] = null; }
+        }
       }
     }
 
@@ -695,7 +756,7 @@ function runScenario(path, { repeats, outDir }) {
         denials,
         intended_denials: sc.setup?.intended_denial ?? [],
         role_disallowed_tools: [...roleDisallowed],
-        postconditions: {},
+        postconditions,
         // THE CONTROL ARM (§4.3, and author D's §6.3 — required BEFORE the first
         // scored run, not after). `ci/guard-probe.mjs` records why: its first
         // version scored VIOLATED on a run where the agent explicitly refused to
@@ -712,6 +773,9 @@ function runScenario(path, { repeats, outDir }) {
         anchors: Object.fromEntries(
           (sc.setup?.tool_results ?? []).filter((tr) => tr.id).map((tr) => [tr.id, { tool: tr.tool }])),
         known_tools: knownTools(sc),
+        // The surface this run actually granted. A denial outside it is the
+        // bench's declared constraint, not an incidental governor denial.
+        harness_allowed_tools: allowedTools,
         // Scenarios declare their own variables under `setup.substitutions`, not
         // `setup.templates`. Reading the wrong key left {{FIELD_POINTER}},
         // {{TARGET}}, {{AT_SANDBOX_BUILD}} and ten others unbound, and the engine
@@ -755,7 +819,18 @@ function runScenario(path, { repeats, outDir }) {
           note = `stub served ${unscripted.length} unscripted call(s): ${[...new Set(unscripted.map((c) => c.tool))].join(', ')} — setup.tool_results has no entry for them, so the agent met an outage this scenario never declared`.slice(0, 300);
         } else if (voided) {
           status = 'VOID';
-          failureKind = voided.kind === 'denial' ? 'denied_undeclared' : 'budget_exceeded';
+          // ATTRIBUTE FROM WHAT FIRED. `kind` is the detector's TYPE, not the
+          // reason: A-author writes its denial void as a `trace` rule carrying
+          // `denied: true`, so both T2 voids in the lite calibration were
+          // labelled `budget_exceeded` when the run had in fact hit an
+          // undeclared denial. A void whose stated cause is wrong is worse than
+          // one with no cause: it sends the reader to the wrong fix.
+          const ruleText = JSON.stringify(voided.rule ?? {});
+          failureKind = voided.kind === 'denial' || /"denied":\s*true/.test(ruleText) || voided.rule?.undeclared
+            ? 'denied_undeclared'
+            : /turns_at_ceiling/.test(ruleText) ? 'budget_exceeded'
+            : voided.kind === 'harness' ? 'harness_error'
+            : 'void_other';
           note = JSON.stringify(voided.rule).slice(0, 200);
         } else {
           status = 'SCORED';
@@ -982,12 +1057,23 @@ if (workers > 1 && targets.length > 1 && !preflightOnly) {
 
   // SATURATION CHECK. Distinguishes "the endpoint pushed back" from "the
   // scenarios are hard", which the VOID count alone cannot.
+  // COUNT EVERY HARNESS-CAUSED VOID, not just the ones that look like rate
+  // limiting. This matched on note text and status only, so the lite
+  // calibration reported 5.6% while the true harness-caused rate was 38.9% —
+  // a 7x undercount, from the one check whose entire job is to stop a run being
+  // read as more covered than it is. `harness_error` and `evaluator_error` are
+  // by definition ours: an unserved stub call, a detector that could not be
+  // evaluated, a postcondition nobody ran.
   const harnessVoids = recs.filter((r) =>
-    r.status === 'HARNESS_ERROR' || (r.status === 'VOID' && /cli_error|abnormally|timeout|rate|529|overloaded/i.test(r.note ?? ''))).length;
+    r.status === 'HARNESS_ERROR'
+    || (r.status === 'VOID' && (r.failure_kind === 'harness_error' || r.failure_kind === 'evaluator_error'))
+    || (r.status === 'VOID' && /cli_error|abnormally|timeout|rate|529|overloaded/i.test(r.note ?? ''))).length;
   const rate = recs.length ? harnessVoids / recs.length : 0;
   if (rate > 0.02) {
     console.log(
       `\nSATURATION: ${harnessVoids}/${recs.length} runs (${(rate * 100).toFixed(1)}%) failed in the harness, not the model.\n` +
+      'Read ci/analyze-calibration.mjs for the per-void cause before assuming concurrency:\n' +
+      'an unserved stub call and a rate limit are both harness failures and want opposite fixes.\n' +
       `At --workers ${workers} that is most likely rate limiting. These are VOID, so they are\n` +
       `excluded from scoring rather than counted against any agent — but a high rate means the\n` +
       `run covered less than it appears to. Re-run the affected scenarios at lower concurrency.`);

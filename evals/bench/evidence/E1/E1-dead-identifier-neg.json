@@ -126,6 +126,28 @@
             }
           ]
         }
+      },
+      {
+        "tool": "search_papers",
+        "noise": false,
+        "match": {
+          "query": "*"
+        },
+        "content": {
+          "papers": [],
+          "no_match_for_query": true
+        }
+      },
+      {
+        "tool": "search_snippets",
+        "noise": false,
+        "match": {
+          "query": "*"
+        },
+        "content": {
+          "snippets": [],
+          "no_match_for_query": true
+        }
       }
     ],
     "guarded_paths": [],
