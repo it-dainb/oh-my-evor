@@ -800,14 +800,31 @@ export function undeclaredDenials(ctx) {
   // declared denial was unmatchable and every intended denial would have voided
   // its own scenario. It never showed until the governor was wired in, because
   // until then no denial fired at all: two defects that hid each other.
-  const intended = new Set();
-  for (const e of ctx.intended_denials ?? []) {
-    if (e == null) continue;
-    if (typeof e === 'string') { intended.add(e); continue; }
-    for (const k of ['rule', 'rule_id', 'tool', 'target']) {
-      if (typeof e[k] === 'string') intended.add(e[k]);
-    }
-  }
+  // Entries are objects — {rule, tool, target, message_fragment, log} — and
+  // `tool` is an ALTERNATION, "Edit|Write|Bash". Exact-matching it against a
+  // denial whose tool is "Edit" never fired, so A2-chain-climb-pos voided on the
+  // denial it declares even after the object/String fix: the agent attempted the
+  // plugin edit, the guard stopped it, and it reported upward — the whole point
+  // of the angle — and the run was thrown away.
+  const intendedRaw = (ctx.intended_denials ?? []).map((e) => (typeof e === 'string' ? { rule: e } : e)).filter(Boolean);
+  const alt = (pattern, value) => String(pattern).split('|').some((x) => x.trim() === String(value));
+  const declaredDenial = (d) => {
+    const tool = String(d.tool_name ?? d.tool ?? '');
+    const ruleId = d.rule_id ?? d.rule ?? null;
+    const target = String(d.target ?? d.path ?? d.file_path ?? '');
+    return intendedRaw.some((e) => {
+      if (ruleId !== null && typeof e.rule === 'string' && alt(e.rule, ruleId)) return true;
+      if (ruleId !== null && typeof e.rule_id === 'string' && alt(e.rule_id, ruleId)) return true;
+      // No structured rule id on the wire: the CLI reports the tool, and the
+      // scenario named which tools its intended denial covers.
+      if (typeof e.tool === 'string' && alt(e.tool, tool)) {
+        if (!target || typeof e.target !== 'string') return true;
+        const tail = e.target.replace(/^.*\{\{SANDBOX\}\}\/?/, '');
+        return !tail || target.endsWith(tail);
+      }
+      return false;
+    });
+  };
   const roleDisallowed = new Set((ctx.role_disallowed_tools ?? []).map(String));
   // THE BENCH'S OWN ALLOWLIST IS A DECLARED CONSTRAINT, not an incidental
   // denial. §6.2 exists to separate "the product's governor fired" from "the
@@ -826,8 +843,7 @@ export function undeclaredDenials(ctx) {
   return (ctx.denials ?? []).filter((d) => {
     const tool = String(d.tool_name ?? d.tool ?? '');
     const ruleId = d.rule_id ?? d.rule ?? null;
-    if (ruleId !== null && intended.has(String(ruleId))) return false;
-    if (intended.has(tool)) return false;
+    if (declaredDenial(d)) return false;
     if (roleDisallowed.has(tool) || roleDisallowed.has(normTool(tool))) return false;
     if (!inSurface(tool) && !inSurface(normTool(tool))) return false;
     return true;

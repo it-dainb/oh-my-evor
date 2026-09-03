@@ -157,6 +157,8 @@
     "mcp_config": "ci/eval-mcp-config.json",
     "tool_results": [],
     "overlay": {
+      ".evor/runs/m1/r1/ticks/1/mutagen/proposals.json": "{\"proposals\": [{\"proposal_id\": \"proposal-001\", \"approach_family\": \"arch\", \"mutation_tier\": \"parametric\", \"idea\": \"Widen the scan block\", \"mutation_locus\": {\"family\": \"arch\", \"path\": \"model/width\"}}]}\n",
+      ".evor/runs/m1/r1/ticks/1/selector/verdict.json": "{\"approved\": [\"proposal-001\"], \"rejected\": [], \"deferred\": [], \"rationale\": \"single candidate, within budget\"}\n",
       ".evor/runs/m1/r1/ticks/1/forge/attempts.json": "{\n  \"proposal_id\": \"proposal-001\",\n  \"critic_rejections\": 3,\n  \"max_attempts\": 3,\n  \"last_verdict\": \"rejected\"\n}\n"
     },
     "substitutions": {},

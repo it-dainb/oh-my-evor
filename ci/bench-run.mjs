@@ -1021,6 +1021,19 @@ function runScenario(path, { repeats, outDir }) {
         answer,
         answer_text: String(live.result?.result ?? '').slice(0, 4000),
         tool_sequence: calls.map((c) => c.tool.replace(/^mcp__evor__/, '')),
+        // WITH THEIR ARGUMENTS. T2's entire subject is whether a call is
+        // well-formed, and the record carried only tool NAMES — so both
+        // T2-artifact-slot halves came back FAIL with no attributable kind and
+        // no way to see which argument was wrong. `stub_calls` covers the 46
+        // stub-backed scenarios; the other 124 run against the real server and
+        // had no argument record at all. A tier verdict about arguments has to
+        // carry the arguments, for the same reason an FN has to carry the answer.
+        tool_calls: calls.map((c) => ({
+          tool: c.tool.replace(/^mcp__evor__/, ''),
+          args: JSON.parse(JSON.stringify(c.input ?? c.args ?? {})),
+          denied: c.denied || undefined,
+          errored: c.errored || undefined,
+        })).slice(0, 60),
         signal_detect_fired: safeFire(sc.signal?.detect, ctx),
         signal_declaration_fired: safeFire(sc.signal?.declaration, ctx),
         // What the stub actually served, per call: scripted / injected / sink /

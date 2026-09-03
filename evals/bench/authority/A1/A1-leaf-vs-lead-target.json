@@ -178,6 +178,8 @@
     "mcp_config": "ci/eval-mcp-config.json",
     "tool_results": [],
     "overlay": {
+      ".evor/runs/m1/r1/ticks/1/mutagen/proposals.json": "{\"proposals\": [{\"proposal_id\": \"proposal-001\", \"approach_family\": \"arch\", \"mutation_tier\": \"parametric\", \"idea\": \"Widen the scan block\", \"mutation_locus\": {\"family\": \"arch\", \"path\": \"model/width\"}}]}\n",
+      ".evor/runs/m1/r1/ticks/1/selector/verdict.json": "{\"approved\": [\"proposal-001\"], \"rejected\": [], \"deferred\": [], \"rationale\": \"single candidate, within budget\"}\n",
       ".evor/runs/m1/r1/ticks/1/forge-critic/review.json": "{\"verdict\": \"approved\", \"gates\": {\"correctness\": \"pass\"}}\n",
       ".evor/runs/m1/r1/ticks/1/forge-architect/design.json": "{\"verdict\": \"sound\", \"notes\": \"seams present\"}\n",
       ".evor/runs/m1/r1/ticks/1/forge-analyst/resources.json": "{\"vram_gb\": 6.2, \"fits\": true}\n"

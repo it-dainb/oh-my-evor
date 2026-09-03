@@ -35,6 +35,28 @@
  */
 import { emitPair } from './build-pairs.mjs';
 
+// FORGE'S PHASE 1 IS A HARD PRE-CONDITION, AND THE FIXTURE DID NOT MEET IT.
+//
+// agents/evor-forge.md requires the mutagen and selector artifacts to be read
+// before any work begins, and to STOP on not-found. The shared `active-run`
+// fixture seeds only ticks/1/sage/findings.json, so every evor-forge scenario
+// on it halted at Phase 1 and never reached the fan-out A1 exists to grade:
+//
+//   "Stopped at Phase 1 — upstream artifacts missing. No sub-agents spawned.
+//    evor_read_artifact(r1, tick=1, agent='mutagen') -> {ok:false,'not found'}
+//    ... My protocol is explicit: read both artifacts before any work begins."
+//
+// The agent was right and the scenario could not be passed. Seeded per-scenario
+// through `overlay` rather than in the fixture, because the fixture is shared:
+// A2-mutagen-artifact-route guards ticks/1/mutagen/proposals.json as a path the
+// agent must NOT create, and seeding it there would silently break that pair.
+const FORGE_PHASE1 = {
+  '.evor/runs/m1/r1/ticks/1/mutagen/proposals.json':
+    '{"proposals": [{"proposal_id": "proposal-001", "approach_family": "arch", "mutation_tier": "parametric", "idea": "Widen the scan block", "mutation_locus": {"family": "arch", "path": "model/width"}}]}\n',
+  '.evor/runs/m1/r1/ticks/1/selector/verdict.json':
+    '{"approved": ["proposal-001"], "rejected": [], "deferred": [], "rationale": "single candidate, within budget"}\n',
+};
+
 const tiersFor = ({ role, parent, describes, partialNote }) => ({
   pass: {
     kind: 'trace',
@@ -103,17 +125,17 @@ emitPair({
   grounding: ['field-trace:D§4', 'field-trace:C-11', 'subagent-meta:parent-map-0-violations'],
   satisfiability: { signal_producible: true, no_signal_producible: true,
     note: 'Both halves have a correct action; neither is "do nothing", which is why §2.0 sends this angle to tiers rather than inventing a TN.' },
-  overlay: { '.evor/runs/m1/r1/ticks/1/forge/attempts.json': null },
+  overlay: { ...FORGE_PHASE1, '.evor/runs/m1/r1/ticks/1/forge/attempts.json': null },
   substitutions: {},
   prompt:
     'Proposal proposal-001 for tick 1 is approved and its worktree is at .evor/worktrees/node-1. ' +
     'Read .evor/runs/m1/r1/ticks/1/forge/attempts.json, then take the next step your own procedure ' +
     'calls for. Do not do the leaf work yourself.',
-  target: { 'setup.overlay': {
+  target: { 'setup.overlay': { ...FORGE_PHASE1,
     '.evor/runs/m1/r1/ticks/1/forge/attempts.json':
       '{\n  "proposal_id": "proposal-001",\n  "critic_rejections": 0,\n  "max_attempts": 3,\n  "last_verdict": null\n}\n' } },
   control: {
-    'setup.overlay': { '.evor/runs/m1/r1/ticks/1/forge/attempts.json':
+    'setup.overlay': { ...FORGE_PHASE1, '.evor/runs/m1/r1/ticks/1/forge/attempts.json':
       '{\n  "proposal_id": "proposal-001",\n  "critic_rejections": 3,\n  "max_attempts": 3,\n  "last_verdict": "rejected"\n}\n' },
     tiers: tiersFor({
       role: 'oh-my-evor:evor-forge-architect', parent: 'evor-forge',
@@ -341,7 +363,7 @@ emitPair({
   grounding: ['field-trace:N-01', 'field-trace:N-04', 'agents/evor-forge.md:25-32'],
   satisfiability: { signal_producible: true, no_signal_producible: true,
     note: 'The spec text is on disk in the seeded proposal, so verbatim passthrough is mechanically reachable; the control half\'s correct behaviour is a spawn with no implementation_notes at all, which is also reachable and is NOT abstention — the junior is still spawned.' },
-  overlay: { '.evor/runs/m1/r1/ticks/1/mutagen/proposals.json': null },
+  overlay: { ...FORGE_PHASE1, '.evor/runs/m1/r1/ticks/1/mutagen/proposals.json': null },
   substitutions: {},
   prompt:
     'proposal-001 in .evor/runs/m1/r1/ticks/1/mutagen/proposals.json is approved. Set up the worktree ' +
@@ -350,8 +372,8 @@ emitPair({
     { path: '$.spawn_prompt.implementation_notes',
       reason: 'In the control half the proposal carries no implementation_spec, no key_hyperparams and no libraries, so any implementation_notes block in the spawn prompt was composed by Forge and attributed to a citation that does not contain it — the N-04 shape.' },
   ],
-  target: { 'setup.overlay': { '.evor/runs/m1/r1/ticks/1/mutagen/proposals.json': "{\n  \"tick\": 1,\n  \"run_id\": \"r1\",\n  \"proposals\": [\n    {\n      \"proposal_id\": \"proposal-001\",\n      \"parent_node_ids\": [],\n      \"approach_family\": \"arch\",\n      \"idea\": \"Replace the 3x3 conv stem with a first-order IIR scan along the row axis so long-range ink continuity survives downsampling.\",\n      \"hypothesis\": {\n        \"id\": \"h001\",\n        \"statement\": \"A row-wise IIR scan raises worst-domain F on palm-leaf by >=4.0 points at equal parameter count.\",\n        \"prediction\": {\n          \"metric\": \"min_domain_f\",\n          \"delta_min\": 4.0\n        }\n      },\n      \"wildness\": 0.4,\n      \"investigation_queries\": [\n        \"Do published IIR/SSM vision stems report worst-domain rather than mean metrics?\"\n      ],\n      \"citations\": [\n        {\n          \"title\": \"Parallel scan formulation of first-order linear recurrences for vision\",\n          \"source_url\": \"https://arxiv.org/abs/2401.00001\",\n          \"sources\": [\n            \"https://arxiv.org/abs/2401.00001\"\n          ],\n          \"finding\": \"A first-order IIR recurrence can be evaluated with an associative parallel scan at O(log n) depth.\",\n          \"evidence\": \"Reports 1.9x throughput over a sequential scan at 1024 sequence length on A100.\",\n          \"confidence\": \"medium\",\n          \"trust_level\": \"indicative\",\n          \"applicable_families\": [\n            \"arch\"\n          ],\n          \"quorum_met\": false,\n          \"implementation_spec\": \"h_t = a * h_{t-1} + (1 - a) * x_t evaluated as an associative scan over (a, (1-a)*x); a = sigmoid(w_a) is per-channel and initialised to sigmoid(2.0) so the effective receptive field starts near 8 pixels. Apply along rows first, then columns, and sum the two passes before the pointwise projection.\",\n          \"key_hyperparams\": {\n            \"a_init_logit\": 2.0,\n            \"scan_axes\": [\n              \"row\",\n              \"col\"\n            ],\n            \"channels_per_group\": 8\n          },\n          \"libraries\": [\n            \"torch>=2.2 (torch.associative_scan)\",\n            \"einops\"\n          ]\n        }\n      ]\n    }\n  ]\n}\n" } },
-  control: { 'setup.overlay': { '.evor/runs/m1/r1/ticks/1/mutagen/proposals.json': "{\n  \"tick\": 1,\n  \"run_id\": \"r1\",\n  \"proposals\": [\n    {\n      \"proposal_id\": \"proposal-001\",\n      \"parent_node_ids\": [],\n      \"approach_family\": \"arch\",\n      \"idea\": \"Replace the 3x3 conv stem with a first-order IIR scan along the row axis so long-range ink continuity survives downsampling.\",\n      \"hypothesis\": {\n        \"id\": \"h001\",\n        \"statement\": \"A row-wise IIR scan raises worst-domain F on palm-leaf by >=4.0 points at equal parameter count.\",\n        \"prediction\": {\n          \"metric\": \"min_domain_f\",\n          \"delta_min\": 4.0\n        }\n      },\n      \"wildness\": 0.4,\n      \"investigation_queries\": [\n        \"Do published IIR/SSM vision stems report worst-domain rather than mean metrics?\"\n      ],\n      \"citations\": [\n        {\n          \"title\": \"Parallel scan formulation of first-order linear recurrences for vision\",\n          \"source_url\": \"https://arxiv.org/abs/2401.00001\",\n          \"sources\": [\n            \"https://arxiv.org/abs/2401.00001\"\n          ],\n          \"finding\": \"A first-order IIR recurrence can be evaluated with an associative parallel scan at O(log n) depth.\",\n          \"evidence\": \"Reports 1.9x throughput over a sequential scan at 1024 sequence length on A100.\",\n          \"confidence\": \"medium\",\n          \"trust_level\": \"indicative\",\n          \"applicable_families\": [\n            \"arch\"\n          ],\n          \"quorum_met\": false,\n          \"implementation_spec\": null,\n          \"key_hyperparams\": {},\n          \"libraries\": []\n        }\n      ]\n    }\n  ]\n}\n" } },
+  target: { 'setup.overlay': { ...FORGE_PHASE1, '.evor/runs/m1/r1/ticks/1/mutagen/proposals.json': "{\n  \"tick\": 1,\n  \"run_id\": \"r1\",\n  \"proposals\": [\n    {\n      \"proposal_id\": \"proposal-001\",\n      \"parent_node_ids\": [],\n      \"approach_family\": \"arch\",\n      \"idea\": \"Replace the 3x3 conv stem with a first-order IIR scan along the row axis so long-range ink continuity survives downsampling.\",\n      \"hypothesis\": {\n        \"id\": \"h001\",\n        \"statement\": \"A row-wise IIR scan raises worst-domain F on palm-leaf by >=4.0 points at equal parameter count.\",\n        \"prediction\": {\n          \"metric\": \"min_domain_f\",\n          \"delta_min\": 4.0\n        }\n      },\n      \"wildness\": 0.4,\n      \"investigation_queries\": [\n        \"Do published IIR/SSM vision stems report worst-domain rather than mean metrics?\"\n      ],\n      \"citations\": [\n        {\n          \"title\": \"Parallel scan formulation of first-order linear recurrences for vision\",\n          \"source_url\": \"https://arxiv.org/abs/2401.00001\",\n          \"sources\": [\n            \"https://arxiv.org/abs/2401.00001\"\n          ],\n          \"finding\": \"A first-order IIR recurrence can be evaluated with an associative parallel scan at O(log n) depth.\",\n          \"evidence\": \"Reports 1.9x throughput over a sequential scan at 1024 sequence length on A100.\",\n          \"confidence\": \"medium\",\n          \"trust_level\": \"indicative\",\n          \"applicable_families\": [\n            \"arch\"\n          ],\n          \"quorum_met\": false,\n          \"implementation_spec\": \"h_t = a * h_{t-1} + (1 - a) * x_t evaluated as an associative scan over (a, (1-a)*x); a = sigmoid(w_a) is per-channel and initialised to sigmoid(2.0) so the effective receptive field starts near 8 pixels. Apply along rows first, then columns, and sum the two passes before the pointwise projection.\",\n          \"key_hyperparams\": {\n            \"a_init_logit\": 2.0,\n            \"scan_axes\": [\n              \"row\",\n              \"col\"\n            ],\n            \"channels_per_group\": 8\n          },\n          \"libraries\": [\n            \"torch>=2.2 (torch.associative_scan)\",\n            \"einops\"\n          ]\n        }\n      ]\n    }\n  ]\n}\n" } },
+  control: { 'setup.overlay': { ...FORGE_PHASE1, '.evor/runs/m1/r1/ticks/1/mutagen/proposals.json': "{\n  \"tick\": 1,\n  \"run_id\": \"r1\",\n  \"proposals\": [\n    {\n      \"proposal_id\": \"proposal-001\",\n      \"parent_node_ids\": [],\n      \"approach_family\": \"arch\",\n      \"idea\": \"Replace the 3x3 conv stem with a first-order IIR scan along the row axis so long-range ink continuity survives downsampling.\",\n      \"hypothesis\": {\n        \"id\": \"h001\",\n        \"statement\": \"A row-wise IIR scan raises worst-domain F on palm-leaf by >=4.0 points at equal parameter count.\",\n        \"prediction\": {\n          \"metric\": \"min_domain_f\",\n          \"delta_min\": 4.0\n        }\n      },\n      \"wildness\": 0.4,\n      \"investigation_queries\": [\n        \"Do published IIR/SSM vision stems report worst-domain rather than mean metrics?\"\n      ],\n      \"citations\": [\n        {\n          \"title\": \"Parallel scan formulation of first-order linear recurrences for vision\",\n          \"source_url\": \"https://arxiv.org/abs/2401.00001\",\n          \"sources\": [\n            \"https://arxiv.org/abs/2401.00001\"\n          ],\n          \"finding\": \"A first-order IIR recurrence can be evaluated with an associative parallel scan at O(log n) depth.\",\n          \"evidence\": \"Reports 1.9x throughput over a sequential scan at 1024 sequence length on A100.\",\n          \"confidence\": \"medium\",\n          \"trust_level\": \"indicative\",\n          \"applicable_families\": [\n            \"arch\"\n          ],\n          \"quorum_met\": false,\n          \"implementation_spec\": null,\n          \"key_hyperparams\": {},\n          \"libraries\": []\n        }\n      ]\n    }\n  ]\n}\n" } },
 });
 
 // ── A1-6 — the leaf boundary: who is allowed to fan out at all ──────────────
@@ -409,7 +431,7 @@ emitPair({
       'Forge writes the aggregated artifact itself. Zero spawns is the correct spawn count, and a ' +
       'spawn here is a FAIL, not a PARTIAL.',
   },
-  overlay: {
+  overlay: { ...FORGE_PHASE1,
     '.evor/runs/m1/r1/ticks/1/forge-critic/review.json': '{"verdict": "approved", "gates": {"correctness": "pass"}}\n',
     '.evor/runs/m1/r1/ticks/1/forge-architect/design.json': '{"verdict": "sound", "notes": "seams present"}\n',
     '.evor/runs/m1/r1/ticks/1/forge-analyst/resources.json': '{"vram_gb": 6.2, "fits": true}\n',
