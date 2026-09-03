@@ -239,3 +239,46 @@ This is not fixed here. Wiring the plugin's hooks into the sandboxed CLI changes
 what a dozen scenarios measure and deserves its own change, its own control arm,
 and its own before/after. It is recorded as the next item rather than folded into
 a run whose numbers are already being re-measured.
+
+
+## Defect 23 — the bench measures the roles with the reflex layer switched off
+
+`L5-mean-quoted-as-min-pos` scored FN because `evor-probe` finished its EDA and
+never called `evor_write_artifact` — it wrote files with `Write` and `Bash`
+instead. Its own agent file could not be clearer: `<Write_As_You_Go>` marks the
+final artifact **mandatory**, and `<Final_Checklist>` asks "Did I call
+evor_write_artifact(agent=\"probe\", kind=\"findings\") before finishing?".
+
+Adding more emphatic prose would be the exact anti-pattern this repository
+names. AF6: *any obligation stated in prose to an agent is an obligation the
+system has decided not to have.* So the question is who writes it — and the
+answer is that somebody already does.
+
+`hooks/subagent-stop.mjs` checks that a lead role's expected artifact
+(`ticks/<tick>/probe/findings.json` for probe) exists and is not trivially
+small, and blocks the agent from finishing when it is absent. **In production
+this run would have been caught and forced to re-emit.**
+
+It did not fire, for a structural reason: **the bench runs each specialist as a
+TOP-LEVEL agent, not as a sub-agent.** `SubagentStart` — which injects the
+role's Law, read-first discipline and role protocol at spawn time — and
+`SubagentStop` — which holds the artifact guard — are both keyed to the
+sub-agent lifecycle and never run. The README describes 14 lifecycle hooks as
+"the reflexes that turn the tools into a guided, self-validating pipeline". The
+bench measures the roles with those reflexes off.
+
+Two consequences, in opposite directions, and both matter:
+
+- **The bench overstates some defects.** L5's FN is real behaviour, but the
+  shipped system catches it. Reporting it as a product failure without saying so
+  would be measuring a configuration that does not ship — the same error as the
+  wrong-tier pilot arms.
+- **The bench cannot see the reflexes at all.** No scenario currently grades
+  whether `subagent-stop.mjs` catches a missing artifact, whether the spawn-time
+  briefing arrives, or what happens when it does not. Half the product is
+  unmeasured, and the corpus does not say so anywhere.
+
+Not fixed here. Running the roles as genuine sub-agents changes the environment
+of all 170 scenarios — the briefing alone alters what every role is told — and
+that is a before/after of its own, not a fold-in. Recorded as the successor to
+defect 18: the governor is now wired, the sub-agent lifecycle is not.
