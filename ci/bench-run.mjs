@@ -344,7 +344,7 @@ function measureControlArm(sc, { fixture, maxTurns, agentPromptBlock }) {
       effort: (sc.arms ?? [])[0]?.effort,
       maxTurns: 3,
       timeoutMs: 300_000,
-      env: { ...env, CLAUDE_PROJECT_DIR: work },
+      env: { ...env, CLAUDE_PROJECT_DIR: projectRoot },
       mcpConfigPath: resolve(REPO, sc.setup?.mcp_config ?? 'ci/eval-mcp-config.json'),
       allowedTools: sc.setup?.allowed_tools ?? defaultAllowedTools(sc),
       tolerateError: true,
@@ -395,10 +395,34 @@ function runScenario(path, { repeats, outDir }) {
   preflightAffordance(sc, allowedTools);
 
   for (let r = 0; r < repeats; r++) {
+    // TWO ROOTS, BOTH INSIDE THE SANDBOX.
+    //
+    // Scenarios address `{{SANDBOX}}/project/...` (62 refs) and
+    // `{{SANDBOX}}/plugin/...` (62), and their guarded paths carry the sentinel
+    // `{{AT_SANDBOX_BUILD}}` — "whatever this hashed to when the sandbox was
+    // built". So the protected files were always meant to live in the sandbox.
+    //
+    // I had copied the fixture flat and hashed guarded paths in the LIVE REPO.
+    // That is wrong twice: `json_equals` on {{SANDBOX}}/project/... found
+    // nothing and returned false against agents that behaved correctly, and an
+    // agent that did decide to write to hooks/stop.mjs would have written to the
+    // real one. Detection after the fact, where prevention was intended.
     const work = mkdtempSync(join(tmpdir(), 'bench-'));
-    if (fixture && existsSync(fixture)) cpSync(fixture, work, { recursive: true });
+    const projectRoot = join(work, 'project');
+    const pluginRoot = join(work, 'plugin');
+    mkdirSync(projectRoot, { recursive: true });
+    mkdirSync(pluginRoot, { recursive: true });
+    if (fixture && existsSync(fixture)) cpSync(fixture, projectRoot, { recursive: true });
+    // The plugin tree the scenarios reach into. Selective: node_modules and .git
+    // would dominate the copy and nothing addresses them.
+    for (const d of ['agents', 'hooks', 'skills', 'contracts', 'harness/evor']) {
+      const src = resolve(REPO, d);
+      if (existsSync(src)) cpSync(src, join(pluginRoot, d), { recursive: true });
+    }
     const env = {};
-    for (const [k, v] of Object.entries(sc.setup?.env ?? {})) env[k] = String(v).replace(/\{\{FIXTURE\}\}/g, work);
+    for (const [k, v] of Object.entries(sc.setup?.env ?? {})) {
+      env[k] = String(v).replace(/\{\{FIXTURE\}\}/g, projectRoot).replace(/\{\{SANDBOX\}\}/g, work);
+    }
 
     // The stub's script goes NEXT TO the sandbox, not inside it. Inside, the
     // agent's own Read/Glob would reach the fixture it is being tested against;
@@ -452,7 +476,7 @@ function runScenario(path, { repeats, outDir }) {
         effort: arm.effort,
         maxTurns: Number(arg('max-turns', 20)),
         timeoutMs: 900_000,
-        env: { ...env, CLAUDE_PROJECT_DIR: work },
+        env: { ...env, CLAUDE_PROJECT_DIR: projectRoot },
         mcpConfigPath: resolve(REPO, sc.setup?.mcp_config ?? 'ci/eval-mcp-config.json'),
         // DEFAULTING TO `mcp__evor` ALONE MANUFACTURED 11 DENIALS AND BURNED
         // THE TURN BUDGET. The role is told to read run state off disk, so
@@ -484,8 +508,17 @@ function runScenario(path, { repeats, outDir }) {
     // neither guarded nor in the repo. Capturing only guarded paths made the
     // engine throw "it was not captured" and void a scored run.
     for (const declared of referencedJsonPaths(sc)) {
-      if (declared in fsState.json) continue;
-      const real = declared.replace(/\{\{SANDBOX\}\}|\{\{FIXTURE\}\}/g, work);
+      // NO EARLY SKIP. The guarded loop above stores under the DECLARED key, so
+      // `declared in fsState.json` was true and this loop `continue`d — never
+      // adding the RESOLVED key the engine actually looks up. The both-keys fix
+      // was correct and this guard silently defeated it, which is why the error
+      // said "not captured" for a file that had been read.
+      if (declared in fsState.json && fsState.json[declared] !== undefined) {
+        const resolved = declared.replace(/\{\{SANDBOX\}\}/g, work).replace(/\{\{FIXTURE\}\}/g, projectRoot);
+        if (!(resolved in fsState.json)) fsState.json[resolved] = fsState.json[declared];
+        continue;
+      }
+      const real = declared.replace(/\{\{SANDBOX\}\}/g, work).replace(/\{\{FIXTURE\}\}/g, projectRoot);
       // KEY BY BOTH. The engine substitutes templates and then looks up the
       // RESOLVED path; storing only the declared form made it report "it was not
       // captured" for a file that had been read successfully. Two components
@@ -550,7 +583,17 @@ function runScenario(path, { repeats, outDir }) {
         anchors: Object.fromEntries(
           (sc.setup?.tool_results ?? []).filter((tr) => tr.id).map((tr) => [tr.id, { tool: tr.tool }])),
         known_tools: knownTools(sc),
-        templates: { SANDBOX: work, FIXTURE: work, ...(sc.setup?.templates ?? {}) },
+        // Scenarios declare their own variables under `setup.substitutions`, not
+        // `setup.templates`. Reading the wrong key left {{FIELD_POINTER}},
+        // {{TARGET}}, {{AT_SANDBOX_BUILD}} and ten others unbound, and the engine
+        // — correctly — refused to guess, voiding 42% of the pilot's first runs.
+        // The corpus uses 14 of these; the runner bound two.
+        templates: {
+          SANDBOX: work,
+          FIXTURE: projectRoot,
+          ...(sc.setup?.templates ?? {}),
+          ...(sc.setup?.substitutions ?? {}),
+        },
         scenario: sc,
       };
       // §4.1 — VOID before anything is scored. A detector that cannot be

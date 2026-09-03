@@ -7,8 +7,8 @@
     "Verify an installed tree with: evor doctor  (see _check_plugin_tree_drift)."
   ],
   "version": "1.2.1",
-  "commit": "6362f57aa17d20eea58536931f5fd8c4f51833de",
-  "generated_at": "2026-09-03T00:08:12.278Z",
+  "commit": "b1f97e99788a3f9b3ff270705ef83e100c03f359",
+  "generated_at": "2026-09-03T01:00:24.548Z",
   "file_count": 863,
   "files": {
     ".claude-plugin/marketplace.json": "81634a97666c1502ee2ff2386ec4b5fc554241f182a3fe2b4d5d4b6f3bd28813",
@@ -148,7 +148,7 @@
     "ci/bench-detect-fixtures.mjs": "faf5a14e53616f9db2969f6901c7c09ede61404800e23f89bfa8642b67eb4171",
     "ci/bench-detect.mjs": "69c439db84b951ec684c6db62ac55dfb23ea2a76f44893adf61933a6cba4b278",
     "ci/bench-freeze.mjs": "46df55fa3e64067a60a440ed2a61fa73ce05d03dd6291e067f989caf608540e8",
-    "ci/bench-run.mjs": "bdb9618e34cc91c7966fb7e028959f06bb846198bbf0ecaa448d1f587cc69b0f",
+    "ci/bench-run.mjs": "7a290a9df75ebffb597115389c5d07912a060f923b4ed4407a2cbfc8721c5a24",
     "ci/bench-tick.mjs": "3f79f1528538ccd55f8ec742bdf46e0598347007cee5ec74f20205a7bbc5ad1b",
     "ci/bench-tick.sh": "5035c1106a7f6a7ab5c869057fa4041fd8a14615ce6d75ed2e3ab1bc0696a863",
     "ci/bench-trace.mjs": "6085f65da7e6138ea45149ab84784c76aff451c354638198375a28aee0eb5cd4",
