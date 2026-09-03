@@ -382,6 +382,82 @@ function traceOf(events, roleDisallowed = new Set(), deniedTools = new Set()) {
  * measurement that had not happened. `record.ts:162` again: absence of a
  * failure verdict is not evidence of integrity.
  */
+/**
+ * Shift every timestamp in the sandbox forward so "recent" is recent AT RUN TIME.
+ *
+ * 496 timestamp fields across 72 fixtures, and 71 of those fixtures were more
+ * than two days stale — median age 10.5 days. `L3-...-neg` seeds a job that is
+ * still running with, in the pair's own words, "a five-second-old heartbeat_at",
+ * and the tick is supposed to keep waiting. By the time it was run the heartbeat
+ * was ten days old, `evor_state_read` reported the job 15,062 minutes past its
+ * 7200-second limit, and every agent correctly concluded it had stalled. Three
+ * runs of three, scored FP. The negative half's condition had decayed out of
+ * existence, and it decays further every day the corpus sits.
+ *
+ * Byte-frozen is not the same as reproducible: a bench whose verdicts depend on
+ * the date you run it measures the calendar.
+ *
+ * ONE SHIFT FOR THE WHOLE SANDBOX, so every interval is preserved exactly — a
+ * file five seconds older than another stays five seconds older, and a record
+ * that deliberately predates the stall window still predates it by the same
+ * margin. The newest event in the fixture lands just before now, which is what
+ * makes "still running" true again.
+ *
+ * Applied to the SANDBOX COPY only. The source fixtures are untouched, so
+ * `bench-freeze --check` still means what it meant. No detector in the corpus
+ * asserts a literal timestamp (checked: zero), so nothing is pinned to a date.
+ *
+ * @returns {number|null} milliseconds shifted, recorded so a run says what it did.
+ */
+const ISO_RE = /"(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?)(Z|[+-]\d{2}:\d{2})"/g;
+
+function rebaseFixtureClock(root, nowMs) {
+  const files = [];
+  const walk = (d) => {
+    for (const e of readdirSync(d, { withFileTypes: true })) {
+      const p = join(d, e.name);
+      if (e.isDirectory()) { if (e.name !== 'node_modules' && e.name !== '.git') walk(p); }
+      else if (/\.(json|jsonl|md|txt)$/.test(e.name)) files.push(p);
+    }
+  };
+  if (!existsSync(root)) return null;
+  walk(root);
+
+  let newest = -Infinity;
+  const texts = new Map();
+  for (const f of files) {
+    let t;
+    try { t = readFileSync(f, 'utf8'); } catch { continue; }
+    if (!/\d{4}-\d{2}-\d{2}T/.test(t)) continue;
+    texts.set(f, t);
+    ISO_RE.lastIndex = 0;
+    let m;
+    while ((m = ISO_RE.exec(t))) {
+      const v = Date.parse(m[1] + m[2]);
+      if (Number.isFinite(v) && v > newest) newest = v;
+    }
+  }
+  if (!Number.isFinite(newest) || !texts.size) return null;
+
+  // Land the newest event 5s before now: a heartbeat authored as "just now"
+  // reads as just now again. A fixture already at or ahead of now is left alone.
+  const delta = (nowMs - 5000) - newest;
+  if (delta <= 0) return 0;
+
+  for (const [f, t] of texts) {
+    ISO_RE.lastIndex = 0;
+    const out = t.replace(ISO_RE, (whole, stamp, zone) => {
+      const v = Date.parse(stamp + zone);
+      if (!Number.isFinite(v)) return whole;
+      const shifted = new Date(v + delta).toISOString();
+      // Keep the authored precision: drop millis if the original had none.
+      return `"${stamp.includes('.') ? shifted : shifted.replace(/\.\d{3}Z$/, 'Z')}"`;
+    });
+    if (out !== t) writeFileSync(f, out);
+  }
+  return delta;
+}
+
 export function buildSandbox(sc, fixture) {
   const work = mkdtempSync(join(tmpdir(), 'bench-'));
   const projectRoot = join(work, 'project');
@@ -419,11 +495,16 @@ export function buildSandbox(sc, fixture) {
     mkdirSync(dirname(dest), { recursive: true });
     writeFileSync(dest, typeof body === 'string' ? body : JSON.stringify(body, null, 1));
   }
+  // LAST, so the overlay's own timestamps are shifted with everything else.
+  // Opt out with `setup.freeze_clock: true` when a scenario genuinely means a
+  // date rather than an interval.
+  const clock_shift_ms = sc.setup?.freeze_clock ? null : rebaseFixtureClock(projectRoot, Date.now());
+
   const env = {};
   for (const [k, v] of Object.entries(sc.setup?.env ?? {})) {
     env[k] = String(v).replace(/\{\{FIXTURE\}\}/g, projectRoot).replace(/\{\{SANDBOX\}\}/g, work);
   }
-  return { work, projectRoot, pluginRoot, env };
+  return { work, projectRoot, pluginRoot, env, clock_shift_ms };
 }
 
 /**
