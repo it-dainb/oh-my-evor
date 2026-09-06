@@ -80,3 +80,56 @@ and what remains is behaviour: mutagen not calling `evor_validate_proposals`,
 probe's unstable verdict, the tick reporting clean over a retried failure, and
 T2's tick. **None of those is fixable by editing the bench, and none is
 measurable at n=2.** The run after lite9 should be repeats, not edits.
+
+---
+
+# lite10 — the two harness defects were worth 8 F1 points, and corrected me twice
+
+**72 runs, n=2. TP 22 · FP 7 · TN 21 · FN 6 → F1 77.2%. Zero voids of any kind.**
+
+| | before | lite10 |
+|---|---|---|
+| `Skill` calls / errors | 37 / **37 failed** | **0 / 0** |
+| undeclared denials | 3 (voided T4) | **0** |
+| voids | 4 | **0** |
+
+`Skill` calls fell to zero not because the roles stopped asking but because they
+no longer need to: the procedure is in the prompt where their frontmatter says
+it should be.
+
+## Two "genuine behavioural failures" were the missing skill
+
+`T3-hard-error-retry-pos` FN,FN → **TP,TP**, and
+`E3-evaluation-did-not-complete-pos` FN,FN → **TP,TP**.
+
+Both were in my "report it, do not design around it — this is the model" list.
+Both were the harness denying the role the nine-step procedure its own
+frontmatter declares. **The classification was wrong, and it was wrong in the
+direction that flatters the instrument**: calling a cell behavioural closes the
+investigation, and closing it early is how a harness defect gets published as a
+model defect.
+
+The rule that caught it: a scenario that passes once and fails once on a
+byte-identical fixture is a natural experiment, not a coin flip. Every run has a
+call sequence and stated reasoning, and the divergence between them names its
+own cause — an instruction that underdetermines the behaviour, or a tool, hook
+or harness that underdetermines the instruction. "Noise" is what that looks like
+from the verdict column with the transcripts unopened.
+
+## What moved
+
+Recovered: `E1-...-pos` TP,TP · `E3-...-neg` TN,TN · `A4-...-neg` TN,TN ·
+`E4-...-pos` FN,FN → TP,FN · `L4-...-pos` FN,FN → FN,TP · `E1-...-neg` and
+`T4-...-neg` now SCORE instead of voiding.
+
+Regressed, all single-rep flips: `A3-...-pos`, `L2-...-neg`, `L4-...-neg`,
+`T5-no-slot-pos`, `L5-...-pos`, `T2-artifact-slot-target`.
+
+## Where it stands
+
+F1 across the loop: 11.8 → 27.3 → 52.6 → 43.5 → 56.5 → 61.5 → 64.0 → 69.2 →
+**77.2**, and lite10 is the first with no voids at all, so nothing is masked.
+
+Six FN and seven FP remain. The FN are now the smallest they have been, and the
+FP rose — which is worth watching rather than explaining, because injecting the
+skills changed what every role sees and this is a new baseline, not a delta.
