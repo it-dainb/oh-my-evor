@@ -700,6 +700,25 @@ function runPostconditions(sc, projectRoot) {
  *
  * Scenario `max_turns` wins; otherwise the role's default; otherwise the flag.
  */
+// THE CORPUS HAS ALWAYS BEEN RUN AT 40, NOT 20.
+//
+// The previous commit claimed "41-47% of every scored run ended at turn 19-20,
+// the ceiling" and built a fix on it. The threshold was wrong: 19-20 is a common
+// turn count, not a truncation. Proof, from the runs themselves — a SINGLE-PHASE
+// scenario cannot exceed the `--max-turns` handed to the CLI, and single-phase
+// runs reached 35 (lite11), 36 (lite9) and **39** (lite10). A ceiling of 20 could
+// not have produced them. Every lite calibration was launched with
+// `--max-turns 40`; the code default of 20 was never the operating value.
+//
+// Reading the default out of the source instead of out of the runs turned a fix
+// into a regression: `max(20, declared)` LOWERED the ceiling from 40 to 20 for
+// every role declaring under 20 — mutagen 14, probe 14, sage-junior 16,
+// selector 12, forge-analyst 10 — and lite13 answered with 14 `budget_exceeded`
+// voids and a pile-up of 17 runs at turns 20-21, on cells that had scored at 30
+// and 35 the run before.
+//
+// The default is now the value the corpus actually runs at.
+const DEFAULT_MAX_TURNS = 40;
 const ROLE_TURN_CEILING = { 'evor-orchestrator': 40 };
 
 /**
@@ -727,7 +746,7 @@ function roleDeclaredMaxTurns(agentFile) {
 
 function turnCeiling(sc) {
   if (sc.max_turns) return Number(sc.max_turns);
-  const flag = Number(arg('max-turns', 20));
+  const flag = Number(arg('max-turns', DEFAULT_MAX_TURNS));
   const declared = roleDeclaredMaxTurns(sc.agent_file) ?? ROLE_TURN_CEILING[sc.role];
   // MAX, NOT THE DECLARED VALUE. A first pass enforced `maxTurns` literally,
   // which would have CUT evor-probe from 20 to 14 in 17 of its 24 recorded runs.
@@ -739,10 +758,9 @@ function turnCeiling(sc) {
   // resume, so enforcing the cap as a hard budget is STRICTER than production and
   // makes a predicate unreachable, which §4.5 calls a free verdict.
   //
-  // Taking the max is monotone against the old flat 20: evor-tick 20 -> 90,
-  // evor-forge -> 45, evor-forge-junior -> 28, evor-sage -> 22, and every role
-  // whose backstop sits below 20 keeps 20. No cell gets less room than it had in
-  // lite11, so any movement is attributable to headroom and nothing else.
+  // Taking the max is monotone against the 40 the corpus actually ran at:
+  // evor-tick 40 -> 90, evor-forge -> 45, and every role whose backstop sits below
+  // 40 keeps 40. No cell gets less room than it had in lite11.
   return Math.max(flag, Number(declared ?? flag));
 }
 
@@ -1347,7 +1365,7 @@ if (workers > 1 && targets.length > 1 && !preflightOnly) {
   const t0 = Date.now();
   const results = await Promise.all(chunks.filter((c) => c.length).map((chunk, i) => new Promise((done) => {
     const args = [fileURLToPath(import.meta.url), ...chunk, '--repeats', String(repeats), '--workers', '1',
-      ...(outDir ? ['--out', outDir] : []), '--max-turns', String(arg('max-turns', 20))];
+      ...(outDir ? ['--out', outDir] : []), '--max-turns', String(arg('max-turns', DEFAULT_MAX_TURNS))];
     const child = spawn('node', args, { stdio: ['ignore', 'pipe', 'inherit'] });
     let buf = '';
     child.stdout.on('data', (d) => {

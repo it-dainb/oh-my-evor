@@ -1,4 +1,57 @@
-# lite13 — what changed, and what each change must produce
+# lite13 — WITHDRAWN, and why
+
+> **This run is not comparable and its numbers must not be cited.** The ceiling
+> premise underneath it was wrong. Everything below is kept as the record of a
+> pre-registration that failed for a reason the pre-registration itself created;
+> the correction is in §0.
+
+## 0. The premise was false: the corpus runs at 40 turns, not 20
+
+The previous commit measured "41-47% of every scored run ended at turn 19-20,
+the ceiling" and built the whole turn-budget fix on it. **19-20 is a common turn
+count, not a truncation.** The proof is in the runs: a SINGLE-PHASE scenario
+cannot exceed the `--max-turns` given to the CLI, and single-phase lite runs
+reached **35 (lite11), 36 (lite9) and 39 (lite10)**. A ceiling of 20 cannot
+produce a 39-turn single-phase run. Every calibration has been launched with
+`--max-turns 40`; the code default of 20 was never the operating value, and I
+read the default out of the source instead of out of the data.
+
+So `max(20, declared)` did not raise the ceiling — it **lowered** it from 40 to
+20 for every role declaring under 20 (mutagen 14, probe 14, sage-junior 16,
+selector 12, forge-analyst 10). lite13 answered exactly as that predicts:
+
+- **14 `budget_exceeded` voids**, on cells that had scored at 30 and 35 turns in
+  lite11, and none of which had ever voided before;
+- a pile-up of **17 runs at turns 20-21**, against a spread that previously ran
+  to 35.
+
+Fixed: the flag default is now `DEFAULT_MAX_TURNS = 40`, the value the corpus
+actually runs at, so `max(flag, declared)` gives tick 90, forge 45 and 40
+everywhere else — monotone against lite11 for the first time.
+
+### What survives
+
+Two results from lite13 are unaffected by the ceiling error, because they were
+measured on cells that did not void:
+
+- **The declaration fix landed as pre-registered.** Group L, over cells scored in
+  BOTH runs: F1 **62.5% -> 36.4%**, TP 5->2, FP 5->3, FN 1->4. I registered
+  beforehand that group-L F1 must FALL and that a rise would mean the fix was
+  wrong. It fell, in the predicted direction and magnitude.
+- **The headline rise was void-masking.** Raw F1 read 64.3% -> 68.2%; over the 53
+  cells scored in both runs it is **74.4% -> 65.0%**. The apparent improvement was
+  entirely the voids I had just introduced removing unfavourable cells from the
+  denominator.
+
+### What this cost, stated plainly
+
+One run (~$41) and a published finding that was wrong in the direction that made
+my own fix look necessary. The check that would have caught it before spending
+anything: **read the ceiling off the runs, not off the source default** — the
+39-turn run in lite10 was already on disk and disproves the premise in one query.
+
+---
+
 
 Written **before** the run. Everything here is falsifiable from the result file,
 and a fix whose prediction fails is a fix that was wrong.
