@@ -98,7 +98,7 @@ Candidate code **must not** import from `evor.*`; use the env-path pattern above
 ### State
 | Tool | Purpose |
 |---|---|
-| `evor_state_read` | Read active run state; returns merged state object |
+| `evor_state_read` | Read active run state; returns merged state object. **`tick_state.tick` is the current tick** — the value every `evor_write_artifact`, `evor_write_handoff` and `evor_signal_emit` call needs. Do not guess it and do not use `run_state.tick_count`, which counts COMPLETED ticks and is one behind. |
 | `evor_state_write` | Update run state fields; optional promotion of strategy, mission status, and active run pointer |
 | `evor_read_goal_contract` | Read and validate the run's goal contract; returns the contract object or `{error}` |
 

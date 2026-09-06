@@ -726,11 +726,24 @@ function roleDeclaredMaxTurns(agentFile) {
 }
 
 function turnCeiling(sc) {
-  return Number(
-    sc.max_turns
-    ?? roleDeclaredMaxTurns(sc.agent_file)
-    ?? ROLE_TURN_CEILING[sc.role]
-    ?? arg('max-turns', 20));
+  if (sc.max_turns) return Number(sc.max_turns);
+  const flag = Number(arg('max-turns', 20));
+  const declared = roleDeclaredMaxTurns(sc.agent_file) ?? ROLE_TURN_CEILING[sc.role];
+  // MAX, NOT THE DECLARED VALUE. A first pass enforced `maxTurns` literally,
+  // which would have CUT evor-probe from 20 to 14 in 17 of its 24 recorded runs.
+  // mcp/tests/agent-frontmatter.test.ts settles why that is wrong, in the
+  // product's own words: "these are set to the observed cap+resume totals... A cap
+  // is a runaway backstop, not a budget." In production a role that hits its cap
+  // is RESUMED by the orchestrator — the transcript quoted there is "Forge stopped
+  // mid-review. Resuming it to finish and write its artifact." The bench has no
+  // resume, so enforcing the cap as a hard budget is STRICTER than production and
+  // makes a predicate unreachable, which §4.5 calls a free verdict.
+  //
+  // Taking the max is monotone against the old flat 20: evor-tick 20 -> 90,
+  // evor-forge -> 45, evor-forge-junior -> 28, evor-sage -> 22, and every role
+  // whose backstop sits below 20 keeps 20. No cell gets less room than it had in
+  // lite11, so any movement is attributable to headroom and nothing else.
+  return Math.max(flag, Number(declared ?? flag));
 }
 
 /**
