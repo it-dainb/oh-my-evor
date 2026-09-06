@@ -20,8 +20,11 @@ KINDS = {"malformed-then-corrected": "wrong_args",
          "semantically-wrong": "wrong_args"}
 
 
-def tier(pass_det, partial_det, fail_dets):
-    return {"pass": pass_det, "partial": partial_det, "fail": fail_dets, "fail_kind_map": KINDS}
+def tier(pass_det, partial_det, fail_dets, extra_kinds=None):
+    kinds = dict(KINDS)
+    if extra_kinds:
+        kinds.update(extra_kinds)
+    return {"pass": pass_det, "partial": partial_det, "fail": fail_dets, "fail_kind_map": kinds}
 
 
 def corrected(wrong_preds, right_pred):
@@ -323,7 +326,21 @@ emit(
                             arg_type={"$.payload": "object"})),
            [det("never-valid", "trace", {"none_of": [called("evor_write_artifact")]}),
             det("semantically-wrong", "trace",
-                {"any_of": [called("evor_write_artifact", {"$.agent": "sage-junior", "$.tick": 3})]})])},
+                {"any_of": [called("evor_write_artifact", {"$.agent": "sage-junior", "$.tick": 3})]}),
+            # THE FAILURE THIS PAIR ACTUALLY PRODUCES, and nothing described it.
+            # `semantically-wrong` only catches the SIBLING half's tick; the agent
+            # sent 1 and 0, so both halves came back FAIL with failure_kind null and
+            # the bench could say the call was wrong without saying which argument.
+            # run-state carries tick_count: 1 — COMPLETED ticks — and the artifact
+            # belongs to the tick in progress, so this is an off-by-one on a field
+            # whose convention was documented nowhere the role reads. `not_arg` and
+            # not "!2": negation goes through matchValue, where 2 === "2" is false,
+            # so a string negation would have matched the CORRECT tick too.
+            det("wrong-tick", "trace",
+                {"any_of": [{"tool": "evor_write_artifact",
+                             "arg": {"$.agent": "sage-junior"},
+                             "not_arg": {"$.tick": 2}}]})],
+           extra_kinds={"wrong-tick": "wrong_args"})},
     b={"setup": {"cwd_fixture": f_t3},
        "tiers": tier(
            det("artifact-well-formed", "trace",
@@ -337,7 +354,21 @@ emit(
                             arg_type={"$.payload": "object"})),
            [det("never-valid", "trace", {"none_of": [called("evor_write_artifact")]}),
             det("semantically-wrong", "trace",
-                {"any_of": [called("evor_write_artifact", {"$.agent": "sage-junior", "$.tick": 2})]})])},
+                {"any_of": [called("evor_write_artifact", {"$.agent": "sage-junior", "$.tick": 2})]}),
+            # THE FAILURE THIS PAIR ACTUALLY PRODUCES, and nothing described it.
+            # `semantically-wrong` only catches the SIBLING half's tick; the agent
+            # sent 1 and 0, so both halves came back FAIL with failure_kind null and
+            # the bench could say the call was wrong without saying which argument.
+            # run-state carries tick_count: 1 — COMPLETED ticks — and the artifact
+            # belongs to the tick in progress, so this is an off-by-one on a field
+            # whose convention was documented nowhere the role reads. `not_arg` and
+            # not "!2": negation goes through matchValue, where 2 === "2" is false,
+            # so a string negation would have matched the CORRECT tick too.
+            det("wrong-tick", "trace",
+                {"any_of": [{"tool": "evor_write_artifact",
+                             "arg": {"$.agent": "sage-junior"},
+                             "not_arg": {"$.tick": 3}}]})],
+           extra_kinds={"wrong-tick": "wrong_args"})},
     diff=["/setup/cwd_fixture", "/tiers/pass", "/tiers/partial", "/tiers/fail"],
 )
 

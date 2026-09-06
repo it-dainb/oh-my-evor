@@ -155,6 +155,26 @@ describe("evor-eval-bench — offline gates", () => {
     expect(missing, `setup paths that do not resolve:\n${missing.join("\n")}`).toEqual([]);
   });
 
+  it("every fail rule maps to a kind — the direction that governs attribution", () => {
+    // The existing check runs map -> rule and catches a kind nothing can reach.
+    // This runs rule -> map and catches the opposite: a detector that CAN fire
+    // and produces `failure_kind: null`, which is how T2-artifact-slot reported
+    // a wrong argument without naming which one. `scoreTiers` returns the fired
+    // detector's mapped kind, so an unmapped rule is a verdict with no cause.
+    const unmapped: string[] = [];
+    for (const p of scenarioFiles()) {
+      const d = JSON.parse(readFileSync(p, "utf8"));
+      if (!d.tiers) continue;
+      const map = d.tiers.fail_kind_map ?? {};
+      for (const r of d.tiers.fail ?? []) {
+        if (r?.id && !(r.id in map)) unmapped.push(`${d.id}: fail rule "${r.id}" has no kind`);
+      }
+      const pid = d.tiers.partial?.id;
+      if (pid && !(pid in map)) unmapped.push(`${d.id}: partial rule "${pid}" has no kind`);
+    }
+    expect(unmapped, `rules that fire with no attributable kind:\n${unmapped.join("\n")}`).toEqual([]);
+  });
+
   it("every fail_kind_map key names a rule that exists", () => {
     // 46 of 170 tier/hybrid scenarios mapped failure kinds — `wrong-store-queried`,
     // `treated-success-as-failure`, `no-delegation` — onto rule ids nothing

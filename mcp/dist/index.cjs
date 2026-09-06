@@ -24285,7 +24285,9 @@ function registerArtifactTools(server) {
       // bad call. Format hints would only make that more diagnosable; resolving
       // from the active run removes the failure mode entirely (rubric rule 1).
       run_id: external_exports.string().optional().describe("Active run identifier"),
-      tick: external_exports.number().int().min(0).describe("Current tick number"),
+      tick: external_exports.number().int().min(0).describe(
+        "Tick this artifact belongs to: the tick IN PROGRESS, which is run-state's tick_count + 1. tick_count is the number of COMPLETED ticks, so passing it unchanged files the artifact against the tick that already finished. Prefer the tick your spawn prompt names; derive it only when it is absent."
+      ),
       agent: external_exports.enum(VALID_AGENTS).describe("Agent writing the artifact (determines path and validation schema)"),
       kind: external_exports.string().optional().describe(
         "Kind slug: required for sage-junior (finding kind) and acquirer (source slug)"

@@ -178,12 +178,30 @@
             }
           ]
         }
+      },
+      {
+        "id": "wrong-tick",
+        "kind": "trace",
+        "rule": {
+          "any_of": [
+            {
+              "tool": "evor_write_artifact",
+              "arg": {
+                "$.agent": "sage-junior"
+              },
+              "not_arg": {
+                "$.tick": 2
+              }
+            }
+          ]
+        }
       }
     ],
     "fail_kind_map": {
       "malformed-then-corrected": "wrong_args",
       "never-valid": "wrong_args",
-      "semantically-wrong": "wrong_args"
+      "semantically-wrong": "wrong_args",
+      "wrong-tick": "wrong_args"
     }
   }
 }

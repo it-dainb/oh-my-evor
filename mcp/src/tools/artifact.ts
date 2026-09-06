@@ -288,7 +288,11 @@ export function registerArtifactTools(server: McpServer): void {
       // bad call. Format hints would only make that more diagnosable; resolving
       // from the active run removes the failure mode entirely (rubric rule 1).
       run_id: z.string().optional().describe("Active run identifier"),
-      tick: z.number().int().min(0).describe("Current tick number"),
+      tick: z.number().int().min(0).describe(
+        "Tick this artifact belongs to: the tick IN PROGRESS, which is run-state's " +
+        "tick_count + 1. tick_count is the number of COMPLETED ticks, so passing it " +
+        "unchanged files the artifact against the tick that already finished. " +
+        "Prefer the tick your spawn prompt names; derive it only when it is absent."),
       agent: z
         .enum(VALID_AGENTS)
         .describe("Agent writing the artifact (determines path and validation schema)"),

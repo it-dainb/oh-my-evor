@@ -7,8 +7,8 @@
  ],
  "groups": {
   "tool": {
-   "author": "a1-phase1-t2-angle",
-   "frozen_at": "2026-09-03T11:57:40.297Z",
+   "author": "tick-convention",
+   "frozen_at": "2026-09-06T10:34:47.731Z",
    "finality_confirmed_by_author": true,
    "count": 265,
    "files": {
@@ -25,8 +25,8 @@
     "evals/bench/tool/T1/T1-verify-vs-result-target.json": "b67c99dc33b8f1ab139e581527c37f0d467b3fd345f1baf95a8ec8cc92183a18",
     "evals/bench/tool/T1/T1-wiki-vs-gotcha-control.json": "69d6056dc7968583c15c85dc1497bde34880232a6b896f263134d540abee766c",
     "evals/bench/tool/T1/T1-wiki-vs-gotcha-target.json": "7e5cba6a1441c0c6956488779e2b88fb44901633e9d8e24777f1c0e9032b463b",
-    "evals/bench/tool/T2/T2-artifact-slot-control.json": "b46493615d38b6a472e887821928d53f4452b545f9b5dfe1a61bef0e500e0f51",
-    "evals/bench/tool/T2/T2-artifact-slot-target.json": "77558ed8f8916633516fe30e057bd2c1840bcbfef7b0e1627a71f474a301707d",
+    "evals/bench/tool/T2/T2-artifact-slot-control.json": "6ae43cd7282c0942f2248762e1feda4656458d7b03f69c0229b072d8d604e081",
+    "evals/bench/tool/T2/T2-artifact-slot-target.json": "ebd8f3022cbc78f644fa7ef072f3f72e2a8c2b0304d8ac5eec15d245a152a6c7",
     "evals/bench/tool/T2/T2-cite-target-control.json": "1064b58369868f91f914262f1e2eb602268128005edf4caf430910666201bf61",
     "evals/bench/tool/T2/T2-cite-target-target.json": "9c894892fba99477e178e7bd5e819bae1ec9d400584d4cef8099214405c00544",
     "evals/bench/tool/T2/T2-lesson-verdict-control.json": "f7d451f7f95b1e0c3c797af619afd6f2f261cae0612df679aace13006745c2d2",
@@ -63,7 +63,7 @@
     "evals/bench/tool/authoring/fixtures_detectors.py": "c41e232fa1332d3f00dc72c42e4055f61b1142ba2fb37dfa9934ee2ab8cd459e",
     "evals/bench/tool/authoring/generate.py": "82708049bc3f9329625dbdf79c988cbe9dfcb32b92fe79659be3c01d30e7cc4e",
     "evals/bench/tool/authoring/scenarios_t1.py": "464f128d9355c9cbc6a888a2bdf22196bbe3e7444d37b79a49424b46e3dd450b",
-    "evals/bench/tool/authoring/scenarios_t2.py": "bf84ef6668d1c94cf4b21e07f2b7c0e208f87bd8ea9e5a3eafcce559379cd653",
+    "evals/bench/tool/authoring/scenarios_t2.py": "23fc5b801cd65a61490ae38b62c87a923de29581e32c9341218f6f76d22a6e1c",
     "evals/bench/tool/authoring/scenarios_t3.py": "0851c51f7848c3eb214d8e66a495a65fcc96bee5b9ab4de27f1f2c5066f1742c",
     "evals/bench/tool/authoring/scenarios_t5.py": "b3021f68a6724b0cc5118a6a24f78826f8085914a755254490879e03fe2c8909",
     "evals/bench/tool/detectors/abandoned.fixtures.json": "f3dc31a9316d6e202591789ee0a47a03048caf9e6cede22cf891679f64f006f0",
@@ -280,7 +280,7 @@
    }
   },
   "lifecycle": {
-   "author": "a1-phase1-t2-angle",
+   "author": "tick-convention",
    "frozen_at": "2026-09-02T18:57:24.823Z",
    "finality_confirmed_by_author": true,
    "count": 595,
@@ -883,7 +883,7 @@
    }
   },
   "authority": {
-   "author": "a1-phase1-t2-angle",
+   "author": "tick-convention",
    "frozen_at": "2026-09-02T19:16:13.932Z",
    "finality_confirmed_by_author": true,
    "count": 96,
@@ -987,7 +987,7 @@
    }
   },
   "evidence": {
-   "author": "a1-phase1-t2-angle",
+   "author": "tick-convention",
    "frozen_at": "2026-09-02T23:21:24.329Z",
    "finality_confirmed_by_author": true,
    "count": 139,
@@ -1134,7 +1134,7 @@
    }
   },
   "mcp": {
-   "author": "a1-phase1-t2-angle",
+   "author": "tick-convention",
    "frozen_at": "2026-09-02T23:22:01.132Z",
    "finality_confirmed_by_author": true,
    "count": 4,
