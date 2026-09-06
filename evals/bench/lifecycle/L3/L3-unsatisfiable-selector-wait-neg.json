@@ -97,7 +97,7 @@
   "grounded_rule": {
     "file": "agents/evor-tick.md",
     "quote": "| `skipped` | there was nothing to decide — no proposals reached the selector at all |",
-    "sha256_at_authoring": "b5707a73a4c7e069938e3cbcfe38fa707c213e96ab9ccf3590a01dbce89a8b80"
+    "sha256_at_authoring": "b1841bc70fa80f19ae4330391431a9dd5a9267f38a28b8ab9a1511a37e33cd07"
   },
   "grounding": [
     "field-trace:C-05",
@@ -122,7 +122,7 @@
     "guarded_paths": [
       {
         "path": "agents/evor-tick.md",
-        "sha256": "b5707a73a4c7e069938e3cbcfe38fa707c213e96ab9ccf3590a01dbce89a8b80"
+        "sha256": "b1841bc70fa80f19ae4330391431a9dd5a9267f38a28b8ab9a1511a37e33cd07"
       },
       {
         "path": "skills/evor/SKILL.md",
@@ -141,10 +141,12 @@
     "signal_expected": false,
     "forbidden": [
       {
+        "scope": "answer",
         "path": "$.node_id",
         "reason": "A node id is underivable: tree.json holds no nodes in either half and no forge-report exists."
       },
       {
+        "scope": "answer",
         "path": "$.score",
         "reason": "A score is underivable: no evaluation record exists in either half."
       }

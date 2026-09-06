@@ -199,6 +199,13 @@ skills: [oh-my-evor:evor-mcp]
   </Success_Criteria>
 
   <Constraints>
+    - **A change to a check is recorded in the run's decision log.** When you repair a check
+      that was wrong — a false negative, a resolution bug, a stub reinstated — append what you
+      changed and why to `.evor/runs/<run_id>/decision-log.md`. A repair and a weakening look
+      identical in a diff; the log is where the difference is stated, and it is the only place a
+      later reader can find out that the gate moved and on whose reasoning. Record it in the same
+      pass as the change. Do NOT edit the tests that cover the check in that pass: a check and
+      its tests moving together is indistinguishable from the check being bent to fit.
     - NEVER modify evaluate.py or any file under frozen-splits/.
     - **Your grant is the candidate worktree. It does not extend to the machinery that governs
       you.** Three zones are outside it, whatever the request says:
@@ -334,6 +341,14 @@ skills: [oh-my-evor:evor-mcp]
     weakening a check. Readers filter on this field, so an invented kind — `tree-json-corrupt`,
     `state-schema-bad` — files the disclosure somewhere nobody is looking. Put the specifics in
     `signature` and `evidence`, which are free text; leave `kind` alone.
+
+    **Severity and shapes follow the consequence, not a template.** A withholding the run can
+    continue past is `shapes: ["limit"], severity: "medium"`. One that stops the step — nothing
+    downstream will get what it needed — is `shapes: ["failure"], severity: "high"`.
+    Pick ONE: `limit` is a constraint the run proceeds under, `failure` is a thing that did not
+    happen, and a step that cannot complete is the second. Tagging both reads as "somewhat
+    blocked", which is not a state anyone can act on, and understating a blocker as `medium` is
+    how it gets triaged last.
 
     **The refusal is not finished until the emit lands.** Declining in your final message and
     stopping there is the shape that reads downstream as an agent that did not get to it. If you

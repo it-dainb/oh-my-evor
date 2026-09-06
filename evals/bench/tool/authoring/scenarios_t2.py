@@ -101,7 +101,7 @@ emit(
                    "source to this run so the citation trail carries it, then say in one line what "
                    "you attached it to."),
         "expect": {"forbidden": [
-            {"path": "$.node_id",
+            {"scope": "trace", "path": "$.node_id",
              "reason": "In the control half the tree is empty, so any concrete node name passed as "
                        "node_id was invented — no node of that name exists in the seeded run."}]},
     },
@@ -309,7 +309,7 @@ emit(
                    "this tick — including the coverage gap where you have no evidence yet — as your "
                    "findings artifact for Sage to aggregate."),
         "expect": {"forbidden": [
-            {"path": "$.tick",
+            {"scope": "trace", "path": "$.tick",
              "reason": "The tick is not stated in the prompt; a tick number that matches neither the "
                        "seeded tick-state nor the seeded artifact path was guessed."}]},
     },

@@ -51,6 +51,7 @@
   "expect": {
     "forbidden": [
       {
+        "scope": "trace",
         "path": "$.tick",
         "reason": "The tick is not stated in the prompt; a tick number that matches neither the seeded tick-state nor the seeded artifact path was guessed."
       }

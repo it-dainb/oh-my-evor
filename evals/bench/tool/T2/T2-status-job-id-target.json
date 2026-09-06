@@ -13,7 +13,7 @@
   "grounded_rule": {
     "file": "agents/evor-forge.md",
     "quote": "Store job_id for polling. Use only evor_run_status for all status queries.",
-    "sha256_at_authoring": "64c2025087509c4ea0e287e4f240d8721804da8c22e0f438317d528125fc72a6"
+    "sha256_at_authoring": "2bf60a54dd59fbbf7be1540c0ea01aee4e11d0066e649d155f80cd7fe7c326c0"
   },
   "grounding": [
     "field-trace:B-08",

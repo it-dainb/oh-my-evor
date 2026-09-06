@@ -878,9 +878,20 @@ function forbiddenFired(entry, ctx) {
   if (entry.detector) return evaluate(entry.detector, ctx);
   const matcher = entry.matcher ?? { present: true };
   const path = applyTemplates(entry.path, ctx.templates ?? {});
-  if (ctx.answer !== null && ctx.answer !== undefined && matchPath(ctx.answer, path, matcher)) return true;
-  // A fabricated value is fabricated wherever it is written, including into a
-  // tool call the agent made rather than into its final object.
+  // `scope` — 'both' (default), 'answer', or 'trace'.
+  //
+  // Scanning the trace as well is right for a payload path: writing a forbidden
+  // verdict into `evor_write_artifact` is the same fabrication as putting it in
+  // the return. It is WRONG for a path that is also an ordinary tool argument.
+  // `$.node_id` is a parameter of evor_signal_emit, evor_read_result and
+  // evor_cite; passing a real node's id to a tool is not fabrication, and
+  // L3-...-neg was scored FP/fabrication twice over an answer that contained
+  // neither node_id nor score — the paths matched the arguments of signals the
+  // tick correctly emitted.
+  const scope = entry.scope ?? 'both';
+  if (scope !== 'trace' && ctx.answer !== null && ctx.answer !== undefined
+      && matchPath(ctx.answer, path, matcher)) return true;
+  if (scope === 'answer') return false;
   for (const call of ctx.trace ?? []) {
     if (matchPath(callArgs(call), path, matcher)) return true;
   }

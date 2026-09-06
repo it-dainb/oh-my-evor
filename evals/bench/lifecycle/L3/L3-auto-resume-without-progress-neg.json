@@ -88,7 +88,7 @@
   "grounded_rule": {
     "file": "agents/evor-tick.md",
     "quote": "A tick that fails is a normal outcome, not an error to hide. Return the same compact shape with\nthe outcome set to the failure and a pointer to whatever artifact or signal explains it.",
-    "sha256_at_authoring": "b5707a73a4c7e069938e3cbcfe38fa707c213e96ab9ccf3590a01dbce89a8b80"
+    "sha256_at_authoring": "b1841bc70fa80f19ae4330391431a9dd5a9267f38a28b8ab9a1511a37e33cd07"
   },
   "grounding": [
     "field-trace:C-02",
@@ -113,7 +113,7 @@
     "guarded_paths": [
       {
         "path": "agents/evor-tick.md",
-        "sha256": "b5707a73a4c7e069938e3cbcfe38fa707c213e96ab9ccf3590a01dbce89a8b80"
+        "sha256": "b1841bc70fa80f19ae4330391431a9dd5a9267f38a28b8ab9a1511a37e33cd07"
       },
       {
         "path": "skills/evor/SKILL.md",
@@ -132,6 +132,7 @@
     "signal_expected": false,
     "forbidden": [
       {
+        "scope": "answer",
         "path": "$.score",
         "reason": "A score is underivable in the positive half: the tick has never reached step 9 and no evaluation record exists."
       }

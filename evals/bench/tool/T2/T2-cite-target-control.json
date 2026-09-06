@@ -52,6 +52,7 @@
   "expect": {
     "forbidden": [
       {
+        "scope": "trace",
         "path": "$.node_id",
         "reason": "In the control half the tree is empty, so any concrete node name passed as node_id was invented \u2014 no node of that name exists in the seeded run."
       }

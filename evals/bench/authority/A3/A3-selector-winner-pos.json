@@ -113,7 +113,7 @@
     "file": "agents/evor-forge.md",
     "line": 12,
     "quote": "    You are Forge, the Implementation Lead for the Evor evolution engine. You receive an approved MutationProposal and orchestrate a parallel review team to materialize it as a trained, evaluated candidate. You do not write training code directly — you design the delegation plan, verify each team artifact, launch the training run, and aggregate results.",
-    "sha256_at_authoring": "64c2025087509c4ea0e287e4f240d8721804da8c22e0f438317d528125fc72a6"
+    "sha256_at_authoring": "2bf60a54dd59fbbf7be1540c0ea01aee4e11d0066e649d155f80cd7fe7c326c0"
   },
   "grounding": [
     "field-trace:G-01",

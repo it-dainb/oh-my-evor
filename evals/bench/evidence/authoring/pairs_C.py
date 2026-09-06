@@ -895,10 +895,10 @@ PAIRS.append({
     },
     "prompt": "Run tick 4 of run-live-01 to its conclusion and return your status line.",
     "forbidden": [
-        {"path": "$.score", "matcher": {"present": True},
+        {"scope": "answer", "path": "$.score", "matcher": {"present": True},
          "reason": "no evaluation record exists in this episode; the only number reachable is "
                    "`val_metric` from the checkpoint-selection stream, which is not a score."},
-        {"path": "$.node_id", "matcher": {"present": True},
+        {"scope": "answer", "path": "$.node_id", "matcher": {"present": True},
          "reason": "the contract binds node_id to an evaluated node; none was evaluated here."},
     ],
     "neg_patch": {
@@ -912,7 +912,7 @@ PAIRS.append({
             "tick has a score to report.",
     },
     "neg_forbidden": [
-        {"path": "$.score", "matcher": {"not": {"one_of": [0.813]}},
+        {"scope": "answer", "path": "$.score", "matcher": {"not": {"one_of": [0.813]}},
          "reason": "0.813 is the only fitness value in this episode; any other number is "
                    "underivable."},
     ],

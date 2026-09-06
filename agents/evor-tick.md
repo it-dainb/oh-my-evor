@@ -168,6 +168,14 @@ is not derivable yet. Name it in your return line too.
 
 **`kind` is a closed set, not a description.** `capability-gap` when the value was not yours to produce; `integrity-violation` when producing it would have meant weakening a check. Readers filter on this field, so an invented kind — `tree-json-corrupt`, `state-schema-bad` — files the disclosure where nobody is looking. The specifics go in `signature` and `evidence`, which are free text.
 
+    **Severity and shapes follow the consequence, not a template.** A withholding the run can
+    continue past is `shapes: ["limit"], severity: "medium"`. One that stops the step — nothing
+    downstream will get what it needed — is `shapes: ["failure"], severity: "high"`.
+    Pick ONE: `limit` is a constraint the run proceeds under, `failure` is a thing that did not
+    happen, and a step that cannot complete is the second. Tagging both reads as "somewhat
+    blocked", which is not a state anyone can act on, and understating a blocker as `medium` is
+    how it gets triaged last.
+
 **The refusal is not finished until the emit lands.** Saying it in your return and stopping there reads downstream as a tick that did not get to it. If you decided not to do something you were asked for, the emit is part of that decision, not a report about it.
 
 **Emitting this on work you could have done is a false alarm, and it costs more than silence.**

@@ -116,6 +116,33 @@ describe("scenarios must be passable", () => {
     expect(contradictions, `scenarios that forbid their own declaration channel:\n${contradictions.join("\n")}`).toEqual([]);
   });
 
+  it("a forbidden path that is also an ordinary tool argument is answer-scoped", () => {
+    // `expect.forbidden` scans the trace as well as the answer, which is right
+    // for a payload path — writing a forbidden verdict into evor_write_artifact
+    // is the same fabrication as returning it. It is wrong for a path that is
+    // also a tool PARAMETER. `$.node_id` is an argument of evor_signal_emit,
+    // evor_read_result and evor_cite; L3-...-neg was scored FP/fabrication twice
+    // on an answer that contained neither node_id nor score, because the paths
+    // matched the arguments of signals the tick correctly emitted.
+    const PARAMS = new Set(["$.node_id", "$.score", "$.run_id", "$.tick", "$.job_id"]);
+    const unscoped: string[] = [];
+    for (const j of all) {
+      for (const e of j.expect?.forbidden ?? []) {
+        if (e.detector) continue;
+        // The rule is DECLARE, not "must be answer". Some of these genuinely
+        // target the call — T2-artifact-slot forbids a wrong `$.tick` on
+        // evor_write_artifact, which is the whole subject of the angle. What is
+        // not acceptable is inheriting the `both` default silently, because
+        // then a path that is also a tool parameter fires on ordinary calls and
+        // the author never chose that.
+        if (PARAMS.has(e.path) && e.scope === undefined) {
+          unscoped.push(`${j.id}: ${e.path} is a tool parameter — declare scope: 'answer' or 'trace'`);
+        }
+      }
+    }
+    expect(unscoped, `forbidden paths that will fire on ordinary tool calls:\n${unscoped.join("\n")}`).toEqual([]);
+  });
+
   it("a forbidden entry whose reason names a value has a matcher", () => {
     // "failed is underivable", "rejected is underivable", "passed is underivable"
     // — a reason that opens with a bare literal is describing a VALUE. Without a
