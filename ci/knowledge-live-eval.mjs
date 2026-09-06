@@ -252,7 +252,7 @@ export function buildSelectorTask() {
  *
  * @returns {{events: object[], result: object, model: string, cost_usd: number, wall_ms: number}}
  */
-export function runLive({ prompt, model, effort, maxTurns, timeoutMs, env, mcpConfigPath, allowedTools, cwd, settingsPath, tolerateError = false }) {
+export function runLive({ prompt, model, effort, maxTurns, timeoutMs, env, mcpConfigPath, allowedTools, cwd, settingsPath, agentsJson, tolerateError = false }) {
   // A PROMPT MAY NOT OPEN WITH A DASH. `-p` will not accept an option-looking
   // token as its value, so the CLI exits 1 with `unknown option` and no output —
   // indistinguishable, from the outside, from a model that said nothing. Name it
@@ -271,6 +271,14 @@ export function runLive({ prompt, model, effort, maxTurns, timeoutMs, env, mcpCo
     '--allowedTools', allowedTools.join(','),
   ];
   if (effort) args.push('--effort', effort);
+  // REGISTER THE ROLES THE ROLE IS TOLD TO DELEGATE TO (defect 23).
+  // Without this the bench runs every role as a top-level agent, so
+  // `oh-my-evor:evor-*` types do not exist, `SubagentStart`/`SubagentStop` never
+  // fire, and every role emits a high-severity `capability-gap` about the gap —
+  // which the group-L declarations then counted as a declaration on BOTH halves
+  // of the same pair. `--agents` takes {name: {description, prompt, model, tools}}
+  // and the spawned type is addressable by bare name; verified live.
+  if (agentsJson) args.push('--agents', agentsJson);
   // The product's own PreToolUse guard, scoped to the sandbox. Without it the
   // governance angles grade prose compliance instead of the gate they name.
   if (settingsPath) args.push('--settings', settingsPath);
@@ -289,7 +297,26 @@ export function runLive({ prompt, model, effort, maxTurns, timeoutMs, env, mcpCo
       // three bench fixtures were mutated by pilot runs writing through it.
       // Callers that want the repo pass nothing and inherit, as before.
       ...(cwd ? { cwd } : {}),
-      env: { ...process.env, ...env },
+      env: {
+        ...process.env,
+        // THE BENCH WAS MEASURING THE OPERATOR'S CLAUDE.md, NOT THE ROLE'S.
+        //
+        // `claude -p` loads the user's global CLAUDE.md as memory, and on this
+        // machine that file is the oh-my-claudecode orchestration layer — "delegate
+        // to executor", "route SDK questions to document-specialist", "prefer the
+        // lightest path". Every scored bench run since the pilot has read it.
+        // Verified by asking a bare `claude -p` to quote its first memory heading:
+        // it answered "# oh-my-claudecode - Intelligent Multi-Agent Orchestration".
+        //
+        // `--system-prompt` does NOT suppress it — memory is injected separately
+        // from the default system prompt, checked. `--bare` and `--safe-mode` do,
+        // but both disable hooks, and the product's PreToolUse guard is the thing
+        // half these angles measure. Isolating CLAUDE_CONFIG_DIR breaks auth.
+        // This env var is the only lever that removes the contamination and leaves
+        // hooks and credentials alone.
+        CLAUDE_CODE_DISABLE_CLAUDE_MDS: '1',
+        ...env,
+      },
     });
   } catch (e) {
     raw = e.stdout ?? '';

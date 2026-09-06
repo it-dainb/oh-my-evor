@@ -288,6 +288,89 @@ emits a subject-named signal.
 
 ---
 
+## 8. What the CLI was doing that nobody had asked it about
+
+Three findings, each verified live before any code changed.
+
+### 8.1 Every scored run has been reading the operator's global CLAUDE.md
+
+```
+$ claude -p 'do you have global CLAUDE.md loaded? quote its first heading'
+→ "# oh-my-claudecode - Intelligent Multi-Agent Orchestration"
+```
+
+So every `evor-tick`, `evor-probe` and `evor-forge` episode since the pilot has
+carried an unrelated orchestration layer's instructions — *delegate to `executor`*,
+*route SDK questions to `document-specialist`*, *choose the lightest-weight path*.
+`A1-forge-fanout-role-control` answered, in lite11, that it *"found the role
+definitions on disk and ran them via `general-purpose` agents"*. That is not evor
+behaviour.
+
+Checked and rejected: `--system-prompt` does **not** suppress it (memory is
+injected separately from the default system prompt); `--bare` and `--safe-mode` do,
+but both disable hooks, and the product's PreToolUse guard is what half these
+angles measure; isolating `CLAUDE_CONFIG_DIR` breaks authentication.
+`CLAUDE_CODE_DISABLE_CLAUDE_MDS=1` removes it and leaves hooks and credentials
+alone — verified to return `NONE`. Now set at both call sites.
+
+### 8.2 `--agents` registers the roles, and the name has to match
+
+`--agents '{name: {description, prompt, model, tools}}'` makes a role a spawnable
+type. That is the direct fix for defect 23 — with it, `SubagentStart` and
+`SubagentStop` can fire and roles stop emitting `capability-gap` about their own
+absent sub-agents.
+
+The first live attempt on A1 registered the twelve roles under their bare
+frontmatter names, and `A1-forge-fanout-role-control` spawned
+`oh-my-evor:evor-forge-architect` and `oh-my-evor:evor-forge-analyst` — both
+`errored: true`. The roles are told, by their own files and by the evor-mcp skill,
+to use the plugin-prefixed spelling. Registered under both names, the prefixed
+spawn returns cleanly.
+
+It stays **opt-in behind `--register-agents`**. Registering the roles is a real
+behavioural change and must not ride along with the declaration fix in the same
+run, or neither delta is attributable.
+
+### 8.3 The roles declared their own turn budgets and the bench ignored all of them
+
+Every agent file carries `maxTurns:` in frontmatter. The runner ran a flat 20.
+
+```
+evor-tick 90   evor-forge 45   evor-forge-junior 28   evor-sage 22
+evor-acquirer 15   evor-probe 14   evor-mutagen 14   evor-selector 12
+evor-forge-analyst 10
+```
+
+Measured over lite9/10/11, the share of **scored** runs that ended at turn 19-20:
+
+| run | scored | at ceiling | |
+|---|---|---|---|
+| lite9 | 64 | 26 | **41%** |
+| lite10 | 68 | 31 | **46%** |
+| lite11 | 68 | 32 | **47%** |
+
+`evor-tick` — 38 scenarios, the corpus's largest bloc, declaring 90 — was at the
+ceiling in 14 of its runs in each of the last two calibrations. `turnsAtCeiling`
+only VOIDs when the ceiling is *also* identified as the cause, so most of these
+were graded as ordinary FN/FAIL on a truncated episode.
+
+This is AF6 at its plainest: the obligation was written down, by the role, and no
+component read it. `turnCeiling` now reads the role's own file, with the scenario
+able to override. Note that it cuts as well as raises — `evor-probe` goes 20 → 14,
+`evor-selector` 20 → 12, `evor-forge-analyst` 20 → 10 — which is the tell that it
+is honouring a declaration rather than buying headroom.
+
+It also puts the earlier `evor-tick` diagnosis in doubt. "Median 6 calls to the
+first evor tool on successes, 14 on failures" was read as an orientation problem;
+a run that spends 14 calls orienting has six turns left of a budget its own role
+file sets at ninety. That measurement needs repeating under the correct ceiling
+before anything is concluded from it.
+
+**Cost warning:** raising evor-tick from 20 to 90 will move the per-run cost of the
+largest bloc in the corpus. lite12 should be priced before it is launched.
+
+---
+
 ## Still open
 
 - **Defect 23** is now the largest item by a wide margin. It is not only

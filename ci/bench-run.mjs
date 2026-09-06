@@ -701,8 +701,78 @@ function runPostconditions(sc, projectRoot) {
  * Scenario `max_turns` wins; otherwise the role's default; otherwise the flag.
  */
 const ROLE_TURN_CEILING = { 'evor-orchestrator': 40 };
+
+/**
+ * THE ROLE ALREADY DECLARED ITS BUDGET AND THE BENCH IGNORED IT.
+ *
+ * Every agent file carries `maxTurns:` in its frontmatter — evor-tick 90,
+ * evor-forge 45, evor-forge-junior 28, evor-probe 14 — and the runner ran all of
+ * them at a flat 20. Measured over lite9/10/11: **41%, 46% and 47% of all scored
+ * runs ended at turn 19-20**, evor-tick in 14 of its runs in each of the last two.
+ * Those episodes were truncated and graded anyway, because `turnsAtCeiling` only
+ * VOIDs when the ceiling is also detected as the cause; the rest scored as
+ * ordinary FN/FAIL.
+ *
+ * This is AF6 in its plainest form: the obligation was written down, by the role,
+ * and no component read it. Precedence is scenario, then the role's own file,
+ * then the role default, then the flag.
+ */
+function roleDeclaredMaxTurns(agentFile) {
+  if (!agentFile) return undefined;
+  const p = resolve(REPO, agentFile);
+  if (!existsSync(p)) return undefined;
+  const m = /^maxTurns:\s*(\d+)\s*$/m.exec(readFileSync(p, 'utf8').slice(0, 4000));
+  return m ? Number(m[1]) : undefined;
+}
+
 function turnCeiling(sc) {
-  return Number(sc.max_turns ?? ROLE_TURN_CEILING[sc.role] ?? arg('max-turns', 20));
+  return Number(
+    sc.max_turns
+    ?? roleDeclaredMaxTurns(sc.agent_file)
+    ?? ROLE_TURN_CEILING[sc.role]
+    ?? arg('max-turns', 20));
+}
+
+/**
+ * Build the `--agents` payload from the SANDBOX's agent files (defect 23).
+ *
+ * The bench runs one role as a top-level agent, so `oh-my-evor:evor-probe` and
+ * friends are not registered types. Every role discovers this, emits a
+ * high-severity `capability-gap`, and — until the declarations were
+ * subject-scoped — that single emission scored TP on a pair's positive half and
+ * FP on its negative half. It also means `SubagentStart` and `SubagentStop`
+ * never fire, so the reflex layer those hooks implement is measured switched off.
+ *
+ * `--agents` takes `{name: {description, prompt, model, tools}}`; the type is
+ * addressable by bare name. Read from `<pluginRoot>/agents`, not the repo, so a
+ * scenario's `plugin_fixture` overlay is what gets registered.
+ *
+ * OPT-IN. Registering the roles is a real behavioural change and must not ride
+ * along with a detector change in the same run — one variable per run, or the
+ * delta is unattributable.
+ */
+function buildAgentsJson(pluginRoot) {
+  const dir = join(pluginRoot, 'agents');
+  if (!existsSync(dir)) return undefined;
+  const out = {};
+  for (const f of readdirSync(dir)) {
+    if (!f.endsWith('.md')) continue;
+    const text = readFileSync(join(dir, f), 'utf8');
+    const head = text.slice(0, 4000);
+    const name = (/^name:\s*(.+)$/m.exec(head)?.[1] ?? basename(f, '.md')).trim();
+    const description = (/^description:\s*(.+)$/m.exec(head)?.[1] ?? name).trim();
+    const model = /^model:\s*(.+)$/m.exec(head)?.[1]?.trim();
+    const prompt = text.includes('<Agent_Prompt>') ? extractAgentPromptBlock(text) : stripFrontmatter(text);
+    // REGISTER UNDER BOTH NAMES. The roles are told, by their own files and by
+    // the evor-mcp skill, to spawn `oh-my-evor:evor-forge-architect`. Registered
+    // under the bare frontmatter name only, that call returns `errored: true` —
+    // observed live on A1-forge-fanout-role-control, which asked for exactly that
+    // and got nothing. Whichever spelling the role reaches for must resolve.
+    const def = { description, prompt, ...(model ? { model } : {}) };
+    out[name] = def;
+    out[`oh-my-evor:${name}`] = def;
+  }
+  return Object.keys(out).length ? JSON.stringify(out) : undefined;
 }
 
 function runScenario(path, { repeats, outDir }) {
@@ -858,6 +928,7 @@ function runScenario(path, { repeats, outDir }) {
         env: { ...env, CLAUDE_PROJECT_DIR: projectRoot },
         // Present only for scenarios that reason about denials. See writeSandboxSettings.
         settingsPath,
+        agentsJson: arg('register-agents', '') ? buildAgentsJson(join(work, 'plugin')) : undefined,
         mcpConfigPath: resolve(REPO, sc.setup?.mcp_config ?? 'ci/eval-mcp-config.json'),
         // DEFAULTING TO `mcp__evor` ALONE MANUFACTURED 11 DENIALS AND BURNED
         // THE TURN BUDGET. The role is told to read run state off disk, so
@@ -1132,7 +1203,7 @@ function runScenario(path, { repeats, outDir }) {
 // consent to spend money is not safe to operate, and the failure is silent by
 // construction: the flag I thought made it free is the one it never read.
 const KNOWN_FLAGS = new Set([
-  'repeats', 'out', 'angle', 'max-turns', 'preflight-only', 'preflight', 'help', 'workers', 'mode',
+  'repeats', 'out', 'angle', 'max-turns', 'preflight-only', 'preflight', 'help', 'workers', 'mode', 'register-agents',
 ]);
 for (const a of process.argv.slice(2)) {
   if (!a.startsWith('--')) continue;

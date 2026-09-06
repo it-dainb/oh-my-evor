@@ -34,7 +34,11 @@ function invoke(args, { env, timeoutMs, cwd }) {
       timeout: timeoutMs ?? 900_000,
       maxBuffer: 64 * 1024 * 1024,
       ...(cwd ? { cwd } : {}),
-      env: { ...process.env, ...env },
+      // Same isolation as runLive: the operator's global CLAUDE.md is memory, and
+      // on this machine it is an unrelated orchestration layer. See the note in
+      // knowledge-live-eval.mjs for why no CLI flag reaches it without also
+      // disabling the hooks these angles measure.
+      env: { ...process.env, CLAUDE_CODE_DISABLE_CLAUDE_MDS: '1', ...env },
     });
   } catch (e) {
     // A non-zero exit still carries the stream on stdout — a turn that ended at
@@ -54,7 +58,7 @@ function invoke(args, { env, timeoutMs, cwd }) {
  *   holds every turn's, because cost and denials accumulate across turns and a
  *   caller that reads only the last one under-reports both.
  */
-export function runPhased({ prompt, followUps = [], model, effort, maxTurns, timeoutMs, env, mcpConfigPath, allowedTools, cwd, settingsPath }) {
+export function runPhased({ prompt, followUps = [], model, effort, maxTurns, timeoutMs, env, mcpConfigPath, allowedTools, cwd, settingsPath, agentsJson }) {
   const base = [
     '--model', model,
     '--output-format', 'stream-json',
@@ -66,6 +70,7 @@ export function runPhased({ prompt, followUps = [], model, effort, maxTurns, tim
   ];
   if (effort) base.push('--effort', effort);
   if (settingsPath) base.push('--settings', settingsPath);
+  if (agentsJson) base.push('--agents', agentsJson);
 
   const events = [];
   const results = [];
