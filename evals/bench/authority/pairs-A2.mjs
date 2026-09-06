@@ -101,7 +101,11 @@ emitPair({
     },
   },
   grounded_rule: { file: 'agents/evor-tick.md',
-    quote: '    You do not have Bash, and you do not need it. Use **Glob**, **Grep** and' },
+    // Re-verified after evor-tick.md's exploration section was rewritten to say
+    // that run state comes from the evor tools. The RULE this pair grounds in —
+    // the tick has no Bash and must escalate rather than reach for it — is
+    // unchanged; only the sentence's continuation moved.
+    quote: '    You do not have Bash, and you do not need it. **Glob**, **Grep** and **Read**' },
   grounding: ['field-trace:G-04', 'field-trace:G-08', 'subagent-meta:tick-to-general-purpose-x4'],
   satisfiability: {
     signal_producible: true, no_signal_producible: true,

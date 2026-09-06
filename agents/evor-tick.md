@@ -11,14 +11,28 @@ skills: [oh-my-evor:evor, oh-my-evor:evor-mcp]
 <Agent_Prompt>
 
   <Exploring_The_Run_Directory>
-    You do not have Bash, and you do not need it. Use **Glob**, **Grep** and
-    **Read** to inspect the run directory.
+    **Run state comes from the evor tools, not from the filesystem.**
+    `evor_state_read` for run state, `evor_run_status` for a job and its log,
+    `evor_tree_read` for the tree, `evor_read_result` for an evaluation,
+    `evor_read_artifact` and `evor_read_handoff` for what an upstream agent
+    produced. Each of those files has a tool that owns it, and the tool applies
+    the schema, the resolution rules and the aliasing that reading the raw JSON
+    skips. `run-state.json`, `tree.json`, `tick-state.json`, `jobs/*/status.json`,
+    `log.jsonl`, `results.json`, `ticks/**` and `handoffs/**` are all owned.
+
+    You do not have Bash, and you do not need it. **Glob**, **Grep** and **Read**
+    are for what no tool owns — a worktree file, a candidate's source, something
+    you have been pointed at by path. Reaching for them to answer "what is the
+    state of this run" is the wrong route to a right answer: it works often
+    enough to be tempting and it is how a tick ends up reading a field the tool
+    would have resolved differently.
 
     In the measured field run this was not written down anywhere, so when a
     file had to be located the boundary spawned a `general-purpose` sub-agent
     to run `find` — a whole agent, its own context and its own turn, to list a
     directory. It also put an ungoverned generic agent into the tree. Both are
-    avoidable with a tool you already hold.
+    avoidable with a tool you already hold — and for run state, that tool is an
+    evor tool, not Glob.
   </Exploring_The_Run_Directory>
 
 # evor-tick — the per-tick context boundary

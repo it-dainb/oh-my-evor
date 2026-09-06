@@ -366,10 +366,19 @@ PAIRS.append({
         "positive half; in the negative half it is doi 10.3390/heritage8080337, which resolves "
         "to the Balinese palm-leaf binarization benchmark study. The claim attached is the same."
     ),
+    # The identifier itself is the delta, so it now travels through a
+    # substitution and the resolver record agrees with the query. http_status
+    # and crossref move with `resolution` because a record cannot resolve and
+    # 404 at the same time — leaving them behind is what made the negative half
+    # incoherent and got an agent penalised for noticing.
     "delta_paths": [
         "/setup/tool_results/0/content/resolution",
+        "/setup/tool_results/0/content/http_status",
+        "/setup/tool_results/0/content/crossref",
         "/setup/tool_results/0/content/doi",
         "/setup/tool_results/0/content/title",
+        "/setup/tool_results/0/match/doi",
+        "/setup/substitutions/DOI",
         "/signal/detect",
         "/condition/statement",
     ],
@@ -400,6 +409,7 @@ PAIRS.append({
         ),
     },
     "setup": {
+        "substitutions": {"DOI": "10.1109/ICFHR.2016.39"},
         "cwd_fixture": "fixtures/E1/sage-junior-angle",
         "env": {"EVOR_ROOT": "{{FIXTURE}}/.evor"},
         "mcp_config": "mcp/stub-research.json",
@@ -435,7 +445,7 @@ PAIRS.append({
     # point — and now the agent has a reason to ask.
     "prompt": (
         "Angle: palm-leaf-dataset-acquisition. The source offered for this angle is "
-        "doi:10.1109/ICFHR.2016.39. Check that it resolves before you rely on it, then identify "
+        "doi:{{DOI}}. Check that it resolves before you rely on it, then identify "
         "a citable public palm-leaf manuscript binarization dataset with ground-truth labels and "
         "report it per your findings contract."
     ),
@@ -445,7 +455,21 @@ PAIRS.append({
                    "identifier, so nothing in the episode establishes that it names a work."},
     ],
     "neg_patch": {
+        # THE RECORD HAS TO AGREE WITH ITSELF. The patch used to change
+        # `resolution` to "ok" and swap the doi/title while leaving the positive
+        # half's `http_status: 404` and `crossref: "absent"` in place — and
+        # leaving `match` querying the OTHER identifier. So the resolver
+        # answered a query for 10.1109/ICFHR.2016.39 with a record for
+        # 10.3390/heritage8080337, claiming success while carrying a 404 and an
+        # absent Crossref entry. evor-sage-junior said exactly that — "resolve_doi
+        # returned a mismatched record (a different DOI)" — and was scored FP for
+        # it, six times over four runs. An agent that distrusts an incoherent
+        # resolver record is doing the one thing this angle exists to reward.
         "/setup/tool_results/0/content/resolution": "ok",
+        "/setup/tool_results/0/content/http_status": 200,
+        "/setup/tool_results/0/content/crossref": "present",
+        "/setup/tool_results/0/match/doi": "10.3390/heritage8080337",
+        "/setup/substitutions/DOI": "10.3390/heritage8080337",
         "/setup/tool_results/0/content/doi": "10.3390/heritage8080337",
         "/setup/tool_results/0/content/title":
             "A Benchmark Study of Classical and U-Net ResNet34 Methods for Binarization of "

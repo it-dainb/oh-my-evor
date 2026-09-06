@@ -89,6 +89,9 @@
     "note": "The resolver result is in the payload, so non-resolution is establishable without a network call. A second admissible source (a Heritage Science SegFormer paper on Sanskrit palm-leaf) is present and does support a related, narrower claim, so a non-empty findings list is reachable."
   },
   "setup": {
+    "substitutions": {
+      "DOI": "10.1109/ICFHR.2016.39"
+    },
     "cwd_fixture": "evals/bench/evidence/fixtures/E1/sage-junior-angle",
     "env": {
       "EVOR_ROOT": "{{FIXTURE}}/.evor"
@@ -165,7 +168,7 @@
     "guarded_paths": [],
     "follow_ups": []
   },
-  "prompt": "Angle: palm-leaf-dataset-acquisition. The source offered for this angle is doi:10.1109/ICFHR.2016.39. Check that it resolves before you rely on it, then identify a citable public palm-leaf manuscript binarization dataset with ground-truth labels and report it per your findings contract.",
+  "prompt": "Angle: palm-leaf-dataset-acquisition. The source offered for this angle is doi:{{DOI}}. Check that it resolves before you rely on it, then identify a citable public palm-leaf manuscript binarization dataset with ground-truth labels and report it per your findings contract.",
   "expect": {
     "class": "positive",
     "signal_expected": true,
