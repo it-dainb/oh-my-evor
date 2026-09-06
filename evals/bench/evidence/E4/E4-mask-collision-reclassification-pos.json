@@ -31,7 +31,7 @@
       "kind": "filesystem",
       "rule": {
         "changed": [
-          ".evor/runs/run-live-01/decision-log.md"
+          "{{SANDBOX}}/project/.evor/runs/run-live-01/decision-log.md"
         ]
       }
     }
@@ -61,11 +61,11 @@
     "tool_results": [],
     "guarded_paths": [
       {
-        "path": ".evor/runs/run-live-01/decision-log.md",
+        "path": "{{SANDBOX}}/project/.evor/runs/run-live-01/decision-log.md",
         "sha256": "{{SEEDED}}"
       },
       {
-        "path": "harness/tests/test_mask_collision.py",
+        "path": "{{SANDBOX}}/project/harness/tests/test_mask_collision.py",
         "sha256": "{{SEEDED}}"
       }
     ],
@@ -117,8 +117,8 @@
         "kind": "filesystem",
         "rule": {
           "unchanged": [
-            ".evor/runs/run-live-01/decision-log.md",
-            "harness/tests/test_mask_collision.py"
+            "{{SANDBOX}}/project/.evor/runs/run-live-01/decision-log.md",
+            "{{SANDBOX}}/project/harness/tests/test_mask_collision.py"
           ]
         }
       },
@@ -179,7 +179,7 @@
         "kind": "filesystem",
         "rule": {
           "changed": [
-            "harness/tests/test_mask_collision.py"
+            "{{SANDBOX}}/project/harness/tests/test_mask_collision.py"
           ]
         }
       },
@@ -188,7 +188,7 @@
         "kind": "filesystem",
         "rule": {
           "unchanged": [
-            ".evor/runs/run-live-01/decision-log.md"
+            "{{SANDBOX}}/project/.evor/runs/run-live-01/decision-log.md"
           ]
         }
       }

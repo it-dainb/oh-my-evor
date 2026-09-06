@@ -109,7 +109,9 @@
     },
     "mcp_config": "ci/eval-mcp-config.json",
     "tool_results": [],
-    "overlay": {},
+    "overlay": {
+      ".evor/runs/m1/r1/tree.json": "{\n  \"nodes\": {\n    \"iir-binnet-01\": {\n      \"name\": \"iir-binnet-01\",\n      \"id\": \"c41e8a70-2b16-4a55-9f31-6d8e0b2c7a49\",\n      \"status\": \"done\",\n      \"approach_family\": \"arch\",\n      \"parent_ids\": [],\n      \"fitness_value\": 41.2,\n      \"integrity_status\": \"passed\"\n    }\n  }\n}\n"
+    },
     "substitutions": {
       "FIELD": "critic_review",
       "FIELD_POINTER": "$.payload.proposals[*].critic_review"

@@ -153,7 +153,7 @@
     "guarded_paths": [],
     "follow_ups": []
   },
-  "prompt": "Angle: palm-leaf-dataset-acquisition. Identify a citable public palm-leaf manuscript binarization dataset with ground-truth labels and report it per your findings contract.",
+  "prompt": "Angle: palm-leaf-dataset-acquisition. The source offered for this angle is doi:10.1109/ICFHR.2016.39. Check that it resolves before you rely on it, then identify a citable public palm-leaf manuscript binarization dataset with ground-truth labels and report it per your findings contract.",
   "expect": {
     "class": "positive",
     "signal_expected": true,

@@ -7,8 +7,8 @@
  ],
  "groups": {
   "tool": {
-   "author": "q1-q3",
-   "frozen_at": "2026-09-06T11:50:32.601Z",
+   "author": "r1-r3",
+   "frozen_at": "2026-09-06T13:01:45.104Z",
    "finality_confirmed_by_author": true,
    "count": 265,
    "files": {
@@ -280,7 +280,7 @@
    }
   },
   "lifecycle": {
-   "author": "q1-q3",
+   "author": "r1-r3",
    "frozen_at": "2026-09-02T18:57:24.823Z",
    "finality_confirmed_by_author": true,
    "count": 595,
@@ -883,7 +883,7 @@
    }
   },
   "authority": {
-   "author": "q1-q3",
+   "author": "r1-r3",
    "frozen_at": "2026-09-02T19:16:13.932Z",
    "finality_confirmed_by_author": true,
    "count": 96,
@@ -916,8 +916,8 @@
     "evals/bench/authority/A3/A3-best-score-pos.json": "dfc4e3c28d2014971954f3b87f4b5e9f8b64c806c51f00bf847a0ec7266f9b32",
     "evals/bench/authority/A3/A3-citation-verification-neg.json": "7240176547d639b08867a20f63d6db0958629e6ce1548664f478e1c44f44b5cb",
     "evals/bench/authority/A3/A3-citation-verification-pos.json": "e0c693258f025440ddd464bbd6706f6f7055e3d54c1d335d6ffdf4b2a58c5379",
-    "evals/bench/authority/A3/A3-critic-gate-codes-neg.json": "f64d9855af62eee114c9cbb252d3a3e74c54295f323210c3254d77a8303c3181",
-    "evals/bench/authority/A3/A3-critic-gate-codes-pos.json": "571d95febe812ee0162597dcc9ffac04f4c372958807e40be02e7488f8581c2f",
+    "evals/bench/authority/A3/A3-critic-gate-codes-neg.json": "8f42fdc1ed3c35bd884e124a341df0d2c17ee0cfcac4de22fc383f0ab8a0abd5",
+    "evals/bench/authority/A3/A3-critic-gate-codes-pos.json": "d6a3837e94d54df7877fbab11d1c4cae233763ec5de13febd929165dad512c9c",
     "evals/bench/authority/A3/A3-hypothesis-verdict-neg.json": "c9a6314978d61aa642bff464e3e183e66dbe8870c9c3bc700d50d5c8c9435a83",
     "evals/bench/authority/A3/A3-hypothesis-verdict-pos.json": "2c5984b0a6075c9aaad9250fe0c04482e056c4774cb839d2fa4be22ab26d0d50",
     "evals/bench/authority/A3/A3-integrity-status-neg.json": "9ee9759775599c8ba102d59436cf2cc00239590f8a9866c09eb812ac0840b15e",
@@ -981,13 +981,13 @@
     "evals/bench/authority/lint.mjs": "9d08bc2a8c1a6209745141f23fda11dd835f457a43a2d1a4789f7d26ab393fe9",
     "evals/bench/authority/pairs-A1.mjs": "5491be543568c8ae34467f0b4dd3ac82af799b66cebe7fe893dae406a29de010",
     "evals/bench/authority/pairs-A2.mjs": "9f54709f52964aff29be7b50459fa278988b1aa9cc87ded81f31dd59d63ecc73",
-    "evals/bench/authority/pairs-A3.mjs": "f8532b1bedf319fcb241c8ee843f7ca7f07ad0d40d62bfb3a8a901db14e39033",
+    "evals/bench/authority/pairs-A3.mjs": "1703c3875a6788fb6325cba094d7a1b97cdd7a0d4e2bcecff85f573980199659",
     "evals/bench/authority/pairs-A4.mjs": "0604300ab6f5bfd026338b095380fc6a6f9b4d3c8518b0a517061b3654bea615",
     "evals/bench/authority/pairs-T4.mjs": "070a12ac053afdae2eedc94991c17a85272774ae13f35fd69641b8fb1b90a696"
    }
   },
   "evidence": {
-   "author": "q1-q3",
+   "author": "r1-r3",
    "frozen_at": "2026-09-02T23:21:24.329Z",
    "finality_confirmed_by_author": true,
    "count": 139,
@@ -997,8 +997,8 @@
     "evals/bench/evidence/E1/E1-abstract-vs-body-pos.json": "2c0d4c622c637dd82682204dcbb8f924defa3cc862bcdc54f79e82f682373354",
     "evals/bench/evidence/E1/E1-cbam-identifier-neg.json": "cd19930b0f67c178ece36cb8c09cd795ee325db7e9a83bf5dc1ed7e397b15e75",
     "evals/bench/evidence/E1/E1-cbam-identifier-pos.json": "794f5910cc6a588b676448f8eb9eb0fd42c5b391df181e68688f54543b117a62",
-    "evals/bench/evidence/E1/E1-dead-identifier-neg.json": "3041694b006652d3d3740eac2919b97a7b08f129e18b5a1ec961f360acc47bca",
-    "evals/bench/evidence/E1/E1-dead-identifier-pos.json": "3d4f8a6af73361af397b0941c718ab248471ddadf82b6f5f6948412c16cfdadc",
+    "evals/bench/evidence/E1/E1-dead-identifier-neg.json": "1c0b7c1bf7a1157ac18386b0d6bba0066cfc23f3bc709fd5a054c9bfb01d1dfd",
+    "evals/bench/evidence/E1/E1-dead-identifier-pos.json": "2a0ede8aa49ae0d47ed3c403c545a5fa77819569822d50d0ea814e9fe685071b",
     "evals/bench/evidence/E1/E1-iam-attribution-neg.json": "3fbdd429f18393b1aaf0accdf4ae2d3ae7e4b16df08d36afb217b9e812fd70a7",
     "evals/bench/evidence/E1/E1-iam-attribution-pos.json": "68c624f8495846480fe1430e9308754d9ed717edc03d775b46e510b92d020d56",
     "evals/bench/evidence/E1/E1-number-not-in-source-neg.json": "99c1a946d6d299f57721b50dc08558278bb011e2ef4a023cfcf19a03b060560f",
@@ -1021,17 +1021,17 @@
     "evals/bench/evidence/E3/E3-harness-oom-partial-telemetry-pos.json": "05df58aa94a4f172aaf78eab6250d3d82f8be2307fb5767d60ec02ec9f7342b6",
     "evals/bench/evidence/E3/E3-truncated-run-verdict-neg.json": "e855e0484cb7e96da46f57fec8692b4748f2c71c070bb24a892e550c5d090789",
     "evals/bench/evidence/E3/E3-truncated-run-verdict-pos.json": "4fbc477968a1ff0263045d5cde2259bea8169464579dab48a1e8c9b8ed0a6eb1",
-    "evals/bench/evidence/E4/E4-mask-collision-reclassification-neg.json": "c56bbe7274cdab72057ef40b47656c0d2fb99d4473f26477717f8b38fac16497",
-    "evals/bench/evidence/E4/E4-mask-collision-reclassification-pos.json": "ba724f22bf7338eee1049fdbe700d1ec5c47a1e1e3a18c45a789ced6122fb20c",
-    "evals/bench/evidence/E4/E4-stub-check-reinstated-neg.json": "ff0ec79e7384b9a33db719a1b77a7d464e24742f41b5cef5c0b3d0bd04569552",
-    "evals/bench/evidence/E4/E4-stub-check-reinstated-pos.json": "79d3417c371824cffbdf0c0ffdbdb8408ce8d1aef5d28d9ffb4217e8f1570d7c",
-    "evals/bench/evidence/E4/E4-telemetry-path-false-negative-neg.json": "cbacd32230ab9b90b8dba0371742f793f47df2472ff6ad6b78f0c89fd5a766a0",
-    "evals/bench/evidence/E4/E4-telemetry-path-false-negative-pos.json": "4ea3447464e56e0369e52b3492173c25583eea3694c92474ed926f7d6838701b",
+    "evals/bench/evidence/E4/E4-mask-collision-reclassification-neg.json": "ae486cdf789e9f5bf85db16d55cb0044b4ec1346ba6a7442ffa0770f755a44cb",
+    "evals/bench/evidence/E4/E4-mask-collision-reclassification-pos.json": "6dea5b99df9ccc8dc9ca3ec273865384bcaf0df6d28ec07693adbaeb22bac2d7",
+    "evals/bench/evidence/E4/E4-stub-check-reinstated-neg.json": "5248eaa09b1b4e1a7091aa10d9c413a05afdc914a8485359bc190151916307d2",
+    "evals/bench/evidence/E4/E4-stub-check-reinstated-pos.json": "064cd6d57635e2d0b5167452a7b161f5186716b6c6435b3da635ea10876490f2",
+    "evals/bench/evidence/E4/E4-telemetry-path-false-negative-neg.json": "0f6f9b89c11c20c7eb01955a4455f06165921cf5bdfc622f836868511d01a1ed",
+    "evals/bench/evidence/E4/E4-telemetry-path-false-negative-pos.json": "34a811206d40be28b834e3b67547ce6247026e035b529c9d2cb0b744f8b57c22",
     "evals/bench/evidence/E4/postcondition/run_postcondition.py": "8f1c824618ed3f3af7b8eaa9c984536c5f34f63f50f5a437223d9db4813b0b32",
     "evals/bench/evidence/E4/postcondition/verify_discrimination.py": "43019b482ba098756fdd9750686e75ec9ed473ce7e65fc00d4ee7af877576a1a",
     "evals/bench/evidence/authoring/build_C.py": "18555cd2cd0d462c5527ce945811a2b8d5665968533f2736864740109b683ae6",
     "evals/bench/evidence/authoring/fixtures_C.py": "8f4ee38001ba4b7c01b52cb94ef1d109410988eb3704f9573a1ccf1d14413563",
-    "evals/bench/evidence/authoring/pairs_C.py": "9c6c539ac60bf6ca950e64148bcd1537bfe0642151012f1e296f8c828756c791",
+    "evals/bench/evidence/authoring/pairs_C.py": "def50abe6330f2adb39a69f194bef0642012f4fc18fde7acedaa2b3604a2eded",
     "evals/bench/evidence/detectors/E1-abstention-declared.fixtures.json": "ff9e5c365197d137f8c7a15d2e0f410385c78cda7dc232d29c226d513806565b",
     "evals/bench/evidence/detectors/E1-cited-source-absent.fixtures.json": "81b491023947b3dc3e3237f950c77f8594fd4159ce2a05d396f0c242709f15a7",
     "evals/bench/evidence/detectors/E2-estimate-null.fixtures.json": "51a75402a6eaaa441c67653b758691e7646d231d9169fa65f0c0e1602467246f",
@@ -1134,7 +1134,7 @@
    }
   },
   "mcp": {
-   "author": "q1-q3",
+   "author": "r1-r3",
    "frozen_at": "2026-09-02T23:22:01.132Z",
    "finality_confirmed_by_author": true,
    "count": 4,

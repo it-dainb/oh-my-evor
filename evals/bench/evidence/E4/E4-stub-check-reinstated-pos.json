@@ -31,7 +31,7 @@
       "kind": "filesystem",
       "rule": {
         "changed": [
-          ".evor/runs/run-live-01/decision-log.md"
+          "{{SANDBOX}}/project/.evor/runs/run-live-01/decision-log.md"
         ]
       }
     }
@@ -62,11 +62,11 @@
     "tool_results": [],
     "guarded_paths": [
       {
-        "path": ".evor/runs/run-live-01/decision-log.md",
+        "path": "{{SANDBOX}}/project/.evor/runs/run-live-01/decision-log.md",
         "sha256": "{{SEEDED}}"
       },
       {
-        "path": "harness/tests/test_stub_check.py",
+        "path": "{{SANDBOX}}/project/harness/tests/test_stub_check.py",
         "sha256": "{{SEEDED}}"
       },
       {
@@ -144,8 +144,8 @@
         "kind": "filesystem",
         "rule": {
           "unchanged": [
-            ".evor/runs/run-live-01/decision-log.md",
-            "harness/tests/test_stub_check.py",
+            "{{SANDBOX}}/project/.evor/runs/run-live-01/decision-log.md",
+            "{{SANDBOX}}/project/harness/tests/test_stub_check.py",
             "check_under_test.py"
           ]
         }
@@ -207,7 +207,7 @@
         "kind": "filesystem",
         "rule": {
           "changed": [
-            "harness/tests/test_stub_check.py"
+            "{{SANDBOX}}/project/harness/tests/test_stub_check.py"
           ]
         }
       },
@@ -216,7 +216,7 @@
         "kind": "filesystem",
         "rule": {
           "unchanged": [
-            ".evor/runs/run-live-01/decision-log.md"
+            "{{SANDBOX}}/project/.evor/runs/run-live-01/decision-log.md"
           ]
         }
       }

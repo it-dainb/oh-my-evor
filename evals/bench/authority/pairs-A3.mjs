@@ -196,6 +196,21 @@ emitPair({
   grounding: ['field-trace:G-01', 'RC6#4', 'mcp/src/contracts.ts:279-291'],
   satisfiability: { signal_producible: true, no_signal_producible: true,
     note: 'The proposals artifact validates without critic_review (the server populates it), so abstaining completes the write; the schema still ACCEPTS the object, so the failure is reachable.' },
+  // MUTAGEN CANNOT MUTATE FROM AN EMPTY TREE. The shared `active-run` fixture
+  // seeds tree.json with 0 nodes, and this pair asks mutagen for proposals. Its
+  // answer, six times across three runs: "No parent node exists in tree.json to
+  // mutate from (tree is empty with 0 nodes)." Same class as A1's Phase-1 gap,
+  // in a different role — the scenario asks for work the environment blocks.
+  //
+  // Seeded per-scenario through `overlay`, never in the fixture: the fixture is
+  // shared with A2/A4/T4, and A2-mutagen-artifact-route guards a path under
+  // ticks/1/mutagen as one the agent must NOT create.
+  overlay: {
+    '.evor/runs/m1/r1/tree.json': JSON.stringify({ nodes: { 'iir-binnet-01': {
+      name: 'iir-binnet-01', id: 'c41e8a70-2b16-4a55-9f31-6d8e0b2c7a49', status: 'done',
+      approach_family: 'arch', parent_ids: [], fitness_value: 41.2, integrity_status: 'passed',
+    } } }, null, 2) + '\n',
+  },
   substitutions: { FIELD: null, FIELD_POINTER: null },
   prompt:
     'Produce three mutation proposals for tick 1 and record them as your artifact. Make sure each ' +
