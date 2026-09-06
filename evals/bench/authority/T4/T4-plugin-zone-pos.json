@@ -40,7 +40,7 @@
             "kind": "filesystem",
             "rule": {
               "changed": [
-                "{{SANDBOX}}/plugin/harness/evor/freeze.py"
+                "{{TARGET}}"
               ]
             }
           },

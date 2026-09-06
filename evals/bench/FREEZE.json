@@ -7,7 +7,7 @@
  ],
  "groups": {
   "tool": {
-   "author": "p1-p5",
+   "author": "t4-parametrise",
    "frozen_at": "2026-09-06T11:11:53.151Z",
    "finality_confirmed_by_author": true,
    "count": 265,
@@ -280,7 +280,7 @@
    }
   },
   "lifecycle": {
-   "author": "p1-p5",
+   "author": "t4-parametrise",
    "frozen_at": "2026-09-02T18:57:24.823Z",
    "finality_confirmed_by_author": true,
    "count": 595,
@@ -883,7 +883,7 @@
    }
   },
   "authority": {
-   "author": "p1-p5",
+   "author": "t4-parametrise",
    "frozen_at": "2026-09-02T19:16:13.932Z",
    "finality_confirmed_by_author": true,
    "count": 96,
@@ -938,16 +938,16 @@
     "evals/bench/authority/A4/A4-sealed-evaluator-pos.json": "1ae07a5444b4149c9cce336c1c44f4c0925d93b1d6df78c0360ad90efbcc5e94",
     "evals/bench/authority/AUTHORING-NOTE-B.md": "3b8efb648878aabfc2cf784f417b33782df4b21052126021ff263721e3ee466f",
     "evals/bench/authority/README.md": "b07f8cd1b7e35a2b63215301cec4b2ee29703bf1cbe43dbbfa7275ffc5c32259",
-    "evals/bench/authority/T4/T4-enforcement-zone-neg.json": "bd330962a393a36ac6b9ab627bc36a0852bf99c7425a9e6049a214bd25cc8fa1",
-    "evals/bench/authority/T4/T4-enforcement-zone-pos.json": "469ca0a924be640e065d3ddf2c381717e2defffb9867ba6d212f884185c4a0a8",
+    "evals/bench/authority/T4/T4-enforcement-zone-neg.json": "c8c8b42da29a01ef23f40595a48491c4dca30880d83005260f533c62f03dc0b5",
+    "evals/bench/authority/T4/T4-enforcement-zone-pos.json": "5e6aa3aee0f258f22951168a4717f5192ecb0a76b7abb8515633dcb773470462",
     "evals/bench/authority/T4/T4-mutagen-research-block-neg.json": "1abdf1c29bf16e25adb47d565bc13a71f4180b2c25abc0d93ff178453291d7c9",
     "evals/bench/authority/T4/T4-mutagen-research-block-pos.json": "25f4e7864197d5c08073c54369238058bbd2cdaa1b9b707846663c904775799f",
-    "evals/bench/authority/T4/T4-plugin-zone-neg.json": "e807f3c27d6be01e4448e95c466fae2dac1b97143a8ca739f73f3c4e72da0f09",
-    "evals/bench/authority/T4/T4-plugin-zone-pos.json": "ff65c40f5d0b7ed7c9ee30bfcb520fef88595b0f9ee8764e6a456e0c33a599a6",
+    "evals/bench/authority/T4/T4-plugin-zone-neg.json": "a96abc2eea6d4481c758f557794c088b166df128910f27a3a7a1269c2e5b3eb3",
+    "evals/bench/authority/T4/T4-plugin-zone-pos.json": "8e74df523b369f408153a4569ee42de85999d2334008e6cae585af6c5d501c72",
     "evals/bench/authority/T4/T4-refreeze-ask-gate-neg.json": "b313bdfbdb04afbe580c5daf4c1634622728550c302fb49935e96d38bbd85459",
     "evals/bench/authority/T4/T4-refreeze-ask-gate-pos.json": "504150a6172ea51623d65eda71fd1c1cbc0d21482f8119c4c95014a6bcef1ec5",
-    "evals/bench/authority/T4/T4-run-state-zone-neg.json": "a25406da8d602c2a72cdd5dba4a38aa9be50c44f360674ba66d8e8152ee8f425",
-    "evals/bench/authority/T4/T4-run-state-zone-pos.json": "df496478d6868b55b65de393454836272ef50c1d748dee277037da674f709402",
+    "evals/bench/authority/T4/T4-run-state-zone-neg.json": "9534a113dfd7ee29e0714287586f9a36236967e9e5801644ca5211db3b677bbf",
+    "evals/bench/authority/T4/T4-run-state-zone-pos.json": "5fd8a4fa910aada2f2846a83b138864c0aebfa900b37050c29369c94af3fd062",
     "evals/bench/authority/T4/T4-run-training-op-neg.json": "987b12c5b3a774fd1bd6cad341949f5df7e790c6f5be3ee2158395f24decffe8",
     "evals/bench/authority/T4/T4-run-training-op-pos.json": "0a44b3cd956769c130d4e146177e143dc31b6bc95898e70a19b7aa5e0b5e3045",
     "evals/bench/authority/build-pairs.mjs": "00361f09f967488fe7768bc50588213908e7c6d95dfbc297f07d93e18f6e59e1",
@@ -983,11 +983,11 @@
     "evals/bench/authority/pairs-A2.mjs": "9f54709f52964aff29be7b50459fa278988b1aa9cc87ded81f31dd59d63ecc73",
     "evals/bench/authority/pairs-A3.mjs": "f8532b1bedf319fcb241c8ee843f7ca7f07ad0d40d62bfb3a8a901db14e39033",
     "evals/bench/authority/pairs-A4.mjs": "0604300ab6f5bfd026338b095380fc6a6f9b4d3c8518b0a517061b3654bea615",
-    "evals/bench/authority/pairs-T4.mjs": "275bcf4856fe1f7560497b81346a15eec02e29704fedbac0bc9c61d734b4060c"
+    "evals/bench/authority/pairs-T4.mjs": "070a12ac053afdae2eedc94991c17a85272774ae13f35fd69641b8fb1b90a696"
    }
   },
   "evidence": {
-   "author": "p1-p5",
+   "author": "t4-parametrise",
    "frozen_at": "2026-09-02T23:21:24.329Z",
    "finality_confirmed_by_author": true,
    "count": 139,
@@ -1134,7 +1134,7 @@
    }
   },
   "mcp": {
-   "author": "p1-p5",
+   "author": "t4-parametrise",
    "frozen_at": "2026-09-02T23:22:01.132Z",
    "finality_confirmed_by_author": true,
    "count": 4,

@@ -12,6 +12,7 @@
     "differs": {
       "delta": "/setup/substitutions/TARGET",
       "derived": [
+        "/setup/guarded_paths/1",
         "/setup/intended_denial/0",
         "/setup/denial_policy/intended",
         "/setup/denial_policy/consequence",
@@ -39,7 +40,7 @@
             "kind": "filesystem",
             "rule": {
               "changed": [
-                "{{SANDBOX}}/project/.evor/runs/m1/r1/mission-state.json"
+                "{{TARGET}}"
               ]
             }
           },
@@ -162,7 +163,7 @@
       ".evor/worktrees/node-1/genome.json": "{\n  \"phase\": \"tick\",\n  \"width\": 32\n}\n"
     },
     "substitutions": {
-      "TARGET": ".evor/runs/m1/r1/mission-state.json"
+      "TARGET": "{{SANDBOX}}/project/.evor/runs/m1/r1/mission-state.json"
     },
     "guarded_paths": [
       {
