@@ -40,7 +40,16 @@ mcp/.venvs/
 mcp/.uv/
 
 # runtime state anywhere in the tree (not source) — nested .omc/.evor
-**/.omc/
+# `**/.omc/*` and not `**/.omc/`: git cannot re-include a path whose PARENT
+# DIRECTORY is excluded, so the directory-form pattern made the negations below
+# inert — the skill file was written, read back, and silently never added.
+# Excluding the CONTENTS instead leaves the directory itself includable.
+**/.omc/*
+# ...EXCEPT project-scoped skills. CLAUDE.md names `.omc/skills/**` as the
+# intentional committable exception: a skill that describes this corpus is
+# worth little if it cannot travel with it.
+!**/.omc/skills/
+!**/.omc/skills/**
 # ── P-02 / Q-01: the installed plugin must ship NO run state ────────────────
 #
 # The repo tracked `.evor/active-run.json` and a whole
