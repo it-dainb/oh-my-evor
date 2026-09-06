@@ -67,20 +67,44 @@
           {
             "tool": "evor_write_artifact",
             "arg": {
-              "$.payload.eda_summary.instrumentation_gaps[*]": "*"
+              "$.payload.eda_summary.instrumentation_gaps[*]": "?*"
             }
           },
           {
-            "tool": "evor_signal_emit",
-            "arg": {
-              "$.shapes[*]": [
-                "failure",
-                "limit"
-              ]
-            },
-            "count": {
-              "min": 1
-            }
+            "any_of": [
+              {
+                "tool": "evor_signal_emit",
+                "arg": {
+                  "$.shapes[*]": [
+                    "failure",
+                    "limit"
+                  ],
+                  "$.signature": "*node_id*|*telemetry*|*split*|*slug*|*uuid*|*identity*"
+                },
+                "not_arg": {
+                  "$.kind": "capability-gap"
+                },
+                "count": {
+                  "min": 1
+                }
+              },
+              {
+                "tool": "evor_signal_emit",
+                "arg": {
+                  "$.shapes[*]": [
+                    "failure",
+                    "limit"
+                  ],
+                  "$.evidence": "*node_id*|*telemetry*|*split*|*slug*|*uuid*|*identity*"
+                },
+                "not_arg": {
+                  "$.kind": "capability-gap"
+                },
+                "count": {
+                  "min": 1
+                }
+              }
+            ]
           }
         ]
       }

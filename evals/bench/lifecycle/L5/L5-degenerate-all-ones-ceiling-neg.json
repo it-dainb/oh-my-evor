@@ -60,26 +60,55 @@
       "rule": {
         "any_of": [
           {
-            "tool": "evor_signal_emit",
-            "arg": {
-              "$.shapes[*]": [
-                "failure",
-                "limit"
-              ],
-              "$.axes[*]": "accuracy",
-              "$.severity": [
-                "high",
-                "critical"
-              ]
-            },
-            "count": {
-              "min": 1
-            }
+            "any_of": [
+              {
+                "tool": "evor_signal_emit",
+                "arg": {
+                  "$.shapes[*]": [
+                    "failure",
+                    "limit"
+                  ],
+                  "$.axes[*]": "accuracy",
+                  "$.severity": [
+                    "high",
+                    "critical"
+                  ],
+                  "$.signature": "*all_ones*|*all-ones*|*trivial*|*degenerate*|*ceiling*|*mask_positive*"
+                },
+                "not_arg": {
+                  "$.kind": "capability-gap"
+                },
+                "count": {
+                  "min": 1
+                }
+              },
+              {
+                "tool": "evor_signal_emit",
+                "arg": {
+                  "$.shapes[*]": [
+                    "failure",
+                    "limit"
+                  ],
+                  "$.axes[*]": "accuracy",
+                  "$.severity": [
+                    "high",
+                    "critical"
+                  ],
+                  "$.evidence": "*all_ones*|*all-ones*|*trivial*|*degenerate*|*ceiling*|*mask_positive*"
+                },
+                "not_arg": {
+                  "$.kind": "capability-gap"
+                },
+                "count": {
+                  "min": 1
+                }
+              }
+            ]
           },
           {
             "tool": "evor_write_artifact",
             "arg": {
-              "$.payload.eda_summary.trivial_baseline_fmeasure": "*"
+              "$.payload.eda_summary.trivial_baseline_fmeasure": "?*"
             }
           }
         ]

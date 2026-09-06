@@ -253,6 +253,13 @@ export function buildSelectorTask() {
  * @returns {{events: object[], result: object, model: string, cost_usd: number, wall_ms: number}}
  */
 export function runLive({ prompt, model, effort, maxTurns, timeoutMs, env, mcpConfigPath, allowedTools, cwd, settingsPath, tolerateError = false }) {
+  // A PROMPT MAY NOT OPEN WITH A DASH. `-p` will not accept an option-looking
+  // token as its value, so the CLI exits 1 with `unknown option` and no output —
+  // indistinguishable, from the outside, from a model that said nothing. Name it
+  // here rather than let it arrive as an unreadable harness error.
+  if (/^-/.test(prompt)) {
+    throw new Error(`prompt starts with '-' (${JSON.stringify(prompt.slice(0, 40))}) — the CLI parses it as a flag; strip leading frontmatter or dashes before calling runLive`);
+  }
   const args = [
     '-p', prompt,
     '--model', model,
@@ -287,7 +294,13 @@ export function runLive({ prompt, model, effort, maxTurns, timeoutMs, env, mcpCo
   } catch (e) {
     raw = e.stdout ?? '';
     if (!raw) {
-      throw new Error(`live call failed and produced no output: ${e.message}`);
+      // NAME THE EXIT, NOT THE COMMAND. `e.message` for execFileSync opens with
+      // the entire argv, so a 40KB prompt buried the one fact that identifies
+      // the failure. L1 voided in six consecutive runs behind that prefix.
+      const st = e.status ?? e.code ?? '?';
+      const sig = e.signal ? ` signal=${e.signal}` : '';
+      const err = String(e.stderr ?? '').trim().slice(0, 400) || '(stderr empty)';
+      throw new Error(`live call failed and produced no output: exit=${st}${sig} stderr=${err}`);
     }
   }
   const wall_ms = Date.now() - t0;

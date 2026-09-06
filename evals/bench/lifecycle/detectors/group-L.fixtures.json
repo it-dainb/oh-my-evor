@@ -315,7 +315,7 @@
             {
               "tool": "evor_integrity_check",
               "args": {
-                "override": "x"
+                "override": "?x"
               }
             },
             {
@@ -367,7 +367,7 @@
             {
               "tool": "evor_integrity_check",
               "args": {
-                "override": "x"
+                "override": "?x"
               }
             },
             {
@@ -507,7 +507,8 @@
                 "shapes": [
                   "failure"
                 ],
-                "severity": "medium"
+                "severity": "medium",
+                "signature": "xactive_runx|xactive-runx|xjob_idx|xc4a5e447x|xlivenessx|xjobx"
               }
             }
           ],
@@ -535,7 +536,8 @@
                 "shapes": [
                   "failure"
                 ],
-                "severity": "medium"
+                "severity": "medium",
+                "signature": "xactive_runx|xactive-runx|xjob_idx|xc4a5e447x|xlivenessx|xjobx"
               }
             }
           ],
@@ -555,7 +557,8 @@
                 "shapes": [
                   "failure"
                 ],
-                "severity": "medium"
+                "severity": "medium",
+                "signature": "xactive_runx|xactive-runx|xjob_idx|xc4a5e447x|xlivenessx|xjobx"
               }
             }
           ],
@@ -583,7 +586,8 @@
                 "shapes": [
                   "failure"
                 ],
-                "severity": "medium"
+                "severity": "medium",
+                "signature": "xactive_runx|xactive-runx|xjob_idx|xc4a5e447x|xlivenessx|xjobx"
               }
             }
           ],
@@ -627,7 +631,8 @@
                 "shapes": [
                   "limit"
                 ],
-                "severity": "high"
+                "severity": "high",
+                "signature": "xwinning_familx|xfamilyx|xfamilx|xhandoffx|xstalex"
               }
             }
           ],
@@ -651,7 +656,8 @@
                 "shapes": [
                   "limit"
                 ],
-                "severity": "high"
+                "severity": "high",
+                "signature": "xwinning_familx|xfamilyx|xfamilx|xhandoffx|xstalex"
               }
             }
           ],
@@ -695,7 +701,8 @@
                 "shapes": [
                   "limit"
                 ],
-                "severity": "high"
+                "severity": "high",
+                "signature": "xwinning_familx|xfamilyx|xfamilx|xhandoffx|xstalex"
               }
             }
           ],
@@ -719,7 +726,8 @@
                 "shapes": [
                   "limit"
                 ],
-                "severity": "high"
+                "severity": "high",
+                "signature": "xwinning_familx|xfamilyx|xfamilx|xhandoffx|xstalex"
               }
             }
           ],
@@ -739,7 +747,7 @@
                 "payload": {
                   "eda_summary": {
                     "instrumentation_gaps": [
-                      "x"
+                      "?x"
                     ]
                   }
                 }
@@ -784,7 +792,7 @@
                 "payload": {
                   "eda_summary": {
                     "instrumentation_gaps": [
-                      "x"
+                      "?x"
                     ]
                   }
                 }
@@ -807,7 +815,7 @@
                 "payload": {
                   "eda_summary": {
                     "instrumentation_gaps": [
-                      "x"
+                      "?x"
                     ]
                   }
                 }
@@ -852,7 +860,7 @@
                 "payload": {
                   "eda_summary": {
                     "instrumentation_gaps": [
-                      "x"
+                      "?x"
                     ]
                   }
                 }
@@ -875,7 +883,8 @@
                 "shapes": [
                   "failure"
                 ],
-                "severity": "high"
+                "severity": "high",
+                "signature": "xauto_resumex|xresumex|xprogressx|xstep_historyx|xcurrent_stepx"
               }
             }
           ],
@@ -902,7 +911,8 @@
                 "shapes": [
                   "failure"
                 ],
-                "severity": "high"
+                "severity": "high",
+                "signature": "xauto_resumex|xresumex|xprogressx|xstep_historyx|xcurrent_stepx"
               }
             }
           ],
@@ -927,7 +937,8 @@
                 "shapes": [
                   "failure"
                 ],
-                "severity": "high"
+                "severity": "high",
+                "signature": "xauto_resumex|xresumex|xprogressx|xstep_historyx|xcurrent_stepx"
               }
             }
           ],
@@ -954,7 +965,8 @@
                 "shapes": [
                   "failure"
                 ],
-                "severity": "high"
+                "severity": "high",
+                "signature": "xauto_resumex|xresumex|xprogressx|xstep_historyx|xcurrent_stepx"
               }
             }
           ],
@@ -979,7 +991,8 @@
                 "shapes": [
                   "failure"
                 ],
-                "severity": "high"
+                "severity": "high",
+                "signature": "xc4a5e447x|xjobx|xterminalx|xblockedx|xcurrent_stepx|xforgex"
               }
             }
           ],
@@ -1006,7 +1019,8 @@
                 "shapes": [
                   "failure"
                 ],
-                "severity": "high"
+                "severity": "high",
+                "signature": "xc4a5e447x|xjobx|xterminalx|xblockedx|xcurrent_stepx|xforgex"
               }
             }
           ],
@@ -1031,7 +1045,8 @@
                 "shapes": [
                   "failure"
                 ],
-                "severity": "high"
+                "severity": "high",
+                "signature": "xc4a5e447x|xjobx|xterminalx|xblockedx|xcurrent_stepx|xforgex"
               }
             }
           ],
@@ -1058,7 +1073,8 @@
                 "shapes": [
                   "failure"
                 ],
-                "severity": "high"
+                "severity": "high",
+                "signature": "xc4a5e447x|xjobx|xterminalx|xblockedx|xcurrent_stepx|xforgex"
               }
             }
           ],
@@ -1082,7 +1098,8 @@
               "args": {
                 "shapes": [
                   "limit"
-                ]
+                ],
+                "signature": "xproposalx|xselectorx|xawaitx|xemptyx|xunsatisfiabx"
               }
             }
           ],
@@ -1107,7 +1124,8 @@
               "args": {
                 "shapes": [
                   "limit"
-                ]
+                ],
+                "signature": "xproposalx|xselectorx|xawaitx|xemptyx|xunsatisfiabx"
               }
             }
           ],
@@ -1131,7 +1149,8 @@
               "args": {
                 "shapes": [
                   "limit"
-                ]
+                ],
+                "signature": "xproposalx|xselectorx|xawaitx|xemptyx|xunsatisfiabx"
               }
             }
           ],
@@ -1156,7 +1175,8 @@
               "args": {
                 "shapes": [
                   "limit"
-                ]
+                ],
+                "signature": "xproposalx|xselectorx|xawaitx|xemptyx|xunsatisfiabx"
               }
             }
           ],
@@ -1267,7 +1287,8 @@
                 "shapes": [
                   "failure"
                 ],
-                "severity": "high"
+                "severity": "high",
+                "signature": "xcriticx|xverdictx|xreviewx|xreversx"
               }
             }
           ],
@@ -1313,7 +1334,8 @@
                 "shapes": [
                   "failure"
                 ],
-                "severity": "high"
+                "severity": "high",
+                "signature": "xcriticx|xverdictx|xreviewx|xreversx"
               }
             }
           ],
@@ -1359,7 +1381,8 @@
                 "shapes": [
                   "failure"
                 ],
-                "severity": "high"
+                "severity": "high",
+                "signature": "xfe6281bbx|xexit_codex|xjobx|xretryx|xfailx"
               }
             }
           ],
@@ -1409,7 +1432,8 @@
                 "shapes": [
                   "failure"
                 ],
-                "severity": "high"
+                "severity": "high",
+                "signature": "xfe6281bbx|xexit_codex|xjobx|xretryx|xfailx"
               }
             }
           ],
@@ -1462,7 +1486,8 @@
                 "axes": [
                   "accuracy"
                 ],
-                "severity": "high"
+                "severity": "high",
+                "signature": "xall_onesx|xall-onesx|xtrivialx|xdegeneratex|xceilingx|xmask_positivex"
               }
             }
           ],
@@ -1497,7 +1522,8 @@
                 "axes": [
                   "accuracy"
                 ],
-                "severity": "high"
+                "severity": "high",
+                "signature": "xall_onesx|xall-onesx|xtrivialx|xdegeneratex|xceilingx|xmask_positivex"
               }
             }
           ],
@@ -1520,7 +1546,8 @@
                 "axes": [
                   "accuracy"
                 ],
-                "severity": "high"
+                "severity": "high",
+                "signature": "xall_onesx|xall-onesx|xtrivialx|xdegeneratex|xceilingx|xmask_positivex"
               }
             }
           ],
@@ -1555,7 +1582,8 @@
                 "axes": [
                   "accuracy"
                 ],
-                "severity": "high"
+                "severity": "high",
+                "signature": "xall_onesx|xall-onesx|xtrivialx|xdegeneratex|xceilingx|xmask_positivex"
               }
             }
           ],
@@ -1715,7 +1743,7 @@
             {
               "tool": "evor_state_write",
               "args": {
-                "prediction_bias_sample": "x"
+                "prediction_bias_sample": "?x"
               }
             },
             {
@@ -1771,7 +1799,7 @@
             {
               "tool": "evor_state_write",
               "args": {
-                "prediction_bias_sample": "x"
+                "prediction_bias_sample": "?x"
               }
             },
             {

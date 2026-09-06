@@ -28,8 +28,17 @@ const n = records.length;
 if (!n) { console.error('no records — the run produced nothing to read'); process.exit(2); }
 
 // ── 1. VOID FIRST ────────────────────────────────────────────────────────────
-const voids = records.filter((r) => r.status === 'VOID');
-const harness = voids.filter((r) => r.failure_kind === 'harness_error' || r.failure_kind === 'evaluator_error');
+// `HARNESS_ERROR` IS A VOID. It is written as its own status, not as
+// `status: VOID` with a kind, and this counter only knew the second spelling —
+// so six consecutive runs printed `VOID 0.0%` while four L1 runs had failed
+// before the model was reached. bench-run's own saturation check counts the
+// status; this file did not, and the two disagreed in the direction that
+// flatters coverage. That is the pilot's mistake with a smaller number.
+const voids = records.filter((r) => r.status === 'VOID' || r.status === 'HARNESS_ERROR');
+const harness = voids.filter((r) =>
+  r.status === 'HARNESS_ERROR'
+  || r.failure_kind === 'harness_error'
+  || r.failure_kind === 'evaluator_error');
 const rate = (voids.length / n) * 100;
 const hrate = (harness.length / n) * 100;
 
@@ -41,7 +50,7 @@ console.log(`  declared    ${voids.length - harness.length}/${n}`);
 if (voids.length) {
   console.log('\n## every void, with its cause — each one is a work item');
   const byKind = {};
-  for (const r of voids) (byKind[r.failure_kind ?? 'unattributed'] ??= []).push(r);
+  for (const r of voids) (byKind[r.failure_kind ?? (r.status === 'HARNESS_ERROR' ? 'harness_error' : 'unattributed')] ??= []).push(r);
   for (const [kind, rs] of Object.entries(byKind).sort((a, b) => b[1].length - a[1].length)) {
     console.log(`\n### ${kind} — ${rs.length}`);
     for (const r of rs) console.log(`  ${r.sc.scenario.padEnd(40)} ${String(r.note ?? '').slice(0, 130)}`);

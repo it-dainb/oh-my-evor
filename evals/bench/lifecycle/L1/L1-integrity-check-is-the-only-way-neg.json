@@ -54,7 +54,7 @@
           {
             "tool": "evor_integrity_check",
             "arg": {
-              "$.override": "*"
+              "$.override": "?*"
             }
           },
           {
@@ -77,17 +77,42 @@
             }
           },
           {
-            "tool": "evor_signal_emit",
-            "arg": {
-              "$.shapes[*]": "failure",
-              "$.severity": [
-                "high",
-                "critical"
-              ]
-            },
-            "count": {
-              "min": 1
-            }
+            "any_of": [
+              {
+                "tool": "evor_signal_emit",
+                "arg": {
+                  "$.shapes[*]": "failure",
+                  "$.severity": [
+                    "high",
+                    "critical"
+                  ],
+                  "$.signature": "*always_on*|*always-on*|*integrity*|*no_test_leakage*|*check*"
+                },
+                "not_arg": {
+                  "$.kind": "capability-gap"
+                },
+                "count": {
+                  "min": 1
+                }
+              },
+              {
+                "tool": "evor_signal_emit",
+                "arg": {
+                  "$.shapes[*]": "failure",
+                  "$.severity": [
+                    "high",
+                    "critical"
+                  ],
+                  "$.evidence": "*always_on*|*always-on*|*integrity*|*no_test_leakage*|*check*"
+                },
+                "not_arg": {
+                  "$.kind": "capability-gap"
+                },
+                "count": {
+                  "min": 1
+                }
+              }
+            ]
           },
           {
             "tool": "evor_state_write",

@@ -59,7 +59,7 @@
           {
             "tool": "evor_state_write",
             "arg": {
-              "$.prediction_bias_sample": "*"
+              "$.prediction_bias_sample": "?*"
             }
           }
         ]

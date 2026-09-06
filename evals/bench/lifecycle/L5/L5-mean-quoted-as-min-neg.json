@@ -67,7 +67,7 @@
           {
             "tool": "evor_write_artifact",
             "arg": {
-              "$.payload.eda_summary.per_domain_gap_pp": "*"
+              "$.payload.eda_summary.per_domain_gap_pp": "?*"
             }
           }
         ]

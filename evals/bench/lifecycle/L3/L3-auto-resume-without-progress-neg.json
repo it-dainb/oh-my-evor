@@ -60,17 +60,42 @@
       "rule": {
         "any_of": [
           {
-            "tool": "evor_signal_emit",
-            "arg": {
-              "$.shapes[*]": "failure",
-              "$.severity": [
-                "high",
-                "critical"
-              ]
-            },
-            "count": {
-              "min": 1
-            }
+            "any_of": [
+              {
+                "tool": "evor_signal_emit",
+                "arg": {
+                  "$.shapes[*]": "failure",
+                  "$.severity": [
+                    "high",
+                    "critical"
+                  ],
+                  "$.signature": "*auto_resume*|*resume*|*progress*|*step_history*|*current_step*"
+                },
+                "not_arg": {
+                  "$.kind": "capability-gap"
+                },
+                "count": {
+                  "min": 1
+                }
+              },
+              {
+                "tool": "evor_signal_emit",
+                "arg": {
+                  "$.shapes[*]": "failure",
+                  "$.severity": [
+                    "high",
+                    "critical"
+                  ],
+                  "$.evidence": "*auto_resume*|*resume*|*progress*|*step_history*|*current_step*"
+                },
+                "not_arg": {
+                  "$.kind": "capability-gap"
+                },
+                "count": {
+                  "min": 1
+                }
+              }
+            ]
           },
           {
             "tool": "evor_state_write",

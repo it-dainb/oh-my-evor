@@ -511,6 +511,17 @@ function writeSandboxSettings(sc, work, pluginRoot) {
  * Read from the sandbox copy, not the repo, so a scenario's `plugin_fixture`
  * still governs what the role sees.
  */
+function stripFrontmatter(text) {
+  // A SKILL BODY IS NOT ITS FRONTMATTER. `---\nname: ...\n---` is loader
+  // metadata; production never puts it in front of the model. Worse, a prompt
+  // that OPENS with `---` is rejected by the CLI outright — commander refuses to
+  // take an option-looking token as the value of `-p` — so every L1 scenario
+  // died before the model was reached, in six consecutive runs, behind an error
+  // message whose first 300 characters were the prompt.
+  const m = /^---\r?\n[\s\S]*?\r?\n---\r?\n?/.exec(text);
+  return m ? text.slice(m[0].length).replace(/^\s+/, '') : text;
+}
+
 function declaredSkills(agentText, pluginRoot) {
   const m = /^skills:\s*\[([^\]]*)\]/m.exec(agentText.slice(0, 4000));
   if (!m) return [];
@@ -519,7 +530,7 @@ function declaredSkills(agentText, pluginRoot) {
     const name = raw.trim().replace(/^oh-my-evor:/, '');
     if (!name) continue;
     const p = join(pluginRoot, 'skills', name, 'SKILL.md');
-    if (existsSync(p)) out.push({ name, body: readFileSync(p, 'utf8') });
+    if (existsSync(p)) out.push({ name, body: stripFrontmatter(readFileSync(p, 'utf8')) });
   }
   return out;
 }
@@ -678,6 +689,22 @@ function runPostconditions(sc, projectRoot) {
   return out;
 }
 
+/**
+ * THE TURN CEILING IS A PROPERTY OF THE TASK, NOT OF THE CLI INVOCATION.
+ *
+ * `--max-turns` was a flat 20 for every role. `evor-orchestrator` runs the whole
+ * nine-step loop with sub-agent fan-out; four of the six L1 runs hit the ceiling
+ * at turns 20-23 and voided `budget_exceeded`. A void is not a failure, so L1
+ * would have stayed unmeasured behind a different word than the one that hid it
+ * for the previous six runs.
+ *
+ * Scenario `max_turns` wins; otherwise the role's default; otherwise the flag.
+ */
+const ROLE_TURN_CEILING = { 'evor-orchestrator': 40 };
+function turnCeiling(sc) {
+  return Number(sc.max_turns ?? ROLE_TURN_CEILING[sc.role] ?? arg('max-turns', 20));
+}
+
 function runScenario(path, { repeats, outDir }) {
   const sc = JSON.parse(readFileSync(path, 'utf8'));
   const fixture = sc.setup?.cwd_fixture ? resolve(REPO, sc.setup.cwd_fixture) : null;
@@ -693,12 +720,12 @@ function runScenario(path, { repeats, outDir }) {
   const agentText = readFileSync(resolve(REPO, sc.agent_file), 'utf8');
   const agentPromptBlock = agentText.includes('<Agent_Prompt>')
     ? extractAgentPromptBlock(agentText)
-    : agentText;
+    : stripFrontmatter(agentText);
   // Once per scenario, not per repeat: the harness's footprint is a property of
   // the fixture. Skipped only when no detector asks about it.
   const needsControl = JSON.stringify(sc).includes('control_arm_moved');
   const controlArm = needsControl
-    ? measureControlArm(sc, { fixture, maxTurns: Number(arg('max-turns', 20)), agentPromptBlock })
+    ? measureControlArm(sc, { fixture, maxTurns: turnCeiling(sc), agentPromptBlock })
     : undefined;
   if (needsControl) console.log(`  control arm: watched files ${controlArm ? 'MOVED — the harness writes here' : 'unchanged'}`);
   const records = [];
@@ -820,7 +847,7 @@ function runScenario(path, { repeats, outDir }) {
         ].join('\n\n'),
         model: arm.model,
         effort: arm.effort,
-        maxTurns: Number(arg('max-turns', 20)),
+        maxTurns: turnCeiling(sc),
         timeoutMs: 900_000,
         // THE SANDBOX IS THE WORKING DIRECTORY, not just an env var. Setting
         // CLAUDE_PROJECT_DIR and leaving the process in the repo root gave the
@@ -925,7 +952,7 @@ function runScenario(path, { repeats, outDir }) {
       const turnsAtCeiling =
         live.result?.subtype === 'error_max_turns' ||
         live.result?.terminal_reason === 'max_turns' ||
-        (live.result?.num_turns ?? 0) >= Number(arg('max-turns', 20));
+        (live.result?.num_turns ?? 0) >= turnCeiling(sc);
 
       // ONE ENGINE, ONE CONTEXT (ci/bench-detect.mjs). The inline logic that
       // stood here implemented 3 of 8 detector kinds and returned `false` for

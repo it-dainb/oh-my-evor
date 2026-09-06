@@ -384,6 +384,18 @@ const PAIRS = [
       t.tickState = { tick: 1, current_step: 7, step_status: 'running', integrity_verdict: null, auto_resume_count: 2, step_history: [1, 2, 3, 4, 5, 6, 7], updated_at: '2026-08-24T00:14:02Z' };
       t.forgeReport = null;
       t.evaluation = { node_id: NODE_UUID, verdict: 'pending', verdict_source: 'computed', checks: {} };
+      // THE NEGATIVE HALF WAS NOT NEGATIVE. The shared base node is `done` /
+      // `passed`, which every other pair wants — but this pair's premise, in BOTH
+      // halves, is that the job has not produced: failed-without-producing on the
+      // positive side, still-running on the negative. A node marked finished and
+      // integrity-passed for a job that is still running is a real contradiction
+      // sitting in the half whose whole claim is that there is nothing to report.
+      // Agents found it every time (`premature-node-record-afb204f4`,
+      // `tick1-node-afb204f4-marked-done-before-job-finished`) and were scored FP
+      // for being right — 6/6, the corpus's only never-once-correct matrix cell.
+      // Set in `base` so both halves move together and no new delta is created.
+      t.tree.nodes[NODE_UUID].status = 'running';
+      t.tree.nodes[NODE_UUID].integrity_status = 'pending';
     },
     pos: (t) => {
       t.jobs[0].state = 'failed'; t.jobs[0].exit_code = 1;

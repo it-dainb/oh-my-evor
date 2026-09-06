@@ -107,10 +107,17 @@ function predHolds(trace, pred) {
   return n >= min && n <= max;
 }
 
+// A BRANCH MAY ITSELF BE A RULE. This evaluator is deliberately a second,
+// independent implementation of §4.2, so it has to learn the nested shape on its
+// own terms rather than inherit it — the subject-scoped declarations are
+// `{any_of: [by-signature, by-evidence]}` sitting inside the rule's own `any_of`.
+const isRuleNode = (p) => Boolean(p.all_of || p.any_of || p.none_of);
+
 function traceRule(trace, rule) {
-  if (rule.all_of) return rule.all_of.every((p) => predHolds(trace, p));
-  if (rule.any_of) return rule.any_of.some((p) => predHolds(trace, p));
-  if (rule.none_of) return rule.none_of.every((p) => predCount(trace, p) === 0);
+  const holds = (p) => (isRuleNode(p) ? traceRule(trace, p) : predHolds(trace, p));
+  if (rule.all_of) return rule.all_of.every(holds);
+  if (rule.any_of) return rule.any_of.some(holds);
+  if (rule.none_of) return rule.none_of.every((p) => (isRuleNode(p) ? !traceRule(trace, p) : predCount(trace, p) === 0));
   throw new Error('trace rule needs all_of | any_of | none_of');
 }
 
@@ -124,9 +131,10 @@ function answerPred(ans, p) {
 }
 
 function answerRule(ans, rule) {
-  if (rule.all_of) return rule.all_of.every((p) => answerPred(ans, p));
-  if (rule.any_of) return rule.any_of.some((p) => answerPred(ans, p));
-  if (rule.none_of) return rule.none_of.every((p) => !answerPred(ans, p));
+  const holds = (p) => (isRuleNode(p) ? answerRule(ans, p) : answerPred(ans, p));
+  if (rule.all_of) return rule.all_of.every(holds);
+  if (rule.any_of) return rule.any_of.some(holds);
+  if (rule.none_of) return rule.none_of.every((p) => !holds(p));
   throw new Error('answer rule needs all_of | any_of | none_of');
 }
 
@@ -190,6 +198,13 @@ function traceSatisfying(rule) {
   const preds = rule.all_of ?? rule.any_of;
   const out = [];
   for (const p of (rule.all_of ? preds : [preds[0]])) {
+    // A BRANCH MAY ITSELF BE A RULE. The subject-scoped declarations are
+    // `{any_of: [signature-form, evidence-form]}` nested inside the rule's own
+    // `any_of`, and this loop handed that node straight to `callFor`, which read
+    // no `tool` and no `arg` and emitted `{tool: undefined, args: {}}`. The
+    // §4.5 floors then ran against a synthetic agent that did nothing, and the
+    // fixture file recorded that as the scenario's own ideal run.
+    if (p.any_of || p.all_of || p.none_of) { out.push(...traceSatisfying(p)); continue; }
     if ((p.count?.max ?? Infinity) === 0) continue;   // "must not appear"
     if (p.after) out.push({ tool: p.after, args: {} });
     for (let i = 0; i < (p.count?.min ?? 1); i++) out.push(callFor(p));

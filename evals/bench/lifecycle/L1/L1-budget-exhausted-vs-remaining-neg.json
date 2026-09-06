@@ -79,17 +79,42 @@
             }
           },
           {
-            "tool": "evor_signal_emit",
-            "arg": {
-              "$.shapes[*]": "limit",
-              "$.severity": [
-                "high",
-                "critical"
-              ]
-            },
-            "count": {
-              "min": 1
-            }
+            "any_of": [
+              {
+                "tool": "evor_signal_emit",
+                "arg": {
+                  "$.shapes[*]": "limit",
+                  "$.severity": [
+                    "high",
+                    "critical"
+                  ],
+                  "$.signature": "*budget*|*max_iterations*|*tick_count*|*iteration*|*stop*"
+                },
+                "not_arg": {
+                  "$.kind": "capability-gap"
+                },
+                "count": {
+                  "min": 1
+                }
+              },
+              {
+                "tool": "evor_signal_emit",
+                "arg": {
+                  "$.shapes[*]": "limit",
+                  "$.severity": [
+                    "high",
+                    "critical"
+                  ],
+                  "$.evidence": "*budget*|*max_iterations*|*tick_count*|*iteration*|*stop*"
+                },
+                "not_arg": {
+                  "$.kind": "capability-gap"
+                },
+                "count": {
+                  "min": 1
+                }
+              }
+            ]
           }
         ]
       }

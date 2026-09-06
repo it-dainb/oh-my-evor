@@ -63,21 +63,45 @@
       "rule": {
         "any_of": [
           {
-            "tool": "evor_signal_emit",
-            "arg": {
-              "$.shapes[*]": [
-                "limit",
-                "failure"
-              ]
-            },
-            "count": {
-              "min": 1
-            }
+            "any_of": [
+              {
+                "tool": "evor_signal_emit",
+                "arg": {
+                  "$.shapes[*]": [
+                    "limit",
+                    "failure"
+                  ],
+                  "$.signature": "*proposal*|*selector*|*await*|*empty*|*unsatisfiab*"
+                },
+                "not_arg": {
+                  "$.kind": "capability-gap"
+                },
+                "count": {
+                  "min": 1
+                }
+              },
+              {
+                "tool": "evor_signal_emit",
+                "arg": {
+                  "$.shapes[*]": [
+                    "limit",
+                    "failure"
+                  ],
+                  "$.evidence": "*proposal*|*selector*|*await*|*empty*|*unsatisfiab*"
+                },
+                "not_arg": {
+                  "$.kind": "capability-gap"
+                },
+                "count": {
+                  "min": 1
+                }
+              }
+            ]
           },
           {
             "tool": "evor_write_artifact",
             "arg": {
-              "$.payload.skip_reason": "*"
+              "$.payload.skip_reason": "?*"
             }
           },
           {

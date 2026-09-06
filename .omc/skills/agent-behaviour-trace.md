@@ -95,6 +95,18 @@ A fix can move the number without fixing anything. All of these occurred:
 - **Rot** — absolute timestamps age, premises describe bugs that got fixed,
   fingerprints describe files that moved. `--check` stays green because the bytes
   never changed, only their meaning.
+- **Degenerate floor probe** — a §4.5 floor that *derives* its synthetic run from
+  the rule under test will happily pass when the derivation breaks: a rule shape
+  the builder cannot read yields an empty run, and "the scenario's own signal
+  scores its declared class" is then a statement about nothing. Read the recorded
+  probe, not just the verdict.
+- **Predicate that matches its own absence** — `'*'` glob-matches the string
+  `"null"`, so a field the agent explicitly reported as uncomputable satisfies a
+  channel meaning "the agent reported this quantity". Use the not-null matcher.
+- **Declaration scoped by shape, not subject** — if the rule constrains only
+  severity/category, the negative half measures *silence*, not restraint. Test
+  it: cross-tab FP against "did the agent emit anything at all". If the silent
+  runs are never FP, the half is not measuring what it claims.
 
 ## What you must not do
 
@@ -110,6 +122,10 @@ A fix can move the number without fixing anything. All of these occurred:
   finding disappears.
 - **Never edit a product or agent file while a scored run is in flight.**
   Guarded-path shas are checked per scenario; the run dies mid-way.
+- **Never teach only one evaluator a new rule shape.** Where a corpus ships a
+  second, independent implementation on purpose, a shape added to one and not the
+  other turns a real disagreement into a passing gate on one side and noise on
+  the other.
 
 ## Verification, every time
 

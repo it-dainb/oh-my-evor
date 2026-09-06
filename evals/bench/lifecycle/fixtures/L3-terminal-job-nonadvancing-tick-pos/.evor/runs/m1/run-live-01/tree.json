@@ -16,8 +16,8 @@
       },
       "eval_version": "v1",
       "fitness_value": 0,
-      "status": "done",
-      "integrity_status": "passed",
+      "status": "running",
+      "integrity_status": "pending",
       "depth": 1
     }
   }

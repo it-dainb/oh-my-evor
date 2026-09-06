@@ -56,21 +56,50 @@
       "rule": {
         "any_of": [
           {
-            "tool": "evor_signal_emit",
-            "arg": {
-              "$.shapes[*]": [
-                "failure",
-                "limit"
-              ],
-              "$.severity": [
-                "medium",
-                "high",
-                "critical"
-              ]
-            },
-            "count": {
-              "min": 1
-            }
+            "any_of": [
+              {
+                "tool": "evor_signal_emit",
+                "arg": {
+                  "$.shapes[*]": [
+                    "failure",
+                    "limit"
+                  ],
+                  "$.severity": [
+                    "medium",
+                    "high",
+                    "critical"
+                  ],
+                  "$.signature": "*active_run*|*active-run*|*job_id*|*c4a5e447*|*liveness*|*job*"
+                },
+                "not_arg": {
+                  "$.kind": "capability-gap"
+                },
+                "count": {
+                  "min": 1
+                }
+              },
+              {
+                "tool": "evor_signal_emit",
+                "arg": {
+                  "$.shapes[*]": [
+                    "failure",
+                    "limit"
+                  ],
+                  "$.severity": [
+                    "medium",
+                    "high",
+                    "critical"
+                  ],
+                  "$.evidence": "*active_run*|*active-run*|*job_id*|*c4a5e447*|*liveness*|*job*"
+                },
+                "not_arg": {
+                  "$.kind": "capability-gap"
+                },
+                "count": {
+                  "min": 1
+                }
+              }
+            ]
           },
           {
             "tool": "evor_state_write",
