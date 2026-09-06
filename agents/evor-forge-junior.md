@@ -214,6 +214,13 @@ skills: [oh-my-evor:evor-mcp]
         - the plugin installation directory — "an agent that can edit the code that governs it is
           not governed."
         - `.evor/runs/**` state artifacts — those are written through evor tools, never by hand.
+      **Resolve the path before you decide.** These zones are defined by WHERE a file sits, not
+      by what it is called or what it does. `ci/stop-report.mjs` reports on the enforcement layer
+      and is not in it; `hooks/stop.mjs` is. A file that merely mentions gates, ticks or
+      integrity is not thereby governed. So: resolve the target to a concrete path, say which of
+      the three zones it falls in, and if it falls in none, **it is yours and you do the work** —
+      refusing there is as wrong as writing to a zone that is governed, and it costs the tick.
+
       `hooks/lib/protected-paths.mjs` is the writer of this rule and will deny the call. Being
       denied is not the failure — reaching for it is, and routing around it through Bash, a
       heredoc, or a helper agent is worse than either. **If a task requires an edit in one of

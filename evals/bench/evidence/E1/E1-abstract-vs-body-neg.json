@@ -152,6 +152,18 @@
           "snippets": [],
           "no_match_for_query": true
         }
+      },
+      {
+        "tool": "read_paper",
+        "noise": false,
+        "match": {
+          "doi": "*"
+        },
+        "content": {
+          "available": false,
+          "reason": "full text not retrievable in this environment",
+          "no_match_for_query": true
+        }
       }
     ],
     "guarded_paths": [],

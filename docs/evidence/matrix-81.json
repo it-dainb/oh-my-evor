@@ -3294,7 +3294,13 @@
      "status": "correct",
      "cli_cost_usd": 0.3764
     }
-   ]
+   ],
+   "stale": {
+    "since": "2026-09-06",
+    "agent_sha256_now": "ee3334a4c0c90340",
+    "reason": "The agent file changed after the 8.1 run: this role gained a capability-gap disclosure channel, closed-set kind vocabulary and severity-by-consequence guidance during the evor-eval-bench loop. The tier comparison in \u00a73 was measured against the PREVIOUS text and no longer describes what ships. The numbers are not wrong about what they measured; they are no longer about this agent.",
+    "action": "re-measure this role before citing its \u00a73 row"
+   }
   },
   {
    "role": "evor-probe",
@@ -3965,7 +3971,13 @@
      "status": "correct",
      "cli_cost_usd": 0.4847
     }
-   ]
+   ],
+   "stale": {
+    "since": "2026-09-06",
+    "agent_sha256_now": "46d3063c5277c49e",
+    "reason": "The agent file changed after the 8.1 run: this role gained a capability-gap disclosure channel, closed-set kind vocabulary and severity-by-consequence guidance during the evor-eval-bench loop. The tier comparison in \u00a73 was measured against the PREVIOUS text and no longer describes what ships. The numbers are not wrong about what they measured; they are no longer about this agent.",
+    "action": "re-measure this role before citing its \u00a73 row"
+   }
   },
   {
    "role": "evor-sage-junior",
@@ -5678,7 +5690,13 @@
      "status": "incorrect",
      "cli_cost_usd": 0.0157
     }
-   ]
+   ],
+   "stale": {
+    "since": "2026-09-06",
+    "agent_sha256_now": "b1841bc70fa80f19",
+    "reason": "The agent file changed after the 8.1 run: this role gained a capability-gap disclosure channel, closed-set kind vocabulary and severity-by-consequence guidance during the evor-eval-bench loop. The tier comparison in \u00a73 was measured against the PREVIOUS text and no longer describes what ships. The numbers are not wrong about what they measured; they are no longer about this agent.",
+    "action": "re-measure this role before citing its \u00a73 row"
+   }
   }
  ]
 }

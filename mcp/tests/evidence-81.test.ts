@@ -31,10 +31,28 @@ describe("8.1 evidence — the digest describes the roles that ship", () => {
   it.each(digest.runs.map((r: any) => [r.role, r]))("%s", (_role, run: any) => {
     const agentPath = resolve(REPO_ROOT, run.fingerprint.agent_file);
     expect(existsSync(agentPath), `${run.fingerprint.agent_file} is gone`).toBe(true);
+
+    // A row may be marked STALE instead of matching, and the message above has
+    // always offered that — but nothing implemented it, so the only way to make
+    // this test green after editing an agent was to overwrite the fingerprint,
+    // which silently re-points a published measurement at text it never ran
+    // against. A stale row must say what changed and what it costs, and §3 must
+    // carry the withdrawal where a reader will see it (asserted below).
+    if (run.stale) {
+      expect(run.stale.reason, `${run.role}: a stale row needs a reason`).toBeTruthy();
+      expect(run.stale.since, `${run.role}: a stale row needs a date`).toBeTruthy();
+      expect(
+        run.stale.agent_sha256_now,
+        `${run.role}: record the sha the row went stale AT, or the next edit hides inside this one`,
+      ).toBe(sha(readFileSync(agentPath, "utf8")));
+      return;
+    }
+
     expect(
       sha(readFileSync(agentPath, "utf8")),
       `${run.fingerprint.agent_file} has changed since the 8.1 run. §3's numbers no ` +
-        `longer describe the shipped agent — re-measure that role or mark its row stale.`,
+        `longer describe the shipped agent — re-measure that role or mark its row stale ` +
+        `({ stale: { since, reason, agent_sha256_now } }).`,
     ).toBe(run.fingerprint.agent_sha256);
 
     const specPath = resolve(REPO_ROOT, `evals/${run.role.replace(/^evor-/, "")}/spec.json`);
@@ -43,6 +61,24 @@ describe("8.1 evidence — the digest describes the roles that ship", () => {
       `${specPath} has changed since the 8.1 run — the cases behind §3's numbers are ` +
         `not the cases in the tree.`,
     ).toBe(run.fingerprint.spec_sha256);
+  });
+});
+
+describe("8.1 evidence — a stale row is withdrawn where it is read", () => {
+  it("every stale role is named in the doc that cites it", () => {
+    // Marking a row stale in the JSON and leaving §3's table untouched moves the
+    // problem rather than fixing it: the numbers are cited from the prose, not
+    // from the digest. A reader who never opens matrix-81.json must still be
+    // told the row no longer describes the shipped agent.
+    const doc = readFileSync(DOC, "utf8");
+    const missing = digest.runs
+      .filter((r: any) => r.stale)
+      .map((r: any) => r.role)
+      .filter((role: string) => !new RegExp(`${role}[^\\n]*\\bstale\\b|\\bstale\\b[^\\n]*${role}`, "i").test(doc));
+    expect(
+      missing,
+      `stale in the digest but not withdrawn in ${DOC}:\n${missing.join("\n")}`,
+    ).toEqual([]);
   });
 });
 

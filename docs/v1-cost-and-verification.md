@@ -23,17 +23,37 @@ of the thing it names.
 | agent | main | release | status |
 |---|---|---|---|
 | evor-sage | opus | **haiku** | ships — **margin NOT SHOWN at 8.1**, and 92.3% is below the 95% floor |
-| evor-mutagen | opus | **haiku** | ships — margin **NOT SHOWN** at 8.1 (upper bound sits exactly on +10.0pp) |
-| evor-probe | opus | **haiku** | ships |
+| evor-mutagen | opus | **haiku** | ships — margin **NOT SHOWN** at 8.1 (upper bound sits exactly on +10.0pp) — **row STALE, see below** |
+| evor-probe | opus | **haiku** | ships — **row STALE, see below** |
 | evor-acquirer | sonnet | **haiku** | ships |
 | evor-selector | opus | **haiku** | ships — **not** re-measured at 8.1 (legacy cases.json path) |
 | evor-forge-junior | sonnet | sonnet **`effort: low`** | ships — **not** re-measured at 8.1 (legacy cases.json path) |
-| evor-tick | — (new) | sonnet | ships; benchmarked at 8.1 — sonnet 80.0% vs haiku 20.0% |
+| evor-tick | — (new) | sonnet | ships; benchmarked at 8.1 — sonnet 80.0% vs haiku 20.0% — **row STALE, see below** |
 | evor-forge-critic | opus | opus | reverted — arms unpaired |
 | evor-forge-analyst | opus | opus | reverted — 93.5% |
 | evor-sage-junior | sonnet | sonnet | reverted on figures 8.1 does not reproduce (78.2% / 83.6%) |
 | evor-forge-architect | opus | opus | reverted on a regression that **does not reproduce** at 8.1 (CI [+0.0, +0.0]) |
 | evor-forge | opus | opus | reverted — 3-tick A/B only |
+
+### Three rows are STALE as of 2026-09-06 — do not cite them
+
+`evor-mutagen`, `evor-probe` and `evor-tick` have all changed since the 8.1 run.
+During the evor-eval-bench loop each gained a `capability-gap` disclosure
+channel, a closed-set `kind` vocabulary and severity-by-consequence guidance;
+probe additionally gained explicit "a file write is not a filed artifact / an
+appended line is not an emitted signal" rules, and tick gained the no-borrowed-
+artifact-slot and job-accounting sections.
+
+**The numbers above are not wrong about what they measured. They are no longer
+about these agents.** A tier comparison is a claim about a specific text, and
+that text moved. `docs/evidence/matrix-81.json` carries the sha each row went
+stale at, so the next edit cannot hide inside this one, and
+`mcp/tests/evidence-81.test.ts` fails if a stale row is not withdrawn here.
+
+Re-measure before citing. The alternative — refreshing the fingerprints so the
+gate goes green — would re-point a published measurement at text it never ran
+against, which is the precise failure this gate exists to catch.
+
 
 **The reverts are frontmatter-only.** Every prompt-body fix ships on all twelve,
 including the five reverted roles: those fixes were verified on *both* arms and

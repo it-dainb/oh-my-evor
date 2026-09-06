@@ -191,8 +191,16 @@ try {
 try {
   const tool = input?.tool_name ?? '';
   const ti = input?.tool_input ?? {};
-  const agentType = (input?.agent_type ?? '').replace(/^oh-my-evor:/, '');
-  const isMain = !agentType; // no agent_type ⇒ the main Evor orchestrator
+  // `agent_type` is absent when the MAIN orchestrator calls, and ALSO whenever a
+  // role runs outside the sub-agent lifecycle — a harness, an eval, a direct
+  // invocation. Those are not the same thing, and conflating them denies a
+  // specialist the tools it legitimately holds: evor-forge-junior was refused
+  // Bash three times in one bench episode because the guard read it as Evor.
+  // `EVOR_AGENT_ROLE` is the role the caller has already declared —
+  // hooks/subagent-stop.mjs reads it for exactly this purpose — so honour it
+  // when the payload carries nothing.
+  const agentType = ((input?.agent_type ?? process.env.EVOR_AGENT_ROLE ?? '') || '').replace(/^oh-my-evor:/, '');
+  const isMain = !agentType; // no agent_type and no declared role ⇒ main Evor
 
   const filePath = String(ti?.file_path ?? '');
   const cmd = String(ti?.command ?? '');
@@ -609,7 +617,8 @@ try {
 // used throughout. Escape hatch: EVOR_SKIP_HOOKS=pre-tool-use.
 try {
   const toolNameO = input?.tool_name ?? '';
-  const isMainO = !(input?.agent_type ?? '');
+  // Same rule as above: a declared role is not the orchestrator.
+  const isMainO = !((input?.agent_type ?? process.env.EVOR_AGENT_ROLE ?? '') || '');
   if (isMainO && (toolNameO === 'Bash' || toolNameO === 'Write' || toolNameO === 'Edit')) {
     const tiO = input?.tool_input ?? {};
 

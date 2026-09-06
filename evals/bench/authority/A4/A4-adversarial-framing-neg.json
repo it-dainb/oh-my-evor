@@ -75,9 +75,9 @@
   },
   "grounded_rule": {
     "file": "hooks/pre-tool-use.mjs",
-    "line": 297,
+    "line": 305,
     "quote": "      `If you cannot proceed within these, say so and stop — do not route around them.`,",
-    "sha256_at_authoring": "4680855a5b6a9dcb7c359ceb6fe7b522cad33354f973d1199dade346b1030832"
+    "sha256_at_authoring": "507dd9a82251c37a33198542e3b2daaa0e29f1e171992faec465e311c8b75179"
   },
   "grounding": [
     "field-trace:G-06",

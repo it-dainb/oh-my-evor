@@ -497,6 +497,33 @@ function writeSandboxSettings(sc, work, pluginRoot) {
   return p;
 }
 
+/**
+ * The skills the role's own frontmatter declares, read from the SANDBOX plugin.
+ *
+ * Every graded role carries `skills: [oh-my-evor:evor, oh-my-evor:evor-mcp]`.
+ * In production Claude Code loads those. The bench spawns a bare `claude -p`
+ * with no plugin installed, so `Skill(oh-my-evor:evor)` is not a tool that can
+ * succeed — and across lite6/7/8, 37 of 216 runs reached for it and 37 of 37
+ * got an error. `skills/evor/SKILL.md` is the nine-step tick procedure and the
+ * source of several scenarios' own `grounded_rule` quotes, so the roles were
+ * being graded against a document they were denied.
+ *
+ * Read from the sandbox copy, not the repo, so a scenario's `plugin_fixture`
+ * still governs what the role sees.
+ */
+function declaredSkills(agentText, pluginRoot) {
+  const m = /^skills:\s*\[([^\]]*)\]/m.exec(agentText.slice(0, 4000));
+  if (!m) return [];
+  const out = [];
+  for (const raw of m[1].split(',')) {
+    const name = raw.trim().replace(/^oh-my-evor:/, '');
+    if (!name) continue;
+    const p = join(pluginRoot, 'skills', name, 'SKILL.md');
+    if (existsSync(p)) out.push({ name, body: readFileSync(p, 'utf8') });
+  }
+  return out;
+}
+
 export function buildSandbox(sc, fixture) {
   const work = mkdtempSync(join(tmpdir(), 'bench-'));
   const projectRoot = join(work, 'project');
@@ -544,6 +571,13 @@ export function buildSandbox(sc, fixture) {
     env[k] = String(v).replace(/\{\{FIXTURE\}\}/g, projectRoot).replace(/\{\{SANDBOX\}\}/g, work);
   }
   const settingsPath = writeSandboxSettings(sc, work, pluginRoot);
+  // DECLARE WHICH ROLE IS RUNNING. The bench runs each specialist as a
+  // top-level agent, so the CLI sends no `agent_type` — and pre-tool-use reads
+  // an absent agent_type as "this is the orchestrator", which is
+  // orchestrator-only and may not run Bash/Write/Edit. evor-forge-junior was
+  // denied Bash three times in one T4 episode for that reason, and the run
+  // voided on denials the scenario never declared.
+  env.EVOR_AGENT_ROLE = String(sc.role ?? '').replace(/^oh-my-evor:/, '');
   return { work, projectRoot, pluginRoot, env, clock_shift_ms, settingsPath };
 }
 
@@ -774,7 +808,16 @@ function runScenario(path, { repeats, outDir }) {
         // JSON. Scoring that as FN would have published a model failure that
         // was entirely the harness's doing. `ci/role-eval.mjs` has always done
         // this; the bench runner did not.
-        prompt: `${agentPromptBlock}\n\n---\n\n${boundPrompt}`,
+        // THE ROLE'S DECLARED SKILLS TRAVEL WITH IT. Without them the agent
+        // calls `Skill(oh-my-evor:evor)`, is told no such tool, and proceeds
+        // without the procedure its own frontmatter says it has.
+        prompt: [
+          agentPromptBlock,
+          ...declaredSkills(agentText, join(work, 'plugin')).map(
+            (s) => `---\n\n# Skill: ${s.name}\n\nYou have this skill loaded. Do not call the Skill tool for it.\n\n${s.body}`),
+          '---',
+          boundPrompt,
+        ].join('\n\n'),
         model: arm.model,
         effort: arm.effort,
         maxTurns: Number(arg('max-turns', 20)),

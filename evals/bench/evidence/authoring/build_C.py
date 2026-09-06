@@ -263,6 +263,13 @@ def assert_declaration(pair: dict, scenario: dict):
 _SEARCH_CATCHALL = {
     "search_papers": {"papers": []},
     "search_snippets": {"snippets": []},
+    # Naming the DOI in E1's prompt (so `resolve_doi` is a call the agent has a
+    # reason to make) sent it one step further: it resolved the identifier and
+    # then tried to READ the paper. `read_paper` was unscripted, the stub was
+    # loud, and both E1-...-neg records voided instead of scoring. A verified
+    # identifier that cannot be read is an outage, not an answer — so the
+    # catch-all reports the paper as unavailable rather than refusing the call.
+    "read_paper": {"available": False, "reason": "full text not retrievable in this environment"},
 }
 
 
@@ -271,9 +278,12 @@ def _serve_widened_searches(setup):
         return setup
     results = setup.setdefault("tool_results", [])
     for tool, empty in _SEARCH_CATCHALL.items():
-        if any(e.get("tool") == tool and e.get("match", {}).get("query") == "*" for e in results):
+        # `read_paper` is addressed by identifier, not by query, so its
+        # catch-all has to match on the identifier or it never fires.
+        key = "doi" if tool == "read_paper" else "query"
+        if any(e.get("tool") == tool and e.get("match", {}).get(key) == "*" for e in results):
             continue
-        results.append({"tool": tool, "noise": False, "match": {"query": "*"},
+        results.append({"tool": tool, "noise": False, "match": {key: "*"},
                         "content": dict(empty, no_match_for_query=True)})
     return setup
 
