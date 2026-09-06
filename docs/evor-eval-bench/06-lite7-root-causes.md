@@ -99,3 +99,75 @@ that is true.
 F1 cannot reach 100% by fixing the bench, and the remaining product fixes are
 prompt-level changes whose effect at n=2 I will not be able to distinguish from
 noise. **Beyond lite8 the right move is more repeats, not more edits.**
+
+---
+
+# lite8 — Q1–Q3 measured
+
+**72 runs, n=2, 0.0% harness VOID. TP 16 · FP 6 · TN 21 · FN 12 → F1 64.0%**
+(lite6 56.5%, lite7 61.5%).
+
+## Q1 worked, and the emissions show it directly
+
+| | lite7 | lite8 |
+|---|---|---|
+| `L3-...-pos` | `["failure"]/medium`, `["limit","failure"]/high` — each failing one axis | `["failure"]/high`, `["failure"]/critical` → **TP 2/2** |
+| `L5-...-pos` | 0 artifacts filed | 1 artifact filed → **TP 2/2** |
+
+"Pick one shape, severity by consequence" and "writing a file is not filing an
+artifact" both did exactly what they were written to do, and the trace shows the
+mechanism rather than just the score.
+
+**Q3 recovered 2 FPs** — `E3-...-neg` FP→TN 2/2, and one each on `L3-...-neg`
+and `L5-...-neg` — which is what scoping return-shaped forbiddens to the answer
+was predicted to do.
+
+**Q2 did not move E4.** `E4-...-pos` is still FN 2/2 with the decision-log
+instruction in place. Either forge-junior is not reaching that step, or the
+instruction is not enough on its own — unresolved, and it should not be
+re-worded a third time without evidence about which.
+
+## The regression, reported rather than explained away
+
+`E3-...-pos` went TP 2/2 → FN 2/2, and `detect=false` both times. The positive
+half is "the evaluation did not complete", so the verdict must be
+**inconclusive**. Across three observations of the same fixture, probe produced:
+
+- lite7: `hypothesis-inconclusive` — correct
+- lite8 rep0: `hypothesis-confirmed`
+- lite8 rep1: `hypothesis-refuted`
+
+Two different WRONG verdicts, and the earlier right one. **The instability is the
+finding**: probe issues a definite verdict on an incomplete evaluation, and which
+definite verdict appears to be arbitrary. That is worse than the FN label
+suggests — it is fabricating a conclusion from data that does not support one.
+No edit of mine plausibly steers toward "confirmed" in one run and "refuted" in
+the next; the cause is not attributed.
+
+## Where lite stands
+
+**TP is 16/16 on evor-tool use, three runs running. FN is 7/12.** The single
+strongest predictor of a correct outcome remains: the agent used the tool that
+owns the effect.
+
+FN now splits **6 silent / 6 genuine** — even, where it was 9/3 in lite7. The
+instrument defects are nearly exhausted; what is left is mostly behaviour.
+
+Remaining, by kind:
+
+- **Genuine product behaviour (9 cells):** `A3-...-pos` (mutagen never calls
+  `evor_validate_proposals`), `E3-...-pos` (unstable verdict), `L4-...-pos`
+  (tick reports clean over a failed-then-retried job), `T3-...-pos` (probe
+  writes signals with Bash), `E1-...-neg` (emits no-evidence where the DOI
+  resolves).
+- **Unresolved (3 cells):** `E4-...-pos` after Q2, `T4-...-pos`/`neg` asymmetry,
+  `E2-...-pos` and `L2-...-neg` single-rep flips.
+
+## The ceiling, stated plainly
+
+F1 has moved 11.8% → 27.3% → 52.6% → 43.5% → 56.5% → 61.5% → 64.0% across eight
+runs. The last three are within a band that n=2 cannot separate cleanly, and the
+remaining failures are majority-behavioural. **More prompt edits will not be
+distinguishable from noise at this sample size.** The next measurement worth
+taking is `--mode normal` or lite at higher repeats, to put error bars on 64%
+before anything else is changed.
