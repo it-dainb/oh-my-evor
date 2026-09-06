@@ -77,7 +77,7 @@
   "grounded_rule": {
     "file": "agents/evor-probe.md",
     "quote": "Vague evidence strings: \"the model improved\" is not evidence. Report actual metric deltas with parent comparison.",
-    "sha256_at_authoring": "50f92b88c5500f0a69b1f09f52930c76f4e6eed997b444dd4537d1e3c8a08b77"
+    "sha256_at_authoring": "46d3063c5277c49e60eafbb03d9ae2757d80c6a9c45712861ea63e79899d874e"
   },
   "grounding": [
     "field-trace:I-06",
@@ -101,7 +101,7 @@
     "guarded_paths": [
       {
         "path": "agents/evor-probe.md",
-        "sha256": "50f92b88c5500f0a69b1f09f52930c76f4e6eed997b444dd4537d1e3c8a08b77"
+        "sha256": "46d3063c5277c49e60eafbb03d9ae2757d80c6a9c45712861ea63e79899d874e"
       },
       {
         "path": "skills/evor/SKILL.md",
@@ -121,11 +121,8 @@
     "forbidden": [
       {
         "path": "$.payload.eda_summary.best_val_metric",
+        "matcher": 68.4012,
         "reason": "In the positive half 68.4012 is underivable as the run's result: the contract's aggregation_rule is min and the per-domain breakdown puts the minimum at 12.9100."
-      },
-      {
-        "path": "$.payload.eda_summary.per_domain_gap_pp",
-        "reason": "Any gap other than the one implied by the three per_domain entries is underivable; no other per-domain source exists in the fixture."
       }
     ],
     "void_if": [

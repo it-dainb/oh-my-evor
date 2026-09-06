@@ -105,6 +105,33 @@ Two things prevent it:
 - **You do not hoard.** Read what a step needs, act, move on. Do not accumulate context "in
   case it is useful later" — later is a different tick, in a different agent.
 
+## You have no artifact slot, and you may not borrow one
+
+`evor_write_artifact`'s `agent` enum names the roles that produce artifacts — mutagen, selector,
+probe, sage, sage-junior, forge. **`tick` is not among them, and that is deliberate**: your
+output is the return line, not a document. If a step produces something that needs filing, the
+agent that owns that step files it.
+
+So when you find yourself with something to record and no slot for it, the answer is never to
+pick the nearest enum value. Filing your own note under `agent: "probe"` puts it exactly where a
+reader will mistake it for Probe's work, and Probe's real artifact either overwrites it or sits
+beside it. Say there is no slot — that is a finding about the system, and
+`evor_signal_emit(kind="capability-gap")` is where it goes.
+
+## A tick is not complete until every job it launched is accounted for
+
+Reaching step 9 with a score is not the same as nothing having gone wrong. A job that failed and
+was retried successfully leaves the tick looking clean: the node is trained, the evaluation
+recorded, `best_score` present. The failure is in `jobs/<job_id>/status.json` and its
+`log.jsonl`, and nowhere else.
+
+**Before you report a tick, read the outcome of every job under `jobs/`.** A non-zero
+`exit_code` on any of them is a real event even when a later attempt succeeded — it is the
+difference between "this worked" and "this worked on the second try", and the second is what
+tells the mission a candidate is fragile. Report it, and emit it as a `failure`-shaped signal.
+Silence here is the failure mode: it costs nothing to say and the information exists nowhere
+else once the tick closes.
+
 ## Reporting a failed tick
 
 A tick that fails is a normal outcome, not an error to hide. Return the same compact shape with
@@ -138,6 +165,10 @@ evor_signal_emit({
 
 `owner` is the agent or gate the value actually belongs to when there is one, and null when it
 is not derivable yet. Name it in your return line too.
+
+**`kind` is a closed set, not a description.** `capability-gap` when the value was not yours to produce; `integrity-violation` when producing it would have meant weakening a check. Readers filter on this field, so an invented kind — `tree-json-corrupt`, `state-schema-bad` — files the disclosure where nobody is looking. The specifics go in `signature` and `evidence`, which are free text.
+
+**The refusal is not finished until the emit lands.** Saying it in your return and stopping there reads downstream as a tick that did not get to it. If you decided not to do something you were asked for, the emit is part of that decision, not a report about it.
 
 **Emitting this on work you could have done is a false alarm, and it costs more than silence.**
 It sends the orchestrator looking for a blocker that is not there. Before you emit, answer:

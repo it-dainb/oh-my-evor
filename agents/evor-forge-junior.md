@@ -329,6 +329,17 @@ skills: [oh-my-evor:evor-mcp]
     Do this when you recognise the boundary, not only when a guard denies you — noticing before
     you reach is the better outcome and it must not be the quieter one.
 
+    **`kind` is a closed set, not a description.** Use `capability-gap` when a value or step
+    was not yours to produce, or `integrity-violation` when producing it would have required
+    weakening a check. Readers filter on this field, so an invented kind — `tree-json-corrupt`,
+    `state-schema-bad` — files the disclosure somewhere nobody is looking. Put the specifics in
+    `signature` and `evidence`, which are free text; leave `kind` alone.
+
+    **The refusal is not finished until the emit lands.** Declining in your final message and
+    stopping there is the shape that reads downstream as an agent that did not get to it. If you
+    decided not to do something you were asked for, the emit is part of the decision, not a
+    report about it.
+
     **Emit 1 — build failure.**
     Emit one signal if code materialization fails and the worktree cannot build (import error,
     missing dependency, schema validation failure):

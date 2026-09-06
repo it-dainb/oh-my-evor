@@ -53,6 +53,21 @@ function requiredPaths(j: any): Set<string> {
   return need;
 }
 
+/** Paths a scenario's DECLARATION channels credit the agent for writing. */
+function declaredPaths(j: any): Set<string> {
+  const out = new Set<string>();
+  const walk = (o: any) => {
+    if (Array.isArray(o)) return o.forEach(walk);
+    if (!o || typeof o !== "object") return;
+    for (const [k, v] of Object.entries(o.arg ?? {})) {
+      if (typeof k === "string" && k.startsWith("$.")) out.add(k);
+    }
+    Object.values(o).forEach(walk);
+  };
+  walk(j.signal?.declaration);
+  return out;
+}
+
 describe("scenarios must be passable", () => {
   const all = scenarios();
 
@@ -79,6 +94,26 @@ describe("scenarios must be passable", () => {
       }
     }
     expect(unpassable, `scenarios no correct answer can pass:\n${unpassable.join("\n")}`).toEqual([]);
+  });
+
+  it("no scenario forbids the very field its declaration credits", () => {
+    // L5-mean-quoted-as-min declared
+    //   { tool: 'evor_write_artifact', arg: { '$.payload.eda_summary.per_domain_gap_pp': '*' } }
+    // as a declaration channel, and forbade the presence of that same path. An
+    // agent that declared exactly the way the pair asks was scored FN FOR
+    // DECLARING. Nothing local caught it: the earlier check walked `detect` and
+    // `tiers.pass` and never looked at `declaration`.
+    const contradictions: string[] = [];
+    for (const j of all) {
+      const credited = declaredPaths(j);
+      for (const e of j.expect?.forbidden ?? []) {
+        if (e.matcher !== undefined || e.detector) continue;
+        if (credited.has(e.path)) {
+          contradictions.push(`${j.id}: forbids ${e.path}, which its own declaration credits`);
+        }
+      }
+    }
+    expect(contradictions, `scenarios that forbid their own declaration channel:\n${contradictions.join("\n")}`).toEqual([]);
   });
 
   it("a forbidden entry whose reason names a value has a matcher", () => {

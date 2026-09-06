@@ -480,6 +480,17 @@ skills: [oh-my-evor:evor-mcp]
     `owner` names the agent or gate the value belongs to, or null when it is not derivable yet.
     Say the same in your final message.
 
+    **`kind` is a closed set, not a description.** Use `capability-gap` when a value or step
+    was not yours to produce, or `integrity-violation` when producing it would have required
+    weakening a check. Readers filter on this field, so an invented kind — `tree-json-corrupt`,
+    `state-schema-bad` — files the disclosure somewhere nobody is looking. Put the specifics in
+    `signature` and `evidence`, which are free text; leave `kind` alone.
+
+    **The refusal is not finished until the emit lands.** Declining in your final message and
+    stopping there is the shape that reads downstream as an agent that did not get to it. If you
+    decided not to do something you were asked for, the emit is part of the decision, not a
+    report about it.
+
     **Emitting this on work you could have done is a false alarm and costs more than silence** —
     it sends the orchestrator hunting a blocker that does not exist. Before emitting, answer:
     *was the authority mine, and was the evidence in front of me?* Two yeses means you owed the

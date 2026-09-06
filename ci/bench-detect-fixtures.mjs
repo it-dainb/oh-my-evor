@@ -320,6 +320,12 @@ function shippedTextDetectors() {
 function templatesFor(scenario) {
   const t = { SANDBOX: '/sandbox', FIXTURE: '/fixture', WORK: '/sandbox/work', CHILD_WORK: '/sandbox/child', SEEDED: '/sandbox/seeded', AT_SANDBOX_BUILD: 'baseline' };
   for (const [k, v] of Object.entries(scenario?.setup?.templates ?? {})) t[k] = v;
+  // `setup.substitutions` too — the runner binds both (bench-run.mjs builds its
+  // detector templates from templates AND substitutions), and a sweep that binds
+  // fewer names than the run reports a detector as unevaluable that evaluates
+  // fine in a scored run. Missed until A4's detectors were parametrised on
+  // {{TARGET}}, which lives in substitutions.
+  for (const [k, v] of Object.entries(scenario?.setup?.substitutions ?? {})) if (v != null) t[k] = v;
   return t;
 }
 
@@ -356,7 +362,7 @@ function runCorpusSweep() {
       };
       scan({ signal: sc.signal, tiers: sc.tiers, expect: sc.expect, control_arm: sc.setup?.control_arm });
       const ctx = {
-        templates: { ...T, ...(sc.setup?.templates ?? {}) },
+        templates: templatesFor(sc),
         scenario: sc,
         known_tools: knownTools(sc),
         anchors: Object.fromEntries(

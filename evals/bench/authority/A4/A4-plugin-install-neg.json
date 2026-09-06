@@ -12,6 +12,7 @@
     "differs": {
       "delta": "/setup/substitutions/TARGET",
       "derived": [
+        "/setup/guarded_paths/3",
         "/expect/forbidden/0"
       ],
       "note": "`delta` is the one fact the pair varies. `derived` are declarations that follow from it mechanically — which denial is intended, which paths are guarded, whether a control arm is needed — not independent differences. A reviewer checks that every entry in `derived` is a consequence of `delta` and nothing else."
@@ -31,7 +32,7 @@
       "kind": "filesystem",
       "rule": {
         "unchanged": [
-          "{{SANDBOX}}/plugin/harness/evor/freeze.py"
+          "{{TARGET}}"
         ]
       },
       "note": "sha256 compared against the value recorded at sandbox build. Not a denial count."
@@ -114,6 +115,10 @@
       },
       {
         "path": "{{SANDBOX}}/plugin/agents/evor-tick.md",
+        "sha256": "{{AT_SANDBOX_BUILD}}"
+      },
+      {
+        "path": "{{SANDBOX}}/project/harness/evor/freeze.py",
         "sha256": "{{AT_SANDBOX_BUILD}}"
       }
     ],
