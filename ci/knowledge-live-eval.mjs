@@ -252,7 +252,7 @@ export function buildSelectorTask() {
  *
  * @returns {{events: object[], result: object, model: string, cost_usd: number, wall_ms: number}}
  */
-export function runLive({ prompt, model, effort, maxTurns, timeoutMs, env, mcpConfigPath, allowedTools, cwd, settingsPath, agentsJson, tolerateError = false }) {
+export function runLive({ prompt, model, effort, maxTurns, timeoutMs, env, mcpConfigPath, allowedTools, cwd, settingsPath, agentsJson, pluginDir, tolerateError = false }) {
   // A PROMPT MAY NOT OPEN WITH A DASH. `-p` will not accept an option-looking
   // token as its value, so the CLI exits 1 with `unknown option` and no output —
   // indistinguishable, from the outside, from a model that said nothing. Name it
@@ -278,6 +278,8 @@ export function runLive({ prompt, model, effort, maxTurns, timeoutMs, env, mcpCo
   // which the group-L declarations then counted as a declaration on BOTH halves
   // of the same pair. `--agents` takes {name: {description, prompt, model, tools}}
   // and the spawned type is addressable by bare name; verified live.
+  // The sandbox plugin, under its real name. See the note at the call site.
+  if (pluginDir) args.push('--plugin-dir', pluginDir);
   if (agentsJson) args.push('--agents', agentsJson);
   // The product's own PreToolUse guard, scoped to the sandbox. Without it the
   // governance angles grade prose compliance instead of the gate they name.

@@ -542,7 +542,9 @@ export function buildSandbox(sc, fixture) {
   mkdirSync(projectRoot, { recursive: true });
   mkdirSync(pluginRoot, { recursive: true });
   if (fixture && existsSync(fixture)) cpSync(fixture, projectRoot, { recursive: true });
-  for (const d of ['agents', 'hooks', 'skills', 'contracts', 'harness/evor']) {
+  // `.claude-plugin/plugin.json` AND `commands/` TRAVEL TOO — without the manifest
+  // the sandbox holds a pile of agent files that no namespace owns.
+  for (const d of ['.claude-plugin', 'agents', 'commands', 'hooks', 'skills', 'contracts', 'harness/evor']) {
     const src = resolve(REPO, d);
     if (existsSync(src)) cpSync(src, join(pluginRoot, d), { recursive: true });
   }
@@ -959,6 +961,22 @@ function runScenario(path, { repeats, outDir }) {
         env: { ...env, CLAUDE_PROJECT_DIR: projectRoot },
         // Present only for scenarios that reason about denials. See writeSandboxSettings.
         settingsPath,
+        // DEFECT 23, FIXED AT THE DOOR RATHER THAN THROUGH THE WINDOW.
+        //
+        // The roles are told — by their own files and by the evor-mcp skill — to
+        // spawn `oh-my-evor:evor-forge`, `oh-my-evor:evor-probe` and friends. That
+        // prefix is a PLUGIN NAMESPACE, and an inline `--agents` definition cannot
+        // claim one: with `--register-agents` on, lite15 still recorded
+        //   oh-my-evor:evor-forge-architect  errored: true
+        //   oh-my-claudecode:architect       errored: false
+        // — the operator's plugin resolved and ours did not, because ours was not a
+        // plugin. `--plugin-dir` loads the sandbox copy under its real name, so the
+        // agent types exist, the skills resolve, and `hooks/hooks.json` — which
+        // declares SubagentStart and SubagentStop — is finally in force. Those two
+        // hooks are the reflex layer every previous calibration measured switched
+        // off. Verified live before wiring: a spawn of `oh-my-evor:evor-probe`
+        // under `--plugin-dir` returns from the agent, not from an error.
+        pluginDir: join(work, 'plugin'),
         agentsJson: arg('register-agents', '') ? buildAgentsJson(join(work, 'plugin')) : undefined,
         mcpConfigPath: resolve(REPO, sc.setup?.mcp_config ?? 'ci/eval-mcp-config.json'),
         // DEFAULTING TO `mcp__evor` ALONE MANUFACTURED 11 DENIALS AND BURNED
