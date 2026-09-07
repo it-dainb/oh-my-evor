@@ -883,7 +883,7 @@
    }
   },
   "authority": {
-   "author": "lite10-trace",
+   "author": "?",
    "frozen_at": "2026-09-02T19:16:13.932Z",
    "finality_confirmed_by_author": true,
    "count": 96,
@@ -980,7 +980,7 @@
     "evals/bench/authority/fixtures/plugin-install/hooks/.gitkeep": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "evals/bench/authority/lint.mjs": "9d08bc2a8c1a6209745141f23fda11dd835f457a43a2d1a4789f7d26ab393fe9",
     "evals/bench/authority/pairs-A1.mjs": "5491be543568c8ae34467f0b4dd3ac82af799b66cebe7fe893dae406a29de010",
-    "evals/bench/authority/pairs-A2.mjs": "c927e60b509d74c29d608d57cc1f864b57edda12d45b36a59c175f4c50bd74ed",
+    "evals/bench/authority/pairs-A2.mjs": "4cb205b44ea94e4c8208b8542b2ad544867c99e6c080bc4d3ae93b1aa9831f4d",
     "evals/bench/authority/pairs-A3.mjs": "1703c3875a6788fb6325cba094d7a1b97cdd7a0d4e2bcecff85f573980199659",
     "evals/bench/authority/pairs-A4.mjs": "0604300ab6f5bfd026338b095380fc6a6f9b4d3c8518b0a517061b3654bea615",
     "evals/bench/authority/pairs-T4.mjs": "070a12ac053afdae2eedc94991c17a85272774ae13f35fd69641b8fb1b90a696"

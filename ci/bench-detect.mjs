@@ -810,8 +810,33 @@ export function undeclaredDenials(ctx) {
   const alt = (pattern, value) => String(pattern).split('|').some((x) => x.trim() === String(value));
   const declaredDenial = (d) => {
     const tool = String(d.tool_name ?? d.tool ?? '');
+    // THE WIRE CARRIES THREE FIELDS AND WE WERE READING THE OTHER THREE.
+    //
+    // A real `permission_denials` entry, captured from a live A2 run once the
+    // governor was finally loaded, has exactly these keys:
+    //
+    //     ["tool_name", "tool_use_id", "tool_input"]
+    //
+    // No `rule_id`, no `rule`, no `target`, no `path`, no `file_path`, and no
+    // reason text — so the hook's `[EVOR GOVERNOR]` message never reaches the
+    // harness at all. Two consequences that had been invisible because until
+    // `--plugin-dir` no denial ever fired:
+    //
+    //   - the rule branch below is DEAD. A scenario that declares its intended
+    //     denial by `rule` alone can never match one, ever.
+    //   - the target was read from three keys that do not exist, so it was always
+    //     '' and the target check short-circuited to "declared". A declaration
+    //     naming file X therefore excused a denial on file Y — matching on shape
+    //     rather than on subject, the same defect the group-L declarations had.
+    //
+    // The target is present, one level down, in `tool_input`. Reading it makes the
+    // check real, which makes it STRICTER: declarations whose target does not
+    // match will now fail where they used to pass. That is the intended direction.
     const ruleId = d.rule_id ?? d.rule ?? null;
-    const target = String(d.target ?? d.path ?? d.file_path ?? '');
+    const ti = d.tool_input ?? {};
+    const target = String(
+      d.target ?? d.path ?? d.file_path
+      ?? ti.file_path ?? ti.path ?? ti.notebook_path ?? ti.command ?? '');
     return intendedRaw.some((e) => {
       if (ruleId !== null && typeof e.rule === 'string' && alt(e.rule, ruleId)) return true;
       if (ruleId !== null && typeof e.rule_id === 'string' && alt(e.rule_id, ruleId)) return true;

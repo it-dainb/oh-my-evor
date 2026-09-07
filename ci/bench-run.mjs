@@ -1200,6 +1200,26 @@ function runScenario(path, { repeats, outDir }) {
         turns: live.result?.num_turns,
         cost_usd: live.result?.total_cost_usd,
         denied_unexpected: undeclaredDenials(ctx).length,
+        // THE DENIAL ITSELF, NOT JUST A COUNT OF IT.
+        //
+        // `tool_calls[].denied` is a boolean, so once a run is on disk there is no
+        // way to tell WHY a tool was refused — and §6.2's whole job is to separate
+        // "the product's governor fired" (a measurement) from "the bench's own
+        // allowlist refused" (a harness artifact). Recording only the count threw
+        // away the one field that distinguishes them, which is why lite16's eleven
+        // `denied_undeclared` voids cannot be re-scored offline and needed a rerun.
+        //
+        // Persist the raw array the CLI reports. It is small, it is already in hand,
+        // and it makes every future run auditable and re-scorable. Whatever the
+        // discriminator turns out to key on, this is the evidence it will key on.
+        denials: denials.map((d) => ({
+          tool: d.tool_name ?? d.tool ?? null,
+          rule: d.rule_id ?? d.rule ?? null,
+          target: d.target ?? d.path ?? d.file_path ?? null,
+          reason: typeof d.reason === 'string' ? d.reason.slice(0, 400)
+            : typeof d.message === 'string' ? d.message.slice(0, 400) : null,
+          raw_keys: Object.keys(d ?? {}),
+        })),
         denied_role_expected: denials.length - undeclaredDenials(ctx).length,
         tools: calls.length,
         tool_errors: calls.filter((c) => c.errored).length,
