@@ -1212,6 +1212,27 @@ function runScenario(path, { repeats, outDir }) {
         // Persist the raw array the CLI reports. It is small, it is already in hand,
         // and it makes every future run auditable and re-scorable. Whatever the
         // discriminator turns out to key on, this is the evidence it will key on.
+        // THE REASON LIVES IN THE GOVERNOR LOG, NOT ON THE WIRE.
+        //
+        // `permission_denials` carries only tool_name / tool_use_id / tool_input —
+        // no rule, no reason. But `deny()` calls `logDecision({verdict, reason,
+        // rule, target})`, which writes to $EVOR_ROOT/logs/governor.log INSIDE the
+        // sandbox, and the sandbox is a temp dir deleted when the run ends. Every
+        // denial explains itself and then the explanation is thrown away.
+        //
+        // That is why A3-critic-gate-codes-pos#0 in lite18 could not be attributed:
+        // the denied calls were read-only `ls`/`find` on the run directory, and
+        // four candidate rules were checked and eliminated by hand without finding
+        // the writer. Copy the log out and the next one answers itself.
+        governor_log: (() => {
+          try {
+            const lp = join(projectRoot, '.evor', 'logs', 'governor.log');
+            if (!existsSync(lp)) return null;
+            return readFileSync(lp, 'utf8').split('\n').filter(Boolean).slice(-40)
+              .map((l) => { try { return JSON.parse(l); } catch { return { raw: l.slice(0, 200) }; } })
+              .filter((e) => e.verdict === 'deny' || e.verdict === 'ask' || e.raw);
+          } catch { return null; }
+        })(),
         denials: denials.map((d) => ({
           tool: d.tool_name ?? d.tool ?? null,
           rule: d.rule_id ?? d.rule ?? null,
