@@ -325,6 +325,23 @@ try {
       );
     }
 
+    // EVOR-TICK MAY NOT SPAWN ANOTHER EVOR-TICK. The PARENT map above governs five
+    // roles and evor-tick was in none of them, so nothing forbade a tick spawning
+    // a tick — recursive delegation with no base case. The bench surfaced it the
+    // moment the agent types became spawnable: three evor-tick runs ended their
+    // turn with "a nested evor-tick agent is now running in the background... I'll
+    // report back once it completes", one of them after two turns, and there is
+    // nobody to report back to. The tick runs the orchestrator's own loop ONE
+    // level down (see the note below); a second level is not a delegation, it is a
+    // stack.
+    if (spawnType === 'evor-tick' && !isMain) {
+      deny(
+        `[EVOR GOVERNOR] evor-tick is the orchestrator's loop one level down and may be spawned ` +
+          `only by Evor itself. ${agentType || 'this agent'} must not spawn it — finish this tick and ` +
+          `return your status line; do not nest another tick inside it.`
+      );
+    }
+
     // evor-acquirer is multi-parent: Forge (enrich-train), main Evor, or evor-tick
     // (harden-test). evor-tick was added for Phase 3a: it runs the orchestrator's
     // own 9-step loop one level down, so the harden-test acquisition path moves
