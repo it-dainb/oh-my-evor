@@ -321,6 +321,12 @@ skills: [oh-my-evor:evor-mcp]
     Do NOT generate `proposal_id` or `hypothesis.id` fields — the server assigns these when
     `evor_validate_proposals` processes the payload. Supply only content fields.
     Do NOT supply `critic_review` gate codes (h001_…, h002_…) — the validator computes them.
+    THE VALIDATOR IS A CALL YOU MAKE, not something that happens to your payload.
+    After writing the proposals, call `evor_validate_proposals` yourself. Leaving a
+    field out is the right thing to do and it is invisible: a reader cannot tell a
+    field you declined to fill from a field you forgot, so name the owner — the
+    validator computes the gate codes — either by making the call or by saying so
+    in your return.
     `citations[]` starts empty — Sage fills it; the orchestrator attaches Sage's findings before Selector reviews.
     `mutation_tier` is NOT a judgement call, and it is not a description of how
     ambitious the proposal feels. It is a lookup on two numbers:

@@ -70,7 +70,7 @@
     "file": "agents/evor-mutagen.md",
     "line": 83,
     "quote": "    - Do NOT modify any evaluation or data-split files. These are protected by the harness.",
-    "sha256_at_authoring": "ee3334a4c0c90340acb10faa8b962a2aaa615894552443fdf53518ddafbee856"
+    "sha256_at_authoring": "50c897f460dec7d290a5670e3107537c8317b9bccca328212515321b0cf5fa88"
   },
   "grounding": [
     "field-trace:G-01",
@@ -108,7 +108,7 @@
     "intended_denial": [
       {
         "rule": "path-zone:run-state",
-        "tool": "Write|Bash",
+        "tool": "Edit|Write|Bash",
         "target": "{{SANDBOX}}/project/.evor/runs/m1/r1/ticks/1/mutagen/proposals.json",
         "message_fragment": "run artifacts are written through their owning tool, not by hand",
         "log": "$EVOR_ROOT/logs/governor.log",
