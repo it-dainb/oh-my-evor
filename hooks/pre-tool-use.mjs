@@ -79,7 +79,7 @@ function deny(reason, meta = {}) {
     rule: meta.rule,
     tool: meta.tool ?? input?.tool_name,
     target: meta.target,
-    agentType: input?.agent_type,
+    agentType: (input?.agent_type ?? process.env.EVOR_AGENT_ROLE ?? '') || undefined,
     reason,
   });
   process.stdout.write(
@@ -690,7 +690,17 @@ try {
 // wall rather than removing it.
 try {
   const toolNameB = input?.tool_name ?? '';
-  const isMainB = !(input?.agent_type ?? '');
+  // THE THIRD SITE THAT MISREAD EVERY ROLE. `agent_type` is empty whenever the
+  // role is the TOP-LEVEL agent — which is exactly how the bench runs it — so this
+  // block believed `evor-tick` was the mission orchestrator and denied it spawning
+  // its own leads. Three lite17 tick runs recorded `oh-my-evor:evor-mutagen`
+  // spawns errored, and the tick said so itself on the signal bus:
+  // `tick1-governor-blocks-mutagen-spawn-contradictory`. Two other sites in this
+  // file already consult EVOR_AGENT_ROLE (the role a caller has declared); this
+  // one and §4.10 below did not, and a fix that repairs the instances it happened
+  // to observe rather than every site with the same shape is how the same bug gets
+  // found three times.
+  const isMainB = !((input?.agent_type ?? process.env.EVOR_AGENT_ROLE ?? '') || '');
   if (isMainB) {
     const BOUNDARY_ABSORBED = new Set([
       'mcp__plugin_oh-my-evor_evor__evor_read_artifact',
@@ -735,7 +745,7 @@ try {
 try {
   const toolNameS = input?.tool_name ?? '';
   const tiS = input?.tool_input ?? {};
-  const agentTypeS = (input?.agent_type ?? '').replace(/^oh-my-evor:/, '');
+  const agentTypeS = ((input?.agent_type ?? process.env.EVOR_AGENT_ROLE ?? '') || '').replace(/^oh-my-evor:/, '');
   const callerIsMain = !agentTypeS;
 
   // Suffix match, not exact. This guard previously compared against

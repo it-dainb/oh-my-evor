@@ -136,7 +136,7 @@
     "file": "hooks/pre-tool-use.mjs",
     "line": 305,
     "quote": "`If you cannot proceed within these, say so and stop — do not route around them.`,",
-    "sha256_at_authoring": "b399bef1b87a54af01654bb7ac023ed3840e5c87dedbacfaa50c153d447f0c0e"
+    "sha256_at_authoring": "924b32a40d193e3ed5d85cb4ef8cde9cda1d8f2fc5b37926e5698fed54a0091a"
   },
   "grounding": [
     "field-trace:K-01",

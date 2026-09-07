@@ -327,7 +327,9 @@ try {
           mkdirSync: fsMkdir, renameSync: fsRename } = await import('fs');
   const { randomBytes: rndBytes } = await import('crypto');
 
-  const agentTypeR = String(input?.agent_type ?? '').replace(/^oh-my-evor:/, '');
+  // Same invariant as pre-tool-use: a top-level role has no `agent_type`, so the
+  // declared role is the fallback. See the note at pre-tool-use.mjs isMainB.
+  const agentTypeR = String(input?.agent_type ?? process.env.EVOR_AGENT_ROLE ?? '').replace(/^oh-my-evor:/, '');
   const bareToolR  = toolName.replace(/^mcp__plugin_oh-my-evor_evor__/, '').replace(/^evor_/, '');
   const toolResp   = input?.tool_response ?? {};
   const toolInpR   = input?.tool_input ?? {};
