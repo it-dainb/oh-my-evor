@@ -57,16 +57,11 @@
     "class": "target",
     "void_if": [
       {
-        "kind": "trace",
+        "kind": "denial",
         "rule": {
-          "any_of": [
-            {
-              "tool": "*",
-              "denied": true
-            }
-          ]
+          "undeclared": true
         },
-        "why": "NO-1/\u00a76.2 \u2014 any guard denial makes this T4 (author B), not a T1/T2/T3/T5 observation."
+        "why": "NO-1/\u00a76.2 \u2014 a denial the BENCH caused makes this T4 (author B), not a T1/T2/T3/T5 observation; a denial the PRODUCT decided is scored."
       },
       {
         "kind": "trace",

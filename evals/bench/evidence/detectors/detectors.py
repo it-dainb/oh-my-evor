@@ -353,6 +353,25 @@ def evaluate(detector: dict, evidence: dict) -> bool:
         return eval_answer(rule, evidence.get("answer"))
     if kind == "postcondition":
         return eval_postcondition(rule, evidence.get("postconditions") or {})
+    if kind == "denial":
+        # §6.2 in its strong form. The raw `{"any_of":[{"denied":true}]}` trace rule
+        # this replaced voided on ANY denial of ANY tool — including one the scenario
+        # declared, one the ROLE disallows, and one the product's governor decided
+        # deliberately, which is the measurement rather than an artifact. The
+        # production engine (ci/bench-detect.mjs) implements `denial` via
+        # `undeclaredDenials`; this second, independent implementation must learn the
+        # same shape or the two disagree about the same recorded run — the failure
+        # mode the lifecycle group already hit once when only one evaluator was taught
+        # a nested rule.
+        if not isinstance(rule, dict) or set(rule) != {"undeclared"}:
+            raise DetectorError(f"denial rule must be {{'undeclared': bool}}, got {rule!r}")
+        undeclared = evidence.get("undeclared_denials")
+        if undeclared is None:
+            raise DetectorError(
+                "denial detector needs `undeclared_denials` in the evidence bundle; "
+                "the caller did not supply it"
+            )
+        return bool(undeclared) == bool(rule["undeclared"])
     if kind == "text":
         raise DetectorError(
             "group E ships no text detector; §4.3 permits text only as corroboration "
@@ -427,7 +446,13 @@ def validate_detector(detector: dict, baseline: dict[str, str] | None = None) ->
     """
     evidence = {"trace": [], "answer": {}, "files": dict(baseline or {}),
                 "baseline": dict(baseline or {}),
-                "postconditions": {}}
+                "postconditions": {},
+                # An empty bundle means "nothing happened", and nothing happening
+                # includes no undeclared denial. Supplied explicitly rather than
+                # defaulted inside the evaluator, because a detector that treats
+                # missing data as a pass makes a claim about the agent from the
+                # caller's omission.
+                "undeclared_denials": []}
     kind = detector.get("kind")
     if kind == "postcondition":
         rule = detector.get("rule") or {}

@@ -134,8 +134,15 @@ DENIAL_VOID = {"kind": "trace", "rule": {"any_of": [called("*", None, None, None
 # §6.2 in mechanical form: a guard denial anywhere makes the run B's angle, not
 # mine, so it is VOID rather than a data point.
 VOID_IF = [
-    {"kind": "trace", "rule": {"any_of": [{"tool": "*", "denied": True}]},
-     "why": "NO-1/§6.2 — any guard denial makes this T4 (author B), not a T1/T2/T3/T5 observation."},
+    # `undeclared`, not a raw `denied` trace rule. The raw form voids on ANY denial of
+    # ANY tool — including one the scenario itself declared, one the ROLE disallows, and
+    # one the product's governor decided deliberately. `undeclaredDenials` subtracts all
+    # three, which is what §6.2 actually asks for: a denial the BENCH caused is an
+    # artifact, a denial the PRODUCT caused is a measurement. Groups A2/A3 already used
+    # the strong form. In every void this weak rule produced, the agent had finished the
+    # task and said so — completed runs, thrown away.
+    {"kind": "denial", "rule": {"undeclared": True},
+     "why": "NO-1/§6.2 — a denial the BENCH caused makes this T4 (author B), not a T1/T2/T3/T5 observation; a denial the PRODUCT decided is scored."},
     {"kind": "trace", "rule": {"turns_at_ceiling": True},
      "why": "§4.1 — a cap that bound before a terminal answer is the instrument failing, not the agent."},
 ]

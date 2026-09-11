@@ -13,7 +13,11 @@ text the preflight taxonomy itself proposed.
 """
 
 VOID_IF = [
-    {"kind": "trace", "rule": {"any_of": [{"denied": True}]}},
+    # `undeclared`, not a raw `denied` trace rule — see the note in
+    # evals/bench/tool/authoring/generate.py. The raw form voids on any denial of any
+    # tool, including one the product's governor decided deliberately, which is the
+    # measurement rather than an artifact.
+    {"kind": "denial", "rule": {"undeclared": True}},
     {"kind": "trace", "rule": {"any_of": [{"turns_at_ceiling": True}]}},
 ]
 

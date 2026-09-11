@@ -328,7 +328,7 @@ function finalJson(text) {
 }
 
 // ── trace view: every tool call, whether it was denied ───────────────────────
-function traceOf(events, roleDisallowed = new Set(), deniedTools = new Set()) {
+function traceOf(events, roleDisallowed = new Set(), deniedTools = new Set(), deniedIds = new Set()) {
   const calls = [];
   const results = new Map();
   // `phase` is the zero-based index of the user turn that was active when the
@@ -363,9 +363,24 @@ function traceOf(events, roleDisallowed = new Set(), deniedTools = new Set()) {
     // BENCH never granted was expected by one and an accident by the other, and
     // E1-dead-identifier-pos voided on a `denied: true` rule after
     // evor-sage-junior reached for its documented Tier-3 web fallback.
-    c.role_expected_denial = deniedTools.has(c.tool)
+    // DENIAL IS PER CALL, NOT PER TOOL NAME. This read `deniedTools.has(c.tool)` — a
+    // set of tool NAMES — so one denied `Bash` marked every Bash call in the run as
+    // denied. Measured over lite17/18/19: 412 calls flagged against 159 actual CLI
+    // denials, a 2.6x inflation, 253 calls marked denied that the guard never saw.
+    //
+    // The quiet half is worse than the loud half. `bench-detect.mjs:342` reads
+    // `else if (call.denied) return false`, so once any Bash is denied, NO ordinary
+    // trace predicate can match ANY Bash call for the rest of that run. Every
+    // detector keyed on a Bash, Write or Edit call silently stops matching — a
+    // manufactured false negative, with no void to mark it and nothing in the record
+    // that says so.
+    //
+    // `permission_denials` carries `tool_use_id` and the trace already stores `id`
+    // per call, so match them. The tool-name fallback survives only when no entry
+    // carries an id at all.
+    c.denied = deniedIds.size ? deniedIds.has(c.id) : deniedTools.has(c.tool);
+    c.role_expected_denial = c.denied
       && (roleDisallowed.has(c.tool) || !grantedSurface(c.tool));
-    c.denied = deniedTools.has(c.tool);
     c.result_text = txt;
   }
   return calls;
@@ -1067,7 +1082,8 @@ function runScenario(path, { repeats, outDir }) {
       const roleDisallowed = readRoleDisallowedTools(sc.agent_file);
       const denials = live.result?.permission_denials ?? [];
       const deniedTools = new Set(denials.map((d) => String(d.tool_name ?? '')));
-      const calls = traceOf(live.events, roleDisallowed, deniedTools);
+      const deniedIds = new Set(denials.map((d) => d.tool_use_id ?? d.id).filter(Boolean));
+      const calls = traceOf(live.events, roleDisallowed, deniedTools, deniedIds);
       const answer = finalJson(live.result?.result ?? '');
       const turnsAtCeiling =
         live.result?.subtype === 'error_max_turns' ||

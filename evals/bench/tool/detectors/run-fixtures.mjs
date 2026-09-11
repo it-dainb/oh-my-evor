@@ -13,7 +13,14 @@ import { readFileSync, readdirSync, existsSync, statSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
-import { evaluate } from './detector-lib.mjs';
+// THE PRODUCTION ENGINE, not this group's local one. `detector-lib.mjs` is one of the
+// three partial engines `ci/bench-detect.mjs` was written to replace — its own header
+// names this file — and it never learned the `denial` kind, so a gate replaying the
+// NO-1/§6.2 void rule was evaluating it with an evaluator that cannot read it. My own
+// skill's rule: never teach only one evaluator a new rule shape. Here the right move is
+// not to teach the stale one but to stop using it, so the gate and the run agree by
+// construction.
+import { evaluate } from '../../../../ci/bench-detect.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const TOOL = join(HERE, '..');
@@ -139,8 +146,15 @@ for (const angle of angles) {
     const fx = join(REPO, s.setup.cwd_fixture);
     T(existsSync(fx) && statSync(fx).isDirectory(), `cwd_fixture ${s.setup.cwd_fixture} is not on disk`);
 
-    // void_if carries the NO-1 denial guard on every Author A scenario
-    T(JSON.stringify(s.expect.void_if).includes('"denied":true'),
+    // void_if carries the NO-1 denial guard on every Author A scenario.
+    //
+    // The gate matched the literal `"denied":true`, which is the WEAK form of the
+    // rule — it voids on any denial of any tool, including one the scenario declared
+    // and one the product's governor decided deliberately. The strong form is a
+    // `denial` detector reading `undeclared`, which subtracts exactly those. This
+    // gate was pinning the weaker of the two shapes in place; it now accepts the
+    // strong form and would reject a silent removal of either.
+    T(/"undeclared":\s*true|"denied":\s*true/.test(JSON.stringify(s.expect.void_if)),
       'every group-T scenario must void on an undeclared denial (NO-1, §6.2)');
 
     // no answer key in the prompt

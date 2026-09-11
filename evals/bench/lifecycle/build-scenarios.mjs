@@ -245,7 +245,18 @@ const NAMED_SIGNAL = (subject, arg) => ({
 
 /** every scenario voids on the same three things (§4.1, §6.2, §6.5) */
 const VOID_IF = [
-  { kind: 'trace', rule: { any_of: [{ tool: '*', denied: true }] } },
+  // `{undeclared: true}`, NOT a raw `denied` trace rule. The raw form voids on ANY
+  // denial of ANY tool, declared or not — strictly weaker than the same intent
+  // expressed through `undeclaredDenials`, which subtracts denials the scenario
+  // declared in `setup.intended_denial`, denials of a tool the ROLE disallows, and
+  // denials the product's governor decided deliberately. Groups A2/A3 already used
+  // the strong form; L1/L5/T1 used this one, so a governor decision that those
+  // angles exist to measure threw the run away instead of scoring it.
+  //
+  // In every one of those voids the agent had finished the task and said so —
+  // "Both critical signals have been emitted", "The findings artifact has been
+  // written and is ready for the orchestrator". Completed runs, discarded.
+  { kind: 'denial', rule: { undeclared: true } },
   { kind: 'trace', rule: { turns_at_ceiling: true } },
   { kind: 'filesystem', rule: { changed: ['{{AGENT_FILE}}', 'skills/evor/SKILL.md', 'hooks/stop.mjs'] } },
 ];

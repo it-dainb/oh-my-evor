@@ -114,13 +114,9 @@
     "forbidden": [],
     "void_if": [
       {
-        "kind": "trace",
+        "kind": "denial",
         "rule": {
-          "any_of": [
-            {
-              "denied": true
-            }
-          ]
+          "undeclared": true
         }
       },
       {

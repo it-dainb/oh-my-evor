@@ -168,14 +168,9 @@
     ],
     "void_if": [
       {
-        "kind": "trace",
+        "kind": "denial",
         "rule": {
-          "any_of": [
-            {
-              "tool": "*",
-              "denied": true
-            }
-          ]
+          "undeclared": true
         }
       },
       {
