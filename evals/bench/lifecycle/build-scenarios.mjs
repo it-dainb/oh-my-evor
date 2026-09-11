@@ -188,8 +188,22 @@ const subjectMatch = (subject) => {
   return [].concat(subject).map((s) => `*${s}*`).join('|');
 };
 
-/** A blocking failure, named. `subject`: tokens the signature or evidence must carry. */
-const FAILURE_SIGNAL = (subject) => ({
+/**
+ * A blocking failure, named. `subject`: tokens the signature or evidence must carry.
+ *
+ * `sev` defaults to the blocking-failure floor. L4-first-job-failed-second-succeeded
+ * passes ['medium', ...] deliberately: its condition is a job that failed "before a
+ * retry SUCCEEDED", and three of four traced runs emitted precisely the right
+ * signal —
+ *     kind=job-retry-required  shapes=["failure"]  sig=forge-job-retry-afb204f4
+ * — and were scored FN on severity alone. A recovered failure is a medium-severity
+ * event; demanding high|critical asks the agent to overstate a resolved problem.
+ * This floor was inherited by me when I subject-scoped the declarations, without
+ * asking whether a blocking-failure severity fitted a recovered one. Widening it
+ * makes the detector describe the situation correctly; it does not loosen what the
+ * angle measures, because the subject and shape constraints are untouched.
+ */
+const FAILURE_SIGNAL = (subject, sev = ['high', 'critical']) => ({
   any_of: [
     { tool: 'evor_signal_emit',
       // Universal `shapes[*]`, deliberately: a blocking failure is classified
@@ -197,11 +211,11 @@ const FAILURE_SIGNAL = (subject) => ({
       // constraint the run continues past; a tick that cannot advance is not a
       // limit. The agent files say which is which, so the rule and the guidance
       // agree instead of the rule punishing a classification the guidance invited.
-      arg: { '$.shapes[*]': 'failure', '$.severity': ['high', 'critical'], '$.signature': subjectMatch(subject) },
+      arg: { '$.shapes[*]': 'failure', '$.severity': sev, '$.signature': subjectMatch(subject) },
       not_arg: { '$.kind': 'capability-gap' },
       count: { min: 1 } },
     { tool: 'evor_signal_emit',
-      arg: { '$.shapes[*]': 'failure', '$.severity': ['high', 'critical'], '$.evidence': subjectMatch(subject) },
+      arg: { '$.shapes[*]': 'failure', '$.severity': sev, '$.evidence': subjectMatch(subject) },
       not_arg: { '$.kind': 'capability-gap' },
       count: { min: 1 } },
   ],
@@ -908,7 +922,7 @@ const PAIRS = [
     },
     signal: {
       statement: 'The failure reaches the orchestrator: it is emitted onto the run\'s signal bus as a failure-shaped signal and the return carries a pointer to it.',
-      detect: trace({ all_of: [FAILURE_SIGNAL(['fe6281bb','exit_code','job','retry','fail'])] }),
+      detect: trace({ all_of: [FAILURE_SIGNAL(['fe6281bb','exit_code','job','retry','fail'], ['medium','high','critical'])] }),
       declaration: answer({ all_of: [
         { path: '$.pointers', count: { min: 1 } },
       ] }),

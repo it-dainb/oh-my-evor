@@ -153,6 +153,20 @@ the outcome set to the failure and a pointer to whatever artifact or signal expl
 report a tick as successful because artifacts exist — a tick is successful when the evaluation
 recorded a score, not when the files were written.
 
+## A contradiction you act on is a contradiction you must name
+
+When two records of this run disagree — the run advertises a live job whose own
+status says it terminated, a handoff carries a snapshot the state file contradicts,
+a node is marked done for a job still running — declining to trust the stale one is
+the right move and it is INVISIBLE. A reader cannot tell a wait you correctly
+skipped from a wait you forgot.
+
+So emit a signal that names the object: `evor_signal_emit` carrying the job id, node
+id or file whose two records disagree, `shapes: ["failure"]` or `["limit"]`, and the
+severity the consequence warrants. `capability-gap` is not that signal — it reports
+on your own tooling, not on this run's state, and a reader looking for the
+disagreement will not find it there.
+
 ## Reporting what you deliberately did NOT do
 
 **First: do the work.** This section is not permission to withhold. If the value is yours to

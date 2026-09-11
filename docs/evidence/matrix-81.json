@@ -5693,8 +5693,8 @@
    ],
    "stale": {
     "since": "2026-09-06",
-    "agent_sha256_now": "6c1416011493be8e",
-    "reason": "The agent file changed after the 8.1 run: this role gained a capability-gap disclosure channel, closed-set kind vocabulary and severity-by-consequence guidance during the evor-eval-bench loop. The tier comparison in §3 was measured against the PREVIOUS text and no longer describes what ships. The numbers are not wrong about what they measured; they are no longer about this agent. Amended 2026-09-06: the file changed again — evor-tick's exploration section now says run state comes from the evor tools rather than from Glob/Grep/Read. The row was already stale; recording the new sha keeps this edit from hiding inside the previous one, which is what the gate is for.",
+    "agent_sha256_now": "8983d729b2ba9271",
+    "reason": "The agent file changed after the 8.1 run: this role gained a capability-gap disclosure channel, closed-set kind vocabulary and severity-by-consequence guidance during the evor-eval-bench loop. The tier comparison in §3 was measured against the PREVIOUS text and no longer describes what ships. The numbers are not wrong about what they measured; they are no longer about this agent. Amended 2026-09-06: the file changed again — evor-tick's exploration section now says run state comes from the evor tools rather than from Glob/Grep/Read. The row was already stale; recording the new sha keeps this edit from hiding inside the previous one, which is what the gate is for. Amended 2026-09-11: the role now also states that a contradiction it acts on must be named in a signal carrying the disagreeing object, since declining to trust a stale record is invisible to a reader. The row stays stale; only the sha it went stale AT is re-recorded.",
     "action": "re-measure this role before citing its §3 row"
    }
   }

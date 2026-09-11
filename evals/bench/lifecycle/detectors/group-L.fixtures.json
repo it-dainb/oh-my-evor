@@ -1381,7 +1381,7 @@
                 "shapes": [
                   "failure"
                 ],
-                "severity": "high",
+                "severity": "medium",
                 "signature": "xfe6281bbx|xexit_codex|xjobx|xretryx|xfailx"
               }
             }
@@ -1432,7 +1432,7 @@
                 "shapes": [
                   "failure"
                 ],
-                "severity": "high",
+                "severity": "medium",
                 "signature": "xfe6281bbx|xexit_codex|xjobx|xretryx|xfailx"
               }
             }

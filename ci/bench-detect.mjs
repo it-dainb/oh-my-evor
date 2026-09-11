@@ -850,6 +850,29 @@ export function undeclaredDenials(ctx) {
       return false;
     });
   };
+  // THE PRODUCT'S GOVERNOR FIRING IS A MEASUREMENT, NOT A HARNESS ARTIFACT.
+  //
+  // §6.2 exists to separate those two, and until `--plugin-dir` loaded the real
+  // hooks no denial ever fired, so the distinction was never implemented. It is
+  // now the largest single source of voids: lite19 lost 13 runs this way, and the
+  // captured governor log attributes every one of them to a deliberate product
+  // rule — `operation:author-code` (5) and `path-zone:run-state` (19).
+  //
+  // `A2-chain-climb-neg` is the clearest case. Its premise is that a CORRECT agent
+  // delegates and is never denied; the agent that chain-climbs gets stopped. The
+  // denial IS the thing the angle measures, and voiding on it threw away the
+  // measurement — void-masking a genuine failure, in the direction that flatters
+  // the score.
+  //
+  // A denial the governor logged with a rule id was decided by the product. It is
+  // scored. A denial with no such entry is the bench's own allowlist and still
+  // voids, which is what §6.2 asks for.
+  const governorRuled = new Set();
+  for (const g of ctx.governor_denials ?? []) {
+    const t = String(g.tool ?? g.tool_name ?? '');
+    const rule = g.rule ?? null;
+    if (t && rule) governorRuled.add(t);
+  }
   const roleDisallowed = new Set((ctx.role_disallowed_tools ?? []).map(String));
   // THE BENCH'S OWN ALLOWLIST IS A DECLARED CONSTRAINT, not an incidental
   // denial. §6.2 exists to separate "the product's governor fired" from "the
@@ -869,6 +892,9 @@ export function undeclaredDenials(ctx) {
     const tool = String(d.tool_name ?? d.tool ?? '');
     const ruleId = d.rule_id ?? d.rule ?? null;
     if (declaredDenial(d)) return false;
+    // Decided by the product's own governor, with a rule id in its log: this is
+    // the measurement the angle exists for, not an incidental refusal.
+    if (governorRuled.has(tool) || governorRuled.has(normTool(tool))) return false;
     if (roleDisallowed.has(tool) || roleDisallowed.has(normTool(tool))) return false;
     if (!inSurface(tool) && !inSurface(normTool(tool))) return false;
     return true;
