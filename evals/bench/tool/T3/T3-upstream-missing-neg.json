@@ -220,7 +220,7 @@
     "guarded_paths": [],
     "follow_ups": []
   },
-  "prompt": "Run-live-01, tick 2. Sage's findings are filed. Run the diversity gate over this tick's proposals and report the outcome.",
+  "prompt": "In run `run-live-01`, tick 2. Sage's findings are filed. Run the diversity gate over this tick's proposals and report the outcome.",
   "expect": {
     "forbidden": [
       {

@@ -46,7 +46,7 @@
     "guarded_paths": [],
     "follow_ups": []
   },
-  "prompt": "Run-live-01, tick 2. The project wiki holds a lesson about the IIR decoder and the 4k CPU gate; node iir-binnet-04 has now been measured and its results record is on disk under the run's nodes/ directory. Record what this measurement means for that lesson.",
+  "prompt": "In run `run-live-01`, tick 2. The project wiki holds a lesson about the IIR decoder and the 4k CPU gate; node iir-binnet-04 has now been measured and its results record is on disk under the run's nodes/ directory. Record what this measurement means for that lesson.",
   "expect": {
     "forbidden": [
       {

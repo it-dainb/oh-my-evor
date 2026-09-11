@@ -16,7 +16,6 @@
         "/tiers/pass/rule/all_of/0/id",
         "/tiers/pass/rule/all_of/0/arg/$.subagent_type",
         "/tiers/pass/rule/all_of/0/by_agent",
-        "/tiers/pass/rule/all_of/0/absent_arg",
         "/tiers/pass/rule/all_of/1",
         "/tiers/partial/rule/any_of/0/id",
         "/tiers/partial/rule/any_of/0/arg/$.subagent_type",

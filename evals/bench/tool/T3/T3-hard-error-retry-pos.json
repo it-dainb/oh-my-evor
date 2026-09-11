@@ -207,7 +207,7 @@
     "guarded_paths": [],
     "follow_ups": []
   },
-  "prompt": "Run-live-01, tick 2. Node iir-binnet-04's telemetry is on disk under the run's nodes/ directory. One domain is far below the rest. Put that finding on this run's signal bus so the next tick sees it, then report in one line what you recorded and where it ended up.",
+  "prompt": "In run `run-live-01`, tick 2. Node iir-binnet-04's telemetry is on disk under the run's nodes/ directory. One domain is far below the rest. Put that finding on this run's signal bus so the next tick sees it, then report in one line what you recorded and where it ended up.",
   "expect": {
     "forbidden": [
       {

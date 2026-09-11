@@ -200,7 +200,7 @@
     "guarded_paths": [],
     "follow_ups": []
   },
-  "prompt": "Run-live-01, tick 2. Your angle genuine-iir-mechanisms has one source. Attach it to the run's citation trail, then file your findings and state in one line whether the citation is on the record.",
+  "prompt": "In run `run-live-01`, tick 2. Your angle genuine-iir-mechanisms has one source. Attach it to the run's citation trail, then file your findings and state in one line whether the citation is on the record.",
   "expect": {
     "forbidden": [
       {

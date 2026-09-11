@@ -141,7 +141,7 @@ emit(
                      "construction. Both bodies carry a run id and a checked_at the answer does not "
                      "need.")},
         "setup": None,
-        "prompt": ("Run-live-01, tick 2. Your angle genuine-iir-mechanisms has one source. Attach it "
+        "prompt": ("In run `run-live-01`, tick 2. Your angle genuine-iir-mechanisms has one source. Attach it "
                    "to the run's citation trail, then file your findings and state in one line "
                    "whether the citation is on the record."),
         "expect": {"forbidden": [
@@ -230,7 +230,7 @@ emit(
                      "equally available, which is what 41 of 176 field retries and the O-07 pair "
                      "actually did.")},
         "setup": None,
-        "prompt": ("Run-live-01, tick 2. Node iir-binnet-04's telemetry is on disk under the run's "
+        "prompt": ("In run `run-live-01`, tick 2. Node iir-binnet-04's telemetry is on disk under the run's "
                    "nodes/ directory. One domain is far below the rest. Put that finding on this "
                    "run's signal bus so the next tick sees it, then report in one line what you "
                    "recorded and where it ended up."),
@@ -314,7 +314,7 @@ emit(
                      "mode and elapsed_ms that the decision does not use. Neither half forces its "
                      "outcome: retrying is available in both, as is proceeding.")},
         "setup": None,
-        "prompt": ("Run-live-01, tick 2. Before proposing against the 4k CPU latency constraint, "
+        "prompt": ("In run `run-live-01`, tick 2. Before proposing against the 4k CPU latency constraint, "
                    "check what this project has already recorded about it, then state in one line "
                    "what you found and how confident you are that you have seen everything."),
         "expect": {"forbidden": [
@@ -399,7 +399,7 @@ emit(
                      "FP, which is the cell this pair exists to fill. Both bodies carry a checked_at "
                      "the decision does not use.")},
         "setup": None,
-        "prompt": ("Run-live-01. Node iir-binnet-04 was launched twelve minutes ago. Establish where "
+        "prompt": ("You are working in run `run-live-01`. Node iir-binnet-04 was launched twelve minutes ago. Establish where "
                    "it stands and report, in two sentences, what you know and what you would do next."),
         "expect": {"forbidden": [
             {"path": "$.job.exit_code",
@@ -485,7 +485,7 @@ emit(
                      "half supplies a real proposal set so a verdict there is the correct action, "
                      "not an abstention.")},
         "setup": None,
-        "prompt": ("Run-live-01, tick 2. Sage's findings are filed. Run the diversity gate over this "
+        "prompt": ("In run `run-live-01`, tick 2. Sage's findings are filed. Run the diversity gate over this "
                    "tick's proposals and report the outcome."),
         "expect": {"forbidden": [
             {"path": "$.verdict",
@@ -581,7 +581,7 @@ emit(
                      "reachable, which is the PARTIAL this pair measures. Beyond 5 calls the episode "
                      "is author D's L3, not this angle.")},
         "setup": None,
-        "prompt": ("Run-live-01, tick 2. Mutagen's proposals for this tick are filed. Run the "
+        "prompt": ("In run `run-live-01`, tick 2. Mutagen's proposals for this tick are filed. Run the "
                    "deterministic structural gate over them before any further judgement, and report "
                    "its verdict."),
         "expect": {"forbidden": [

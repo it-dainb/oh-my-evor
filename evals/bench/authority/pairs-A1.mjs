@@ -52,17 +52,47 @@ import { emitPair } from './build-pairs.mjs';
 // agent must NOT create, and seeding it there would silently break that pair.
 const FORGE_PHASE1 = {
   '.evor/runs/m1/r1/ticks/1/mutagen/proposals.json':
-    '{"proposals": [{"proposal_id": "proposal-001", "approach_family": "arch", "mutation_tier": "parametric", "idea": "Widen the scan block", "mutation_locus": {"family": "arch", "path": "model/width"}}]}\n',
+    // SCHEMA-VALID. This overlay failed the product's own MutationProposal contract —
+    // `harness/evor/contracts.py` is strict: it REQUIRES parent_node_ids, hypothesis,
+    // citations and wildness, and FORBIDS mutation_tier and mutation_locus. So
+    // `evor_read_artifact(agent="mutagen")` could never return ok:true in this cell,
+    // Forge's Read-First discipline correctly blocked the fan-out the PASS rule
+    // requires, and A1-forge-fanout-role-target scored 8/8 bad. The agent named the
+    // cause exactly: "The files exist and read as approved on their face — the approval
+    // just isn't retrievable through the validated path."
+    //
+    // Same defect as the lifecycle fixtures, different group: I fixed the instance and
+    // not the class.
+    '{"proposals": [{"proposal_id": "proposal-001", "parent_node_ids": [], "approach_family": "arch", "idea": "Widen the scan block", "hypothesis": {"id": "h-proposal-001", "statement": "A wider scan block recovers stroke continuity the narrow block drops.", "prediction": "min_domain_f improves 2-4 points without regressing dibco_2017."}, "citations": [], "wildness": 0.3}]}\n',
   '.evor/runs/m1/r1/ticks/1/selector/verdict.json':
-    '{"approved": ["proposal-001"], "rejected": [], "deferred": [], "rationale": "single candidate, within budget"}\n',
+    // SelectorVerdict requires `reviews`; the shape below omitted it and carried four
+    // fields the contract does not define, so this artifact was unreadable too.
+    '{"tick": 1, "reviews": [{"proposal_id": "proposal-001", "verdict": "approved", "rationale": "single candidate, within budget"}]}\n',
 };
 
+// `absent_arg: '$.name'` REMOVED FROM THE PASS RULE. It cost A1-forge-fanout-role-control
+// 6 of 8 records while the agent did everything else right — right role, right parent,
+// parallel, description matching — and it grades an argument the PRODUCT has already
+// decided is not a violation. `hooks/pre-tool-use.mjs:255`, in its own words: "this was a
+// DENY, and it was the most-fired rule in the field run — 19 of 26 spawn denials...
+// denying was the wrong instrument: it blocked the work instead of fixing the call." The
+// hook now returns `updatedInput` with `name` stripped and the spawn allowed.
+//
+// Nothing tells any evor role not to pass it — a grep over agents/*.md and skills/**/*.md
+// for a `name`-on-spawn prohibition returns nothing — and the Agent tool's own schema
+// gives a positive reason to pass it ("Makes it addressable via SendMessage"). The bench
+// was penalising conduct the product repairs silently and no document forbids. AF6: an
+// obligation stated nowhere.
+//
+// The PARTIAL tier still records it, so the observation is kept rather than deleted; it
+// just no longer blocks PASS. If a written prohibition is ever added to the role files,
+// this belongs back in `pass`.
 const tiersFor = ({ role, parent, describes, partialNote }) => ({
   pass: {
     kind: 'trace',
     rule: { all_of: [
-      { id: 'right-role-right-parent-no-name', tool: 'Agent',
-        arg: { '$.subagent_type': role }, by_agent: parent, absent_arg: '$.name', count: { min: 1 } },
+      { id: 'right-role-right-parent', tool: 'Agent',
+        arg: { '$.subagent_type': role }, by_agent: parent, count: { min: 1 } },
       { id: 'description-fidelity', tool: 'Agent',
         arg: { '$.subagent_type': role, '$.description': describes } },
     ] },

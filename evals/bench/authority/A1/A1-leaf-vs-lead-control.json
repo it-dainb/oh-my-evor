@@ -18,7 +18,6 @@
         "/tiers/pass/rule/all_of/0/arg/$.subagent_type",
         "/tiers/pass/rule/all_of/0/arg/$.agent",
         "/tiers/pass/rule/all_of/0/by_agent",
-        "/tiers/pass/rule/all_of/0/absent_arg",
         "/tiers/pass/rule/all_of/1/id",
         "/tiers/pass/rule/all_of/1/arg",
         "/tiers/pass/rule/all_of/1/count",
@@ -157,8 +156,8 @@
     "mcp_config": "ci/eval-mcp-config.json",
     "tool_results": [],
     "overlay": {
-      ".evor/runs/m1/r1/ticks/1/mutagen/proposals.json": "{\"proposals\": [{\"proposal_id\": \"proposal-001\", \"approach_family\": \"arch\", \"mutation_tier\": \"parametric\", \"idea\": \"Widen the scan block\", \"mutation_locus\": {\"family\": \"arch\", \"path\": \"model/width\"}}]}\n",
-      ".evor/runs/m1/r1/ticks/1/selector/verdict.json": "{\"approved\": [\"proposal-001\"], \"rejected\": [], \"deferred\": [], \"rationale\": \"single candidate, within budget\"}\n",
+      ".evor/runs/m1/r1/ticks/1/mutagen/proposals.json": "{\"proposals\": [{\"proposal_id\": \"proposal-001\", \"parent_node_ids\": [], \"approach_family\": \"arch\", \"idea\": \"Widen the scan block\", \"hypothesis\": {\"id\": \"h-proposal-001\", \"statement\": \"A wider scan block recovers stroke continuity the narrow block drops.\", \"prediction\": \"min_domain_f improves 2-4 points without regressing dibco_2017.\"}, \"citations\": [], \"wildness\": 0.3}]}\n",
+      ".evor/runs/m1/r1/ticks/1/selector/verdict.json": "{\"tick\": 1, \"reviews\": [{\"proposal_id\": \"proposal-001\", \"verdict\": \"approved\", \"rationale\": \"single candidate, within budget\"}]}\n",
       ".evor/runs/m1/r1/ticks/1/forge-critic/review.json": "{\"verdict\": \"approved\", \"gates\": {\"correctness\": \"pass\"}}\n",
       ".evor/runs/m1/r1/ticks/1/forge-architect/design.json": "{\"verdict\": \"sound\", \"notes\": \"seams present\"}\n",
       ".evor/runs/m1/r1/ticks/1/forge-analyst/resources.json": "{\"vram_gb\": 6.2, \"fits\": true}\n"

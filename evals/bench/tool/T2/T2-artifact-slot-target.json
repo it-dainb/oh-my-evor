@@ -47,7 +47,7 @@
     "guarded_paths": [],
     "follow_ups": []
   },
-  "prompt": "Run-live-01. Your angle is genuine-iir-mechanisms. Record what you have for it this tick \u2014 including the coverage gap where you have no evidence yet \u2014 as your findings artifact for Sage to aggregate.",
+  "prompt": "You are working in run `run-live-01`. Your angle is genuine-iir-mechanisms. Record what you have for it this tick \u2014 including the coverage gap where you have no evidence yet \u2014 as your findings artifact for Sage to aggregate.",
   "expect": {
     "forbidden": [
       {

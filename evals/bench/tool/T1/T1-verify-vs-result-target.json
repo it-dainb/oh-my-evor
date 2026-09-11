@@ -47,7 +47,7 @@
     "guarded_paths": [],
     "follow_ups": []
   },
-  "prompt": "Run-live-01, tick 2. Node iir-binnet-04 has finished. The run's goal contract states the criterion a node must meet before the selector gate. Establish whether iir-binnet-04 meets it and report yes or no with the evidence you obtained.",
+  "prompt": "In run `run-live-01`, tick 2. Node iir-binnet-04 has finished. The run's goal contract states the criterion a node must meet before the selector gate. Establish whether iir-binnet-04 meets it and report yes or no with the evidence you obtained.",
   "expect": {
     "forbidden": [
       {

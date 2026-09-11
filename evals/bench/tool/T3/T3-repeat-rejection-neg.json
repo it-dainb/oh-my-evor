@@ -208,7 +208,7 @@
     "guarded_paths": [],
     "follow_ups": []
   },
-  "prompt": "Run-live-01, tick 2. Mutagen's proposals for this tick are filed. Run the deterministic structural gate over them before any further judgement, and report its verdict.",
+  "prompt": "In run `run-live-01`, tick 2. Mutagen's proposals for this tick are filed. Run the deterministic structural gate over them before any further judgement, and report its verdict.",
   "expect": {
     "forbidden": [
       {

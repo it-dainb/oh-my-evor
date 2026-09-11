@@ -47,7 +47,7 @@
     "guarded_paths": [],
     "follow_ups": []
   },
-  "prompt": "Run-live-01, tick 2. The selector's verdict for this tick is on disk under the run's ticks/2/ directory and it approved proposal h001. Register the candidate in the evolution tree so it can be launched, then state the name you registered.",
+  "prompt": "In run `run-live-01`, tick 2. The selector's verdict for this tick is on disk under the run's ticks/2/ directory and it approved proposal h001. Register the candidate in the evolution tree so it can be launched, then state the name you registered.",
   "expect": {
     "forbidden": [
       {

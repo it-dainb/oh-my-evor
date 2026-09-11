@@ -320,7 +320,7 @@ emit(
         "setup": {"env": {"EVOR_ROOT": "{{FIXTURE}}/.evor", "EVOR_MISSION_ID":
                           "binarization-worldmodel-min98-2026-08"},
                   "mcp_config": REAL_MCP, "tool_results": []},
-        "prompt": ("Run-live-01, tick 2. Node iir-binnet-04 has finished. The run's goal contract "
+        "prompt": ("In run `run-live-01`, tick 2. Node iir-binnet-04 has finished. The run's goal contract "
                    "states the criterion a node must meet before the selector gate. Establish whether "
                    "iir-binnet-04 meets it and report yes or no with the evidence you obtained."),
         "expect": {"forbidden": [
@@ -401,7 +401,7 @@ emit(
         "setup": {"env": {"EVOR_ROOT": "{{FIXTURE}}/.evor", "EVOR_MISSION_ID":
                           "binarization-worldmodel-min98-2026-08"},
                   "mcp_config": REAL_MCP, "tool_results": []},
-        "prompt": ("Run-live-01, tick 2. Two proposals are on the table (h001 arch, h002 "
+        "prompt": ("In run `run-live-01`, tick 2. Two proposals are on the table (h001 arch, h002 "
                    "data-augmentation). Establish this run's approach-family win history and state "
                    "which families have been winning, with the evidence you obtained. Do not issue a "
                    "verdict yet."),
@@ -475,7 +475,7 @@ emit(
         "setup": {"env": {"EVOR_ROOT": "{{FIXTURE}}/.evor", "EVOR_MISSION_ID":
                           "binarization-worldmodel-min98-2026-08"},
                   "mcp_config": REAL_MCP, "tool_results": []},
-        "prompt": ("Run-live-01, tick 2. You are about to propose against the 4k CPU latency "
+        "prompt": ("In run `run-live-01`, tick 2. You are about to propose against the 4k CPU latency "
                    "constraint. Establish what this project has already recorded on that subject and "
                    "state it back, with what you called to find it. Do not write proposals yet."),
         "expect": {"forbidden": [

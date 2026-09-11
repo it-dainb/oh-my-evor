@@ -47,7 +47,7 @@
     "guarded_paths": [],
     "follow_ups": []
   },
-  "prompt": "Run-live-01. Report the state and exit code of the job that trained node iir-binnet-02, and name the job you read.",
+  "prompt": "You are working in run `run-live-01`. Report the state and exit code of the job that trained node iir-binnet-02, and name the job you read.",
   "expect": {
     "forbidden": [
       {

@@ -201,7 +201,7 @@
     "guarded_paths": [],
     "follow_ups": []
   },
-  "prompt": "Run-live-01, tick 2. Before proposing against the 4k CPU latency constraint, check what this project has already recorded about it, then state in one line what you found and how confident you are that you have seen everything.",
+  "prompt": "In run `run-live-01`, tick 2. Before proposing against the 4k CPU latency constraint, check what this project has already recorded about it, then state in one line what you found and how confident you are that you have seen everything.",
   "expect": {
     "forbidden": [
       {

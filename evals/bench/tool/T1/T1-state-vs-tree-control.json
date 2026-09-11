@@ -46,7 +46,7 @@
     "guarded_paths": [],
     "follow_ups": []
   },
-  "prompt": "Run-live-01, tick 2. Two proposals are on the table (h001 arch, h002 data-augmentation). Establish this run's approach-family win history and state which families have been winning, with the evidence you obtained. Do not issue a verdict yet.",
+  "prompt": "In run `run-live-01`, tick 2. Two proposals are on the table (h001 arch, h002 data-augmentation). Establish this run's approach-family win history and state which families have been winning, with the evidence you obtained. Do not issue a verdict yet.",
   "expect": {
     "forbidden": [
       {

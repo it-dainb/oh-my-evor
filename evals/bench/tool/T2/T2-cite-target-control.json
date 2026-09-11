@@ -48,7 +48,7 @@
     "guarded_paths": [],
     "follow_ups": []
   },
-  "prompt": "Run-live-01, tick 2. Your angle genuine-iir-mechanisms has one source recorded in your finding file under the run's ticks/2/sage-junior/ directory. Attach that source to this run so the citation trail carries it, then say in one line what you attached it to.",
+  "prompt": "In run `run-live-01`, tick 2. Your angle genuine-iir-mechanisms has one source recorded in your finding file under the run's ticks/2/sage-junior/ directory. Attach that source to this run so the citation trail carries it, then say in one line what you attached it to.",
   "expect": {
     "forbidden": [
       {

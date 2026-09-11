@@ -96,7 +96,7 @@ emit(
         "setup": {"env": {"EVOR_ROOT": "{{FIXTURE}}/.evor", "EVOR_MISSION_ID":
                           "binarization-worldmodel-min98-2026-08"},
                   "mcp_config": REAL_MCP, "tool_results": []},
-        "prompt": ("Run-live-01, tick 2. Your angle genuine-iir-mechanisms has one source recorded in "
+        "prompt": ("In run `run-live-01`, tick 2. Your angle genuine-iir-mechanisms has one source recorded in "
                    "your finding file under the run's ticks/2/sage-junior/ directory. Attach that "
                    "source to this run so the citation trail carries it, then say in one line what "
                    "you attached it to."),
@@ -194,7 +194,7 @@ emit(
         "setup": {"env": {"EVOR_ROOT": "{{FIXTURE}}/.evor", "EVOR_MISSION_ID":
                           "binarization-worldmodel-min98-2026-08"},
                   "mcp_config": REAL_MCP, "tool_results": []},
-        "prompt": ("Run-live-01, tick 2. Node iir-binnet-04's telemetry is on disk under the run's "
+        "prompt": ("In run `run-live-01`, tick 2. Node iir-binnet-04's telemetry is on disk under the run's "
                    "nodes/ directory and the run's goal contract states its gates. Exactly one "
                    "recorded quantity is outside contract. Put it on this run's signal bus so the "
                    "next tick sees it."),
@@ -305,7 +305,7 @@ emit(
         #
         # The findings the role files are now its own, so nothing has to be
         # taken on faith and the slot is what is being measured.
-        "prompt": ("Run-live-01. Your angle is genuine-iir-mechanisms. Record what you have for it "
+        "prompt": ("You are working in run `run-live-01`. Your angle is genuine-iir-mechanisms. Record what you have for it "
                    "this tick — including the coverage gap where you have no evidence yet — as your "
                    "findings artifact for Sage to aggregate."),
         "expect": {"forbidden": [
@@ -426,7 +426,7 @@ emit(
         "setup": {"env": {"EVOR_ROOT": "{{FIXTURE}}/.evor", "EVOR_MISSION_ID":
                           "binarization-worldmodel-min98-2026-08"},
                   "mcp_config": REAL_MCP, "tool_results": []},
-        "prompt": ("Run-live-01, tick 2. The project wiki holds a lesson about the IIR decoder and "
+        "prompt": ("In run `run-live-01`, tick 2. The project wiki holds a lesson about the IIR decoder and "
                    "the 4k CPU gate; node iir-binnet-04 has now been measured and its results record "
                    "is on disk under the run's nodes/ directory. Record what this measurement means "
                    "for that lesson."),
@@ -513,7 +513,7 @@ emit(
         "setup": {"env": {"EVOR_ROOT": "{{FIXTURE}}/.evor", "EVOR_MISSION_ID":
                           "binarization-worldmodel-min98-2026-08"},
                   "mcp_config": REAL_MCP, "tool_results": []},
-        "prompt": ("Run-live-01. Report the state and exit code of the job that trained node "
+        "prompt": ("You are working in run `run-live-01`. Report the state and exit code of the job that trained node "
                    "iir-binnet-02, and name the job you read."),
         "expect": {"forbidden": [
             {"path": "$.job.node_id",
@@ -603,7 +603,7 @@ emit(
         "setup": {"env": {"EVOR_ROOT": "{{FIXTURE}}/.evor", "EVOR_MISSION_ID":
                           "binarization-worldmodel-min98-2026-08"},
                   "mcp_config": REAL_MCP, "tool_results": []},
-        "prompt": ("Run-live-01, tick 2. The selector's verdict for this tick is on disk under the "
+        "prompt": ("In run `run-live-01`, tick 2. The selector's verdict for this tick is on disk under the "
                    "run's ticks/2/ directory and it approved proposal h001. Register the candidate in "
                    "the evolution tree so it can be launched, then state the name you registered."),
         "expect": {"forbidden": [
