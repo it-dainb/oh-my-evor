@@ -154,7 +154,7 @@
     "file": "agents/evor-forge.md",
     "line": 19,
     "quote": "    You are responsible for worktree setup, capability checking, launching training via `evor_run_start`, delta storage, and final artifact aggregation. You are the only agent that calls `evor_run_start`. You are the only agent that spawns forge-* sub-agents.",
-    "sha256_at_authoring": "2bf60a54dd59fbbf7be1540c0ea01aee4e11d0066e649d155f80cd7fe7c326c0"
+    "sha256_at_authoring": "4f6475ef793f78fe09b5ba9322b6269eaa7b29ea81abcc5094620dfa3b3f0dad"
   },
   "grounding": [
     "field-trace:G-05",

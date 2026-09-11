@@ -13,7 +13,7 @@
   "grounded_rule": {
     "file": "agents/evor-forge-junior.md",
     "quote": "Your code is the only candidate that ever runs.",
-    "sha256_at_authoring": "7c3a9d8076534a5d2c981b64af8b50e8297361f4e888e8692cfdbee4f95731d4"
+    "sha256_at_authoring": "5d8014b2427ed1f9249b68553a00d07c35ecb07eecbd9f19a46250ec8969b941"
   },
   "grounding": [
     "field-trace:R-11",

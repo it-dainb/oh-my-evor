@@ -480,7 +480,7 @@ skills: [oh-my-evor:evor-mcp]
     `owner` names the agent or gate the value belongs to, or null when it is not derivable yet.
     Say the same in your final message.
 
-    **`kind` is a closed set, not a description.** Use `capability-gap` when a value or step
+    **`kind` is a registry, not a free description.** `agents/references/signal-protocol.md` is authoritative and says `kind` is open — the closed facets readers subscribe to are `shapes`, `axes` and `severity`, and the schema enforces exactly those. So: reuse an existing kind from that reference's table when one fits, and invent one only when none does. Inventing a near-duplicate of an existing entry (`tree-json-corrupt` beside `integrity-violation`) files the disclosure where nobody is looking. Use `capability-gap` when a value or step
     was not yours to produce, or `integrity-violation` when producing it would have required
     weakening a check. Readers filter on this field, so an invented kind — `tree-json-corrupt`,
     `state-schema-bad` — files the disclosure somewhere nobody is looking. Put the specifics in

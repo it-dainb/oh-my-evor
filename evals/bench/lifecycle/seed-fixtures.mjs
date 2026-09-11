@@ -175,6 +175,30 @@ function baseTree() {
   };
 }
 
+// SCHEMA-VALID BY CONSTRUCTION. These proposals were missing five of eight
+// MutationProposalSchema required fields — idea, hypothesis, citations, wildness,
+// critic_review — and the tick is the one role whose task makes it read them through
+// the schema-validating tools (45 of 77 tick records call evor_doctor, 55 call
+// evor_tree_read). It correctly filed `capability-gap` about the invalid artifact,
+// every subject-scoped declaration excludes that kind, and the cell became
+// unpassable: §4.5 nothing-can-pass, violated by two individually-correct decisions
+// meeting. The agents were right about this for four calibrations.
+const PROPOSAL = (id, name, parents) => ({
+  proposal_id: id,
+  name,
+  approach_family: 'arch',
+  parent_node_ids: parents,
+  idea: 'Widen the IIR scan to four directions and share the gate weights across passes.',
+  hypothesis: {
+    id: `h-${id}`,
+    statement: 'Multi-directional IIR scanning recovers stroke continuity the single-pass variant drops.',
+    prediction: 'min_domain_f improves by 3-6 points on palmleaf_khmer without regressing dibco_2017.',
+  },
+  citations: [],
+  wildness: 0.35,
+});
+
+
 /**
  * Build one fixture tree.
  *
@@ -204,7 +228,7 @@ function buildTree(patch) {
     strategy: { winning_families: { arch: 1, 'data-augmentation': 0 }, updated_at: '2026-08-24T02:00:08Z' },
     angleRegistry: { angles: [{ angle_id: 'palmleaf_khmer', covered: true }, { angle_id: 'palmleaf_balinese', covered: false }] },
     signals: [],
-    proposals: { tick: 1, proposals: [{ proposal_id: 'p-001', name: NODE_SLUG, approach_family: 'arch', parent_node_ids: [] }] },
+    proposals: { tick: 1, proposals: [PROPOSAL('p-001', NODE_SLUG, [])] },
     verdict: { tick: 1, reviews: [{ proposal_id: 'p-001', critic_review: { verdict: 'approved' } }] },
     forgeReport: { node_id: NODE_UUID, node_name: NODE_SLUG, recorded: true, worktree: `worktrees/${NODE_SLUG}`, harness_exit: 0 },
     jobs: [{
@@ -333,7 +357,7 @@ const PAIRS = [
     base: (t) => {
       t.handoffName = 'evor_to_selector';
       t.strategy = { winning_families: { arch: 0, 'data-augmentation': 2 }, updated_at: '2026-08-24T02:04:00Z' };
-      t.proposals = { tick: 2, proposals: [{ proposal_id: 'p-101', name: 'iir-scan-binnet-03', approach_family: 'arch', parent_node_ids: [NODE_UUID] }] };
+      t.proposals = { tick: 2, proposals: [PROPOSAL('p-101', 'iir-scan-binnet-03', [NODE_UUID])] };
       t.tickState = { tick: 2, current_step: 4, step_status: 'running', integrity_verdict: null, auto_resume_count: 0, step_history: [1, 2, 3, 4], updated_at: '2026-08-24T02:05:00Z' };
       t.verdict = null;
     },

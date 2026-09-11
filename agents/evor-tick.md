@@ -149,7 +149,11 @@ else once the tick closes.
 ## Reporting a failed tick
 
 A tick that fails is a normal outcome, not an error to hide. Return the same compact shape with
-the outcome set to the failure and a pointer to whatever artifact or signal explains it. Never
+the outcome set to the failure and a pointer to whatever artifact or signal explains it. The
+pointer rule above governs what may go in that field: a `pointers` triple names an ARTIFACT you
+wrote or read, so when nothing was produced you omit `pointers` entirely and the `error` string is
+the complete answer on its own. A signal you emitted is not a pointer target — name it in `error`.
+Never
 report a tick as successful because artifacts exist — a tick is successful when the evaluation
 recorded a score, not when the files were written.
 
@@ -194,7 +198,7 @@ evor_signal_emit({
 `owner` is the agent or gate the value actually belongs to when there is one, and null when it
 is not derivable yet. Name it in your return line too.
 
-**`kind` is a closed set, not a description.** `capability-gap` when the value was not yours to produce; `integrity-violation` when producing it would have meant weakening a check. Readers filter on this field, so an invented kind — `tree-json-corrupt`, `state-schema-bad` — files the disclosure where nobody is looking. The specifics go in `signature` and `evidence`, which are free text.
+**`kind` is a registry, not a free description.** `agents/references/signal-protocol.md` is authoritative and says `kind` is open — the closed facets readers subscribe to are `shapes`, `axes` and `severity`, and the schema enforces exactly those. So: reuse an existing kind from that reference's table when one fits, and invent one only when none does. Inventing a near-duplicate of an existing entry (`tree-json-corrupt` beside `integrity-violation`) files the disclosure where nobody is looking. `capability-gap` when the value was not yours to produce; `integrity-violation` when producing it would have meant weakening a check. Readers filter on this field, so an invented kind — `tree-json-corrupt`, `state-schema-bad` — files the disclosure where nobody is looking. The specifics go in `signature` and `evidence`, which are free text.
 
     **Severity and shapes follow the consequence, not a template.** A withholding the run can
     continue past is `shapes: ["limit"], severity: "medium"`. One that stops the step — nothing
