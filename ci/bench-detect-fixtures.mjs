@@ -84,6 +84,16 @@ function contextFor(caseObj, extra = {}) {
     denials: caseObj.denials ?? deriveDenials(trace),
     intended_denials: caseObj.intended_denials ?? [],
     role_disallowed_tools: caseObj.role_disallowed_tools ?? [],
+    // THE OTHER TWO SUBTRACTIONS §6.2 ADVERTISES. `undeclaredDenials` subtracts three
+    // things — a denial the scenario declared, one the ROLE disallows, one the
+    // product's GOVERNOR decided — and it also treats a tool the bench never granted
+    // as a declared constraint rather than an incidental refusal. This builder passed
+    // the first two through and dropped the last two, so a fixture case exercising
+    // them was evaluated against a ctx that could not see them and fired when it
+    // should not have. Two evaluators reading the same fixture file must build the
+    // same context, or the fixture tests whichever one it happens to reach.
+    governor_denials: caseObj.governor_denials ?? [],
+    ...(caseObj.harness_allowed_tools ? { harness_allowed_tools: caseObj.harness_allowed_tools } : {}),
     postconditions: caseObj.postconditions ?? {},
     ...extra,
   };

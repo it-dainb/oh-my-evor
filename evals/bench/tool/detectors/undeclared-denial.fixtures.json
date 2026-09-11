@@ -2,10 +2,10 @@
  "detector": "undeclared-denial",
  "from_scenario": "T1/T1-result-vs-status-target.json",
  "detector_path": "/expect/void_if/0",
- "why": "Replays the NO-1/\u00a76.2 void rule. The rule moved from the weak trace form `{any_of:[{tool:'*',denied:true}]}` \u2014 which voided on ANY denial of ANY tool, including one the scenario declared and one the product's governor decided deliberately \u2014 to the strong `denial` detector reading `undeclared`, which subtracts declared denials, role-disallowed tools, and governor-decided ones. These cases therefore supply `denials` + `intended_denials` rather than a trace carrying `denied` flags, because the new rule reads the denial record, not the per-call flag.",
+ "why": "Replays the NO-1/\u00a76.2 void rule. The rule moved from the weak trace form `{any_of:[{tool:'*',denied:true}]}` \u2014 which voided on ANY denial of ANY tool, including one the scenario declared and one the product's governor decided deliberately \u2014 to the strong `denial` detector reading `undeclared`, which subtracts declared denials, role-disallowed tools, and governor-decided ones. These cases therefore supply `denials` + `intended_denials` rather than a trace carrying `denied` flags, because the new rule reads the denial record, not the per-call flag. Amended: the first positive case was named 'a governor denial on Bash' and asserted the detector FIRES \u2014 asserting that a governor decision counts as undeclared, which is the opposite of what this rule exists to do and of what this file's own `why` says. It pinned the pre-fix behaviour in the case named after the fix. Renamed to what it actually tests, and the two advertised subtractions that no case exercised \u2014 governor-decided denials, and tools the bench never granted \u2014 now have one positive and one negative each.",
  "positive": [
   {
-   "name": "a governor denial on Bash the scenario never declared",
+   "name": "a denial with no governor log entry \u2014 the bench's own allowlist",
    "denials": [
     {
      "tool_name": "Bash",
@@ -17,7 +17,8 @@
    ],
    "intended_denials": [],
    "role_disallowed_tools": [],
-   "trace": []
+   "trace": [],
+   "governor_denials": []
   },
   {
    "name": "a denied spawn the scenario never declared",
@@ -32,7 +33,8 @@
    ],
    "intended_denials": [],
    "role_disallowed_tools": [],
-   "trace": []
+   "trace": [],
+   "governor_denials": []
   },
   {
    "name": "an undeclared denial among successful calls",
@@ -56,7 +58,30 @@
      "tool": "evor_tree_read",
      "args": {}
     }
-   ]
+   ],
+   "governor_denials": []
+  },
+  {
+   "name": "a governor entry for a DIFFERENT target does not excuse this denial",
+   "denials": [
+    {
+     "tool_name": "Bash",
+     "tool_use_id": "tu_7",
+     "tool_input": {
+      "command": "ls /unrelated"
+     }
+    }
+   ],
+   "intended_denials": [],
+   "role_disallowed_tools": [],
+   "governor_denials": [
+    {
+     "tool": "Bash",
+     "rule": "path-zone:run-state",
+     "target": "python -m evor run"
+    }
+   ],
+   "trace": []
   }
  ],
  "negative": [
@@ -70,14 +95,16 @@
      "tool": "evor_state_read",
      "args": {}
     }
-   ]
+   ],
+   "governor_denials": []
   },
   {
    "name": "an empty trace",
    "denials": [],
    "intended_denials": [],
    "role_disallowed_tools": [],
-   "trace": []
+   "trace": [],
+   "governor_denials": []
   },
   {
    "name": "a tool that returned an error is not a denial",
@@ -90,7 +117,8 @@
      "args": {},
      "errored": true
     }
-   ]
+   ],
+   "governor_denials": []
   },
   {
    "name": "a denial the scenario DECLARED is not undeclared",
@@ -114,7 +142,8 @@
    "trace": [],
    "templates": {
     "SANDBOX": "/tmp/x"
-   }
+   },
+   "governor_denials": []
   },
   {
    "name": "a denial of a tool the ROLE disallows is the role's own boundary",
@@ -130,6 +159,50 @@
    "intended_denials": [],
    "role_disallowed_tools": [
     "Bash"
+   ],
+   "trace": [],
+   "governor_denials": []
+  },
+  {
+   "name": "a denial the product's GOVERNOR decided, matched on (tool,target)",
+   "denials": [
+    {
+     "tool_name": "Bash",
+     "tool_use_id": "tu_6",
+     "tool_input": {
+      "command": "python -m evor run"
+     }
+    }
+   ],
+   "intended_denials": [],
+   "role_disallowed_tools": [],
+   "governor_denials": [
+    {
+     "tool": "Bash",
+     "rule": "path-zone:run-state",
+     "target": "python -m evor run"
+    }
+   ],
+   "trace": []
+  },
+  {
+   "name": "a tool the bench never granted is a declared constraint, not an incidental denial",
+   "denials": [
+    {
+     "tool_name": "WebSearch",
+     "tool_use_id": "tu_8",
+     "tool_input": {
+      "query": "x"
+     }
+    }
+   ],
+   "intended_denials": [],
+   "role_disallowed_tools": [],
+   "governor_denials": [],
+   "harness_allowed_tools": [
+    "Read",
+    "Glob",
+    "mcp__evor"
    ],
    "trace": []
   }

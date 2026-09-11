@@ -154,8 +154,14 @@ for (const angle of angles) {
     // `denial` detector reading `undeclared`, which subtracts exactly those. This
     // gate was pinning the weaker of the two shapes in place; it now accepts the
     // strong form and would reject a silent removal of either.
-    T(/"undeclared":\s*true|"denied":\s*true/.test(JSON.stringify(s.expect.void_if)),
-      'every group-T scenario must void on an undeclared denial (NO-1, §6.2)');
+    // THE STRONG FORM SPECIFICALLY. An earlier edit widened this to accept either
+    // shape so the corpus could migrate — but a gate that accepts both stops being a
+    // gate on shape, and would not reject a silent DOWNGRADE from `undeclared` back to
+    // the raw `denied` rule, which is exactly the regression this gate exists to
+    // prevent. All 46 group-T scenarios carry the strong form, so require it.
+    T(/"undeclared":\s*true/.test(JSON.stringify(s.expect.void_if)),
+      'every group-T scenario must void on an UNDECLARED denial (NO-1, §6.2) — the raw '
+      + '`denied` rule voids on denials the product decided, which are the measurement');
 
     // no answer key in the prompt
     T(!/\bT[1-5]\b|angle:/i.test(s.prompt) || /Angle: [a-z-]+/.test(s.prompt),
