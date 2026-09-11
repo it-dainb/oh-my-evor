@@ -1083,6 +1083,17 @@ function runScenario(path, { repeats, outDir }) {
       const denials = live.result?.permission_denials ?? [];
       const deniedTools = new Set(denials.map((d) => String(d.tool_name ?? '')));
       const deniedIds = new Set(denials.map((d) => d.tool_use_id ?? d.id).filter(Boolean));
+      // READ ONCE, USED TWICE: the detector ctx needs it to subtract governor-decided
+      // denials, and the record needs it so a future void can be attributed offline.
+      const govLog = (() => {
+        try {
+          const lp = join(projectRoot, '.evor', 'logs', 'governor.log');
+          if (!existsSync(lp)) return [];
+          return readFileSync(lp, 'utf8').split('\n').filter(Boolean).slice(-40)
+            .map((l) => { try { return JSON.parse(l); } catch { return { raw: l.slice(0, 200) }; } })
+            .filter((e) => e.verdict === 'deny' || e.verdict === 'ask' || e.raw);
+        } catch { return []; }
+      })();
       const calls = traceOf(live.events, roleDisallowed, deniedTools, deniedIds);
       const answer = finalJson(live.result?.result ?? '');
       const turnsAtCeiling =
@@ -1110,6 +1121,14 @@ function runScenario(path, { repeats, outDir }) {
         // over payload text (evor results legitimately contain "denied").
         denials,
         intended_denials: sc.setup?.intended_denial ?? [],
+        // THE SUBTRACTION THAT NEVER FIRED. `undeclaredDenials` has read
+        // `ctx.governor_denials` since the governor-log capture landed, and NOTHING in
+        // the repository ever set it — one grep, one hit, the consumer. The log went
+        // into the RECORD and never into the CTX the detector reads, so the whole
+        // "a denial the product decided is scored, not voided" repair was dead code
+        // from the commit that introduced it. An adversarial audit of my own fixes
+        // found it; I would have reported it as working.
+        governor_denials: govLog ?? [],
         role_disallowed_tools: [...roleDisallowed],
         postconditions,
         // THE CONTROL ARM (§4.3, and author D's §6.3 — required BEFORE the first
@@ -1240,15 +1259,7 @@ function runScenario(path, { repeats, outDir }) {
         // the denied calls were read-only `ls`/`find` on the run directory, and
         // four candidate rules were checked and eliminated by hand without finding
         // the writer. Copy the log out and the next one answers itself.
-        governor_log: (() => {
-          try {
-            const lp = join(projectRoot, '.evor', 'logs', 'governor.log');
-            if (!existsSync(lp)) return null;
-            return readFileSync(lp, 'utf8').split('\n').filter(Boolean).slice(-40)
-              .map((l) => { try { return JSON.parse(l); } catch { return { raw: l.slice(0, 200) }; } })
-              .filter((e) => e.verdict === 'deny' || e.verdict === 'ask' || e.raw);
-          } catch { return null; }
-        })(),
+        governor_log: govLog,
         denials: denials.map((d) => ({
           tool: d.tool_name ?? d.tool ?? null,
           rule: d.rule_id ?? d.rule ?? null,
