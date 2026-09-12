@@ -1077,7 +1077,27 @@ function runScenario(path, { repeats, outDir }) {
     }
 
     let status, cls = null, note = '', failureKind = null, ctx = null, tier = null, points = null;
+    // THE TASK NEVER ARRIVED. Four scored records across lite18/19/22 made ZERO tool
+    // calls and answered "I'm ready to help. Please share what you'd like me to do."
+    // or "I'm receiving repeated feedback from your stop hook with no new
+    // information" — the prompt did not reach the model, and all four were scored
+    // FAIL. That is §4.1's definition of a void: the instrument failed, not the
+    // agent. It also explains part of why T1-blob-vs-artifact-* has never passed —
+    // some of its records were never given the task.
+    //
+    // Deliberately narrow: zero tool calls AND a final message that asks for the
+    // task. A run that legitimately answers without tools (there are several) says
+    // something about the run, not "what would you like me to do".
+    const askedForTheTask = (live?.result?.result ?? '') &&
+      /\b(ready to help|what you'd like me to do|share what you|no new information|is there a task|message is repeating)\b/i
+        .test(String(live.result.result));
     if (err) { status = 'HARNESS_ERROR'; note = err.slice(0, 300); }
+    else if (askedForTheTask && !(live.events ?? []).some(
+      (e) => (e?.message?.content ?? []).some((b) => b?.type === 'tool_use'))) {
+      status = 'VOID';
+      failureKind = 'prompt_not_delivered';
+      note = `no tool calls and the answer asks for the task: ${String(live.result.result).slice(0, 140)}`;
+    }
     else {
       const roleDisallowed = readRoleDisallowedTools(sc.agent_file);
       const denials = live.result?.permission_denials ?? [];
