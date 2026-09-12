@@ -317,6 +317,31 @@ export function runLive({ prompt, model, effort, maxTurns, timeoutMs, env, mcpCo
         // This env var is the only lever that removes the contamination and leaves
         // hooks and credentials alone.
         CLAUDE_CODE_DISABLE_CLAUDE_MDS: '1',
+        // THE PRODUCT'S STOP HOOK CAN ONLY MISFIRE HERE, and my own fix loaded it.
+        // `--plugin-dir` brought all of hooks.json into force — which is what finally
+        // gave SubagentStart/SubagentStop to the roles, and brought `Stop` along.
+        //
+        // `hooks/stop.mjs` blocks when the tick is incomplete, up to 8 times, and never
+        // for a `pending_node_ids` violation. Every fixture in this corpus DEPICTS a
+        // mid-tick state — that is the point of them — so a role asked one question
+        // about that state trips the hook on its way out, every time, and is handed a
+        // content-free notice with no new instruction. The agents describe it exactly:
+        // "This is the fourth identical hook notice with no new content or instruction",
+        // "I'm receiving repeated feedback from your stop hook with no new information".
+        // Nine records across lite19 and lite22 say so in their final answer, and it is
+        // the mechanism behind the `prompt_not_delivered` voids and part of the
+        // `no terminal JSON answer` ones: the last message replies to the hook, not the
+        // task.
+        //
+        // The hook is doing its job; the bench put it somewhere it cannot do anything
+        // else. Disabled through the product's OWN documented kill switch
+        // (hooks/stop.mjs:7) rather than by filtering hooks.json, so exactly one named
+        // hook is excluded and the rest of the reflex layer stays in force.
+        //
+        // Stop discipline deserves an angle that measures it deliberately, with a
+        // fixture whose tick is COMPLETE so a block is a finding rather than a
+        // certainty. None exists today.
+        EVOR_SKIP_HOOKS: [process.env.EVOR_SKIP_HOOKS, 'stop'].filter(Boolean).join(','),
         ...env,
       },
     });

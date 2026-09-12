@@ -38,7 +38,11 @@ function invoke(args, { env, timeoutMs, cwd }) {
       // on this machine it is an unrelated orchestration layer. See the note in
       // knowledge-live-eval.mjs for why no CLI flag reaches it without also
       // disabling the hooks these angles measure.
-      env: { ...process.env, CLAUDE_CODE_DISABLE_CLAUDE_MDS: '1', ...env },
+      // Same two exclusions as runLive: the operator's CLAUDE.md is memory, and the
+      // product's Stop hook can only misfire against a fixture that depicts a
+      // mid-tick state. See the note in knowledge-live-eval.mjs.
+      env: { ...process.env, CLAUDE_CODE_DISABLE_CLAUDE_MDS: '1',
+        EVOR_SKIP_HOOKS: [process.env.EVOR_SKIP_HOOKS, 'stop'].filter(Boolean).join(','), ...env },
     });
   } catch (e) {
     // A non-zero exit still carries the stream on stdout — a turn that ended at
