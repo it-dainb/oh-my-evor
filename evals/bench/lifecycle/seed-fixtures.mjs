@@ -153,6 +153,17 @@ function baseContract(over = {}) {
 
 function baseTree() {
   return {
+    // THE ENVELOPE CARRIES `updated_at`. `harness/evor/tree.py:310` writes
+    // `{nodes, updated_at}` and `contracts.py:926` requires it, so a tree.json with
+    // only `nodes` fails the product's own contract — which is why agents kept filing
+    // `tree-json-schema-mismatch-vs-doctor`. I dismissed those reports as fabrication
+    // once, on the strength of the NODE having no `updated_at` field (true, and a
+    // different claim). The ENVELOPE does, and the agents were right about it.
+    //
+    // Fixed clock, not Date.now(): rebaseFixtureClock shifts every timestamp in the
+    // fixture by one delta at run time, so a wall-clock read here would make the
+    // fixture irreproducible.
+    updated_at: '2026-08-24T00:12:00Z',
     nodes: {
       [NODE_UUID]: {
         id: NODE_UUID,
@@ -185,7 +196,17 @@ function baseTree() {
 // meeting. The agents were right about this for four calibrations.
 const PROPOSAL = (id, name, parents) => ({
   proposal_id: id,
-  name,
+  // `name` REMOVED and `critic_review` ADDED. The first pass at this fixture repaired
+  // four of the five missing required fields and left the artifact still invalid:
+  // `MutationProposalSchema` has no `name` and the strict Python contract rejects the
+  // extra, while `critic_review` was still absent. lite22 shows the consequence —
+  // L2-active-run-job-disagree-pos went 1/4, not the 3/4 the repair predicted, and an
+  // agent on the same fixture family named it exactly: "mutagen_artifact: fails
+  // MutationProposal schema: extra field 'name'". The legitimate reason to file
+  // `capability-gap` survived, so the exclusion still trapped the cell.
+  //
+  // Partially repairing a schema violation leaves the cell exactly as unpassable as
+  // before. The node name lives in tree.json, which is where a reader looks for it.
   approach_family: 'arch',
   parent_node_ids: parents,
   idea: 'Widen the IIR scan to four directions and share the gate weights across passes.',
@@ -196,6 +217,17 @@ const PROPOSAL = (id, name, parents) => ({
   },
   citations: [],
   wildness: 0.35,
+  // Server-owned and optional in the schema, but present here because the fixture
+  // depicts a tick whose proposals have already been through the validator.
+  critic_review: {
+    h001_one_hypothesis: 'pass',
+    h002_family_streak: 'pass',
+    h003_intra_tick_diversity: 'pass',
+    integrity_risk: 'pass',
+    instrumentation_check: 'pass',
+    schema_valid: 'pass',
+    verdict: 'approved',
+  },
 });
 
 
@@ -457,7 +489,7 @@ const PAIRS = [
     base: (t) => {
       t.tickState = { tick: 1, current_step: 5, step_status: 'running', integrity_verdict: null, auto_resume_count: 1, step_history: [1, 2, 3, 4, 5], updated_at: '2026-08-24T00:41:20Z' };
       t.verdict = null; t.forgeReport = null; t.telemetry = null;
-      t.tree = { nodes: {} };
+      t.tree = { updated_at: '2026-08-24T00:12:00Z', nodes: {} };
       t.evaluation = { node_id: null, verdict: 'pending', verdict_source: 'computed', checks: {} };
       t.results = { node_id: null, status: 'pending' };
       t.jobs = [];

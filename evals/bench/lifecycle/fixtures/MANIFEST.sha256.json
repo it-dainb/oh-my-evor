@@ -15,7 +15,7 @@
     ".evor/runs/m1/run-live-01/strategy.json": "ff2c7f9b578ff51ae1a42fd082222a5e28a6f9daae90e9ea3ba8e04932b10f48",
     ".evor/runs/m1/run-live-01/tick-state.json": "fd2438b0da455412bd295ac38fc083431846e43f49c1cc6321a87b5e1e745012",
     ".evor/runs/m1/run-live-01/ticks/1/forge/forge-report.json": "3d6af0a38e30005bdf527b341beecb71f617e252b8dd98a474b91a8e4071ef17",
-    ".evor/runs/m1/run-live-01/ticks/1/mutagen/proposals.json": "a5e45ac505793538f8ea773cd466440c2e4bfb29d66b6d07fa0d2c47884559ba",
+    ".evor/runs/m1/run-live-01/ticks/1/mutagen/proposals.json": "3ad2dff8a133479c7e7401427ac77f37385daef9fd46ab340fe69aee31bc6395",
     ".evor/runs/m1/run-live-01/ticks/1/selector/verdict.json": "085c82237a364fbf4108a940c833169fc51d2719103218ad81c210def695bc38",
     ".evor/runs/m1/run-live-01/tree.json": "a262321b3cba1aa91343dc21cfc20f170664effaec0d44910b6b20d5b426bc98"
   },
@@ -35,7 +35,7 @@
     ".evor/runs/m1/run-live-01/strategy.json": "ff2c7f9b578ff51ae1a42fd082222a5e28a6f9daae90e9ea3ba8e04932b10f48",
     ".evor/runs/m1/run-live-01/tick-state.json": "fd2438b0da455412bd295ac38fc083431846e43f49c1cc6321a87b5e1e745012",
     ".evor/runs/m1/run-live-01/ticks/1/forge/forge-report.json": "3d6af0a38e30005bdf527b341beecb71f617e252b8dd98a474b91a8e4071ef17",
-    ".evor/runs/m1/run-live-01/ticks/1/mutagen/proposals.json": "a5e45ac505793538f8ea773cd466440c2e4bfb29d66b6d07fa0d2c47884559ba",
+    ".evor/runs/m1/run-live-01/ticks/1/mutagen/proposals.json": "3ad2dff8a133479c7e7401427ac77f37385daef9fd46ab340fe69aee31bc6395",
     ".evor/runs/m1/run-live-01/ticks/1/selector/verdict.json": "085c82237a364fbf4108a940c833169fc51d2719103218ad81c210def695bc38",
     ".evor/runs/m1/run-live-01/tree.json": "a262321b3cba1aa91343dc21cfc20f170664effaec0d44910b6b20d5b426bc98"
   },
@@ -56,9 +56,9 @@
     ".evor/runs/m1/run-live-01/strategy.json": "ff2c7f9b578ff51ae1a42fd082222a5e28a6f9daae90e9ea3ba8e04932b10f48",
     ".evor/runs/m1/run-live-01/tick-state.json": "531ac22387427b282a44b6202ca5935afc1d0d063d28f883e2129ee1a6085b09",
     ".evor/runs/m1/run-live-01/ticks/1/forge/forge-report.json": "3d6af0a38e30005bdf527b341beecb71f617e252b8dd98a474b91a8e4071ef17",
-    ".evor/runs/m1/run-live-01/ticks/1/mutagen/proposals.json": "a5e45ac505793538f8ea773cd466440c2e4bfb29d66b6d07fa0d2c47884559ba",
+    ".evor/runs/m1/run-live-01/ticks/1/mutagen/proposals.json": "3ad2dff8a133479c7e7401427ac77f37385daef9fd46ab340fe69aee31bc6395",
     ".evor/runs/m1/run-live-01/ticks/1/selector/verdict.json": "085c82237a364fbf4108a940c833169fc51d2719103218ad81c210def695bc38",
-    ".evor/runs/m1/run-live-01/tree.json": "a5c4d3d8118b83510f06ed828c72d6e67da334d024bf5be08ee31d5d0949d6f1"
+    ".evor/runs/m1/run-live-01/tree.json": "6abb2c6eaf222c700272cc09300125fc2c0fb001d007aebe1a8728a35541be47"
   },
   "L1-integrity-check-is-the-only-way-neg": {
     ".evor/active-run.json": "1ed40a5b4d15889a467044f6d70b864e223eb167147f3187a020c5f8bec08246",
@@ -77,9 +77,9 @@
     ".evor/runs/m1/run-live-01/strategy.json": "ff2c7f9b578ff51ae1a42fd082222a5e28a6f9daae90e9ea3ba8e04932b10f48",
     ".evor/runs/m1/run-live-01/tick-state.json": "531ac22387427b282a44b6202ca5935afc1d0d063d28f883e2129ee1a6085b09",
     ".evor/runs/m1/run-live-01/ticks/1/forge/forge-report.json": "3d6af0a38e30005bdf527b341beecb71f617e252b8dd98a474b91a8e4071ef17",
-    ".evor/runs/m1/run-live-01/ticks/1/mutagen/proposals.json": "a5e45ac505793538f8ea773cd466440c2e4bfb29d66b6d07fa0d2c47884559ba",
+    ".evor/runs/m1/run-live-01/ticks/1/mutagen/proposals.json": "3ad2dff8a133479c7e7401427ac77f37385daef9fd46ab340fe69aee31bc6395",
     ".evor/runs/m1/run-live-01/ticks/1/selector/verdict.json": "085c82237a364fbf4108a940c833169fc51d2719103218ad81c210def695bc38",
-    ".evor/runs/m1/run-live-01/tree.json": "a5c4d3d8118b83510f06ed828c72d6e67da334d024bf5be08ee31d5d0949d6f1"
+    ".evor/runs/m1/run-live-01/tree.json": "6abb2c6eaf222c700272cc09300125fc2c0fb001d007aebe1a8728a35541be47"
   },
   "L1-budget-exhausted-vs-remaining-pos": {
     ".evor/active-run.json": "1ed40a5b4d15889a467044f6d70b864e223eb167147f3187a020c5f8bec08246",
@@ -98,9 +98,9 @@
     ".evor/runs/m1/run-live-01/strategy.json": "ff2c7f9b578ff51ae1a42fd082222a5e28a6f9daae90e9ea3ba8e04932b10f48",
     ".evor/runs/m1/run-live-01/tick-state.json": "2a7169f420001854e8a46ad8373b82dc7bd8db587984ca2546500cb28dda5019",
     ".evor/runs/m1/run-live-01/ticks/1/forge/forge-report.json": "3d6af0a38e30005bdf527b341beecb71f617e252b8dd98a474b91a8e4071ef17",
-    ".evor/runs/m1/run-live-01/ticks/1/mutagen/proposals.json": "a5e45ac505793538f8ea773cd466440c2e4bfb29d66b6d07fa0d2c47884559ba",
+    ".evor/runs/m1/run-live-01/ticks/1/mutagen/proposals.json": "3ad2dff8a133479c7e7401427ac77f37385daef9fd46ab340fe69aee31bc6395",
     ".evor/runs/m1/run-live-01/ticks/1/selector/verdict.json": "085c82237a364fbf4108a940c833169fc51d2719103218ad81c210def695bc38",
-    ".evor/runs/m1/run-live-01/tree.json": "5c824b5dd4c1eaea54ed67be565956d1ea9fc64c6cf9ff4c70825dd319e794e4"
+    ".evor/runs/m1/run-live-01/tree.json": "a3576662482f05d8f0ad4a0e044404d037c682ba6f450c0dcdbfa814c9a76551"
   },
   "L1-budget-exhausted-vs-remaining-neg": {
     ".evor/active-run.json": "1ed40a5b4d15889a467044f6d70b864e223eb167147f3187a020c5f8bec08246",
@@ -119,9 +119,9 @@
     ".evor/runs/m1/run-live-01/strategy.json": "ff2c7f9b578ff51ae1a42fd082222a5e28a6f9daae90e9ea3ba8e04932b10f48",
     ".evor/runs/m1/run-live-01/tick-state.json": "2a7169f420001854e8a46ad8373b82dc7bd8db587984ca2546500cb28dda5019",
     ".evor/runs/m1/run-live-01/ticks/1/forge/forge-report.json": "3d6af0a38e30005bdf527b341beecb71f617e252b8dd98a474b91a8e4071ef17",
-    ".evor/runs/m1/run-live-01/ticks/1/mutagen/proposals.json": "a5e45ac505793538f8ea773cd466440c2e4bfb29d66b6d07fa0d2c47884559ba",
+    ".evor/runs/m1/run-live-01/ticks/1/mutagen/proposals.json": "3ad2dff8a133479c7e7401427ac77f37385daef9fd46ab340fe69aee31bc6395",
     ".evor/runs/m1/run-live-01/ticks/1/selector/verdict.json": "085c82237a364fbf4108a940c833169fc51d2719103218ad81c210def695bc38",
-    ".evor/runs/m1/run-live-01/tree.json": "5c824b5dd4c1eaea54ed67be565956d1ea9fc64c6cf9ff4c70825dd319e794e4"
+    ".evor/runs/m1/run-live-01/tree.json": "a3576662482f05d8f0ad4a0e044404d037c682ba6f450c0dcdbfa814c9a76551"
   },
   "L2-family-history-stale-handoff-pos": {
     ".evor/active-run.json": "1ed40a5b4d15889a467044f6d70b864e223eb167147f3187a020c5f8bec08246",
@@ -140,8 +140,8 @@
     ".evor/runs/m1/run-live-01/strategy.json": "e8d72dba6d766d45386192ed4b4934e7825b233a1864b20a122db5caa9b75c2b",
     ".evor/runs/m1/run-live-01/tick-state.json": "31984a36ec3ccccb20c547a1e0382e50f7fbcdb952a21bbd587ea48447c525c1",
     ".evor/runs/m1/run-live-01/ticks/1/forge/forge-report.json": "3d6af0a38e30005bdf527b341beecb71f617e252b8dd98a474b91a8e4071ef17",
-    ".evor/runs/m1/run-live-01/ticks/1/mutagen/proposals.json": "3dd6f61557f312db033b950b512c2db1c7a1f211a876648d701b6468ea44f93c",
-    ".evor/runs/m1/run-live-01/tree.json": "5c824b5dd4c1eaea54ed67be565956d1ea9fc64c6cf9ff4c70825dd319e794e4"
+    ".evor/runs/m1/run-live-01/ticks/1/mutagen/proposals.json": "c2197a6d3278e4f049a54aae458d444f784257c5ebe1f129783188dc5bad2bea",
+    ".evor/runs/m1/run-live-01/tree.json": "a3576662482f05d8f0ad4a0e044404d037c682ba6f450c0dcdbfa814c9a76551"
   },
   "L2-family-history-stale-handoff-neg": {
     ".evor/active-run.json": "1ed40a5b4d15889a467044f6d70b864e223eb167147f3187a020c5f8bec08246",
@@ -160,8 +160,8 @@
     ".evor/runs/m1/run-live-01/strategy.json": "e8d72dba6d766d45386192ed4b4934e7825b233a1864b20a122db5caa9b75c2b",
     ".evor/runs/m1/run-live-01/tick-state.json": "31984a36ec3ccccb20c547a1e0382e50f7fbcdb952a21bbd587ea48447c525c1",
     ".evor/runs/m1/run-live-01/ticks/1/forge/forge-report.json": "3d6af0a38e30005bdf527b341beecb71f617e252b8dd98a474b91a8e4071ef17",
-    ".evor/runs/m1/run-live-01/ticks/1/mutagen/proposals.json": "3dd6f61557f312db033b950b512c2db1c7a1f211a876648d701b6468ea44f93c",
-    ".evor/runs/m1/run-live-01/tree.json": "5c824b5dd4c1eaea54ed67be565956d1ea9fc64c6cf9ff4c70825dd319e794e4"
+    ".evor/runs/m1/run-live-01/ticks/1/mutagen/proposals.json": "c2197a6d3278e4f049a54aae458d444f784257c5ebe1f129783188dc5bad2bea",
+    ".evor/runs/m1/run-live-01/tree.json": "a3576662482f05d8f0ad4a0e044404d037c682ba6f450c0dcdbfa814c9a76551"
   },
   "L2-active-run-job-disagree-pos": {
     ".evor/active-run.json": "1ed40a5b4d15889a467044f6d70b864e223eb167147f3187a020c5f8bec08246",
@@ -180,9 +180,9 @@
     ".evor/runs/m1/run-live-01/strategy.json": "ff2c7f9b578ff51ae1a42fd082222a5e28a6f9daae90e9ea3ba8e04932b10f48",
     ".evor/runs/m1/run-live-01/tick-state.json": "29a102e396b08d7d55bd857957300dae307246756ea8b6804fe7432390e3c9ec",
     ".evor/runs/m1/run-live-01/ticks/1/forge/forge-report.json": "3d6af0a38e30005bdf527b341beecb71f617e252b8dd98a474b91a8e4071ef17",
-    ".evor/runs/m1/run-live-01/ticks/1/mutagen/proposals.json": "a5e45ac505793538f8ea773cd466440c2e4bfb29d66b6d07fa0d2c47884559ba",
+    ".evor/runs/m1/run-live-01/ticks/1/mutagen/proposals.json": "3ad2dff8a133479c7e7401427ac77f37385daef9fd46ab340fe69aee31bc6395",
     ".evor/runs/m1/run-live-01/ticks/1/selector/verdict.json": "085c82237a364fbf4108a940c833169fc51d2719103218ad81c210def695bc38",
-    ".evor/runs/m1/run-live-01/tree.json": "5c824b5dd4c1eaea54ed67be565956d1ea9fc64c6cf9ff4c70825dd319e794e4"
+    ".evor/runs/m1/run-live-01/tree.json": "a3576662482f05d8f0ad4a0e044404d037c682ba6f450c0dcdbfa814c9a76551"
   },
   "L2-active-run-job-disagree-neg": {
     ".evor/active-run.json": "1ed40a5b4d15889a467044f6d70b864e223eb167147f3187a020c5f8bec08246",
@@ -201,9 +201,9 @@
     ".evor/runs/m1/run-live-01/strategy.json": "ff2c7f9b578ff51ae1a42fd082222a5e28a6f9daae90e9ea3ba8e04932b10f48",
     ".evor/runs/m1/run-live-01/tick-state.json": "29a102e396b08d7d55bd857957300dae307246756ea8b6804fe7432390e3c9ec",
     ".evor/runs/m1/run-live-01/ticks/1/forge/forge-report.json": "3d6af0a38e30005bdf527b341beecb71f617e252b8dd98a474b91a8e4071ef17",
-    ".evor/runs/m1/run-live-01/ticks/1/mutagen/proposals.json": "a5e45ac505793538f8ea773cd466440c2e4bfb29d66b6d07fa0d2c47884559ba",
+    ".evor/runs/m1/run-live-01/ticks/1/mutagen/proposals.json": "3ad2dff8a133479c7e7401427ac77f37385daef9fd46ab340fe69aee31bc6395",
     ".evor/runs/m1/run-live-01/ticks/1/selector/verdict.json": "085c82237a364fbf4108a940c833169fc51d2719103218ad81c210def695bc38",
-    ".evor/runs/m1/run-live-01/tree.json": "5c824b5dd4c1eaea54ed67be565956d1ea9fc64c6cf9ff4c70825dd319e794e4"
+    ".evor/runs/m1/run-live-01/tree.json": "a3576662482f05d8f0ad4a0e044404d037c682ba6f450c0dcdbfa814c9a76551"
   },
   "L2-node-identity-split-brain-pos": {
     ".evor/active-run.json": "1ed40a5b4d15889a467044f6d70b864e223eb167147f3187a020c5f8bec08246",
@@ -222,9 +222,9 @@
     ".evor/runs/m1/run-live-01/strategy.json": "ff2c7f9b578ff51ae1a42fd082222a5e28a6f9daae90e9ea3ba8e04932b10f48",
     ".evor/runs/m1/run-live-01/tick-state.json": "2a7169f420001854e8a46ad8373b82dc7bd8db587984ca2546500cb28dda5019",
     ".evor/runs/m1/run-live-01/ticks/1/forge/forge-report.json": "3d6af0a38e30005bdf527b341beecb71f617e252b8dd98a474b91a8e4071ef17",
-    ".evor/runs/m1/run-live-01/ticks/1/mutagen/proposals.json": "a5e45ac505793538f8ea773cd466440c2e4bfb29d66b6d07fa0d2c47884559ba",
+    ".evor/runs/m1/run-live-01/ticks/1/mutagen/proposals.json": "3ad2dff8a133479c7e7401427ac77f37385daef9fd46ab340fe69aee31bc6395",
     ".evor/runs/m1/run-live-01/ticks/1/selector/verdict.json": "085c82237a364fbf4108a940c833169fc51d2719103218ad81c210def695bc38",
-    ".evor/runs/m1/run-live-01/tree.json": "5c824b5dd4c1eaea54ed67be565956d1ea9fc64c6cf9ff4c70825dd319e794e4"
+    ".evor/runs/m1/run-live-01/tree.json": "a3576662482f05d8f0ad4a0e044404d037c682ba6f450c0dcdbfa814c9a76551"
   },
   "L2-node-identity-split-brain-neg": {
     ".evor/active-run.json": "1ed40a5b4d15889a467044f6d70b864e223eb167147f3187a020c5f8bec08246",
@@ -243,9 +243,9 @@
     ".evor/runs/m1/run-live-01/strategy.json": "ff2c7f9b578ff51ae1a42fd082222a5e28a6f9daae90e9ea3ba8e04932b10f48",
     ".evor/runs/m1/run-live-01/tick-state.json": "2a7169f420001854e8a46ad8373b82dc7bd8db587984ca2546500cb28dda5019",
     ".evor/runs/m1/run-live-01/ticks/1/forge/forge-report.json": "3d6af0a38e30005bdf527b341beecb71f617e252b8dd98a474b91a8e4071ef17",
-    ".evor/runs/m1/run-live-01/ticks/1/mutagen/proposals.json": "a5e45ac505793538f8ea773cd466440c2e4bfb29d66b6d07fa0d2c47884559ba",
+    ".evor/runs/m1/run-live-01/ticks/1/mutagen/proposals.json": "3ad2dff8a133479c7e7401427ac77f37385daef9fd46ab340fe69aee31bc6395",
     ".evor/runs/m1/run-live-01/ticks/1/selector/verdict.json": "085c82237a364fbf4108a940c833169fc51d2719103218ad81c210def695bc38",
-    ".evor/runs/m1/run-live-01/tree.json": "5c824b5dd4c1eaea54ed67be565956d1ea9fc64c6cf9ff4c70825dd319e794e4"
+    ".evor/runs/m1/run-live-01/tree.json": "a3576662482f05d8f0ad4a0e044404d037c682ba6f450c0dcdbfa814c9a76551"
   },
   "L3-terminal-job-nonadvancing-tick-pos": {
     ".evor/active-run.json": "1ed40a5b4d15889a467044f6d70b864e223eb167147f3187a020c5f8bec08246",
@@ -263,9 +263,9 @@
     ".evor/runs/m1/run-live-01/signals.jsonl": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     ".evor/runs/m1/run-live-01/strategy.json": "ff2c7f9b578ff51ae1a42fd082222a5e28a6f9daae90e9ea3ba8e04932b10f48",
     ".evor/runs/m1/run-live-01/tick-state.json": "4b80c6822eda4337fd9455cb20e691e1d406a51623773abb46bc350d61a2c394",
-    ".evor/runs/m1/run-live-01/ticks/1/mutagen/proposals.json": "a5e45ac505793538f8ea773cd466440c2e4bfb29d66b6d07fa0d2c47884559ba",
+    ".evor/runs/m1/run-live-01/ticks/1/mutagen/proposals.json": "3ad2dff8a133479c7e7401427ac77f37385daef9fd46ab340fe69aee31bc6395",
     ".evor/runs/m1/run-live-01/ticks/1/selector/verdict.json": "085c82237a364fbf4108a940c833169fc51d2719103218ad81c210def695bc38",
-    ".evor/runs/m1/run-live-01/tree.json": "0db9d434308861e9f47aee82b2c7a3efd70e7f94dfad59c8b2e5dc7195783874"
+    ".evor/runs/m1/run-live-01/tree.json": "aed4472be7087bf3b7707465160adf09a82313cb0abd7d65930381fbae55a029"
   },
   "L3-terminal-job-nonadvancing-tick-neg": {
     ".evor/active-run.json": "1ed40a5b4d15889a467044f6d70b864e223eb167147f3187a020c5f8bec08246",
@@ -283,9 +283,9 @@
     ".evor/runs/m1/run-live-01/signals.jsonl": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     ".evor/runs/m1/run-live-01/strategy.json": "ff2c7f9b578ff51ae1a42fd082222a5e28a6f9daae90e9ea3ba8e04932b10f48",
     ".evor/runs/m1/run-live-01/tick-state.json": "4b80c6822eda4337fd9455cb20e691e1d406a51623773abb46bc350d61a2c394",
-    ".evor/runs/m1/run-live-01/ticks/1/mutagen/proposals.json": "a5e45ac505793538f8ea773cd466440c2e4bfb29d66b6d07fa0d2c47884559ba",
+    ".evor/runs/m1/run-live-01/ticks/1/mutagen/proposals.json": "3ad2dff8a133479c7e7401427ac77f37385daef9fd46ab340fe69aee31bc6395",
     ".evor/runs/m1/run-live-01/ticks/1/selector/verdict.json": "085c82237a364fbf4108a940c833169fc51d2719103218ad81c210def695bc38",
-    ".evor/runs/m1/run-live-01/tree.json": "0db9d434308861e9f47aee82b2c7a3efd70e7f94dfad59c8b2e5dc7195783874"
+    ".evor/runs/m1/run-live-01/tree.json": "aed4472be7087bf3b7707465160adf09a82313cb0abd7d65930381fbae55a029"
   },
   "L3-auto-resume-without-progress-pos": {
     ".evor/active-run.json": "1ed40a5b4d15889a467044f6d70b864e223eb167147f3187a020c5f8bec08246",
@@ -304,9 +304,9 @@
     ".evor/runs/m1/run-live-01/strategy.json": "ff2c7f9b578ff51ae1a42fd082222a5e28a6f9daae90e9ea3ba8e04932b10f48",
     ".evor/runs/m1/run-live-01/tick-state.json": "b38729346dec89aa09af33d1becdec6e85ff62dfb6958903fcfc1129045d442a",
     ".evor/runs/m1/run-live-01/ticks/1/forge/forge-report.json": "3d6af0a38e30005bdf527b341beecb71f617e252b8dd98a474b91a8e4071ef17",
-    ".evor/runs/m1/run-live-01/ticks/1/mutagen/proposals.json": "a5e45ac505793538f8ea773cd466440c2e4bfb29d66b6d07fa0d2c47884559ba",
+    ".evor/runs/m1/run-live-01/ticks/1/mutagen/proposals.json": "3ad2dff8a133479c7e7401427ac77f37385daef9fd46ab340fe69aee31bc6395",
     ".evor/runs/m1/run-live-01/ticks/1/selector/verdict.json": "085c82237a364fbf4108a940c833169fc51d2719103218ad81c210def695bc38",
-    ".evor/runs/m1/run-live-01/tree.json": "5c824b5dd4c1eaea54ed67be565956d1ea9fc64c6cf9ff4c70825dd319e794e4"
+    ".evor/runs/m1/run-live-01/tree.json": "a3576662482f05d8f0ad4a0e044404d037c682ba6f450c0dcdbfa814c9a76551"
   },
   "L3-auto-resume-without-progress-neg": {
     ".evor/active-run.json": "1ed40a5b4d15889a467044f6d70b864e223eb167147f3187a020c5f8bec08246",
@@ -325,9 +325,9 @@
     ".evor/runs/m1/run-live-01/strategy.json": "ff2c7f9b578ff51ae1a42fd082222a5e28a6f9daae90e9ea3ba8e04932b10f48",
     ".evor/runs/m1/run-live-01/tick-state.json": "ce70057bac6d2d0705c9520737cd069d4a23abc45af15a6687ef93b454d555c0",
     ".evor/runs/m1/run-live-01/ticks/1/forge/forge-report.json": "3d6af0a38e30005bdf527b341beecb71f617e252b8dd98a474b91a8e4071ef17",
-    ".evor/runs/m1/run-live-01/ticks/1/mutagen/proposals.json": "a5e45ac505793538f8ea773cd466440c2e4bfb29d66b6d07fa0d2c47884559ba",
+    ".evor/runs/m1/run-live-01/ticks/1/mutagen/proposals.json": "3ad2dff8a133479c7e7401427ac77f37385daef9fd46ab340fe69aee31bc6395",
     ".evor/runs/m1/run-live-01/ticks/1/selector/verdict.json": "085c82237a364fbf4108a940c833169fc51d2719103218ad81c210def695bc38",
-    ".evor/runs/m1/run-live-01/tree.json": "5c824b5dd4c1eaea54ed67be565956d1ea9fc64c6cf9ff4c70825dd319e794e4"
+    ".evor/runs/m1/run-live-01/tree.json": "a3576662482f05d8f0ad4a0e044404d037c682ba6f450c0dcdbfa814c9a76551"
   },
   "L3-unsatisfiable-selector-wait-pos": {
     ".evor/active-run.json": "1ed40a5b4d15889a467044f6d70b864e223eb167147f3187a020c5f8bec08246",
@@ -343,7 +343,7 @@
     ".evor/runs/m1/run-live-01/strategy.json": "ff2c7f9b578ff51ae1a42fd082222a5e28a6f9daae90e9ea3ba8e04932b10f48",
     ".evor/runs/m1/run-live-01/tick-state.json": "8d1478963ad4e912d97711171fee7faace37afc57f938824a44abcba8954b37d",
     ".evor/runs/m1/run-live-01/ticks/1/mutagen/proposals.json": "a2165ba0235ee74d9ca0c6c6d35b6c35513dc78f210882ee780ea0881b9baeb3",
-    ".evor/runs/m1/run-live-01/tree.json": "f81811e006e93d46c7091036a73a15dc417bb120f3fcc747b4927b2fdcfcac76"
+    ".evor/runs/m1/run-live-01/tree.json": "37ad433ce3764b5198b37ff086ee2d4c9505e9fcf367304530c11464bf74f266"
   },
   "L3-unsatisfiable-selector-wait-neg": {
     ".evor/active-run.json": "1ed40a5b4d15889a467044f6d70b864e223eb167147f3187a020c5f8bec08246",
@@ -359,7 +359,7 @@
     ".evor/runs/m1/run-live-01/strategy.json": "ff2c7f9b578ff51ae1a42fd082222a5e28a6f9daae90e9ea3ba8e04932b10f48",
     ".evor/runs/m1/run-live-01/tick-state.json": "8d1478963ad4e912d97711171fee7faace37afc57f938824a44abcba8954b37d",
     ".evor/runs/m1/run-live-01/ticks/1/mutagen/proposals.json": "c001072fa0b11893f82ba256b7cf6c763de84fca5752da7953d74db3278c71a2",
-    ".evor/runs/m1/run-live-01/tree.json": "f81811e006e93d46c7091036a73a15dc417bb120f3fcc747b4927b2fdcfcac76"
+    ".evor/runs/m1/run-live-01/tree.json": "37ad433ce3764b5198b37ff086ee2d4c9505e9fcf367304530c11464bf74f266"
   },
   "L4-first-job-failed-second-succeeded-pos": {
     ".evor/active-run.json": "1ed40a5b4d15889a467044f6d70b864e223eb167147f3187a020c5f8bec08246",
@@ -380,9 +380,9 @@
     ".evor/runs/m1/run-live-01/strategy.json": "ff2c7f9b578ff51ae1a42fd082222a5e28a6f9daae90e9ea3ba8e04932b10f48",
     ".evor/runs/m1/run-live-01/tick-state.json": "fd2438b0da455412bd295ac38fc083431846e43f49c1cc6321a87b5e1e745012",
     ".evor/runs/m1/run-live-01/ticks/1/forge/forge-report.json": "3d6af0a38e30005bdf527b341beecb71f617e252b8dd98a474b91a8e4071ef17",
-    ".evor/runs/m1/run-live-01/ticks/1/mutagen/proposals.json": "a5e45ac505793538f8ea773cd466440c2e4bfb29d66b6d07fa0d2c47884559ba",
+    ".evor/runs/m1/run-live-01/ticks/1/mutagen/proposals.json": "3ad2dff8a133479c7e7401427ac77f37385daef9fd46ab340fe69aee31bc6395",
     ".evor/runs/m1/run-live-01/ticks/1/selector/verdict.json": "085c82237a364fbf4108a940c833169fc51d2719103218ad81c210def695bc38",
-    ".evor/runs/m1/run-live-01/tree.json": "435b6ab27af3d63014eb960536b04c60c1ecfd5c7a74abb0c03f7602ed24c09b"
+    ".evor/runs/m1/run-live-01/tree.json": "4324d7e67fcf10b23eb9f005476be54d800c92a0c145d8bd7f00819c5cb88c73"
   },
   "L4-first-job-failed-second-succeeded-neg": {
     ".evor/active-run.json": "1ed40a5b4d15889a467044f6d70b864e223eb167147f3187a020c5f8bec08246",
@@ -403,9 +403,9 @@
     ".evor/runs/m1/run-live-01/strategy.json": "ff2c7f9b578ff51ae1a42fd082222a5e28a6f9daae90e9ea3ba8e04932b10f48",
     ".evor/runs/m1/run-live-01/tick-state.json": "fd2438b0da455412bd295ac38fc083431846e43f49c1cc6321a87b5e1e745012",
     ".evor/runs/m1/run-live-01/ticks/1/forge/forge-report.json": "3d6af0a38e30005bdf527b341beecb71f617e252b8dd98a474b91a8e4071ef17",
-    ".evor/runs/m1/run-live-01/ticks/1/mutagen/proposals.json": "a5e45ac505793538f8ea773cd466440c2e4bfb29d66b6d07fa0d2c47884559ba",
+    ".evor/runs/m1/run-live-01/ticks/1/mutagen/proposals.json": "3ad2dff8a133479c7e7401427ac77f37385daef9fd46ab340fe69aee31bc6395",
     ".evor/runs/m1/run-live-01/ticks/1/selector/verdict.json": "085c82237a364fbf4108a940c833169fc51d2719103218ad81c210def695bc38",
-    ".evor/runs/m1/run-live-01/tree.json": "435b6ab27af3d63014eb960536b04c60c1ecfd5c7a74abb0c03f7602ed24c09b"
+    ".evor/runs/m1/run-live-01/tree.json": "4324d7e67fcf10b23eb9f005476be54d800c92a0c145d8bd7f00819c5cb88c73"
   },
   "L4-acquirer-dropped-items-pos": {
     ".evor/active-run.json": "1ed40a5b4d15889a467044f6d70b864e223eb167147f3187a020c5f8bec08246",
@@ -424,9 +424,9 @@
     ".evor/runs/m1/run-live-01/strategy.json": "ff2c7f9b578ff51ae1a42fd082222a5e28a6f9daae90e9ea3ba8e04932b10f48",
     ".evor/runs/m1/run-live-01/tick-state.json": "fd2438b0da455412bd295ac38fc083431846e43f49c1cc6321a87b5e1e745012",
     ".evor/runs/m1/run-live-01/ticks/1/forge/forge-report.json": "3d6af0a38e30005bdf527b341beecb71f617e252b8dd98a474b91a8e4071ef17",
-    ".evor/runs/m1/run-live-01/ticks/1/mutagen/proposals.json": "a5e45ac505793538f8ea773cd466440c2e4bfb29d66b6d07fa0d2c47884559ba",
+    ".evor/runs/m1/run-live-01/ticks/1/mutagen/proposals.json": "3ad2dff8a133479c7e7401427ac77f37385daef9fd46ab340fe69aee31bc6395",
     ".evor/runs/m1/run-live-01/ticks/1/selector/verdict.json": "085c82237a364fbf4108a940c833169fc51d2719103218ad81c210def695bc38",
-    ".evor/runs/m1/run-live-01/tree.json": "435b6ab27af3d63014eb960536b04c60c1ecfd5c7a74abb0c03f7602ed24c09b"
+    ".evor/runs/m1/run-live-01/tree.json": "4324d7e67fcf10b23eb9f005476be54d800c92a0c145d8bd7f00819c5cb88c73"
   },
   "L4-acquirer-dropped-items-neg": {
     ".evor/active-run.json": "1ed40a5b4d15889a467044f6d70b864e223eb167147f3187a020c5f8bec08246",
@@ -445,9 +445,9 @@
     ".evor/runs/m1/run-live-01/strategy.json": "ff2c7f9b578ff51ae1a42fd082222a5e28a6f9daae90e9ea3ba8e04932b10f48",
     ".evor/runs/m1/run-live-01/tick-state.json": "fd2438b0da455412bd295ac38fc083431846e43f49c1cc6321a87b5e1e745012",
     ".evor/runs/m1/run-live-01/ticks/1/forge/forge-report.json": "3d6af0a38e30005bdf527b341beecb71f617e252b8dd98a474b91a8e4071ef17",
-    ".evor/runs/m1/run-live-01/ticks/1/mutagen/proposals.json": "a5e45ac505793538f8ea773cd466440c2e4bfb29d66b6d07fa0d2c47884559ba",
+    ".evor/runs/m1/run-live-01/ticks/1/mutagen/proposals.json": "3ad2dff8a133479c7e7401427ac77f37385daef9fd46ab340fe69aee31bc6395",
     ".evor/runs/m1/run-live-01/ticks/1/selector/verdict.json": "085c82237a364fbf4108a940c833169fc51d2719103218ad81c210def695bc38",
-    ".evor/runs/m1/run-live-01/tree.json": "435b6ab27af3d63014eb960536b04c60c1ecfd5c7a74abb0c03f7602ed24c09b"
+    ".evor/runs/m1/run-live-01/tree.json": "4324d7e67fcf10b23eb9f005476be54d800c92a0c145d8bd7f00819c5cb88c73"
   },
   "L4-critic-verdict-reversal-pos": {
     ".evor/active-run.json": "1ed40a5b4d15889a467044f6d70b864e223eb167147f3187a020c5f8bec08246",
@@ -466,9 +466,9 @@
     ".evor/runs/m1/run-live-01/strategy.json": "ff2c7f9b578ff51ae1a42fd082222a5e28a6f9daae90e9ea3ba8e04932b10f48",
     ".evor/runs/m1/run-live-01/tick-state.json": "fd2438b0da455412bd295ac38fc083431846e43f49c1cc6321a87b5e1e745012",
     ".evor/runs/m1/run-live-01/ticks/1/forge/forge-report.json": "3d6af0a38e30005bdf527b341beecb71f617e252b8dd98a474b91a8e4071ef17",
-    ".evor/runs/m1/run-live-01/ticks/1/mutagen/proposals.json": "a5e45ac505793538f8ea773cd466440c2e4bfb29d66b6d07fa0d2c47884559ba",
+    ".evor/runs/m1/run-live-01/ticks/1/mutagen/proposals.json": "3ad2dff8a133479c7e7401427ac77f37385daef9fd46ab340fe69aee31bc6395",
     ".evor/runs/m1/run-live-01/ticks/1/selector/verdict.json": "59552d79376718bed29f84d562a73a819f8cd6f59765c0f5d8ce70debaa0fb4b",
-    ".evor/runs/m1/run-live-01/tree.json": "435b6ab27af3d63014eb960536b04c60c1ecfd5c7a74abb0c03f7602ed24c09b"
+    ".evor/runs/m1/run-live-01/tree.json": "4324d7e67fcf10b23eb9f005476be54d800c92a0c145d8bd7f00819c5cb88c73"
   },
   "L4-critic-verdict-reversal-neg": {
     ".evor/active-run.json": "1ed40a5b4d15889a467044f6d70b864e223eb167147f3187a020c5f8bec08246",
@@ -487,9 +487,9 @@
     ".evor/runs/m1/run-live-01/strategy.json": "ff2c7f9b578ff51ae1a42fd082222a5e28a6f9daae90e9ea3ba8e04932b10f48",
     ".evor/runs/m1/run-live-01/tick-state.json": "fd2438b0da455412bd295ac38fc083431846e43f49c1cc6321a87b5e1e745012",
     ".evor/runs/m1/run-live-01/ticks/1/forge/forge-report.json": "3d6af0a38e30005bdf527b341beecb71f617e252b8dd98a474b91a8e4071ef17",
-    ".evor/runs/m1/run-live-01/ticks/1/mutagen/proposals.json": "a5e45ac505793538f8ea773cd466440c2e4bfb29d66b6d07fa0d2c47884559ba",
+    ".evor/runs/m1/run-live-01/ticks/1/mutagen/proposals.json": "3ad2dff8a133479c7e7401427ac77f37385daef9fd46ab340fe69aee31bc6395",
     ".evor/runs/m1/run-live-01/ticks/1/selector/verdict.json": "0ad8b8932f11fb6acc1bbb2d6f83ee244f32a4705f8e19bddcb0fa02d42e42fc",
-    ".evor/runs/m1/run-live-01/tree.json": "435b6ab27af3d63014eb960536b04c60c1ecfd5c7a74abb0c03f7602ed24c09b"
+    ".evor/runs/m1/run-live-01/tree.json": "4324d7e67fcf10b23eb9f005476be54d800c92a0c145d8bd7f00819c5cb88c73"
   },
   "L5-truncated-run-under-30pct-pos": {
     ".evor/active-run.json": "1ed40a5b4d15889a467044f6d70b864e223eb167147f3187a020c5f8bec08246",
@@ -510,7 +510,7 @@
     ".evor/runs/m1/run-live-01/ticks/1/forge/forge-report.json": "3d6af0a38e30005bdf527b341beecb71f617e252b8dd98a474b91a8e4071ef17",
     ".evor/runs/m1/run-live-01/ticks/1/mutagen/proposals.json": "85ad8d7f6098653220e1c7d51e7480ab503e664efe2a72a20ebc30f60f1eafcc",
     ".evor/runs/m1/run-live-01/ticks/1/selector/verdict.json": "085c82237a364fbf4108a940c833169fc51d2719103218ad81c210def695bc38",
-    ".evor/runs/m1/run-live-01/tree.json": "435b6ab27af3d63014eb960536b04c60c1ecfd5c7a74abb0c03f7602ed24c09b"
+    ".evor/runs/m1/run-live-01/tree.json": "4324d7e67fcf10b23eb9f005476be54d800c92a0c145d8bd7f00819c5cb88c73"
   },
   "L5-truncated-run-under-30pct-neg": {
     ".evor/active-run.json": "1ed40a5b4d15889a467044f6d70b864e223eb167147f3187a020c5f8bec08246",
@@ -531,7 +531,7 @@
     ".evor/runs/m1/run-live-01/ticks/1/forge/forge-report.json": "3d6af0a38e30005bdf527b341beecb71f617e252b8dd98a474b91a8e4071ef17",
     ".evor/runs/m1/run-live-01/ticks/1/mutagen/proposals.json": "85ad8d7f6098653220e1c7d51e7480ab503e664efe2a72a20ebc30f60f1eafcc",
     ".evor/runs/m1/run-live-01/ticks/1/selector/verdict.json": "085c82237a364fbf4108a940c833169fc51d2719103218ad81c210def695bc38",
-    ".evor/runs/m1/run-live-01/tree.json": "435b6ab27af3d63014eb960536b04c60c1ecfd5c7a74abb0c03f7602ed24c09b"
+    ".evor/runs/m1/run-live-01/tree.json": "4324d7e67fcf10b23eb9f005476be54d800c92a0c145d8bd7f00819c5cb88c73"
   },
   "L5-degenerate-all-ones-ceiling-pos": {
     ".evor/active-run.json": "1ed40a5b4d15889a467044f6d70b864e223eb167147f3187a020c5f8bec08246",
@@ -552,7 +552,7 @@
     ".evor/runs/m1/run-live-01/ticks/1/forge/forge-report.json": "abd35de4cbe69258a17d43d4d190edfea53bf8d1749207a1fd4346c878b82994",
     ".evor/runs/m1/run-live-01/ticks/1/mutagen/proposals.json": "85ad8d7f6098653220e1c7d51e7480ab503e664efe2a72a20ebc30f60f1eafcc",
     ".evor/runs/m1/run-live-01/ticks/1/selector/verdict.json": "085c82237a364fbf4108a940c833169fc51d2719103218ad81c210def695bc38",
-    ".evor/runs/m1/run-live-01/tree.json": "435b6ab27af3d63014eb960536b04c60c1ecfd5c7a74abb0c03f7602ed24c09b"
+    ".evor/runs/m1/run-live-01/tree.json": "4324d7e67fcf10b23eb9f005476be54d800c92a0c145d8bd7f00819c5cb88c73"
   },
   "L5-degenerate-all-ones-ceiling-neg": {
     ".evor/active-run.json": "1ed40a5b4d15889a467044f6d70b864e223eb167147f3187a020c5f8bec08246",
@@ -573,7 +573,7 @@
     ".evor/runs/m1/run-live-01/ticks/1/forge/forge-report.json": "6dca539e17d06e283db80fa858da3c911c9ddd1bda3e0053c6dca3a2a1ac3c86",
     ".evor/runs/m1/run-live-01/ticks/1/mutagen/proposals.json": "85ad8d7f6098653220e1c7d51e7480ab503e664efe2a72a20ebc30f60f1eafcc",
     ".evor/runs/m1/run-live-01/ticks/1/selector/verdict.json": "085c82237a364fbf4108a940c833169fc51d2719103218ad81c210def695bc38",
-    ".evor/runs/m1/run-live-01/tree.json": "435b6ab27af3d63014eb960536b04c60c1ecfd5c7a74abb0c03f7602ed24c09b"
+    ".evor/runs/m1/run-live-01/tree.json": "4324d7e67fcf10b23eb9f005476be54d800c92a0c145d8bd7f00819c5cb88c73"
   },
   "L5-mean-quoted-as-min-pos": {
     ".evor/active-run.json": "1ed40a5b4d15889a467044f6d70b864e223eb167147f3187a020c5f8bec08246",
@@ -592,9 +592,9 @@
     ".evor/runs/m1/run-live-01/strategy.json": "ff2c7f9b578ff51ae1a42fd082222a5e28a6f9daae90e9ea3ba8e04932b10f48",
     ".evor/runs/m1/run-live-01/tick-state.json": "fd2438b0da455412bd295ac38fc083431846e43f49c1cc6321a87b5e1e745012",
     ".evor/runs/m1/run-live-01/ticks/1/forge/forge-report.json": "3d6af0a38e30005bdf527b341beecb71f617e252b8dd98a474b91a8e4071ef17",
-    ".evor/runs/m1/run-live-01/ticks/1/mutagen/proposals.json": "a5e45ac505793538f8ea773cd466440c2e4bfb29d66b6d07fa0d2c47884559ba",
+    ".evor/runs/m1/run-live-01/ticks/1/mutagen/proposals.json": "3ad2dff8a133479c7e7401427ac77f37385daef9fd46ab340fe69aee31bc6395",
     ".evor/runs/m1/run-live-01/ticks/1/selector/verdict.json": "085c82237a364fbf4108a940c833169fc51d2719103218ad81c210def695bc38",
-    ".evor/runs/m1/run-live-01/tree.json": "435b6ab27af3d63014eb960536b04c60c1ecfd5c7a74abb0c03f7602ed24c09b"
+    ".evor/runs/m1/run-live-01/tree.json": "4324d7e67fcf10b23eb9f005476be54d800c92a0c145d8bd7f00819c5cb88c73"
   },
   "L5-mean-quoted-as-min-neg": {
     ".evor/active-run.json": "1ed40a5b4d15889a467044f6d70b864e223eb167147f3187a020c5f8bec08246",
@@ -613,8 +613,8 @@
     ".evor/runs/m1/run-live-01/strategy.json": "ff2c7f9b578ff51ae1a42fd082222a5e28a6f9daae90e9ea3ba8e04932b10f48",
     ".evor/runs/m1/run-live-01/tick-state.json": "fd2438b0da455412bd295ac38fc083431846e43f49c1cc6321a87b5e1e745012",
     ".evor/runs/m1/run-live-01/ticks/1/forge/forge-report.json": "3d6af0a38e30005bdf527b341beecb71f617e252b8dd98a474b91a8e4071ef17",
-    ".evor/runs/m1/run-live-01/ticks/1/mutagen/proposals.json": "a5e45ac505793538f8ea773cd466440c2e4bfb29d66b6d07fa0d2c47884559ba",
+    ".evor/runs/m1/run-live-01/ticks/1/mutagen/proposals.json": "3ad2dff8a133479c7e7401427ac77f37385daef9fd46ab340fe69aee31bc6395",
     ".evor/runs/m1/run-live-01/ticks/1/selector/verdict.json": "085c82237a364fbf4108a940c833169fc51d2719103218ad81c210def695bc38",
-    ".evor/runs/m1/run-live-01/tree.json": "435b6ab27af3d63014eb960536b04c60c1ecfd5c7a74abb0c03f7602ed24c09b"
+    ".evor/runs/m1/run-live-01/tree.json": "4324d7e67fcf10b23eb9f005476be54d800c92a0c145d8bd7f00819c5cb88c73"
   }
 }

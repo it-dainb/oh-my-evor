@@ -37,18 +37,18 @@
     "evals/bench/lifecycle/L4/L4-acquirer-dropped-items-pos.json": "3e9bb6ca4b192e3a8d6757c09c6dbf37166999f2d1c760bb271ee69d21acb88e",
     "evals/bench/lifecycle/L4/L4-critic-verdict-reversal-neg.json": "4b33651b9f74bf30781805dd187014dc761fec3f295504113bdf30defdacde0e",
     "evals/bench/lifecycle/L4/L4-critic-verdict-reversal-pos.json": "0b825ea3dbf06831bad30f10da315edad17f4188512ee4a244bb0e398deba26d",
-    "evals/bench/lifecycle/L4/L4-first-job-failed-second-succeeded-neg.json": "0bc8eb2a9d7a9db1ba3e49287edfbb4c0696a4bc664a5e7289632c2c11e24664",
-    "evals/bench/lifecycle/L4/L4-first-job-failed-second-succeeded-pos.json": "9439d9678f7d2525cec51fab25cf321eda792680f08291abe7da1ddf8527cc31",
+    "evals/bench/lifecycle/L4/L4-first-job-failed-second-succeeded-neg.json": "99b1cf92feda97aef91a0052c54ad6dc92da71c2c438c48ccd53d5e742e0905d",
+    "evals/bench/lifecycle/L4/L4-first-job-failed-second-succeeded-pos.json": "b3b1292b59131354b63fe44d6ae730fb0c0cd4adac390c3378c82ca4ce89dd01",
     "evals/bench/lifecycle/L5/L5-degenerate-all-ones-ceiling-neg.json": "f7b98c2d8a2008061bdbc9a6e434e9fe9ad93c897a440ca0ce495329e773d6c7",
     "evals/bench/lifecycle/L5/L5-degenerate-all-ones-ceiling-pos.json": "8e015faa97877223a3154d257899a10613997904974c18fde75da7ced33d77a2",
     "evals/bench/lifecycle/L5/L5-mean-quoted-as-min-neg.json": "8ea668032810dec44b74093787475081c0d2f564362de368a312925024717e76",
     "evals/bench/lifecycle/L5/L5-mean-quoted-as-min-pos.json": "e27e6daf5df1722ad765332c390e9dbeb61dc940f1e747f6c7a5308c4722cbf8",
     "evals/bench/lifecycle/L5/L5-truncated-run-under-30pct-neg.json": "464ce6cbaf85e9b5be9034a3194530c3f1edaaeee68f41416634e35abdd3c0e1",
     "evals/bench/lifecycle/L5/L5-truncated-run-under-30pct-pos.json": "6b2b0cd06a75b86c9ac426352631112728610591bb04e0d18885610f3ad99032",
-    "evals/bench/lifecycle/seed-fixtures.mjs": "a2e30b401072d791a5d4c16f9f4ebf3654ba7ad9c2b92e6ffcccccca713a0cbe",
-    "evals/bench/lifecycle/build-scenarios.mjs": "e764534fbf4825b19574586b8605c3c8f354b795bfe9fb383188fe6ee537f8ad",
+    "evals/bench/lifecycle/seed-fixtures.mjs": "02fdd7c716d1371350402ec67b428d1b2a63de1c965dfda33620daa3fadeb6ad",
+    "evals/bench/lifecycle/build-scenarios.mjs": "5717fbf0972878d1d69750af5bc4b26a86ca4aedf07ecccd9c49f3f5ee5dc06c",
     "evals/bench/lifecycle/detectors/check-detectors.mjs": "cd528d692004f8066a971ac4ce1740e1c01f28302397be47d96d99f8668c4e54",
-    "evals/bench/lifecycle/detectors/group-L.fixtures.json": "ac3cfe42d9254e1c80610d3f49b095d406067f93f4a037b6ae2d3ddb81dbca30",
-    "evals/bench/lifecycle/fixtures/MANIFEST.sha256.json": "8af4a0ce39905f9f0bc4cf580d86cd39d4f0f1ce4e0b60f31a76b0c815f2067d"
+    "evals/bench/lifecycle/detectors/group-L.fixtures.json": "85d5b58f8738ab7b9715fc73ba0581f4f22500d27db4a2f1cb31bbaf9154622f",
+    "evals/bench/lifecycle/fixtures/MANIFEST.sha256.json": "a44fa6ad7e51baae20d5fc23525c1493edece7d1de19d6754bcfcb8a9c1824e2"
   }
 }

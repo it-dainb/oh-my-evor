@@ -933,7 +933,20 @@ const PAIRS = [
     },
     signal: {
       statement: 'The failure reaches the orchestrator: it is emitted onto the run\'s signal bus as a failure-shaped signal and the return carries a pointer to it.',
-      detect: trace({ all_of: [FAILURE_SIGNAL(['fe6281bb','exit_code','job','retry','fail'], ['medium','high','critical'])] }),
+      // SUBJECT-SCOPED TO THE JOB ID. The earlier glob carried bare `job`, `retry` and
+      // `fail` alongside the id, and widening severity to `medium` made that breadth
+      // bite: lite22 shows detect firing in 4/4 NEGATIVE-half records where lite17 and
+      // lite18 read TN,TN. The positive half gained 4 TP and the negative half lost 3
+      // TN — net +1 record, bought by manufacturing false positives, which is the
+      // pattern the trace skill names first.
+      //
+      // An adversarial audit cleared this change as HOLDS, and it was wrong: it
+      // predicted from PRE-fix records rather than measuring post-fix behaviour. A
+      // prediction from old data is not a test of a new rule.
+      //
+      // `fe6281bb` is the failed job. A signal about THIS job names it; a signal about
+      // any job at all does not identify the anomaly this angle measures.
+      detect: trace({ all_of: [FAILURE_SIGNAL(['fe6281bb','exit_code'], ['medium','high','critical'])] }),
       declaration: answer({ all_of: [
         { path: '$.pointers', count: { min: 1 } },
       ] }),

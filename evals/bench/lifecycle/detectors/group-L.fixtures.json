@@ -1382,7 +1382,7 @@
                   "failure"
                 ],
                 "severity": "medium",
-                "signature": "xfe6281bbx|xexit_codex|xjobx|xretryx|xfailx"
+                "signature": "xfe6281bbx|xexit_codex"
               }
             }
           ],
@@ -1433,7 +1433,7 @@
                   "failure"
                 ],
                 "severity": "medium",
-                "signature": "xfe6281bbx|xexit_codex|xjobx|xretryx|xfailx"
+                "signature": "xfe6281bbx|xexit_codex"
               }
             }
           ],
