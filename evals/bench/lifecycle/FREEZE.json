@@ -45,10 +45,10 @@
     "evals/bench/lifecycle/L5/L5-mean-quoted-as-min-pos.json": "e27e6daf5df1722ad765332c390e9dbeb61dc940f1e747f6c7a5308c4722cbf8",
     "evals/bench/lifecycle/L5/L5-truncated-run-under-30pct-neg.json": "464ce6cbaf85e9b5be9034a3194530c3f1edaaeee68f41416634e35abdd3c0e1",
     "evals/bench/lifecycle/L5/L5-truncated-run-under-30pct-pos.json": "6b2b0cd06a75b86c9ac426352631112728610591bb04e0d18885610f3ad99032",
-    "evals/bench/lifecycle/seed-fixtures.mjs": "02fdd7c716d1371350402ec67b428d1b2a63de1c965dfda33620daa3fadeb6ad",
+    "evals/bench/lifecycle/seed-fixtures.mjs": "547255b0165cf6b51152a49319960840d5ba906ea43a7eb994750d81bcd8bfce",
     "evals/bench/lifecycle/build-scenarios.mjs": "5717fbf0972878d1d69750af5bc4b26a86ca4aedf07ecccd9c49f3f5ee5dc06c",
     "evals/bench/lifecycle/detectors/check-detectors.mjs": "cd528d692004f8066a971ac4ce1740e1c01f28302397be47d96d99f8668c4e54",
     "evals/bench/lifecycle/detectors/group-L.fixtures.json": "85d5b58f8738ab7b9715fc73ba0581f4f22500d27db4a2f1cb31bbaf9154622f",
-    "evals/bench/lifecycle/fixtures/MANIFEST.sha256.json": "a44fa6ad7e51baae20d5fc23525c1493edece7d1de19d6754bcfcb8a9c1824e2"
+    "evals/bench/lifecycle/fixtures/MANIFEST.sha256.json": "96fc925edd0adb2452e48faf7ec366b55d99037026590565e2e3923eea8df0a4"
   }
 }

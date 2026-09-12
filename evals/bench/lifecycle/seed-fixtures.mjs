@@ -257,7 +257,32 @@ function buildTree(patch) {
       updated_at: '2026-08-24T02:05:00Z',
     },
     tree: baseTree(),
-    strategy: { winning_families: { arch: 1, 'data-augmentation': 0 }, updated_at: '2026-08-24T02:00:08Z' },
+    // A COMPLETE StrategyState. This shipped `{winning_families, updated_at}` against a
+    // schema (mcp/src/contracts.ts, StrategyStateSchema) that requires fifteen fields, so
+    // `evor_state_read` could not validate it and the tick filed
+    // `strategy-json-schema-mismatch-run-live-01` instead of reporting the anomaly its
+    // angle measures. Two of L2-active-run-job-disagree-pos's three lite24 records emit
+    // exactly that and nothing else.
+    //
+    // Third incomplete fixture repair in this loop on the same class: proposals.json,
+    // then tree.json's envelope, now strategy.json. Each time I fixed the file the
+    // agents' last message happened to name. Validated against the schema's field list
+    // this time rather than against one error string.
+    strategy: {
+      meta_iteration: 1,
+      selection_policy: 'ucb1',
+      beam_width: 3,
+      wildness: 0.35,
+      family_mix: { arch: 0.5, 'data-augmentation': 0.3, training: 0.2 },
+      winning_families: { arch: 1, 'data-augmentation': 0 },
+      wins_by_family: { arch: 1, 'data-augmentation': 0 },
+      meta_loop_interval: 5,
+      post_upgrade_exploration_boost: null,
+      post_upgrade_exploration_ticks: 0,
+      rescore_mode: 'sync',
+      dream_k: 6,
+      updated_at: '2026-08-24T02:00:08Z',
+    },
     angleRegistry: { angles: [{ angle_id: 'palmleaf_khmer', covered: true }, { angle_id: 'palmleaf_balinese', covered: false }] },
     signals: [],
     proposals: { tick: 1, proposals: [PROPOSAL('p-001', NODE_SLUG, [])] },
@@ -388,7 +413,10 @@ const PAIRS = [
     // pairs were written.
     base: (t) => {
       t.handoffName = 'evor_to_selector';
-      t.strategy = { winning_families: { arch: 0, 'data-augmentation': 2 }, updated_at: '2026-08-24T02:04:00Z' };
+      // MERGE, do not REPLACE. A whole-object override drops the eleven other fields
+      // StrategyStateSchema requires and re-creates the invalid artifact the base was
+      // just fixed to avoid. The pair only moves winning_families and the timestamp.
+      t.strategy = { ...t.strategy, winning_families: { arch: 0, 'data-augmentation': 2 }, updated_at: '2026-08-24T02:04:00Z' };
       t.proposals = { tick: 2, proposals: [PROPOSAL('p-101', 'iir-scan-binnet-03', [NODE_UUID])] };
       t.tickState = { tick: 2, current_step: 4, step_status: 'running', integrity_verdict: null, auto_resume_count: 0, step_history: [1, 2, 3, 4], updated_at: '2026-08-24T02:05:00Z' };
       t.verdict = null;
@@ -635,7 +663,9 @@ function twelveZeroNodes(t) {
       eval_version: 'v1', fitness_value: 0.0, status: 'done', integrity_status: 'passed', depth: 1,
     };
   }
-  t.tree = { nodes };
+  // Preserve the envelope. `{ nodes }` alone drops `updated_at`, which
+  // harness/evor/tree.py:310 writes and contracts.py:926 requires.
+  t.tree = { ...t.tree, nodes };
   t.runState.tick_history_scores = [0.0];
   t.runState.tick_count = 1;
   t.tickState = { tick: 1, current_step: 9, step_status: 'done', integrity_verdict: 'passed', auto_resume_count: 0, step_history: [1, 2, 3, 4, 5, 6, 7, 8, 9], updated_at: '2026-08-24T02:05:00Z' };
