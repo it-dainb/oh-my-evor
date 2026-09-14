@@ -321,6 +321,9 @@ def _build_parser() -> argparse.ArgumentParser:
 # `run` subcommand
 # ─────────────────────────────────────────────────────────────────────────────
 
+from .node_identity import canonical_node_id  # O-01: writers canonicalize
+
+
 def _cmd_run(args: argparse.Namespace) -> int:
     """Execute the run subcommand.
 
@@ -484,8 +487,15 @@ def _cmd_run(args: argparse.Namespace) -> int:
         "EVOR_RUN_ID": args.run_id,
     }
     # Export telemetry path so the candidate can append records via stdlib only (§19).
+    #
+    # O-01: `args.node_id` may be a NAME or a uuid — every agent-facing surface
+    # is name-keyed on purpose. Building the directory from whichever arrived is
+    # how one node got two of them in the same run, and how integrity check 5
+    # once failed a candidate holding 12,000 well-formed telemetry records. The
+    # canonical id is resolved here so this writer cannot mint the second one.
     if run_dir is not None:
-        _tel_path = run_dir / "nodes" / args.node_id / "telemetry.jsonl"
+        _node_key = canonical_node_id(run_dir, args.node_id)
+        _tel_path = run_dir / "nodes" / _node_key / "telemetry.jsonl"
         _tel_path.parent.mkdir(parents=True, exist_ok=True)
         env["EVOR_TELEMETRY_PATH"] = str(_tel_path)
 

@@ -9,12 +9,15 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { TelemetryRecord, TelemetryRecordSchema } from "../contracts.js";
 import { resolveRunPaths } from "../run-store.js";
+import { resolveNodeRef } from "./node-ref.js";
 
 // ── Core logic (exported for tests) ────────────────────────────────────────
 
 /**
  * Append validated TelemetryRecord objects as JSONL lines to
- * `nodes/<nodeId>/telemetry.jsonl`.  Each record is written as a single
+ * `nodes/<canonical node id>/telemetry.jsonl`. A `nodeId` given as a NAME is
+ * resolved to the node's uuid first, so this can never mint a second directory
+ * for one node — see the note in the body.  Each record is written as a single
  * JSON line terminated with `\n`.
  *
  * Optional fields (node_id, run_id, timestamp) are filled server-side from
@@ -29,7 +32,32 @@ export function telemetryIngest(
   missionId?: string
 ): { telemetryPath: string; count: number } {
   const paths = resolveRunPaths(runId, missionId);
-  const nodeDir = join(paths.nodesDir, nodeId);
+
+  // ── O-01, closed at the write side (was: closed only at the read side) ────
+  //
+  // This joined `nodesDir` with whatever key it was handed, so one node got TWO
+  // directories in the same run: the agent surface is name-keyed on purpose
+  // ("Returns {ok, name} — you never handle an internal id"), the server surface
+  // is uuid-keyed, and both wrote here. A real run ended up holding
+  // `nodes/cf9f0020-…/results.json` beside `nodes/n001-depthwise-unet/telemetry.jsonl`,
+  // and integrity check 5 once failed a node with 12,000 well-formed telemetry
+  // records because it looked under the other one.
+  //
+  // `node_identity.py` made every READER tolerant of both. That was the right
+  // rescue and it is not a fix: as long as this function can mint a second
+  // directory, the split keeps being created and every reader forever needs the
+  // rescue. The uuid is the canonical key (node_identity's own docstring says
+  // so), so a name is resolved to it here. Callers may still pass either.
+  // `resolveNodeRef`, not `tryResolveNodeRef`: node-ref.ts states the rule —
+  // "Readers use this; writers use resolveNodeRef". This is a writer. The strict
+  // form returns the ref unchanged for an unreadable or EMPTY tree (the
+  // legitimate pre-first-node case) and THROWS when the tree is populated and
+  // nothing claims the ref — which is the loud failure O-01 needs, because
+  // resolving an unknown ref to itself is exactly what mints the second
+  // directory. Using the reader's tolerant form here would silently keep doing
+  // that.
+  const canonicalId = resolveNodeRef(runId, nodeId, missionId);
+  const nodeDir = join(paths.nodesDir, canonicalId);
 
   if (!existsSync(nodeDir)) {
     mkdirSync(nodeDir, { recursive: true });
@@ -38,7 +66,7 @@ export function telemetryIngest(
   const now = new Date().toISOString();
   const filled = records.map((r) => ({
     ...r,
-    node_id: r.node_id || nodeId,
+    node_id: r.node_id || canonicalId,
     run_id: r.run_id || runId,
     timestamp: r.timestamp || now,
   }));

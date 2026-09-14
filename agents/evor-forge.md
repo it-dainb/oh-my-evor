@@ -300,8 +300,22 @@ skills: [oh-my-evor:evor-mcp]
     Telemetry instrumentation is forge-junior's responsibility and is non-negotiable.
     The candidate appends one JSON-lines record per training step to the file at
     $EVOR_TELEMETRY_PATH using stdlib os+json only — no evor import required (§19 clean).
-    The harness exports EVOR_TELEMETRY_PATH, EVOR_NODE_ID, and EVOR_RUN_ID to the
-    subprocess environment before training starts.
+    **YOU export EVOR_TELEMETRY_PATH for training, and you use the value
+    `evor_record_node` handed you — never one you build.** Its result carries
+    `telemetry_path`; pass it through verbatim.
+
+    This paragraph used to say "the harness exports EVOR_TELEMETRY_PATH … before
+    training starts". That is true of the EVAL subprocess — `evaluator.py`
+    `_build_env` sets it — and false of training, which forge-junior launches
+    through Bash where nothing sets it. So Forge exported it itself, and the only
+    identity it holds is the node NAME (this tool's contract is that an agent
+    never handles an internal id). It therefore wrote
+    `nodes/<name>/telemetry.jsonl` while the server wrote
+    `nodes/<uuid>/results.json` — one node, two directories, in the same run.
+    Integrity check 5 once failed a candidate that had 12,000 well-formed
+    telemetry records because it looked under the other one.
+
+    EVOR_NODE_ID and EVOR_RUN_ID are likewise yours to export for training.
 
     The append must appear in train/trainer.py:
 

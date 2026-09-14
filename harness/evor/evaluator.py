@@ -189,6 +189,13 @@ def _build_env(
         # nothing exported it. An evaluator may rely on EVAL_ENV_VARS and on
         # nothing else, so the promise is kept here rather than withdrawn there.
         env["EVOR_RUN_DIR"] = str(run_dir)
+        # NOTE ON SCOPE: this env is the EVAL subprocess's only. Training is
+        # launched by forge-junior through Bash, where none of these are set —
+        # `agents/evor-forge.md` claimed the harness exported EVOR_TELEMETRY_PATH
+        # "before training starts", which was never true of training, so Forge
+        # built the path from the node NAME and split one node across two
+        # directories. Forge now passes through the `telemetry_path` that
+        # `evor_record_node` grants. Do not read this block as covering training.
     return env
 
 

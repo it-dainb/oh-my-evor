@@ -21,6 +21,7 @@
 
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
+import { resolveNodeArtifact } from './node-identity.mjs';
 
 /** Read a JSON file, or null. */
 function readJson(path) {
@@ -67,21 +68,14 @@ export function owed(runDir, tick) {
     const missing = [];
     if (!existsSync(join(runDir, 'evaluations', `${node.id}.json`))) missing.push('integrity_verdict');
     if (typeof node.fitness_value !== 'number') missing.push('fitness');
-    // Telemetry is looked up under the id AND the name, because both occur on
-    // disk. `evaluator.py:184` declares `nodes/<node.id>/telemetry.jsonl`, and
-    // in the field the run held BOTH `nodes/cf9f0020-…/results.json` and
-    // `nodes/n001-depthwise-unet/telemetry.jsonl` — the node's own telemetry
-    // filed under its name while everything else used its uuid.
-    //
-    // That split is a real defect and it is not this module's to fix. What
-    // matters here is not repeating it: checking only the declared path reports
-    // a trained node as owing telemetry, and a completeness gate that fires on
-    // a finished candidate is worse than no gate, because the only way past it
-    // is to stop believing it.
-    const telCandidates = [node.id, node.name]
-      .filter(Boolean)
-      .map(key => join(runDir, 'nodes', String(key), 'telemetry.jsonl'));
-    if (!telCandidates.some(existsSync)) missing.push('telemetry');
+    // Telemetry resolved through the identity owner rather than by an alias
+    // list of this module's own. Both identities occur on disk (O-01), and a
+    // second place holding its own opinion about that mapping is how the
+    // problem started: `node_identity.py` exists precisely because every reader
+    // was guessing independently.
+    if (!resolveNodeArtifact(join(runDir, 'nodes', String(node.id), 'telemetry.jsonl'), node)) {
+      missing.push('telemetry');
+    }
     if (missing.length) out.push({ proposal_id: proposalId, node_id: node.id, node_name: node.name, missing });
   }
   return out;

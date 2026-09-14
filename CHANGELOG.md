@@ -2,6 +2,70 @@
 
 All notable changes to Evor. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.2.8] — 2026-09-14 — O-01 closed at the write side
+
+`node_identity.py` made every READER tolerant of a node's two identities. That was the
+right rescue for the runs already on disk, and it was never a fix: while any writer could
+mint a second directory, the split kept being created and every reader needed the rescue
+forever. A live run held `nodes/cf9f0020-…/results.json` beside
+`nodes/n001-depthwise-unet/telemetry.jsonl` — one node, two directories, same run. The
+original victim was integrity check 5, which failed a candidate holding **12,000
+well-formed telemetry records** because it looked under the other one.
+
+### Why the split was still being created
+
+The agent surface is name-keyed **on purpose** — `evor_record_node` "Returns {ok, name} …
+you never handle an internal id" — and the server surface is uuid-keyed. Both wrote
+`nodes/<identity>/`, and nothing decided which owned the directory. Then
+`agents/evor-forge.md` said:
+
+> The harness exports EVOR_TELEMETRY_PATH, EVOR_NODE_ID, and EVOR_RUN_ID to the
+> subprocess environment before training starts.
+
+True of the EVAL subprocess (`evaluator.py::_build_env`), false of training, which
+forge-junior launches through Bash where nothing sets it. So Forge exported it itself,
+from the only identity it holds — the name.
+
+### Writers can no longer choose
+
+- **`evor_record_node` grants the canonical `telemetry_path`.** Forge passes it through
+  verbatim instead of constructing one; the uuid stays inside an opaque path rather than
+  being handed over as an id. The construction is gone, and with it the choice.
+- **`telemetryIngest` resolves through `resolveNodeRef`,** not `tryResolveNodeRef` —
+  `node-ref.ts` states the rule ("Readers use this; writers use resolveNodeRef") and the
+  strict form throws when a populated tree does not claim the ref, which is the loud
+  failure this needs. Resolving an unknown ref to itself is precisely what mints the
+  second directory. It still returns the ref for an empty or unreadable tree, the
+  legitimate pre-first-node case.
+- **`python -m evor run` canonicalises** before exporting `EVOR_TELEMETRY_PATH`, via the
+  new `node_identity.canonical_node_id` — the write-side half the module was missing.
+- **`agents/evor-forge.md` corrected**, and `evaluator.py` now states that its env block
+  covers the eval subprocess only, so the claim cannot be misread back into place.
+
+### Readers that were still guessing
+
+`dashboard/store.py` and `integrity.py` already resolved both identities. Three did not:
+
+- `harness/evor/telemetry.py` built a single path; it resolves now, falling back to the
+  **declared** path when the artifact exists under neither — a caller reporting "not yet
+  written" must keep reporting exactly that, which is what stops the rescue degrading
+  into "pass when missing".
+- `hooks/stop.mjs`'s drift guard checked `nodes/<uuid>/telemetry.jsonl` only — the same
+  guess that failed the 12,000-record node, and it fails toward "the candidate is bad".
+- `hooks/lib/tick-completeness.mjs` (added in 1.2.7) carried its own ad-hoc alias list.
+  It now asks the owner.
+
+### One rule, two runtimes, pinned together
+
+O-01 needs an owner in Python (the harness) and in JS (the hooks and the MCP server), so
+`hooks/lib/node-identity.mjs` mirrors `harness/evor/node_identity.py`.
+`mcp/tests/node-identity-parity.test.ts` runs both over the real split fixture and fails
+if they disagree — two implementations of one rule is the shape of the original defect, and
+a mirror without that test is just another reader with its own opinion.
+
+The parity suite also pins the safety property in both: resolution can rescue a misfiled
+artifact and can **never** manufacture one, so a genuine absence still fails the check.
+
 ## [1.2.7] — 2026-09-14 — a yield is not a return
 
 Two guards, pulled in opposite directions, because that is what the evidence asked for.

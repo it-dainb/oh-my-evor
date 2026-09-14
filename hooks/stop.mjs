@@ -39,6 +39,7 @@ import { randomBytes } from 'crypto';
 import { resolveActiveRun, resolveEvorRoot } from './lib/active-run.mjs';
 import { isMissionLive, isTickFinished } from './lib/run-status.mjs';
 import { isYieldingStop, recordedWait, liveSubagents } from './lib/waiting.mjs';
+import { resolveNodeArtifact } from './lib/node-identity.mjs';
 
 // ── Kill switches ─────────────────────────────────────────────────────────────
 // DISABLE_EVOR: truthy value disables the entire evor hook layer.
@@ -328,10 +329,20 @@ try {
           continue; // skip telemetry check; integrity is the primary debt
         }
 
-        // (b) Evaluated node missing telemetry
-        const telemetryPath = join(runDir, 'nodes', nodeId, 'telemetry.jsonl');
+        // (b) Evaluated node missing telemetry.
+        //
+        // Resolved across BOTH identities (O-01). This built `nodes/<uuid>/`
+        // only, which is the same guess that once failed a node holding 12,000
+        // well-formed telemetry records — the trainer had filed them under the
+        // slug. A guard that reports a trained node as missing telemetry fails
+        // in the direction of "the candidate is bad", which is the worst
+        // direction a silent path miss can fail in.
+        const telemetryPath = resolveNodeArtifact(
+          join(runDir, 'nodes', nodeId, 'telemetry.jsonl'),
+          node,
+        );
         let telemetryMissing = false;
-        if (!existsSync(telemetryPath)) {
+        if (!telemetryPath) {
           telemetryMissing = true;
         } else {
           try {
