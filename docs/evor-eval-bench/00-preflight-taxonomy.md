@@ -1462,6 +1462,30 @@ What changed since the first freeze, and why:
   postcondition left Python bytecode. Neither is authored corpus. A fixture that
   changes when you look at it is not a fixture.
 
+**2026-09-14 — 30 scenarios re-pointed after a product change (not re-frozen corpus).**
+Trap 6.7 forbids fitting a scenario to a model's ANSWER. This is the other case it
+names: the product moved, so grading against the frozen sha would grade against a file
+that no longer exists.
+
+Two product files changed and 30 scenarios declared their shas:
+
+- `hooks/stop.mjs` `9083666602e3 → 8fb70f1fae68` — the Stop hook now emits the JSON
+  block protocol instead of exit-2-with-stdout (the reason was unreadable, so 497
+  consecutive stops blocked with an empty message), releases at a hard ceiling, and
+  allows a stop that is a YIELD rather than an end.
+- `agents/evor-tick.md` `04310dad8df9 → ea4e86b0ac65` — the role now Reads
+  `skills/evor/SKILL.md` explicitly, because its `skills:` frontmatter resolved to
+  `commands/evor.md` and delivered a `cat` stub to an agent with `disallowedTools: Bash`.
+
+Only `grounded_rule.sha256_at_authoring` and `setup.guarded_paths[].sha256` entries
+that are real 64-hex digests of real repo paths were touched. `{{SANDBOX}}` paths and
+`{{AT_SANDBOX…}}` placeholders are resolved by the runner and were left alone — a first
+pass overwrote them with digests, which would have hardcoded one sandbox's state into
+the corpus, and was reverted from git.
+
+No scenario's SUBJECT, expectation or detector changed. If any of these had been scored,
+their records would need withdrawing rather than re-pointing; they had not.
+
 **One corpus mutation was reverted rather than re-frozen.**
 `evals/bench/evidence/fixtures/E4/mask-collision-pos/check_under_test.py` was
 EDITED by an agent during an unintended live run — which is precisely the

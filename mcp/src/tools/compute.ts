@@ -2,7 +2,8 @@
  * tools/compute.ts
  * Compute-wrapper MCP tools (WS-B): async training-job launcher + sync harness wrappers.
  *
- * evor_run_start       — launch `python -m evor run` detached; returns {status, job_id} instantly
+ * evor_run_start       — launch `python -m evor run` detached (EVALUATION of an already-trained
+ *                         candidate, not training); returns {status, job_id} instantly
  * evor_run_status      — read job status (no internal paths or cmd exposed)
  * evor_capability      — probe hardware (wraps `evor capability`)
  * evor_preflight       — smoke-test environment (wraps `evor preflight`)
@@ -20,7 +21,7 @@
 
 import { appendFileSync, chmodSync, existsSync, readFileSync, renameSync, statSync, writeFileSync } from "fs";
 import { createHash } from "crypto";
-import { join } from "path";
+import { basename, join } from "path";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { resolveRunPaths, getEvorRoot, getActiveRunPath } from "../run-store.js";
@@ -176,12 +177,17 @@ export function distillScan(path: string, evorRoot?: string): PyResult {
 }
 
 /**
- * Dispatch multiple candidate training jobs in parallel to the compute backend.
+ * Dispatch multiple candidate EVALUATION jobs in parallel to the compute backend.
  * Returns job results for all candidates immediately without blocking — each
  * job is started via jobStart (evor.jobs start), which spawns a detached
  * supervisor and returns instantly. Poll each with evor_run_status.
  * Use instead of sequential evor_run_start calls when VRAM allows parallel
- * training (P0-3).
+ * evaluation (P0-3).
+ *
+ * NOT training, despite the historical name of this symbol: jobStart runs
+ * `python -m evor run`, whose subcommand help is "Run evaluation for a candidate
+ * node" and whose `_cmd_run` executes `worktree/evaluate.py`. Candidates must be
+ * trained before they get here.
  */
 export interface BatchCandidate {
   node_id: string;
@@ -505,12 +511,44 @@ function patchGoalContract(runDir: string, patch: Record<string, string>): void 
   }
 }
 
+
+/**
+ * Digest over every file the evaluator comprises.
+ *
+ * MIRROR of `evor.eval_contract.evaluator_digest` — kept honest by
+ * `mcp/tests/eval-contract-parity.test.ts`, which runs both over one fixture.
+ * The digest is over `name\0sha256\n` lines so adding, removing or renaming a
+ * constituent file changes it, not only editing one.
+ */
+function digestEvaluator(runDir: string, evalVersion: string): {
+  hash: string;
+  files: Record<string, string>;
+} {
+  const base = join(runDir, "eval-suites");
+  const candidates = [join(base, `${evalVersion}.py`), join(base, "score_plugin.py")];
+  const files: Record<string, string> = {};
+  const acc = createHash("sha256");
+  for (const path of candidates) {
+    if (!existsSync(path)) continue;
+    const digest = createHash("sha256").update(readFileSync(path)).digest("hex");
+    files[basename(path)] = digest;
+    acc.update(basename(path));
+    acc.update(Buffer.from([0]));
+    acc.update(digest);
+    acc.update("\n");
+  }
+  return { hash: acc.digest("hex"), files };
+}
+
 export function registerComputeTools(server: McpServer): void {
 
   // ── evor_run_start ──────────────────────────────────────────────────────────
   server.tool(
     "evor_run_start",
-    "Launch candidate node as a detached background job. "
+    "EVALUATES an ALREADY-TRAINED candidate: runs the sealed evaluate.py against the "
+    + "worktree as a detached background job. It does NOT train. Training is written and "
+    + "run by evor-forge-junior, and its weights must be on disk before you call this — "
+    + "calling it on an untrained worktree scores whatever is there, usually as a failure. "
     + "Returns {status, job_id} instantly — poll progress with evor_run_status.",
     {
       run_id: z.string().describe("Active run identifier"),
@@ -873,9 +911,11 @@ export function registerComputeTools(server: McpServer): void {
   // ── evor_seal_eval_script ───────────────────────────────────────────────────
   server.tool(
     "evor_seal_eval_script",
-    "Hash the canonical evaluator script (eval-suites/<eval_version>.py) and lock its "
-    + "sha256 into goal-contract.json so the integrity gate's no_eval_shift check "
-    + "verifies against a real value. Call once after the canonical evaluator is written.",
+    "Hash the canonical evaluator — EVERY file it comprises, per the evaluator "
+    + "contract, which for the generated shape is the harness AND the mission's "
+    + "score_plugin.py — and lock the digest into goal-contract.json so the integrity "
+    + "gate's no_eval_shift check verifies against a real value. Call once after the "
+    + "canonical evaluator is written.",
     {
       run_id: z.string().describe("Active run identifier"),
       eval_version: z.string().describe("Eval version string (e.g. v1)"),
@@ -891,7 +931,22 @@ export function registerComputeTools(server: McpServer): void {
         );
       }
       const content = readFileSync(evalScriptPath);
-      const hash = createHash("sha256").update(content).digest("hex");
+
+      // ── The evaluator is a SET of files ───────────────────────────────────
+      //
+      // This hashed `eval-suites/<v>.py` alone. The generated harness does
+      // `from score_plugin import score`, so the function that decides every
+      // score sat OUTSIDE the anchor whose stated purpose is that nobody can
+      // shift the metric — a rewrite of the plugin left custody reporting
+      // intact.
+      //
+      // `harness/evor/eval_contract.py` OWNS the rule; this mirrors it, and
+      // `mcp/tests/eval-contract-parity.test.ts` runs both over one fixture and
+      // fails if the hashes diverge. A mirror plus a parity test, rather than a
+      // subprocess on the seal's hot path — and rather than a second
+      // independent opinion, which is the shape of defect this whole change
+      // exists to remove.
+      const { hash, files } = digestEvaluator(runDir, eval_version);
 
       // ── J-01: re-sealing must not launder an out-of-band rewrite ─────────
       //
@@ -965,12 +1020,79 @@ export function registerComputeTools(server: McpServer): void {
       try {
         writeFileSync(
           receiptPath,
-          JSON.stringify({ eval_version, hash, sealed_at: new Date().toISOString() }, null, 2),
+          JSON.stringify(
+            { eval_version, hash, files, sealed_at: new Date().toISOString() },
+            null,
+            2,
+          ),
           "utf8",
         );
       } catch { /* unwritable run dir — the contract anchor still stands */ }
 
-      return ok({ ok: true, eval_version });
+      return ok({ ok: true, eval_version, hash, files });
+    },
+  );
+
+  // ── evor_write_eval_script ──────────────────────────────────────────────────
+  //
+  // The writer that did not exist. `skills/evor-setup/SKILL.md` instructs the
+  // agent to write `eval-suites/<v>.py`, and `evor_scaffold_evaluator` says "the
+  // mission then writes ONLY score(pred, gt) in score_plugin.py" — while both
+  // paths sit under `.evor/runs/`, where PROTECTED_RUNS_RE denies Write and Edit
+  // for every role, and no MCP tool targeted either file. `evor_write_artifact`
+  // writes `ticks/<tick>/<agent>/*.json` and nothing else.
+  //
+  // So both documented paths dead-ended at the same guard, and a mission setup
+  // could only be completed by the operator typing `cp` — the shell being the
+  // one actor outside the PreToolUse hook.
+  //
+  // The guard is NOT relaxed. Run artifacts are written through their owning
+  // tool; this is that tool, and it validates what the hand-written column got
+  // wrong in the field before the bytes land.
+  server.tool(
+    "evor_write_eval_script",
+    "Write the canonical evaluator into the run — the file every node will share. "
+    + "This is the owning writer for eval-suites/<eval_version>.py and for "
+    + "score_plugin.py; direct Write/Edit under .evor/runs/ is denied by design. "
+    + "Validates that the source compiles and conforms to the evaluator contract "
+    + "(no positional argv, prints one JSON object) before writing. Seal it afterwards "
+    + "with evor_seal_eval_script, which anchors every file the evaluator comprises.",
+    {
+      run_id: z.string().describe("Active run identifier"),
+      eval_version: z.string().describe("Eval version this evaluator is for (e.g. v1)"),
+      source: z.string().min(1).describe("Complete Python source of the file"),
+      target: z.enum(["evaluator", "score_plugin"]).default("evaluator").describe(
+        "'evaluator' writes eval-suites/<eval_version>.py; 'score_plugin' writes "
+        + "eval-suites/score_plugin.py, the mission-owned metric of the generated shape",
+      ),
+      mission_id: z.string().optional().describe("Mission id; resolved from the active run when omitted"),
+    },
+    async ({ run_id, eval_version, source, target, mission_id }) => {
+      const resolvedMission = mission_id ?? process.env.EVOR_MISSION_ID;
+      const { runDir } = resolveRunPaths(run_id, resolvedMission);
+      const dir = join(runDir, "eval-suites");
+      const name = target === "score_plugin" ? "score_plugin.py" : `${eval_version}.py`;
+      const dest = join(dir, name);
+
+      // Refuse to overwrite a SEALED evaluator. Re-sealing is already guarded;
+      // silently replacing the sealed bytes and leaving the anchor behind would
+      // route around that guard instead of tripping it.
+      const receipt = join(dir, `${eval_version}.sealed.json`);
+      if (existsSync(receipt)) {
+        return err(
+          `${eval_version} is already sealed. Replacing the evaluator under a sealed ` +
+          `anchor would retroactively revalidate every score measured with the old one. ` +
+          `Write a NEW eval_version so existing scores keep the evaluator they were ` +
+          `measured with.`,
+        );
+      }
+
+      const check = callPythonModule("evor.eval_contract_writer", [
+        "write", "--run-dir", runDir, "--eval-version", eval_version,
+        "--target", target, "--stdin-source",
+      ], { stdin: source });
+      if (!check.ok) return err(check.error ?? "evaluator source rejected");
+      return ok({ ok: true, path: dest, ...(check.data as object ?? {}) });
     },
   );
 
@@ -1065,10 +1187,12 @@ export function registerComputeTools(server: McpServer): void {
   // ── evor_forge_dispatch_batch ───────────────────────────────────────────────
   server.tool(
     "evor_forge_dispatch_batch",
-    "Dispatch multiple candidate training jobs in parallel to the compute backend. "
+    "Dispatch multiple candidate EVALUATION jobs in parallel to the compute backend. "
+    + "Same path as evor_run_start (it does NOT train) — each candidate must already be "
+    + "trained with weights on disk. "
     + "Returns job_ids for all candidates immediately without waiting for completion. "
     + "Poll each job with evor_run_status. "
-    + "Use instead of sequential evor_run_start calls when VRAM allows parallel training.",
+    + "Use instead of sequential evor_run_start calls when VRAM allows parallel evaluation.",
     {
       run_id: z.string().describe("Active run identifier"),
       candidates: z.array(z.object({

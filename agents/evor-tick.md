@@ -52,8 +52,56 @@ entire point: **everything you read, spawn, and reason about must stay inside yo
 
 ## The tick procedure
 
-The 9-step loop is defined in the `oh-my-evor:evor` skill, loaded above. Follow it exactly —
-it is the same procedure the orchestrator ran, unchanged. You are a boundary, not a rewrite.
+**Step 0, before anything else — Read the procedure. It is NOT loaded above.**
+
+```
+Read("${EVOR_PLUGIN_ROOT:-$CLAUDE_PLUGIN_ROOT}/skills/evor/SKILL.md")
+```
+
+`skills: [oh-my-evor:evor]` in the frontmatter does not deliver that file. `commands/evor.md`
+and `skills/evor/SKILL.md` share the name `oh-my-evor:evor`, and the COMMAND wins — so what
+lands in your context is a ~1.3KB dispatch stub, not the ~40KB procedure. Every other evor
+agent names `oh-my-evor:evor-mcp`, which has no command of that name, which is the only reason
+their skill bodies arrive intact.
+
+This was measured, not theorised. In `binarization-worldmodel-recall-2026-09` the tick invoked
+`oh-my-evor:evor` **nine times**, received the stub every time, and never read the file: the
+stub's dispatch is `cat`, and you do not have Bash. It then improvised — it got Sage, Mutagen
+and Selector roughly right from the fragments in this file, and had nothing at all for step 5
+onward. No wait discipline, no `evor_record_node`, no `evor_run_start`. The tick ended
+mid-flight with `pending_node_ids` never cleared, which wedged the mission's Stop hook.
+
+So: Read it. Do not start step 1 until you have. If the Read fails, emit a `capability-gap`
+signal naming the path and return `outcome:"failed"` — running the loop from memory is the
+failure this paragraph exists to prevent.
+
+Follow that procedure exactly — it is the same one the orchestrator ran, unchanged. You are a
+boundary, not a rewrite.
+
+## Waiting is work you do, not work you defer
+
+The procedure's wait discipline (`SKILL.md`, Step 5) is the part you are most likely to skip,
+because ending your turn *feels* like waiting. It is not. When you end your turn, the
+orchestrator's only remaining move is to re-spawn or nudge you, and re-spawning re-primes your
+entire context.
+
+When you have spawned an agent and need its result:
+
+1. `evor_await_artifact` — records WHAT you are waiting for, so a waiting tick is
+   distinguishable from a stalled one.
+2. Then **block**: `TaskOutput(task_id, block:true)` on the agent that owes it, or `Monitor`
+   on the artifact path.
+
+`TaskOutput` and `Monitor` are deferred tools — their schemas are not loaded until you ask for
+them. Load them before you need them:
+
+```
+ToolSearch("select:TaskOutput,Monitor")
+```
+
+In the measured run neither tool was ever loaded, and the string `TaskOutput` never once
+appeared in the tick's context. Never emit a "waiting…" or "still running" turn: it costs a
+turn, says nothing, and is the shape the SubagentStop guard will now reject.
 
 ## Your return value is the product
 

@@ -2,6 +2,258 @@
 
 All notable changes to Evor. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.2.6] — 2026-09-14 — the evaluator contract has an owner
+
+A mission setup could not finish without the operator typing `cp`. The write guard was
+blamed; the write guard was not the cause.
+
+### The root cause
+
+The evaluator's interface had no owner. Four sites each asserted their own belief about
+it, and nothing made them agree:
+
+| site | believed the evaluator… |
+|---|---|
+| `evaluator.py::_build_cmd` | takes no positional args |
+| `scaffold_evaluator.py` | takes `<split_dir> <pred_dir>` |
+| `evor_seal_eval_script` | IS one file, `eval-suites/<v>.py` |
+| `skills/evor-setup/SKILL.md` | loads `build_model` + weights, and gets its split path "via the run environment" |
+
+Every disagreement was fatal and none was visible, because the only test that executed
+an evaluator **substituted itself for both boundaries the product crosses**:
+
+```python
+# how the test launched it        # how evaluator.py:133 launches it
+[python, "v1.py", split, pred]    [python, eval_script]        # no positional args
+# how the test wrote score_plugin.py   # how an agent must
+Path(...).write_text(body)              Write/Edit → denied by PROTECTED_RUNS_RE
+```
+
+It supplied its own argv, wrote the mission-owned file by direct filesystem call, and
+handed in its own `score()` returning a constant. Each substitution hid exactly one
+defect. All three were fatal, and the run environment never exported the split path the
+setup skill promised — a fourth.
+
+### `harness/evor/eval_contract.py`
+
+One owner, in the shape §1.2 already established for `finished`. It defines invocation,
+stdout, **extent** (the evaluator is a SET of files), the environment an evaluator may
+rely on, and the two conformant shapes. All five sites now derive from it.
+
+- **Invocation** — `_build_cmd` calls `build_argv`. The generated harness no longer
+  requires positional arguments; it self-locates from `EVOR_RUN_DIR` (now exported, as
+  the setup skill always claimed) or from `__file__`, and honours `--eval-domains`.
+  `HARNESS_VERSION` 1 → 2, so a version skew stays distinguishable from tampering.
+- **Extent** — the seal anchors every file the evaluator comprises. It hashed
+  `<v>.py` alone while the harness does `from score_plugin import score`, so the
+  function deciding every score sat outside the anchor whose stated purpose is that
+  nobody can shift the metric. Rewriting the metric left custody reporting **intact**.
+- **Shapes** — `generated` scores prediction files and cannot load a model;
+  `authored` can. A contract gating on `latency_*` or `vram_*` requires `authored`, and
+  `evor_scaffold_evaluator` now **refuses** such a contract instead of emitting gates
+  that are skipped rather than enforced. A skipped floor does not fail — the run
+  reports a pass it never earned.
+- **The missing writer** — new `evor_write_eval_script` is the owning tool for
+  `eval-suites/<v>.py` and `score_plugin.py`. The guard is NOT relaxed: it validates
+  that the source compiles, takes no positional argv, prints its one JSON object, and
+  reads polarity from `label_semantics` rather than guessing — every one of those a
+  thing the hand-written column actually got wrong in the field. It refuses to
+  overwrite a sealed version rather than route around the re-seal guard.
+
+### The test that makes drift impossible again
+
+`harness/tests/test_evaluator_contract_conformance.py` crosses both boundaries: write
+through the owning tool, launch through the product's runner, assert a result. It failed
+on all three defects on first run, before any product code changed. Its final case is
+the property the mission actually needed — write, then run, no human.
+
+`test_scaffold_evaluator.py` is converted from inventing its own argv to deriving it,
+which also made one case stronger: under the contract an evaluator cannot be POINTED at
+a different split at all, so the remaining hazard is the declared location holding the
+wrong count.
+
+`mcp/tests/eval-contract-parity.test.ts` runs the TS seal mirror and the Python owner
+over one fixture and fails if the digests diverge — a mirror without that test is just a
+fifth independent opinion.
+
+### Bookkeeping this forced
+
+- 73 bench scenarios re-pointed at the new `hooks/stop.mjs`, `agents/evor-tick.md`,
+  `agents/evor-forge.md`, `skills/evor-setup/SKILL.md` and `skills/evor-mcp/SKILL.md`
+  shas, and four `A1` quotes re-anchored to the rewritten `evor-forge.md` line — with
+  both graded invariants verified present in the new text first. Logged in the §6.7
+  re-freeze log. Applied as text-level replacements after a JSON round-trip was found
+  rewriting `\u00a7` escapes across the corpus; that pass was reverted.
+- `evor-tick`'s 8.1 evidence row keeps its stale mark with the sha re-recorded, so this
+  edit does not hide inside the previous ones.
+
+## [1.2.5] — 2026-09-14 — a stop with live children is a yield, not an end
+
+Claude Code re-activates an agent when a background agent it spawned reports back —
+the CLI says so: *"Waiting for 5 background agents to finish."* An agent that ends its
+turn there has **yielded**. The session was never going to end, so blocking that stop
+buys nothing and costs a turn of context every time.
+
+Every Stop-hook guard here treated a yield as an end. Two field failures, one mistake:
+
+- 497 consecutive blocked stops against a pending node the orchestrator could not
+  record (fixed in 1.2.3 by bounding it; this fixes the cause).
+- The drift guard demanding tick 1's Mutagen artifact **16 seconds into tick 1**, from
+  the orchestrator — which is forbidden to produce it, because the tick boundary owns
+  that spawn. The orchestrator could not comply without committing the exact violation
+  the guard exists to detect. It burned six attempts saying so, then the operator
+  disabled the hook with `EVOR_SKIP_HOOKS=stop` — which disarms every legitimate guard
+  in the file, including the integrity and continuation checks.
+
+The guards are for state **debt the agent can discharge right now**: a node it recorded
+and never evaluated, a tick it abandoned. They were never for the absence of an artifact
+somebody else still owes.
+
+### The yield gate
+
+New `hooks/lib/waiting.mjs`. Two signals, either sufficient, both fail-open **toward
+allowing the stop** — misreading a yield as an end is the failure being removed, and the
+debt survives on disk for the next stop either way.
+
+1. **`tick-state.json`'s `blocked` field**, written by `evor_await_artifact` — which the
+   skill already tells agents to call before they block. First-party and in-band: the
+   agent *said* what it is waiting for. In the field run the tick had written
+   `blocked: {on: "artifact:sage@tick1"}` and parked exactly as instructed, and the
+   guards fired at it anyway.
+2. **A live agent under the session's `subagents/`.** Covers agents that yield without
+   recording a wait — `evor-sage` fanning out to five juniors. An agent counts as live
+   unless its transcript ends in an assistant message with a terminal `stop_reason`;
+   because a *parked* agent reads as terminal by that test, a recent write also counts,
+   which closes the window between a child finishing and its parent waking.
+
+The gate runs **before** the block counter, so a yield cannot consume attempts against
+the ceiling during a long, healthy tick.
+
+### Two guards re-scoped
+
+- **The drift guard's roster checks now require a finished tick.** "Did you skip the
+  roster?" is only answerable once the tick is over; mid-tick, an absent artifact is the
+  normal state.
+- **The SubagentStop mid-flight guard added in 1.2.3 was wrong** and is now yield-aware.
+  A tick that parks to wait for Forge is doing the right thing. It fires only when a tick
+  goes quiet with nothing live and no recorded wait — the original defect — and its
+  message now says which of the two distinguishes them.
+
+### Also verified, not changed
+
+Model routing is correct for every role, checked against two live sessions' transcripts:
+`evor-tick` sonnet, `evor-sage`/`evor-mutagen`/`evor-selector` haiku,
+`evor-sage-junior`/`evor-forge-junior` sonnet, `evor-forge` and all three forge reviewers
+opus. Turn caps bite per invocation (four agents landed exactly at their declared cap);
+the counts that exceed a cap belong to agents that were *resumed*, which continues the
+same transcript. Three of four `evor-sage-junior` spawns hit exactly 16/16 — the cap is
+tight, not broken.
+
+## [1.2.4] — 2026-09-14 — run_start evaluates, it does not train
+
+One correction, to the sentence an agent reads at the moment it decides what a tool
+will cost. Shipped separately from 1.2.3 because 1.2.3 was already installed when this
+was found.
+
+Verified against source: the tool calls `jobStart`, which launches `python -m evor run`;
+that subcommand's own help is *"Run evaluation for a candidate node"*, and `_cmd_run`
+executes `worktree/evaluate.py` through `EvaluatorAdapter`. No training step exists in
+that path. Training is written and run by `evor-forge-junior`, before the call.
+
+The tool description the model reads at call time said `launch training (async)`. A
+mission budgeted 150 from-scratch ticks on the belief that the multi-hour cost sat
+inside `run_start`; it sits inside Forge. The error is quiet in the other direction too
+— calling it on an untrained worktree raises nothing, it just scores whatever weights
+are on disk, which is worse than a failure because it is indistinguishable from one.
+
+Corrected in `mcp/src/tools/compute.ts` (the `evor_run_start` and
+`evor_forge_dispatch_batch` descriptions, the batch docstring, the module header),
+`skills/evor-mcp/SKILL.md` (tool table and tick flow), and `agents/evor-forge.md`
+(role statement, completion checklist, and a new failure-mode entry for evaluating an
+untrained candidate). `evor_forge_dispatch_batch` runs the same `jobStart` path and was
+mislabelled the same way. New `mcp/tests/run-start-does-not-train.test.ts` fails if any
+surface reattaches "training" to either tool, and pins the two harness facts the
+correction rests on.
+
+## [1.2.3] — 2026-09-14 — the tick could not read its own procedure
+
+A single mission (`binarization-worldmodel-recall-2026-09`) wedged at tick 1 and spent
+**497 consecutive blocked stops** emitting "Waiting on tick 1." Four defects, one chain.
+
+### The tick never received the 9-step loop
+
+`commands/evor.md` and `skills/evor/SKILL.md` both claim the address `oh-my-evor:evor`,
+and the **command wins**. So `evor-tick`, whose frontmatter says
+`skills: [oh-my-evor:evor]`, received a 1,295-byte dispatch stub instead of the
+39,897-byte procedure — and that stub's entire dispatch is
+`cat "$EVOR_PLUGIN_ROOT/skills/evor/SKILL.md"`, while the agent declares
+`disallowedTools: Bash`. It was handed an instruction it is structurally forbidden to
+execute. Measured in the tick's transcript: the skill was invoked **nine times**, the
+stub came back every time, and across 28 `Read` calls SKILL.md was never one of them.
+
+It was not turn-capped (45 turns of a declared 90). It had budget and no procedure. It
+improvised Sage → Mutagen → Selector → Forge from fragments in its own agent file and
+had nothing for step 5 onward: no wait discipline, no `evor_record_node`, no
+`evor_run_start`. `evor-mcp` is the control — no command of that name, body arrived
+intact in the same context.
+
+- All ten `commands/evor*.md` now dispatch with the **Read tool** instead of `cat`.
+  Every one of them shadows a skill, so this is the class fix.
+- `agents/evor-tick.md` gains a Step 0 that Reads the procedure explicitly, states why
+  the frontmatter does not deliver it, and adds the waiting section — including that
+  `TaskOutput` and `Monitor` are deferred tools needing
+  `ToolSearch("select:TaskOutput,Monitor")`. In the measured run neither was ever
+  loaded and the string `TaskOutput` never appeared in the tick's context at all.
+- New `mcp/tests/skill-command-name-collision.test.ts` fails if a shadowing command
+  goes back to shelling out, or if evor-tick stops reading its own skill.
+
+### The Stop hook blocked with an unreadable reason
+
+`hooks/stop.mjs` exited 2 with its message on **stdout**. Claude Code reads an exit-2
+Stop hook's reason from **stderr**, so every block surfaced as
+`Stop hook error: [node ".../hooks/stop.mjs"]: No stderr output` — blocked, with no
+stated reason. The orchestrator could not act on what it could not read, so it emitted
+a filler turn and stopped again.
+
+Now emits `{"decision":"block","reason":...}` on stdout with exit 0 — the JSON protocol
+`subagent-stop.mjs` and `pre-tool-use.mjs` already used. This hook was the last one on
+the exit-code path. The reason is mirrored to stderr for session logs.
+
+### The Stop hook had no release ceiling
+
+`pending_node_ids` was declared a structural invariant that "can never be overridden by
+repeated stopping", so its branch fell through and blocked again, forever — the counter
+in that run's `stop-blocks-*.json` reached **497**. The reasoning was wrong on its own
+terms: the debt survives in `run-state.json` after release either way, and the next
+session's guard re-raises it. Blocking 497 times never recorded the node; it only
+consumed the context that might have.
+
+- `SOFT_CEILING` 8 (drift-only debt, as before) and a new `HARD_CEILING` 25 that
+  releases **everything**, `pending_node_ids` included.
+- The ceiling is checked unconditionally rather than only when `stop_hook_active` is
+  set — the platform signal is not guaranteed; the persisted count is.
+- Session id now comes from the STDIN payload. `CLAUDE_SESSION_ID` is unset for Stop
+  hooks in this build, which had collapsed every session onto one `nosession` counter.
+
+### The mid-flight guard did not follow the tick into the subagent
+
+The Stop hook's incomplete-tick guard is scoped to the orchestrator — "only main owns
+tick completion" — which was true before `evor-tick` became the boundary that runs the
+9 steps. The enforcement never moved with the ownership, so a subagent ending its turn
+was exempt from every guard. The tick returned "mid-flight" as if it were an outcome,
+three times in one session.
+
+`hooks/subagent-stop.mjs` now blocks a mid-flight `evor-tick` return with the concrete
+wait instruction, bounded at 2 retries so a tick that genuinely cannot finish costs two
+turns and then goes through.
+
+### Tests
+
+`stop-incomplete-tick.test.ts` and `wave1-autonomy-termination.test.ts` asserted
+`code === 2` and passed for two releases while the hook was unusable in the field —
+an exit code cannot distinguish a readable block from a reason-less one. They now
+assert the reason is readable. 128 tests pass across the five affected suites.
+
 ## [1.2.2] — 2026-09-14 — the instrument release
 
 v1.2.2 is almost entirely work on the thing that measures the agents, not on the

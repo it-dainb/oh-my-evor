@@ -38,6 +38,8 @@ import { join } from 'path';
 import { tmpdir } from 'os';
 import { spawnSync } from 'child_process';
 import { resolveActiveRun, resolveEvorRoot } from './lib/active-run.mjs';
+import { isTickFinished } from './lib/run-status.mjs';
+import { isYieldingStop } from './lib/waiting.mjs';
 
 // ── Kill switches ─────────────────────────────────────────────────────────────
 if (process.env.DISABLE_EVOR) process.exit(0);
@@ -193,6 +195,61 @@ const evorRoot = resolveEvorRoot();
 const runDir = missionId
   ? join(evorRoot, 'runs', missionId, activeRunId)
   : join(evorRoot, 'runs', activeRunId);
+
+// ── evor-tick mid-flight guard ────────────────────────────────────────────────
+// The Stop hook's incomplete-tick guard is deliberately scoped to the
+// orchestrator: "only main owns tick completion". That was true when main ran
+// the 9 steps. It stopped being true when evor-tick became the boundary that
+// runs them, and the enforcement did not follow the ownership.
+//
+// Measured in binarization-worldmodel-recall-2026-09: evor-tick spawned Forge,
+// ended its own turn while Forge was still writing the candidate, and reported
+// "mid-flight" as if that were an outcome. Three times in one session. Nothing
+// blocked it, because a subagent ending its turn is exempt from every guard, so
+// the whole cost landed on the orchestrator — which could only re-spawn or nudge.
+//
+// `SKILL.md` already tells the tick how to wait (`evor_await_artifact`, then
+// `TaskOutput(task_id, block:true)` or `Monitor` the artifact). Prose was not
+// enough; this is the same instruction delivered where the agent cannot skip it.
+//
+// Bounded by the shared retry counter — at most MAX_RETRIES nudges per agent_id,
+// so a tick that genuinely cannot finish costs two turns and then goes through.
+try {
+  const tickType = String(payload.agent_type ?? '').toLowerCase();
+  if (tickType.endsWith('evor-tick') && !payload.stop_hook_active) {
+    const ts = existsSync(join(runDir, 'tick-state.json'))
+      ? JSON.parse(readFileSync(join(runDir, 'tick-state.json'), 'utf8'))
+      : null;
+    const started = typeof ts?.tick === 'number' && ts.tick > 0;
+    // A tick that yields to wait for Forge is doing the RIGHT thing — the CLI
+    // wakes it when Forge reports. Only a tick that goes quiet with nothing
+    // live and no recorded wait has actually abandoned the tick. Blocking the
+    // yield case was this guard's own defect in v1.2.3: in the field the tick
+    // had already written blocked:{on:"artifact:sage@tick1"} and was parked
+    // exactly as instructed, and this fired at it anyway.
+    const yielding = isYieldingStop(payload, ts);
+    if (started && !isTickFinished(ts) && !yielding && bumpRetries(payload.agent_id) <= MAX_RETRIES) {
+      const step = typeof ts?.current_step === 'number' ? ts.current_step : 0;
+      process.stdout.write(JSON.stringify({
+        decision: 'block',
+        reason:
+          `Tick ${ts.tick} is at step ${step} (${ts?.step_status ?? 'unknown'}) — you are ` +
+          `returning mid-flight with NOTHING live and no recorded wait, so nothing will wake ` +
+          `you. The orchestrator can only re-spawn you, and re-spawning re-primes your whole ` +
+          `context.\n` +
+          `Yielding to wait IS allowed and is not this: if you had spawned an agent that is ` +
+          `still running, or called evor_await_artifact to record what you are blocked on, ` +
+          `this would not have fired.\n` +
+          `If you spawned an agent, WAIT for it: call evor_await_artifact to record WHAT you ` +
+          `are waiting for, then TaskOutput(task_id, block:true) on that agent, or Monitor the ` +
+          `artifact path it owes. Do not poll, and do not emit a "waiting..." turn.\n` +
+          `Return only once the tick reaches step 9 with a recorded outcome — or, if it truly ` +
+          `cannot, with outcome:"failed" and an "error" that says what blocked it.`,
+      }) + '\n');
+      process.exit(0);
+    }
+  }
+} catch { /* fail-open — a missing or corrupt tick-state must never trap an agent */ }
 
 // ── Role + tick resolution ────────────────────────────────────────────────────
 // Primary: EVOR_AGENT_ROLE env var set explicitly by the spawning orchestrator.

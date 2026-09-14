@@ -791,9 +791,16 @@ describe("evor_seal_eval_script", () => {
     expect(out.ok).toBe(true);
     expect(out.eval_version).toBe("v1");
 
-    // Verify the hash written matches sha256 of the script
+    // The anchor covers EVERY file the evaluator comprises, per
+    // harness/evor/eval_contract.py — for this fixture just the harness, but
+    // the digest is over `name\0sha256\n` lines rather than raw bytes, so that
+    // adding or renaming a constituent file changes it too. Sealing only
+    // `<v>.py` left `score_plugin.py` — the actual metric — outside custody.
     const contract = JSON.parse(readFileSync(join(runDir, "goal-contract.json"), "utf8")) as Record<string, unknown>;
-    const expectedHash = createHash("sha256").update(scriptContent, "utf8").digest("hex");
+    const fileHash = createHash("sha256").update(scriptContent, "utf8").digest("hex");
+    const expectedHash = createHash("sha256")
+      .update("v1.py").update(Buffer.from([0])).update(fileHash).update("\n")
+      .digest("hex");
     expect(contract.eval_script_hash).toBe(expectedHash);
   });
 

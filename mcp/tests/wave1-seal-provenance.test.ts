@@ -15,7 +15,7 @@
  * tmpdir) and node-ref.test.ts (real tree.json fixture).
  */
 
-import { mkdtempSync, rmSync, mkdirSync, writeFileSync, readFileSync, statSync, linkSync } from "fs";
+import { mkdtempSync, rmSync, mkdirSync, writeFileSync, readFileSync, statSync, linkSync, existsSync } from "fs";
 import { createHash } from "crypto";
 import { join } from "path";
 import { tmpdir } from "os";
@@ -51,6 +51,30 @@ async function callTool(name: string, args: Record<string, unknown>): Promise<Re
 
 const MISSION = "binarization-worldmodel-min98-2026-08";
 const sha256 = (s: string): string => createHash("sha256").update(s, "utf8").digest("hex");
+
+/**
+ * The anchor the seal now records: a digest over EVERY file the evaluator
+ * comprises, per `harness/evor/eval_contract.py`.
+ *
+ * These cases compared `eval_script_hash` to `sha256(<v>.py)`, which was the
+ * seal's whole extent — and that extent is the defect: the generated harness
+ * does `from score_plugin import score`, so the function deciding every score
+ * sat outside the anchor meant to pin it. The invariants each case asserts are
+ * unchanged; only what "the evaluator's hash" means is.
+ */
+const evaluatorAnchor = (runDir: string, evalVersion = "v1"): string => {
+  const base = join(runDir, "eval-suites");
+  const acc = createHash("sha256");
+  for (const name of [`${evalVersion}.py`, "score_plugin.py"]) {
+    const path = join(base, name);
+    if (!existsSync(path)) continue;
+    acc.update(name);
+    acc.update(Buffer.from([0]));
+    acc.update(createHash("sha256").update(readFileSync(path)).digest("hex"));
+    acc.update("\n");
+  }
+  return acc.digest("hex");
+};
 
 let tmpRoot: string;
 let savedEvorRoot: string | undefined;
@@ -153,7 +177,7 @@ describe("M-01 / I-02 — evor_seal_eval_script and hardlinked evaluators", () =
     // r3's agent rewrites the evaluator through the unprotected project-root alias.
     writeFileSync(canonical, "# evaluator rev 2\nLATENCY_GPU_MS_MAX = 500.0\n", "utf8");
 
-    const r2OnDisk = sha256(readFileSync(join(r2, "eval-suites", "v1.py"), "utf8"));
+    const r2OnDisk = evaluatorAnchor(r2);
     expect(
       r2OnDisk,
       "r2's sealed evaluator changed when r3's evaluator was rewritten — the two runs share an inode",
@@ -187,7 +211,8 @@ describe("J-01 — the seal re-applied over content changed out of band", () => 
       run_id: "run-live-01", eval_version: "v1", mission_id: MISSION,
     });
     expect(first.ok).toBe(true);
-    expect(contractOf(runDir).eval_script_hash).toBe(sha256(original));
+    const originalAnchor = evaluatorAnchor(runDir);
+    expect(contractOf(runDir).eval_script_hash).toBe(originalAnchor);
 
     // Out-of-band rewrite, then the seal is re-applied.
     writeFileSync(sealed, "# evaluator rev 2\nLATENCY_GPU_MS_MAX = 500.0\n", "utf8");
@@ -202,7 +227,7 @@ describe("J-01 — the seal re-applied over content changed out of band", () => 
     expect(
       contractOf(runDir).eval_script_hash,
       "the contract's eval_script_hash was overwritten with the hash of the rewritten evaluator",
-    ).toBe(sha256(original));
+    ).toBe(originalAnchor);
   });
 
   /**
@@ -226,7 +251,7 @@ describe("J-01 — the seal re-applied over content changed out of band", () => 
 
     expect(first.ok).toBe(true);
     expect(second.ok).toBe(true);
-    expect(contractOf(runDir).eval_script_hash).toBe(sha256(content));
+    expect(contractOf(runDir).eval_script_hash).toBe(evaluatorAnchor(runDir));
   });
 });
 

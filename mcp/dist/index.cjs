@@ -21904,7 +21904,8 @@ function callPythonModule(module2, args, opts) {
     encoding: "utf8",
     timeout: opts?.timeout ?? 3e4,
     env: { ..._pythonEnv(), ...opts?.extraEnv },
-    cwd: opts?.cwd
+    cwd: opts?.cwd,
+    ...opts?.stdin === void 0 ? {} : { input: opts.stdin }
   });
   return _parseSpawnResult(result);
 }
@@ -24902,10 +24903,26 @@ function patchGoalContract(runDir, patch) {
   } catch {
   }
 }
+function digestEvaluator(runDir, evalVersion) {
+  const base = (0, import_path17.join)(runDir, "eval-suites");
+  const candidates = [(0, import_path17.join)(base, `${evalVersion}.py`), (0, import_path17.join)(base, "score_plugin.py")];
+  const files = {};
+  const acc = (0, import_crypto4.createHash)("sha256");
+  for (const path of candidates) {
+    if (!(0, import_fs16.existsSync)(path)) continue;
+    const digest = (0, import_crypto4.createHash)("sha256").update((0, import_fs16.readFileSync)(path)).digest("hex");
+    files[(0, import_path17.basename)(path)] = digest;
+    acc.update((0, import_path17.basename)(path));
+    acc.update(Buffer.from([0]));
+    acc.update(digest);
+    acc.update("\n");
+  }
+  return { hash: acc.digest("hex"), files };
+}
 function registerComputeTools(server) {
   server.tool(
     "evor_run_start",
-    "Launch candidate node as a detached background job. Returns {status, job_id} instantly \u2014 poll progress with evor_run_status.",
+    "EVALUATES an ALREADY-TRAINED candidate: runs the sealed evaluate.py against the worktree as a detached background job. It does NOT train. Training is written and run by evor-forge-junior, and its weights must be on disk before you call this \u2014 calling it on an untrained worktree scores whatever is there, usually as a failure. Returns {status, job_id} instantly \u2014 poll progress with evor_run_status.",
     {
       run_id: external_exports.string().describe("Active run identifier"),
       node_id: external_exports.string().describe("The node's name (e.g. 'immune-memory-02')"),
@@ -25160,7 +25177,7 @@ function registerComputeTools(server) {
   );
   server.tool(
     "evor_seal_eval_script",
-    "Hash the canonical evaluator script (eval-suites/<eval_version>.py) and lock its sha256 into goal-contract.json so the integrity gate's no_eval_shift check verifies against a real value. Call once after the canonical evaluator is written.",
+    "Hash the canonical evaluator \u2014 EVERY file it comprises, per the evaluator contract, which for the generated shape is the harness AND the mission's score_plugin.py \u2014 and lock the digest into goal-contract.json so the integrity gate's no_eval_shift check verifies against a real value. Call once after the canonical evaluator is written.",
     {
       run_id: external_exports.string().describe("Active run identifier"),
       eval_version: external_exports.string().describe("Eval version string (e.g. v1)"),
@@ -25176,7 +25193,7 @@ function registerComputeTools(server) {
         );
       }
       const content = (0, import_fs16.readFileSync)(evalScriptPath);
-      const hash = (0, import_crypto4.createHash)("sha256").update(content).digest("hex");
+      const { hash, files } = digestEvaluator(runDir, eval_version);
       const receiptPath = `${runDir}/eval-suites/${eval_version}.sealed.json`;
       let receipt = null;
       try {
@@ -25204,12 +25221,54 @@ function registerComputeTools(server) {
       try {
         (0, import_fs16.writeFileSync)(
           receiptPath,
-          JSON.stringify({ eval_version, hash, sealed_at: (/* @__PURE__ */ new Date()).toISOString() }, null, 2),
+          JSON.stringify(
+            { eval_version, hash, files, sealed_at: (/* @__PURE__ */ new Date()).toISOString() },
+            null,
+            2
+          ),
           "utf8"
         );
       } catch {
       }
-      return ok2({ ok: true, eval_version });
+      return ok2({ ok: true, eval_version, hash, files });
+    }
+  );
+  server.tool(
+    "evor_write_eval_script",
+    "Write the canonical evaluator into the run \u2014 the file every node will share. This is the owning writer for eval-suites/<eval_version>.py and for score_plugin.py; direct Write/Edit under .evor/runs/ is denied by design. Validates that the source compiles and conforms to the evaluator contract (no positional argv, prints one JSON object) before writing. Seal it afterwards with evor_seal_eval_script, which anchors every file the evaluator comprises.",
+    {
+      run_id: external_exports.string().describe("Active run identifier"),
+      eval_version: external_exports.string().describe("Eval version this evaluator is for (e.g. v1)"),
+      source: external_exports.string().min(1).describe("Complete Python source of the file"),
+      target: external_exports.enum(["evaluator", "score_plugin"]).default("evaluator").describe(
+        "'evaluator' writes eval-suites/<eval_version>.py; 'score_plugin' writes eval-suites/score_plugin.py, the mission-owned metric of the generated shape"
+      ),
+      mission_id: external_exports.string().optional().describe("Mission id; resolved from the active run when omitted")
+    },
+    async ({ run_id, eval_version, source, target, mission_id }) => {
+      const resolvedMission = mission_id ?? process.env.EVOR_MISSION_ID;
+      const { runDir } = resolveRunPaths(run_id, resolvedMission);
+      const dir = (0, import_path17.join)(runDir, "eval-suites");
+      const name = target === "score_plugin" ? "score_plugin.py" : `${eval_version}.py`;
+      const dest = (0, import_path17.join)(dir, name);
+      const receipt = (0, import_path17.join)(dir, `${eval_version}.sealed.json`);
+      if ((0, import_fs16.existsSync)(receipt)) {
+        return err2(
+          `${eval_version} is already sealed. Replacing the evaluator under a sealed anchor would retroactively revalidate every score measured with the old one. Write a NEW eval_version so existing scores keep the evaluator they were measured with.`
+        );
+      }
+      const check2 = callPythonModule("evor.eval_contract_writer", [
+        "write",
+        "--run-dir",
+        runDir,
+        "--eval-version",
+        eval_version,
+        "--target",
+        target,
+        "--stdin-source"
+      ], { stdin: source });
+      if (!check2.ok) return err2(check2.error ?? "evaluator source rejected");
+      return ok2({ ok: true, path: dest, ...check2.data ?? {} });
     }
   );
   server.tool(
@@ -25288,7 +25347,7 @@ function registerComputeTools(server) {
   );
   server.tool(
     "evor_forge_dispatch_batch",
-    "Dispatch multiple candidate training jobs in parallel to the compute backend. Returns job_ids for all candidates immediately without waiting for completion. Poll each job with evor_run_status. Use instead of sequential evor_run_start calls when VRAM allows parallel training.",
+    "Dispatch multiple candidate EVALUATION jobs in parallel to the compute backend. Same path as evor_run_start (it does NOT train) \u2014 each candidate must already be trained with weights on disk. Returns job_ids for all candidates immediately without waiting for completion. Poll each job with evor_run_status. Use instead of sequential evor_run_start calls when VRAM allows parallel evaluation.",
     {
       run_id: external_exports.string().describe("Active run identifier"),
       candidates: external_exports.array(external_exports.object({

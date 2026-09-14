@@ -8,10 +8,18 @@ This command loads the active mission and starts (or resumes) the Evor tick loop
 
 ## Dispatch
 
-1. Read the bundled skill instructions with one deterministic read:
-   ```bash
-   cat "${EVOR_PLUGIN_ROOT:-$CLAUDE_PLUGIN_ROOT}/skills/evor-run/SKILL.md"
+1. Read the bundled skill instructions with one deterministic read — use the **Read
+   tool**, not a shell command:
    ```
+   Read("${EVOR_PLUGIN_ROOT:-$CLAUDE_PLUGIN_ROOT}/skills/evor-run/SKILL.md")
+   ```
+   This dispatch is also what an agent gets when it names this skill in its
+   `skills:` frontmatter, because the command and the skill share a name and the
+   command wins. `evor-tick` declares `disallowedTools: Bash` and was handed a
+   `cat` — so for nine invocations across one mission it received this stub, could
+   not execute it, and ran the tick without ever seeing the 9-step loop. Read is
+   available to every agent; `cat` is not. If you do hold Bash, `cat` on the same
+   path is equivalent.
    `EVOR_PLUGIN_ROOT` is exported by this plugin’s SessionStart hook and `CLAUDE_PLUGIN_ROOT` by Claude Code — either points at the plugin’s install directory, so this resolves regardless of your current working directory.
 2. Follow that SKILL.md exactly, treating the user's arguments as:
 

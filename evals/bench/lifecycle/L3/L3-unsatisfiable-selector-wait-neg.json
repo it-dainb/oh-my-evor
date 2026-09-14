@@ -121,7 +121,7 @@
   "grounded_rule": {
     "file": "agents/evor-tick.md",
     "quote": "| `skipped` | there was nothing to decide — no proposals reached the selector at all |",
-    "sha256_at_authoring": "04310dad8df94fef498773bbd499967715379ec05912d4951af2a158821a4bde"
+    "sha256_at_authoring": "ea4e86b0ac654f66210c6e6d80e94d0dc4efadfb1b149e45f0d747187f3aa46f"
   },
   "grounding": [
     "field-trace:C-05",
@@ -146,7 +146,7 @@
     "guarded_paths": [
       {
         "path": "agents/evor-tick.md",
-        "sha256": "04310dad8df94fef498773bbd499967715379ec05912d4951af2a158821a4bde"
+        "sha256": "ea4e86b0ac654f66210c6e6d80e94d0dc4efadfb1b149e45f0d747187f3aa46f"
       },
       {
         "path": "skills/evor/SKILL.md",
@@ -154,7 +154,7 @@
       },
       {
         "path": "hooks/stop.mjs",
-        "sha256": "9083666602e33a47d3aaec37d8468f4efd23fde8dd76c81d43ee3d7634ee13a9"
+        "sha256": "8fb70f1fae68fb784a221d1b9a6db016ded95591dc661bf4fd75bec2b920b7e2"
       }
     ],
     "follow_ups": []

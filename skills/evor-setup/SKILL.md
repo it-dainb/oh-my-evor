@@ -361,19 +361,65 @@ This derives initial domains from `task_description`, creates an EvalSuite recor
 
 The integrity gate's eval-shift check compares each node's `evaluate.py` against the mission's sealed canonical evaluator anchor. That anchor must be sealed BEFORE the tick loop starts, or every node fails the integrity check and nothing is ever promoted.
 
-Write `eval-suites/<eval_version>.py` now — the ONE evaluation script every node will share. It defines the fixed evaluation contract that Forge's models must conform to. It must:
-- Load the frozen test split (never re-split, never touch train/val for scoring). The frozen split path is provided via the run environment — do not hardcode it.
-- Import the node's model through the standard worktree interface (e.g. `from model import build_model`) and load its trained weights.
-- Run inference over the frozen test set and compute the primary metric from the mission contract.
-- Print exactly ONE JSON evaluation result object to stdout; all logs go to stderr.
+**First ask the contract which shape this mission needs.** There are two, and picking
+by hand is how a mission spent its setup discovering that neither path was reachable:
 
-This evaluator is authored ONCE, here, and then frozen. Forge copies it verbatim into every node worktree and is forbidden to modify it — so keep it model-agnostic (it depends only on the fixed `build_model` / weights interface, not on any one architecture).
+- **generated** — `evor_scaffold_evaluator` emits the harness from the contract, the
+  eval suite and the frozen index, and you write only `score(pred, gt)` in
+  `score_plugin.py`. Deterministic, so the server can regenerate and byte-compare.
+  It scores prediction FILES and never loads a model.
+- **authored** — you write the whole evaluator. Required when the contract gates on
+  anything only a running model exhibits: `latency_*`, `vram_*`, throughput. Those
+  cannot be recovered from prediction files, and `evor_scaffold_evaluator` will refuse
+  the contract rather than emit gates that get skipped instead of enforced.
 
-Then seal the evaluator anchor into the contract:
+Either way, **both files are written with `evor_write_eval_script`.** Direct `Write`/`Edit`
+under `.evor/runs/` is denied for every role — run artifacts go through their owning
+tool, and this is it. It validates before the bytes land: that the source compiles, that
+it takes no positional arguments (the runner passes none — an evaluator reading
+`sys.argv[1]` cannot be launched), that it prints its one JSON object, and that polarity
+is read from `label_semantics` rather than assumed.
+
+```
+evor_write_eval_script({
+  run_id: "<run_id>",
+  eval_version: "v1",
+  target: "evaluator",        // or "score_plugin" for the generated shape
+  source: "<complete Python source>"
+})
+```
+
+The evaluator contract — argv, stdout, which files constitute the evaluator, and the
+environment it may rely on — is owned by `harness/evor/eval_contract.py`. Read it rather
+than inferring the interface; four sites once each held their own version of it and all
+four disagreed.
+
+An authored evaluator must:
+- Load the frozen test split. Its path comes from the run environment (`EVOR_RUN_DIR`,
+  then `frozen-splits/<eval_version>-test`) — never re-split, never touch train/val for
+  scoring, never hardcode a path.
+- Import the node's model through the standard worktree interface (`from model import
+  build_model`, `EVOR_WORKTREE`) and load its trained weights.
+- Run inference over the frozen test set and compute the primary metric, plus every
+  metric any constraint names — a floor commonly guards a SECONDARY metric.
+- Measure whatever the contract gates on, latency and VRAM included. A declared gate
+  that is never measured is SKIPPED, not failed: the run reports a pass it never earned.
+- Print exactly ONE JSON object to stdout; all logs to stderr.
+
+This evaluator is authored ONCE, here, and then frozen. Forge copies it verbatim into
+every node worktree and is forbidden to modify it — so keep it model-agnostic: it depends
+only on the fixed `build_model` / weights interface, not on any one architecture.
+
+Then seal the anchor into the contract:
 
 ```
 evor_seal_eval_script({ run_id: "<run_id>", eval_version: "v1" })
 ```
+
+The seal covers **every file the evaluator comprises** — for the generated shape that is
+the harness and `score_plugin.py` together, because the harness imports the metric from
+it and an anchor over the harness alone leaves the function that decides every score
+outside custody.
 
 Verify the call returns `ok`. If it reports the evaluator is missing, write eval-suites/<eval_version>.py first, then re-call evor_seal_eval_script. Do NOT proceed to lock if evor_seal_eval_script did not return ok.
 </EvalSuite_Initialization>

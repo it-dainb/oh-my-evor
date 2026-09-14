@@ -33,9 +33,6 @@ import { ensureRunDirs, resolveRunPaths } from "../src/run-store.js";
 
 const HOOKS = resolve(dirname(fileURLToPath(import.meta.url)), "../../hooks");
 
-/** exit 2 is how a Stop hook blocks; 0 lets the turn end. */
-const BLOCKED = 2;
-
 function runStop(tickState: unknown, payload: Record<string, unknown> = {}) {
   const root = mkdtempSync(join(tmpdir(), "evor-w1-stop-"));
   const runDir = join(root, ".evor", "runs", "m1", "r1");
@@ -75,7 +72,16 @@ function runStop(tickState: unknown, payload: Record<string, unknown> = {}) {
     env: { ...process.env, EVOR_ROOT: join(root, ".evor"), CLAUDE_PLUGIN_ROOT: resolve(HOOKS, "..") },
   });
   rmSync(root, { recursive: true, force: true });
-  return { code: r.status, stdout: r.stdout ?? "" };
+  const stdout = r.stdout ?? "";
+  // A block is the JSON hook protocol on stdout with exit 0 — see stop.mjs.
+  // Reading the exit code alone could not tell a readable block from the
+  // reason-less "No stderr output" one the field run actually received.
+  let reason = "";
+  try {
+    const parsed = JSON.parse(stdout);
+    if (parsed?.decision === "block") reason = String(parsed.reason ?? "");
+  } catch { /* not a block */ }
+  return { code: r.status, stdout, blocked: reason !== "", reason };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -86,8 +92,8 @@ describe("C-02: a tick at step 9 is only finished if it actually finished", () =
   it("blocks when step 9 explicitly says step_status: running", () => {
     // r3's final tick-state, verbatim in shape: step 9, still running.
     const r = runStop({ tick: 1, current_step: 9, step_status: "running" });
-    expect(r.code, r.stdout).toBe(BLOCKED);
-    expect(r.stdout).toMatch(/EVOR CONTINUATION/);
+    expect(r.blocked, r.stdout).toBe(true);
+    expect(r.reason).toMatch(/EVOR CONTINUATION/);
   });
 
   it("blocks when the tick's integrity verdict failed, even at step 9", () => {
@@ -99,8 +105,8 @@ describe("C-02: a tick at step 9 is only finished if it actually finished", () =
       step_status: "done",
       integrity_verdict: "failed",
     });
-    expect(r.code, r.stdout).toBe(BLOCKED);
-    expect(r.stdout).toMatch(/EVOR CONTINUATION|integrity/i);
+    expect(r.blocked, r.stdout).toBe(true);
+    expect(r.reason).toMatch(/EVOR CONTINUATION|integrity/i);
   });
 
   it("blocks on the exact final r3 tick-state (step 9 / running / integrity failed)", () => {
@@ -110,13 +116,13 @@ describe("C-02: a tick at step 9 is only finished if it actually finished", () =
       step_status: "running",
       integrity_verdict: "failed",
     });
-    expect(r.code, r.stdout).toBe(BLOCKED);
+    expect(r.blocked, r.stdout).toBe(true);
   });
 
   it("still allows a genuinely complete tick (regression guard for the above)", () => {
-    expect(runStop({ tick: 1, current_step: 9, step_status: "done" }).code).toBe(0);
+    expect(runStop({ tick: 1, current_step: 9, step_status: "done" }).blocked).toBe(false);
     // step 9 with no step_status stays allowed — the deliberate false-stop guard.
-    expect(runStop({ tick: 4, current_step: 9 }).code).toBe(0);
+    expect(runStop({ tick: 4, current_step: 9 }).blocked).toBe(false);
   });
 });
 

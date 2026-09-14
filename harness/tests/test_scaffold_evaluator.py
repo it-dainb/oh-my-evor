@@ -15,12 +15,14 @@ byte-compared — which turns the seal from an assertion into CUSTODY.
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
 
 import pytest
 
+from evor.eval_contract import build_argv
 from evor.scaffold_evaluator import (
     HARNESS_VERSION,
     SCORE_PLUGIN_FILENAME,
@@ -122,17 +124,29 @@ class TestTheGeneratedHarnessBehaves:
         (run_dir / "eval-suites" / SCORE_PLUGIN_FILENAME).write_text(body)
 
     def _evaluate(self, run_dir: Path, tmp_path: Path, preds: dict[str, bytes]) -> dict:
-        split_dir = tmp_path / "split"; split_dir.mkdir(exist_ok=True)
-        pred_dir = tmp_path / "pred"; pred_dir.mkdir(exist_ok=True)
+        """Launch the harness the way the PRODUCT launches it.
+
+        This used to build its own argv — `[python, v1.py, split_dir, pred_dir]`
+        — while `evaluator._build_cmd` passes no positional arguments at all. The
+        substitution is why every test here passed against a generated evaluator
+        that exited 2 with a usage error in the field. The split and predictions
+        now go where a conformant evaluator LOOKS for them, and the command comes
+        from the contract.
+        """
+        split_dir = run_dir / "frozen-splits" / "v1-test"
+        split_dir.mkdir(parents=True, exist_ok=True)
+        pred_dir = run_dir / "predictions" / "v1"
+        pred_dir.mkdir(parents=True, exist_ok=True)
         for name in ("a", "b"):
             (split_dir / name).write_bytes(b"GT")
         for name, data in preds.items():
             (pred_dir / name).write_bytes(data)
         out = subprocess.run(
-            [sys.executable, str(run_dir / "eval-suites" / "v1.py"), str(split_dir), str(pred_dir)],
+            build_argv(run_dir / "eval-suites" / "v1.py"),
             capture_output=True, text=True, timeout=60,
+            env={**os.environ, "EVOR_RUN_DIR": str(run_dir)},
         )
-        assert out.returncode == 0, out.stderr
+        assert out.returncode == 0, out.stdout + out.stderr
         return json.loads(out.stdout.strip().splitlines()[-1])
 
     def test_it_scores_and_reports_per_domain(self, tmp_path: Path):
@@ -152,12 +166,20 @@ class TestTheGeneratedHarnessBehaves:
         scaffold_evaluator(run_dir)
         self._install_plugin(run_dir, "def score(pred, gt, **kw):\n    return {'fmeasure': 1.0}\n")
 
-        split_dir = tmp_path / "wrong"; split_dir.mkdir()
+        # Under the evaluator contract there are no positional arguments, so the
+        # evaluator cannot be POINTED at a different split — a strictly stronger
+        # property than the one this case used to check by passing a wrong path.
+        # The remaining hazard is the declared location holding the wrong count.
+        split_dir = run_dir / "frozen-splits" / "v1-test"
+        split_dir.mkdir(parents=True, exist_ok=True)
         (split_dir / "only-one").write_bytes(b"GT")   # 1 item, frozen said 2
-        pred_dir = tmp_path / "p"; pred_dir.mkdir()
+        pred_dir = run_dir / "predictions" / "v1"
+        pred_dir.mkdir(parents=True, exist_ok=True)
+        (pred_dir / "only-one").write_bytes(b"P")
         out = subprocess.run(
-            [sys.executable, str(run_dir / "eval-suites" / "v1.py"), str(split_dir), str(pred_dir)],
+            build_argv(run_dir / "eval-suites" / "v1.py"),
             capture_output=True, text=True, timeout=60,
+            env={**os.environ, "EVOR_RUN_DIR": str(run_dir)},
         )
         # AF1: a freeze that captured 5 metadata files reported success, and every
         # fitness number in the run was computed against them.

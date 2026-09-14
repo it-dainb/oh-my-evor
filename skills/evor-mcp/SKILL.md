@@ -138,7 +138,7 @@ For the full signal vocabulary (shapes, axes, severity, kind catalogue), read `a
 ### Compute / Run
 | Tool | Purpose |
 |---|---|
-| `evor_run_start` | Launch a candidate node as a detached background job; returns `{job_id, status_path, log_path}` immediately |
+| `evor_run_start` | **Evaluate an already-trained candidate** — runs the sealed `evaluate.py` as a detached job; returns `{job_id, status_path, log_path}` immediately. Does NOT train. |
 | `evor_run_status` | Read run progress and tail the log for a running or completed job |
 | `evor_schedule` | Submit a training job to the run scheduler; returns `{job_id, pid}` |
 | `evor_meta_evolve` | Update the search strategy from the current frontier (meta-evolution of the search policy) |
@@ -178,7 +178,9 @@ evor_tree_read           # inspect frontier
 evor_select              # pick parent node(s)
 ... (specialist agents produce their tick artifacts via evor_write_artifact)
 evor_record_node         # register the candidate node in the evolution tree
-evor_run_start           # launch training (async); returns job_id immediately
+evor_run_start           # EVALUATE the trained candidate (async); returns job_id immediately
+                         # NOT training — it runs the sealed evaluate.py. Weights must already
+                         # be on disk; forge-junior does the training, before this call.
                          # → watch with Monitor (attended) or FileChanged+asyncRewake (unattended)
 evor_run_status          # check state when monitor fires
 evor_telemetry_ingest    # ingest telemetry records from the run

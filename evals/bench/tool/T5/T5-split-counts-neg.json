@@ -13,7 +13,7 @@
   "grounded_rule": {
     "file": "agents/evor-tick.md",
     "quote": "A tick that fails is a normal outcome, not an error to hide.",
-    "sha256_at_authoring": "04310dad8df94fef498773bbd499967715379ec05912d4951af2a158821a4bde"
+    "sha256_at_authoring": "ea4e86b0ac654f66210c6e6d80e94d0dc4efadfb1b149e45f0d747187f3aa46f"
   },
   "grounding": [
     "field-trace:C-07",
