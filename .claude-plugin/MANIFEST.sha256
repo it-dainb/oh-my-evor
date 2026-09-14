@@ -7,11 +7,11 @@
     "Verify an installed tree with: evor doctor  (see _check_plugin_tree_drift)."
   ],
   "version": "1.2.8",
-  "commit": "0262b58f69824fb50d16dc639c6558d0b3e48728",
-  "generated_at": "2026-09-14T09:23:32.033Z",
+  "commit": "affb0ef5e1dce143277462320d1e007944c63504",
+  "generated_at": "2026-09-14T09:27:54.679Z",
   "file_count": 1705,
   "files": {
-    ".claude-plugin/marketplace.json": "81634a97666c1502ee2ff2386ec4b5fc554241f182a3fe2b4d5d4b6f3bd28813",
+    ".claude-plugin/marketplace.json": "bd9bc69485c424788503c20a4ddbd005a09a6b09be0e62fcade6a6fc7cc479f9",
     ".claude-plugin/plugin.json": "6b07b9a36e6a7b62372d86251b834cf06f47552000bc35287b9b043c9b805159",
     ".claude/settings.json": "df81992167dfd71ab7aaa2bea12af8f12d38058edc936b18b11f357b7d3cc415",
     ".dockerignore": "2036e5aa1a04ed87eab8ba1c373570bd65ab826697e92bdc8a10b002eff02be4",
@@ -1646,7 +1646,7 @@
     "mcp/tests/pause-recovery-edge.test.ts": "f25677af1083df66330a8a0bc546883fe0226f6a62147132f44aa851ef43a7eb",
     "mcp/tests/proposals.test.ts": "a1aa602ea30ec69c0a40ed262b427696652ac4d9a594c9e884df88e44d96d472",
     "mcp/tests/record.test.ts": "f0f6d2be8431360dade989c650816aa9c040a56f2e6b009a409a6685f209cb59",
-    "mcp/tests/release-version.test.ts": "01fb5f7e5281e02ca7b8bad99c1c3584cd8ac22d61270800239470160f42cac9",
+    "mcp/tests/release-version.test.ts": "89a43ee490e4458f2635a6c4d0a23af51f3c0b7725fdf416d99a05d00b5623fa",
     "mcp/tests/result-envelope.test.ts": "b4579b2070cb21ec3e69a01d50bc901fddae17f6c77a0444782fb38e5f22332f",
     "mcp/tests/run-start-does-not-train.test.ts": "a1be8c18cb37b3a5418590d7c1f7621ed93f0ca0b19c11ef1c185a7b19caa5f3",
     "mcp/tests/runtime-limits.test.ts": "99dc1daa4ede9ce53460de10c6922d3f834c75dbad738a906ec05c0050856ee6",
