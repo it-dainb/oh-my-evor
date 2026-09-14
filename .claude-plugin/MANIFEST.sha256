@@ -7,9 +7,9 @@
     "Verify an installed tree with: evor doctor  (see _check_plugin_tree_drift)."
   ],
   "version": "1.2.8",
-  "commit": "0ab9add69ab5b2f9831e03e0aab4125f067610e9",
-  "generated_at": "2026-09-14T09:23:09.156Z",
-  "file_count": 1703,
+  "commit": "0262b58f69824fb50d16dc639c6558d0b3e48728",
+  "generated_at": "2026-09-14T09:23:32.033Z",
+  "file_count": 1705,
   "files": {
     ".claude-plugin/marketplace.json": "81634a97666c1502ee2ff2386ec4b5fc554241f182a3fe2b4d5d4b6f3bd28813",
     ".claude-plugin/plugin.json": "6b07b9a36e6a7b62372d86251b834cf06f47552000bc35287b9b043c9b805159",
@@ -1523,6 +1523,7 @@
     "hooks/lib/active-run.mjs": "cfb044e785e931d5691ba7478a0b613b59ce0441075a47e7e11f8b1fc559506a",
     "hooks/lib/audit.mjs": "ade346bdf670800006dc9eabca1e9c49255174c29958ab86019574aa6cb0dbba",
     "hooks/lib/fsm.mjs": "eb37323f33059553497cdd6f520409593d52930921b76cace7d7742e1fe33d85",
+    "hooks/lib/node-identity.mjs": "11392e0be84b949bb9dc4b88323e4df2fa50501e77c29f9e830734676b8c4d21",
     "hooks/lib/operations.mjs": "2e9b20f1cfa7f0ff17637297aefa3d62a97ffeec1f484a11a35ac15feb35e8ee",
     "hooks/lib/protected-paths.mjs": "5d27b42fe7fb3c3521e1ae3f1a8610469716de865bf561abc18ce49859e401c9",
     "hooks/lib/run-status.mjs": "491b8685d266af6f7842f929f45b280ddf3b531adaa2087c2b0ceb455f27353f",
@@ -1640,6 +1641,7 @@
     "mcp/tests/lineage.test.ts": "6cc2b2d898eed383cbd1730f564caff78e94d50d0d6f61962423a04f0ac0ed8d",
     "mcp/tests/live-e2e-leak-scan.mjs": "b95925265f3e58501b100ba7ce160906e3f2a8cf8af9d8e4085c9a3ee4229503",
     "mcp/tests/live-seal-provenance.test.ts": "394f5fec6ba11b2a4df3f41303cd7584ed6c84797f52f9c4d6ebc93a539cba04",
+    "mcp/tests/node-identity-parity.test.ts": "2f6aadb1b1c427760ec6cd901e7bc184fee761dd74a4fab24a8900dea2d50666",
     "mcp/tests/node-ref.test.ts": "6d7c952a8667ffd7f8fab09bb56329e4b89ead6f8d989b2659b91880fc698a57",
     "mcp/tests/pause-recovery-edge.test.ts": "f25677af1083df66330a8a0bc546883fe0226f6a62147132f44aa851ef43a7eb",
     "mcp/tests/proposals.test.ts": "a1aa602ea30ec69c0a40ed262b427696652ac4d9a594c9e884df88e44d96d472",
