@@ -2,6 +2,72 @@
 
 All notable changes to Evor. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.2.2] — 2026-09-14 — the instrument release
+
+v1.2.2 is almost entirely work on the thing that measures the agents, not on the
+agents. `evals/bench` was built to catch a system publishing its own defects as
+model failures, and over sixty commits it was found doing exactly that.
+
+**No F1 number from this cycle should be quoted.** The reason is in
+`docs/evor-eval-bench/13-lite14-is-a-different-instrument.md` and
+`14-the-ceiling.md`: the runs that produced them measured different instruments,
+and the instrument itself re-rolls about one paired cell in three between
+identical runs.
+
+### What the bench was doing wrong
+
+- **The governor was not loaded.** `.claude-plugin/plugin.json` was never copied
+  into the sandbox, so `oh-my-evor:*` agent types did not resolve and
+  `hooks/hooks.json` — including `SubagentStart`/`SubagentStop` — never came into
+  force. Every calibration before this measured the roles with the reflex layer
+  switched off. Fixed by copying the manifest and passing `--plugin-dir`.
+- **The operator's global CLAUDE.md was loaded into every scored run**, so each
+  role carried an unrelated orchestration framework's instructions. Removed with
+  `CLAUDE_CODE_DISABLE_CLAUDE_MDS=1`; `--system-prompt` does not suppress memory,
+  and `--bare`/`--safe-mode` would have taken the hooks with it.
+- **The role-identity read was wrong at three sites.** `agent_type` is empty for a
+  top-level agent, which is how the bench runs every role, so the governor
+  believed `evor-tick` was the mission orchestrator and denied its fan-out. Fixed
+  twice before every site was found.
+- **A denial was flagged per tool NAME, not per call** — 412 flagged against 159
+  real, and `bench-detect.mjs` treats a denied call as invisible, so one denied
+  `Bash` silently un-matched every Bash predicate for the rest of the run.
+- **The governor-decided-denial subtraction was dead code.** `ctx.governor_denials`
+  had one reference in the repository: the consumer.
+- **Four records were scored FAIL for a task that never arrived**, and the
+  product's own `Stop` hook — correct in production — could only misfire against
+  fixtures that all depict a mid-tick state.
+- **Fixtures failed the product's own schemas**: mutation proposals missing five
+  required fields, `tree.json` missing its envelope `updated_at`, `strategy.json`
+  carrying two fields of fifteen. The agents reported this correctly for four
+  calibrations and were recorded as fabricating.
+
+### What the product gained
+
+- `evor-tick` may no longer spawn `evor-tick`. Nothing forbade it, and three runs
+  ended waiting on a nested copy of themselves.
+- `evor-mutagen` is told that `evor_validate_proposals` is a call it makes, not
+  something that happens to its payload.
+- `evor-tick`'s pointer rule no longer contradicts its own failed-tick section.
+- `kind` is documented as a registry rather than a closed set, matching
+  `signal-protocol.md` and the schema, which four agent files contradicted.
+- The per-role `maxTurns` each agent file declares is now honoured.
+
+### Not fixed, and named
+
+- **100% F1 is not reachable on a single run** — the ceiling is about 0.92–0.94,
+  because model sampling is unseeded and roughly one paired position in seven
+  re-rolls after every bench-side cause is removed. Three honest reformulations
+  are set out in `14-the-ceiling.md`; none has been chosen.
+- **Negative halves can pass by staying silent.** `S = detect ∧ declaration` on
+  both halves, so 46% of the false positives the corpus should record are absorbed
+  by the agent saying nothing. Correcting it lowers the reported score by about
+  4 points, which is why it is documented rather than quietly applied.
+- **Three tier rows in `docs/v1-cost-and-verification.md` §3 remain stale.**
+- The last calibration attempt was lost to an account rate limit, and the harness
+  scored the refusal as model failure — the same class of defect as above, still
+  open.
+
 ## [1.2.1] — 2026-09-02 — the affordance release
 
 v1.2.0's first real field deployment ran 19 hours across three missions and
