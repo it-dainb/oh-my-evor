@@ -27,6 +27,9 @@ import { z } from "zod";
 import { resolveRunPaths, getEvorRoot, getActiveRunPath } from "../run-store.js";
 import { callPythonModule, type PyResult } from "../subprocess-bridge.js";
 import { resolveNodeRef, tryResolveNodeRef } from "./node-ref.js";
+import { resolveRunId } from "../active-run.js";
+// Same module the SubagentStop hook imports — one owner for "what does this tick owe".
+import { owed, selectedProposals } from "../../../hooks/lib/tick-completeness.mjs";
 import { nextState } from "../fsm.js";
 
 // ── Shared helpers ────────────────────────────────────────────────────────────
@@ -1030,6 +1033,49 @@ export function registerComputeTools(server: McpServer): void {
       } catch { /* unwritable run dir — the contract anchor still stands */ }
 
       return ok({ ok: true, eval_version, hash, files });
+    },
+  );
+
+  // ── evor_tick_completeness ──────────────────────────────────────────────────
+  //
+  // Lets the tick ask what it still owes instead of discovering it at the
+  // SubagentStop guard. Both callers import the SAME module
+  // (hooks/lib/tick-completeness.mjs) — a tool and a hook holding separate
+  // opinions about the same predicate is exactly how the evaluator ended up
+  // with four disagreeing beliefs about its own interface.
+  server.tool(
+    "evor_tick_completeness",
+    "What this tick still owes: every proposal the selector SELECTED needs a trained, "
+    + "evaluated, integrity-checked node, not just the winner. Returns the undischarged "
+    + "ones. Call it before returning a terminal outcome — the SubagentStop guard checks "
+    + "the same thing and will block a \"scored\" return that still owes a candidate.",
+    {
+      run_id: z.string().optional().describe("Active run identifier; resolved from the active run when omitted"),
+      tick: z.number().int().min(1).describe("The tick to check"),
+      mission_id: z.string().optional().describe("Mission id; resolved from the active run when omitted"),
+    },
+    async ({ run_id, tick, mission_id }) => {
+      let resolvedRun: string;
+      try {
+        resolvedRun = resolveRunId(run_id);
+      } catch (e) {
+        return err(String(e instanceof Error ? e.message : e));
+      }
+      const { runDir } = resolveRunPaths(resolvedRun, mission_id ?? process.env.EVOR_MISSION_ID);
+      const selected = selectedProposals(runDir, tick);
+      const debt = owed(runDir, tick);
+      return ok({
+        ok: true,
+        tick,
+        selected,
+        complete: debt.length === 0,
+        owed: debt,
+        // Said explicitly because "complete: true" with an empty selection is the
+        // shape that let an entire tick pass having forged nothing.
+        note: selected.length === 0
+          ? "the selector selected NOTHING this tick — complete is vacuous; outcome should be 'rejected' or 'skipped', not 'scored'"
+          : undefined,
+      });
     },
   );
 

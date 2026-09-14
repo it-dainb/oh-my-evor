@@ -2,6 +2,82 @@
 
 All notable changes to Evor. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.2.7] — 2026-09-14 — a yield is not a return
+
+Two guards, pulled in opposite directions, because that is what the evidence asked for.
+
+### The tick's return contract had no word for waiting
+
+`evor-tick` spans hours and around ten async agent boundaries and has no blocking
+primitive — `TaskOutput` is not registered for a sub-agent. Its only way to wait is to end
+its turn and be re-activated, which the platform does reliably. The field proves it:
+
+| agent | yields | survived | matched by the tick return contract? |
+|---|---|---|---|
+| `evor-sage` | 7 | **7 of 7** | no |
+| `evor-tick` | 8 | 7 of 8 | **yes** |
+
+Sage yielded seven times with five live juniors and resumed every time. The tick died on
+its eighth — at 42 turns of a declared 90, so not the cap. The only difference was
+`TICK_OUTCOMES = ['scored','rejected','skipped','failed']`: no in-progress value. So a
+yielding tick had to claim a TERMINAL outcome, and `failed` is the only one that can carry
+an explanation. It emitted, three times in one tick:
+
+```json
+{"tick":1,"outcome":"failed","error":"Blocked mid-tick at Step 5 ... No blocking
+ primitive available to hold turn across this compute-bound async boundary."}
+```
+
+Main read a dead tick and recovered the only way it could — a fresh tick agent, discarding
+everything the first one knew. The contract could not express what was happening, so the
+agent reported the nearest available falsehood. This was introduced with the contract and
+survived 1.2.5: that release made the *mid-flight* guard yield-aware and left the *return*
+coercion untouched.
+
+- `yielding` is now an outcome, carrying `waiting_on`.
+- The return contract is **not enforced at all** on a turn end that `isYieldingStop()`
+  identifies as a yield — a yield has no return shape to violate. This restores exactly the
+  sage behaviour.
+- The block message now teaches the word, so a tick that has to be corrected learns that
+  waiting is sayable.
+- `skills/evor/SKILL.md` tells main a `yielding` return is not a finished tick: do not
+  record it, do not advance the counter, **do not spawn a replacement**.
+
+### A terminal return may not owe a selected candidate
+
+`agents/evor-selector.md` said *"`selected` is true for at most one review"*;
+`skills/evor/SKILL.md` said *"one Forge per approved proposal (up to
+`ResourcePlan.concurrency`)"*. Two documents, two beliefs about how many candidates a tick
+trains — and `concurrency` was persisted **nowhere in the run**, so the limit had no value
+to read. In the field the selector selected h001 AND h003, `SelectorVerdict` accepted it
+because nothing checked, only h001 was forged, and h003 was parked in a `carry_forward` key
+defined in no skill, no agent file and no contract. Nothing read it. The tick reported step
+9 done with an approved hypothesis silently gone.
+
+- Multi-select is now the declared shape, and checked: the winner must be among the
+  selected, and an **approved-but-unselected** proposal is rejected outright — it is a
+  candidate that disappears.
+- New `hooks/lib/tick-completeness.mjs` owns "what does this tick still owe". Both callers
+  import it — the SubagentStop guard and the new `evor_tick_completeness` MCP tool. Both are
+  JS, so no mirror and no parity test; a second implementation is how the evaluator ended up
+  with four disagreeing beliefs about its own interface.
+- The guard blocks a `"scored"` return that still owes a node, integrity verdict, fitness or
+  telemetry for any selected proposal. It does **not** fire mid-tick, and does not fire on a
+  `"failed"` return.
+- Telemetry is looked up under the node's id AND its name, because the field run held both
+  `nodes/<uuid>/results.json` and `nodes/<name>/telemetry.jsonl`. That split is a real
+  defect and not this module's to fix; checking only the declared path reported a trained
+  node as owing telemetry, and a completeness gate that fires on a finished candidate is
+  worse than none.
+
+### Why the guard is not what was first proposed
+
+The original idea was to block the tick until all hypotheses were trained. That forbids the
+only mechanism a tick has for waiting: its stop *is* its yield. It would have re-created the
+livelock 1.2.3 and 1.2.5 removed — and it is the anti-pattern `hooks/lib/waiting.mjs`
+already names, *guards are for state debt the agent can discharge right now*. Hence loose on
+a yield, strict on a finish.
+
 ## [1.2.6] — 2026-09-14 — the evaluator contract has an owner
 
 A mission setup could not finish without the operator typing `cp`. The write guard was

@@ -117,8 +117,8 @@ Your entire final response is one JSON object and nothing else:
 }
 ```
 
-`outcome` is one of `"scored"`, `"rejected"`, `"skipped"`, `"failed"`; add `"error"` when it is
-`"failed"`. **Which is which, because listing four words did not say:**
+`outcome` is one of `"scored"`, `"rejected"`, `"skipped"`, `"failed"`, `"yielding"`; add
+`"error"` when it is `"failed"`. **Which is which, because listing the words did not say:**
 
 | outcome | when |
 |---|---|
@@ -126,6 +126,63 @@ Your entire final response is one JSON object and nothing else:
 | `rejected` | candidates existed and the selector approved none of them |
 | `skipped` | there was nothing to decide — no proposals reached the selector at all |
 | `failed` | the tick could not complete; add `error` with the reason |
+| `yielding` | you are WAITING, not finished. Add `waiting_on`. The tick is still yours. |
+
+`rejected` and `skipped` were previously indistinguishable from this file, and a
+tier eval graded a model `incorrect` for choosing between them the other way with
+sound reasoning. A rule that is graded but never stated is a rule the system has
+decided not to have — §2, pointed at an agent file.
+
+## A tick owes a node for EVERY selected proposal
+
+The selector marks `selected: true` on every proposal that passed its gates, and `winner`
+names the primary among them. **All of them are yours to forge, train and evaluate** — the
+winner leads lineage, it is not the only candidate.
+
+Before you return a terminal outcome, ask:
+
+```
+evor_tick_completeness({ tick: <n> })
+```
+
+It returns the selected proposals and any that still lack a node, an integrity verdict, a
+fitness or telemetry. The SubagentStop hook checks the same predicate through the same
+module, so a `"scored"` return that still owes a candidate is blocked — calling the tool
+first means you find out while you can still act on it.
+
+If a selected candidate genuinely cannot be run, emit a signal naming it and return
+`"failed"` with that reason. Do NOT park it for later: the field run put an approved
+hypothesis (`h003-data-curation-hard-mining`) into a `carry_forward` key that is defined in
+no skill, no agent file and no contract. Nothing read it. The tick reported step 9 done and
+the hypothesis was gone.
+
+## Waiting is not failing
+
+**`yielding` is the one you will need most, and it did not exist.** A tick spans hours and
+around ten async agent boundaries. You have no blocking primitive across them: `TaskOutput`
+is not registered for a sub-agent, so your only way to wait is to end your turn and be
+re-activated — which works. In the field `evor-sage` did exactly that SEVEN times while five
+juniors ran, and resumed every time.
+
+You were the only agent it did not work for, because the SubagentStop hook enforced a return
+shape on your turn ends and the shape had no word for waiting. So a tick ending its turn at
+step 5 had to choose a TERMINAL outcome, picked `failed` because it is the only one that can
+carry an explanation, and emitted:
+
+```
+{"tick":1,"outcome":"failed","error":"Blocked mid-tick at Step 5 ... No blocking primitive
+ available to hold turn across this compute-bound async boundary. Steps 1-4 complete."}
+```
+
+three times in one tick. Main read a dead tick each time and recovered the only way it could
+— by spawning a fresh tick agent, throwing away everything the first one knew.
+
+So: **when you end a turn to wait, you are not returning.** Call `evor_await_artifact` to
+record what you are blocked on (that is also the signal the Stop hook reads to tell a yield
+from an abandonment), then end the turn. You may emit
+`{"tick":<n>,"outcome":"yielding","waiting_on":"artifact:forge@tick<n>"}` or ordinary prose —
+the hook no longer enforces a shape on a yield. Do NOT report `failed` for a wait. `failed`
+means the tick cannot be completed at all, which is a different and much rarer thing.
 
 `rejected` and `skipped` were previously indistinguishable from this file, and a
 tier eval graded a model `incorrect` for choosing between them the other way with

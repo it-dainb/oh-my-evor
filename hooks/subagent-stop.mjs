@@ -40,6 +40,7 @@ import { spawnSync } from 'child_process';
 import { resolveActiveRun, resolveEvorRoot } from './lib/active-run.mjs';
 import { isTickFinished } from './lib/run-status.mjs';
 import { isYieldingStop } from './lib/waiting.mjs';
+import { owed, describeOwed } from './lib/tick-completeness.mjs';
 
 // ── Kill switches ─────────────────────────────────────────────────────────────
 if (process.env.DISABLE_EVOR) process.exit(0);
@@ -57,7 +58,25 @@ try { payload = JSON.parse(readFileSync(0, 'utf8') || '{}'); } catch { /* fail-o
 // exists. Rewriting a return is impossible (PostToolUse.updatedToolOutput is
 // documented but inert in CLI 2.1.220); blocking the stop is not — the subagent
 // resumes and re-emits. So: reject and let it correct itself, at most twice.
-const TICK_OUTCOMES = ['scored', 'rejected', 'skipped', 'failed'];
+// `yielding` exists because its absence broke the loop. A tick spans hours and
+// ~10 async agent boundaries, and a sub-agent's only way to wait across one is to
+// end its turn and be re-activated — which the platform does reliably: in the
+// field evor-sage yielded SEVEN times with five live juniors and resumed every
+// time. evor-tick yielded eight times and died on the eighth, and the only
+// difference between them is that this check matches evor-tick.
+//
+// With no in-progress value, a yielding tick had to pick a TERMINAL outcome, and
+// `failed` is the only one that can carry an explanation. So it emitted
+//   {"tick":1,"outcome":"failed","error":"Blocked mid-tick at Step 5 ... No
+//    blocking primitive available to hold turn across this compute-bound async
+//    boundary. Steps 1-4 complete."}
+// three separate times. Main read a dead tick and recovered the only way it
+// could: by spawning a fresh tick agent, losing the first one's whole context.
+// The contract could not express what was happening, so the agent lied in the
+// only vocabulary it was given.
+const TICK_OUTCOMES = ['scored', 'rejected', 'skipped', 'failed', 'yielding'];
+/** Outcomes that mean the tick is OVER. `yielding` deliberately is not one. */
+const TERMINAL_OUTCOMES = ['scored', 'rejected', 'skipped', 'failed'];
 const MAX_RETURN_CHARS = 1500;   // ~400 tokens, per the agent's own budget
 const MAX_RETRIES = 2;
 
@@ -72,6 +91,55 @@ const isTick = agentType.endsWith('evor-tick');
 
 if (isTick) {
   const msg = String(payload.last_assistant_message ?? '');
+
+  // A turn end that is a YIELD is not a return, so it has no return contract to
+  // violate. Enforcing one here is what converted every yield into a
+  // termination: the block says "Re-emit your entire response as ONE JSON
+  // object", the tick complies, and that object becomes the value main consumes.
+  //
+  // `evor-sage` is the control. It is not matched by this check, its yields
+  // carried ordinary prose, nothing coerced them, and it was re-activated all
+  // seven times. Letting a yielding tick emit whatever it likes restores that.
+  const tickStateNow = readTickState();
+  if (isYieldingStop(payload, tickStateNow)) {
+    process.exit(0);
+  }
+
+  // ── Completeness: a tick may not finish owing a selected candidate ────────
+  //
+  // Reached only when the tick is NOT yielding — it is claiming a terminal
+  // outcome. Every proposal the selector selected owes a trained, evaluated,
+  // integrity-checked node; the winner is the primary among them, not the only
+  // one. In the field the selector selected h001 and h003, only h001 was
+  // forged, and h003 went into a `carry_forward` key defined nowhere and read by
+  // nothing. The tick reported step 9 done with an approved hypothesis dropped.
+  //
+  // Deliberately NOT checked mid-tick: there the answer is legitimately
+  // "everything", and blocking on it would forbid the only way a tick can wait
+  // across a multi-hour training.
+  const terminal = (() => {
+    try {
+      const t = JSON.parse(msg.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, ''));
+      return TERMINAL_OUTCOMES.includes(t?.outcome) ? t : null;
+    } catch { return null; }
+  })();
+  if (terminal && terminal.outcome === 'scored' && !payload.stop_hook_active) {
+    const debt = owedForThisTick(terminal.tick);
+    if (debt.length && bumpRetries(payload.agent_id) <= MAX_RETRIES) {
+      process.stdout.write(JSON.stringify({
+        decision: 'block',
+        reason:
+          `Tick ${terminal.tick} reports "scored" but still owes a selected candidate: ` +
+          `${describeOwed(debt)}.\n` +
+          `Every proposal the selector marked selected owes a trained AND evaluated node — ` +
+          `the winner is the primary, not the only one. Forge the remaining candidate(s), or ` +
+          `if one genuinely cannot be run, emit a signal naming it and return "failed" with ` +
+          `that reason. Do not park it in a carry_forward key: nothing reads one.`,
+      }) + '\n');
+      process.exit(0);
+    }
+  }
+
   const violation = checkTickReturn(msg);
   // stop_hook_active is the platform's own loop guard; our counter bounds the
   // case where it is not set. Either one alone must be able to end the loop.
@@ -81,6 +149,9 @@ if (isTick) {
       reason:
         `Your return violates the tick contract: ${violation}\n` +
         `Re-emit your entire response as ONE JSON object, nothing else:\n` +
+        `If you are WAITING on an agent or artifact rather than finishing, say so — ` +
+        `outcome:"yielding" with "waiting_on":"<artifact or task>". That is not a ` +
+        `failure and does not end the tick; do not report "failed" for it.\n` +
         `{"tick":<number>,"outcome":"${TICK_OUTCOMES.join('|')}",` +
         `"node_id":"<id, if a node was produced>","score":<number, if evaluated>,` +
         `"pointers":[{"run_id":"...","tick":<n>,"agent":"..."}],"error":"<only when outcome=failed>"}\n` +
@@ -167,6 +238,40 @@ function checkTickReturn(raw) {
   if (!TICK_OUTCOMES.includes(obj.outcome)) return `"outcome" must be one of ${TICK_OUTCOMES.join(', ')}`;
   if (obj.pointers !== undefined && !Array.isArray(obj.pointers)) return '"pointers" must be an array';
   return null;
+}
+
+/**
+ * The active run's tick-state, or null.
+ *
+ * The return-contract check runs before `runDir` is derived further down, so
+ * this resolves the run itself rather than reordering the file — the yield
+ * question has to be answered before any shape is enforced, or the enforcement
+ * is what destroys the yield.
+ */
+function readTickState() {
+  try {
+    const { runId, missionId } = resolveActiveRun();
+    if (!runId) return null;
+    const root = resolveEvorRoot();
+    const dir = missionId ? join(root, 'runs', missionId, runId) : join(root, 'runs', runId);
+    const p = join(dir, 'tick-state.json');
+    return existsSync(p) ? JSON.parse(readFileSync(p, 'utf8')) : null;
+  } catch {
+    return null; // fail-open: unknown state must not make a yield enforceable
+  }
+}
+
+/** Selected-but-undischarged proposals for a tick, or [] on any failure. */
+function owedForThisTick(tick) {
+  try {
+    const { runId, missionId } = resolveActiveRun();
+    if (!runId || typeof tick !== 'number') return [];
+    const root = resolveEvorRoot();
+    const dir = missionId ? join(root, 'runs', missionId, runId) : join(root, 'runs', runId);
+    return owed(dir, tick);
+  } catch {
+    return []; // fail-open — an unreadable run must not trap a finished tick
+  }
 }
 
 /** Attempt number for this agent. Keyed by agent_id so ticks stay independent. */
