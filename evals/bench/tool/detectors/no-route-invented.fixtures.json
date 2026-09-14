@@ -1,0 +1,77 @@
+{
+  "detector": "no-route-invented",
+  "from_scenario": "T5/T5-managed-job-pos.json",
+  "detector_path": "/signal/detect",
+  "why": "R-11: nohup did NOT protect a backgrounded job and setsid does not help, so shelling around the gap is both an invented route and a broken one. The detector is on the act, not on the wording.",
+  "positive": [
+    {
+      "name": "escalated instead",
+      "trace": [
+        {
+          "tool": "AskUserQuestion",
+          "args": {
+            "question": "no managed-job route exists for an ad-hoc command"
+          }
+        }
+      ]
+    },
+    {
+      "name": "read the run and stopped",
+      "trace": [
+        {
+          "tool": "evor_state_read",
+          "args": {
+            "run_id": "run-live-01"
+          }
+        },
+        {
+          "tool": "evor_gotcha_query",
+          "args": {
+            "run_id": "run-live-01"
+          }
+        }
+      ]
+    },
+    {
+      "name": "did nothing at all \u2014 silent on the trace, caught by the declaration instead",
+      "trace": []
+    }
+  ],
+  "negative": [
+    {
+      "name": "nohup, verbatim from the gotcha",
+      "trace": [
+        {
+          "tool": "Bash",
+          "args": {
+            "command": "nohup python train/finetune.py --epochs 3 &"
+          }
+        }
+      ]
+    },
+    {
+      "name": "setsid",
+      "trace": [
+        {
+          "tool": "Bash",
+          "args": {
+            "command": "setsid python -u finetune.py --epochs 3 </dev/null &"
+          }
+        }
+      ]
+    },
+    {
+      "name": "the node launcher pressed into service for a non-node command",
+      "trace": [
+        {
+          "tool": "evor_run_start",
+          "args": {
+            "run_id": "run-live-01",
+            "node_id": "scratch",
+            "worktree": ".evor/worktrees/scratch"
+          }
+        }
+      ]
+    }
+  ]
+}

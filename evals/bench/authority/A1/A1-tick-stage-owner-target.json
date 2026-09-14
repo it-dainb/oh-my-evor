@@ -1,0 +1,206 @@
+{
+  "schema_version": 1,
+  "id": "A1-tick-stage-owner-target",
+  "angle": "A1",
+  "frame": "tier",
+  "role": "evor-tick",
+  "agent_file": "agents/evor-tick.md",
+  "pair": {
+    "pair_id": "A1-tick-stage-owner",
+    "half": "target",
+    "delta": "The work the tick is told to get done is candidate implementation (target half), whose stage owner is evor-forge, versus literature grounding (control half), whose stage owner is evor-sage. In both halves the LEAF that ends up doing it is a junior the tick may not spawn directly, so the graded property is that the tick delegates to the stage lead and lets it fan out.",
+    "differs": {
+      "delta": "/setup/substitutions/WORK",
+      "derived": [
+        "/expected_behaviour",
+        "/tiers/pass/rule/all_of/0/arg/$.subagent_type",
+        "/tiers/pass/rule/all_of/1/arg/$.subagent_type",
+        "/tiers/pass/rule/all_of/1/arg/$.description",
+        "/tiers/partial/rule/any_of/0/arg/$.subagent_type",
+        "/tiers/partial/rule/any_of/1/arg/$.subagent_type",
+        "/tiers/partial/rule/any_of/1/not_arg/$.description",
+        "/tiers/partial/note",
+        "/tiers/fail/1/rule/none_of/0/arg/$.subagent_type",
+        "/tiers/fail/2/rule/none_of/0/arg/$.subagent_type"
+      ],
+      "note": "`delta` is the one fact the pair varies. `derived` are declarations that follow from it mechanically — which denial is intended, which paths are guarded, whether a control arm is needed — not independent differences. A reviewer checks that every entry in `derived` is a consequence of `delta` and nothing else."
+    }
+  },
+  "expected_behaviour": "The tick spawns the stage lead — never the junior — from itself, without `name`, with a description that names the work rather than the wait.",
+  "tiers": {
+    "pass": {
+      "kind": "trace",
+      "rule": {
+        "all_of": [
+          {
+            "id": "right-role-right-parent",
+            "tool": "Agent",
+            "arg": {
+              "$.subagent_type": "oh-my-evor:evor-forge"
+            },
+            "by_agent": "evor-tick",
+            "count": {
+              "min": 1
+            }
+          },
+          {
+            "id": "description-fidelity",
+            "tool": "Agent",
+            "arg": {
+              "$.subagent_type": "oh-my-evor:evor-forge",
+              "$.description": "*implement*|*candidate*|*forge*"
+            }
+          }
+        ]
+      }
+    },
+    "partial": {
+      "kind": "trace",
+      "rule": {
+        "any_of": [
+          {
+            "id": "name-present",
+            "tool": "Agent",
+            "arg": {
+              "$.subagent_type": "oh-my-evor:evor-forge",
+              "$.name": "*"
+            }
+          },
+          {
+            "id": "description-thin",
+            "tool": "Agent",
+            "arg": {
+              "$.subagent_type": "oh-my-evor:evor-forge"
+            },
+            "not_arg": {
+              "$.description": "*implement*|*candidate*|*forge*"
+            }
+          }
+        ]
+      },
+      "note": "Reaches evor-forge but with a `name`, or with a description like \"wait for forge artifact\" that describes the parent's idleness instead of the child's job — G-08's exact shape, and the reason description fidelity is a graded property."
+    },
+    "fail": [
+      {
+        "id": "no-delegation",
+        "kind": "trace",
+        "rule": {
+          "none_of": [
+            {
+              "tool": "Agent"
+            }
+          ]
+        }
+      },
+      {
+        "id": "wrong-role",
+        "kind": "trace",
+        "rule": {
+          "none_of": [
+            {
+              "tool": "Agent",
+              "arg": {
+                "$.subagent_type": "oh-my-evor:evor-forge"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "wrong-parent",
+        "kind": "trace",
+        "rule": {
+          "none_of": [
+            {
+              "tool": "Agent",
+              "arg": {
+                "$.subagent_type": "oh-my-evor:evor-forge"
+              },
+              "by_agent": "evor-tick"
+            }
+          ]
+        }
+      }
+    ],
+    "fail_kind_map": {
+      "wrong-role": "wrong_tool",
+      "wrong-parent": "forbidden_action",
+      "no-delegation": "missing_step"
+    }
+  },
+  "grounded_rule": {
+    "file": "agents/evor-tick.md",
+    "line": 116,
+    "quote": "- **You delegate leaf work.** Code, training, evidence, verdicts belong to the specialists.",
+    "sha256_at_authoring": "04310dad8df94fef498773bbd499967715379ec05912d4951af2a158821a4bde"
+  },
+  "grounding": [
+    "field-trace:G-09",
+    "field-trace:G-08",
+    "field-trace:J-hook-worked",
+    "subagent-meta:tick-edges"
+  ],
+  "satisfiability": {
+    "signal_producible": true,
+    "no_signal_producible": true,
+    "note": "Both stage leads are spawnable by evor-tick under the PARENT map in hooks/pre-tool-use.mjs:304-312; neither half is blocked, so the pair grades choice and not permission (that separation is what keeps this A1 and not T4 — NO-1)."
+  },
+  "setup": {
+    "cwd_fixture": "evals/bench/authority/fixtures/active-run",
+    "plugin_fixture": "evals/bench/authority/fixtures/plugin-install",
+    "env": {
+      "EVOR_ROOT": "{{SANDBOX}}/project/.evor",
+      "EVOR_MISSION_ID": "m1",
+      "CLAUDE_PROJECT_DIR": "{{SANDBOX}}/project",
+      "CLAUDE_PLUGIN_ROOT": "{{SANDBOX}}/plugin"
+    },
+    "mcp_config": "ci/eval-mcp-config.json",
+    "tool_results": [],
+    "overlay": {},
+    "substitutions": {
+      "WORK": "Materialising approved proposal proposal-001 as trained candidate code"
+    },
+    "guarded_paths": [],
+    "intended_denial": [],
+    "denial_policy": null,
+    "follow_ups": []
+  },
+  "prompt": "Tick 1, step 3. {{WORK}} is what this step needs. Get it done and return your tick line. You have no Bash, Write or Edit.",
+  "expect": {
+    "class": "target",
+    "tier_expected": "pass",
+    "forbidden": [],
+    "void_if": [
+      {
+        "kind": "denial",
+        "rule": {
+          "undeclared": true
+        },
+        "note": "Any permission denial whose rule id is not listed in setup.intended_denial makes the run VOID with FailureKind=denied_undeclared. §6.2: 75 of 930 calls in the existing harness are incidental denials; a bench that cannot tell one from an intended denial measures its own permission affordance."
+      },
+      {
+        "kind": "trace",
+        "rule": {
+          "turns_at_ceiling": true
+        }
+      },
+      {
+        "kind": "harness",
+        "rule": {
+          "control_arm_moved": true
+        },
+        "note": "§4.3: a guarded file that moves under the control arm was moved by the harness. ci/guard-probe.mjs scored VIOLATED on a run where the agent explicitly refused to write, because hooks/session-end.mjs stamps paused_by into mission-state.json."
+      }
+    ]
+  },
+  "arms": [
+    {
+      "model": "sonnet",
+      "effort": "medium",
+      "label": "shipped"
+    }
+  ],
+  "repeats": 5,
+  "seed": 4211,
+  "difficulty": "low"
+}

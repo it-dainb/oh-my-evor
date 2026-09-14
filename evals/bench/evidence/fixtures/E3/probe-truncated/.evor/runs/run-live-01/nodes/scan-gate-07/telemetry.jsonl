@@ -1,0 +1,10 @@
+{"step": 25, "run_id": "run-live-01", "node_id": "scan-gate-07", "timestamp": "2026-08-24T01:05:03Z", "train_loss": 1.452927, "lr": 0.0003, "throughput": 38.4, "grad_norm": 0.059074}
+{"step": 50, "run_id": "run-live-01", "node_id": "scan-gate-07", "timestamp": "2026-08-24T01:05:07Z", "train_loss": 1.444907, "lr": 0.00029999, "throughput": 38.4, "grad_norm": 0.063842}
+{"step": 75, "run_id": "run-live-01", "node_id": "scan-gate-07", "timestamp": "2026-08-24T01:05:10Z", "train_loss": 1.436938, "lr": 0.00029997, "throughput": 38.4, "grad_norm": 0.0686}
+{"step": 100, "run_id": "run-live-01", "node_id": "scan-gate-07", "timestamp": "2026-08-24T01:05:14Z", "train_loss": 1.42902, "lr": 0.00029995, "throughput": 38.4, "grad_norm": 0.07334}
+{"step": 125, "run_id": "run-live-01", "node_id": "scan-gate-07", "timestamp": "2026-08-24T01:05:17Z", "train_loss": 1.421153, "lr": 0.00029992, "throughput": 38.4, "grad_norm": 0.078059}
+{"step": 150, "run_id": "run-live-01", "node_id": "scan-gate-07", "timestamp": "2026-08-24T01:05:21Z", "train_loss": 1.413337, "lr": 0.00029988, "throughput": 38.4, "grad_norm": 0.08275}
+{"step": 175, "run_id": "run-live-01", "node_id": "scan-gate-07", "timestamp": "2026-08-24T01:05:25Z", "train_loss": 1.405571, "lr": 0.00029984, "throughput": 38.4, "grad_norm": 0.087408}
+{"step": 200, "run_id": "run-live-01", "node_id": "scan-gate-07", "timestamp": "2026-08-24T01:05:28Z", "train_loss": 1.397855, "lr": 0.00029979, "throughput": 38.4, "grad_norm": 0.092027}
+{"step": 225, "run_id": "run-live-01", "node_id": "scan-gate-07", "timestamp": "2026-08-24T01:05:32Z", "train_loss": 1.390189, "lr": 0.00029974, "throughput": 38.4, "grad_norm": 0.096602}
+{"step": 250, "run_id": "run-live-01", "node_id": "scan-gate-07", "timestamp": "2026-08-24T01:05:35Z", "train_loss": 1.382572, "lr": 0.00029968, "throughput": 38.4, "grad_norm": 0.101129, "val_metric": 0.724097}

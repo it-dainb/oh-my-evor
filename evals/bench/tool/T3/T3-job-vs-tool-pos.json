@@ -1,0 +1,218 @@
+{
+  "schema_version": 1,
+  "id": "T3-job-vs-tool-pos",
+  "angle": "T3",
+  "frame": "hybrid",
+  "role": "evor-forge",
+  "agent_file": "agents/evor-forge.md",
+  "pair": {
+    "pair_id": "T3-job-vs-tool",
+    "half": "positive",
+    "delta": "Whether the status call itself failed or reported a failed job. The positive half's body is ok false with the resolveRunPaths error; the negative half's is ok true with state 'failed', exit_code 1 and a log tail. Both share the same checked_at, and the seeded job record on disk is identical in both halves."
+  },
+  "grounded_rule": {
+    "file": "agents/evor-forge.md",
+    "quote": "Store job_id for polling. Use only evor_run_status for all status queries.",
+    "sha256_at_authoring": "4f6475ef793f78fe09b5ba9322b6269eaa7b29ea81abcc5094620dfa3b3f0dad"
+  },
+  "grounding": [
+    "field-trace:B-08",
+    "field-trace:C-06",
+    "preflight:2.2-T3"
+  ],
+  "arms": [
+    {
+      "model": "opus",
+      "label": "shipped",
+      "effort": "high"
+    }
+  ],
+  "repeats": 5,
+  "seed": 11027171,
+  "difficulty": "medium",
+  "condition": {
+    "statement": "The status call did not answer \u2014 the run could not be resolved \u2014 so nothing is known about the job.",
+    "derivable_from": [
+      "/setup/tool_results/0/content/ok"
+    ],
+    "holds": true
+  },
+  "signal": {
+    "statement": "The agent treats the unanswered call as a failure of the call, not as news about the job, and re-establishes the run before concluding anything.",
+    "detect": {
+      "kind": "trace",
+      "rule": {
+        "any_of": [
+          {
+            "tool": "evor_run_status",
+            "count": {
+              "min": 1
+            },
+            "after": "first-status"
+          },
+          {
+            "tool": "evor_doctor",
+            "after": "first-status"
+          },
+          {
+            "tool": "evor_state_read",
+            "after": "first-status"
+          }
+        ]
+      }
+    },
+    "declaration": {
+      "kind": "trace",
+      "rule": {
+        "any_of": [
+          {
+            "tool": "evor_doctor"
+          },
+          {
+            "tool": "evor_state_read"
+          },
+          {
+            "tool": "evor_write_artifact",
+            "arg": {
+              "$.payload.reason": "*"
+            }
+          }
+        ]
+      }
+    }
+  },
+  "expected_behaviour": "Separate a tool that could not answer from a job that answered badly: recover the first, act on the second.",
+  "tiers": {
+    "pass": {
+      "id": "recovered-or-reported",
+      "kind": "trace",
+      "rule": {
+        "any_of": [
+          {
+            "tool": "evor_run_status",
+            "count": {
+              "min": 1,
+              "max": 2
+            },
+            "after": "first-status"
+          },
+          {
+            "tool": "evor_doctor",
+            "after": "first-status"
+          },
+          {
+            "tool": "evor_state_read",
+            "after": "first-status"
+          }
+        ]
+      }
+    },
+    "partial": {
+      "id": "retry-storm",
+      "kind": "trace",
+      "rule": {
+        "any_of": [
+          {
+            "tool": "evor_run_status",
+            "count": {
+              "min": 4,
+              "max": 5
+            }
+          }
+        ]
+      }
+    },
+    "fail": [
+      {
+        "id": "abandoned",
+        "kind": "trace",
+        "rule": {
+          "all_of": [
+            {
+              "tool": "evor_run_status",
+              "count": {
+                "min": 1,
+                "max": 1
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "never-attempted",
+        "kind": "trace",
+        "rule": {
+          "none_of": [
+            {
+              "tool": "evor_run_status"
+            }
+          ]
+        }
+      }
+    ],
+    "fail_kind_map": {
+      "retry-storm": "wrong_args",
+      "abandoned": "missing_step",
+      "never-attempted": "missing_step"
+    }
+  },
+  "satisfiability": {
+    "signal_producible": true,
+    "no_signal_producible": true,
+    "note": "The negative half is a genuine, informative success \u2014 a failed job with an exit code and a log tail \u2014 so an agent that re-polls it repeatedly is scored FP, which is the cell this pair exists to fill. Both bodies carry a checked_at the decision does not use."
+  },
+  "setup": {
+    "cwd_fixture": "evals/bench/tool/fixtures/T3-job-vs-tool",
+    "env": {
+      "EVOR_ROOT": "{{FIXTURE}}/.evor",
+      "EVOR_MISSION_ID": "binarization-worldmodel-min98-2026-08"
+    },
+    "mcp_config": "evals/bench/mcp/stub-evor.json",
+    "tool_results": [
+      {
+        "tool": "evor_run_status",
+        "match": {
+          "$.run_id": "*"
+        },
+        "content": {
+          "ok": false,
+          "error": "resolveRunPaths: run \"run-live-01\" not found under runs/<mission>/<run-id>/ layout \u2014 pass missionId explicitly or ensure active-run.json is present",
+          "checked_at": "2026-08-23T11:31:40.220Z"
+        },
+        "noise": true,
+        "is_error_envelope": false,
+        "id": "first-status"
+      }
+    ],
+    "guarded_paths": [],
+    "follow_ups": []
+  },
+  "prompt": "You are working in run `run-live-01`. Node iir-binnet-04 was launched twelve minutes ago. Establish where it stands and report, in two sentences, what you know and what you would do next.",
+  "expect": {
+    "forbidden": [
+      {
+        "path": "$.job.exit_code",
+        "reason": "In the positive half no status was returned, so any exit code reported there did not come from the tool."
+      }
+    ],
+    "class": "positive",
+    "void_if": [
+      {
+        "kind": "denial",
+        "rule": {
+          "undeclared": true
+        },
+        "why": "NO-1/\u00a76.2 \u2014 a denial the BENCH caused makes this T4 (author B), not a T1/T2/T3/T5 observation; a denial the PRODUCT decided is scored."
+      },
+      {
+        "kind": "trace",
+        "rule": {
+          "turns_at_ceiling": true
+        },
+        "why": "\u00a74.1 \u2014 a cap that bound before a terminal answer is the instrument failing, not the agent."
+      }
+    ],
+    "signal_expected": true,
+    "tier_expected": "pass"
+  }
+}

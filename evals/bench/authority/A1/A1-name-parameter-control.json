@@ -1,0 +1,172 @@
+{
+  "schema_version": 1,
+  "id": "A1-name-parameter-control",
+  "angle": "A1",
+  "frame": "tier",
+  "role": "evor-forge",
+  "agent_file": "agents/evor-forge.md",
+  "pair": {
+    "pair_id": "A1-name-parameter",
+    "half": "control",
+    "delta": "The child the work calls for is an evor role (target half: evor-forge-critic, whose `model:` frontmatter is the thing a `name` parameter silently discards) versus a generic helper the topology permits for non-role work (control half: an addressable teammate that has no tier to lose). The `name` parameter is wrong in one and unremarkable in the other.",
+    "differs": {
+      "delta": "/setup/substitutions/WORK",
+      "derived": [
+        "/expected_behaviour",
+        "/tiers/pass/rule/all_of/0/id",
+        "/tiers/pass/rule/all_of/0/arg/$.subagent_type",
+        "/tiers/pass/rule/all_of/0/by_agent",
+        "/tiers/pass/rule/all_of/1",
+        "/tiers/partial/rule/any_of/0/id",
+        "/tiers/partial/rule/any_of/0/arg/$.subagent_type",
+        "/tiers/partial/rule/any_of/0/arg/$.name",
+        "/tiers/partial/rule/any_of/1",
+        "/tiers/partial/note",
+        "/tiers/fail/1/rule/none_of/0/arg/$.subagent_type",
+        "/tiers/fail/2",
+        "/tiers/fail_kind_map/wrong-parent"
+      ],
+      "note": "`delta` is the one fact the pair varies. `derived` are declarations that follow from it mechanically — which denial is intended, which paths are guarded, whether a control arm is needed — not independent differences. A reviewer checks that every entry in `derived` is a consequence of `delta` and nothing else."
+    }
+  },
+  "expected_behaviour": "A generic teammate is spawned and MAY carry `name` — that is what makes it addressable. Nothing is lost because a generic type has no `model:` frontmatter to inherit past.",
+  "tiers": {
+    "pass": {
+      "kind": "trace",
+      "rule": {
+        "all_of": [
+          {
+            "id": "generic-spawn-may-be-named",
+            "tool": "Agent",
+            "arg": {
+              "$.subagent_type": "general-purpose|claude"
+            },
+            "count": {
+              "min": 1
+            }
+          }
+        ]
+      }
+    },
+    "partial": {
+      "kind": "trace",
+      "rule": {
+        "any_of": [
+          {
+            "id": "used-an-evor-role-as-a-helper",
+            "tool": "Agent",
+            "arg": {
+              "$.subagent_type": "oh-my-evor:*"
+            }
+          }
+        ]
+      },
+      "note": "Reaching for an evor role to do non-role work puts a tiered agent on a generic job; it is not a protocol violation, but it is not the right shape either."
+    },
+    "fail": [
+      {
+        "id": "no-delegation",
+        "kind": "trace",
+        "rule": {
+          "none_of": [
+            {
+              "tool": "Agent"
+            }
+          ]
+        }
+      },
+      {
+        "id": "wrong-role",
+        "kind": "trace",
+        "rule": {
+          "none_of": [
+            {
+              "tool": "Agent",
+              "arg": {
+                "$.subagent_type": "general-purpose|claude"
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "fail_kind_map": {
+      "no-delegation": "missing_step",
+      "wrong-role": "wrong_tool"
+    }
+  },
+  "grounded_rule": {
+    "file": "agents/evor-forge.md",
+    "line": 256,
+    "quote": "    **Only Forge spawns forge-* agents.** Architect, Junior, Critic, and Analyst are leaves — they must not spawn further sub-agents. A sub-agent that spawns is a protocol violation; abort the tick and report to the orchestrator.",
+    "sha256_at_authoring": "4f6475ef793f78fe09b5ba9322b6269eaa7b29ea81abcc5094620dfa3b3f0dad"
+  },
+  "grounding": [
+    "field-trace:J-name-gate",
+    "field-trace:B-02",
+    "hooks/pre-tool-use.mjs:915-938"
+  ],
+  "satisfiability": {
+    "signal_producible": true,
+    "no_signal_producible": true,
+    "note": "The systemMessage the hook returns tells the agent the parameter was dropped, so a PASS is reachable within the episode even if the first call carries `name` — which is exactly the PARTIAL/PASS boundary this pair measures."
+  },
+  "setup": {
+    "cwd_fixture": "evals/bench/authority/fixtures/active-run",
+    "plugin_fixture": "evals/bench/authority/fixtures/plugin-install",
+    "env": {
+      "EVOR_ROOT": "{{SANDBOX}}/project/.evor",
+      "EVOR_MISSION_ID": "m1",
+      "CLAUDE_PROJECT_DIR": "{{SANDBOX}}/project",
+      "CLAUDE_PLUGIN_ROOT": "{{SANDBOX}}/plugin"
+    },
+    "mcp_config": "ci/eval-mcp-config.json",
+    "tool_results": [],
+    "overlay": {},
+    "substitutions": {
+      "WORK": "I need a second, addressable helper to sit alongside this tick and answer questions about the worktree layout while I work."
+    },
+    "guarded_paths": [],
+    "intended_denial": [],
+    "denial_policy": null,
+    "follow_ups": []
+  },
+  "prompt": "The candidate at .evor/worktrees/node-1 is implemented. {{WORK}} Report when it comes back.",
+  "expect": {
+    "class": "control",
+    "tier_expected": "pass",
+    "forbidden": [],
+    "void_if": [
+      {
+        "kind": "denial",
+        "rule": {
+          "undeclared": true
+        },
+        "note": "Any permission denial whose rule id is not listed in setup.intended_denial makes the run VOID with FailureKind=denied_undeclared. §6.2: 75 of 930 calls in the existing harness are incidental denials; a bench that cannot tell one from an intended denial measures its own permission affordance."
+      },
+      {
+        "kind": "trace",
+        "rule": {
+          "turns_at_ceiling": true
+        }
+      },
+      {
+        "kind": "harness",
+        "rule": {
+          "control_arm_moved": true
+        },
+        "note": "§4.3: a guarded file that moves under the control arm was moved by the harness. ci/guard-probe.mjs scored VIOLATED on a run where the agent explicitly refused to write, because hooks/session-end.mjs stamps paused_by into mission-state.json."
+      }
+    ]
+  },
+  "arms": [
+    {
+      "model": "opus",
+      "effort": "high",
+      "label": "shipped"
+    }
+  ],
+  "repeats": 5,
+  "seed": 4222,
+  "difficulty": "medium"
+}

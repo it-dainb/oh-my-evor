@@ -1,0 +1,25 @@
+{
+  "meta_iteration": 1,
+  "selection_policy": "ucb1",
+  "beam_width": 3,
+  "wildness": 0.35,
+  "family_mix": {
+    "arch": 0.5,
+    "data-augmentation": 0.3,
+    "training": 0.2
+  },
+  "winning_families": {
+    "arch": 0,
+    "data-augmentation": 2
+  },
+  "wins_by_family": {
+    "arch": 1,
+    "data-augmentation": 0
+  },
+  "meta_loop_interval": 5,
+  "post_upgrade_exploration_boost": null,
+  "post_upgrade_exploration_ticks": 0,
+  "rescore_mode": "sync",
+  "dream_k": 6,
+  "updated_at": "2026-08-24T02:04:00Z"
+}

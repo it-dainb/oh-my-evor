@@ -1,0 +1,203 @@
+{
+  "schema_version": 1,
+  "id": "T2-artifact-slot-control",
+  "angle": "T2",
+  "frame": "tier",
+  "role": "evor-sage-junior",
+  "agent_file": "agents/evor-sage-junior.md",
+  "pair": {
+    "pair_id": "T2-artifact-slot",
+    "half": "control",
+    "delta": "Which tick the run is on. The target half seeds tick-state.json at tick 2 with Sage's tick-2 artifact present; the control half seeds tick 3 with the same artifact at tick 3. Angle slug, findings content, role, prompt and run id are identical, and the prompt states no tick number \u2014 it has to be read from the run."
+  },
+  "grounded_rule": {
+    "file": "agents/evor-sage-junior.md",
+    "quote": "You are a leaf node: you research one thing deeply and write your findings via evor_write_artifact for Sage to aggregate.",
+    "sha256_at_authoring": "3df9f95d1a1a13d694b627d98ff5cd1e299cd41da2be8f5662767a03e36486c0"
+  },
+  "grounding": [
+    "field-trace:B-05",
+    "field-trace:D#3.1c",
+    "preflight:2.2-T2"
+  ],
+  "arms": [
+    {
+      "model": "sonnet",
+      "label": "shipped",
+      "effort": "medium"
+    }
+  ],
+  "repeats": 5,
+  "seed": 10430623,
+  "difficulty": "low",
+  "expected_behaviour": "The agent writes its findings with evor_write_artifact using the run's actual tick, agent=\"sage-junior\", the angle slug as `kind` (required for this slot), and `payload` as an object.",
+  "satisfiability": {
+    "signal_producible": true,
+    "no_signal_producible": true,
+    "note": "evor_write_artifact is registered and the slot is writable in both halves. The tick is derivable from the seeded tick-state.json and from the existing Sage artifact path, i.e. from two independent places, so it is establishable without guessing. The seeded Sage artifact carries a validated flag and an angle list the call does not need."
+  },
+  "setup": {
+    "env": {
+      "EVOR_ROOT": "{{FIXTURE}}/.evor",
+      "EVOR_MISSION_ID": "binarization-worldmodel-min98-2026-08"
+    },
+    "mcp_config": "ci/eval-mcp-config.json",
+    "tool_results": [],
+    "cwd_fixture": "evals/bench/tool/fixtures/T2-artifact-slot-control",
+    "guarded_paths": [],
+    "follow_ups": []
+  },
+  "prompt": "You are working in run `run-live-01`. Your angle is genuine-iir-mechanisms. Record what you have for it this tick \u2014 including the coverage gap where you have no evidence yet \u2014 as your findings artifact for Sage to aggregate.",
+  "expect": {
+    "forbidden": [
+      {
+        "scope": "trace",
+        "path": "$.tick",
+        "reason": "The tick is not stated in the prompt; a tick number that matches neither the seeded tick-state nor the seeded artifact path was guessed."
+      }
+    ],
+    "class": "control",
+    "void_if": [
+      {
+        "kind": "denial",
+        "rule": {
+          "undeclared": true
+        },
+        "why": "NO-1/\u00a76.2 \u2014 a denial the BENCH caused makes this T4 (author B), not a T1/T2/T3/T5 observation; a denial the PRODUCT decided is scored."
+      },
+      {
+        "kind": "trace",
+        "rule": {
+          "turns_at_ceiling": true
+        },
+        "why": "\u00a74.1 \u2014 a cap that bound before a terminal answer is the instrument failing, not the agent."
+      }
+    ],
+    "tier_expected": "pass"
+  },
+  "tiers": {
+    "pass": {
+      "id": "artifact-well-formed",
+      "kind": "trace",
+      "rule": {
+        "all_of": [
+          {
+            "tool": "evor_write_artifact",
+            "arg": {
+              "$.agent": "sage-junior",
+              "$.tick": 3,
+              "$.kind": "genuine-iir-mechanisms"
+            },
+            "arg_type": {
+              "$.payload": "object"
+            }
+          }
+        ]
+      }
+    },
+    "partial": {
+      "id": "malformed-then-corrected",
+      "kind": "trace",
+      "rule": {
+        "any_of": [
+          {
+            "all_of": [
+              {
+                "tool": "evor_write_artifact",
+                "arg_type": {
+                  "$.payload": "string"
+                },
+                "id": "malformed-0"
+              },
+              {
+                "tool": "evor_write_artifact",
+                "arg": {
+                  "$.agent": "sage-junior",
+                  "$.tick": 3
+                },
+                "arg_type": {
+                  "$.payload": "object"
+                },
+                "after": "malformed-0"
+              }
+            ]
+          },
+          {
+            "all_of": [
+              {
+                "tool": "evor_write_artifact",
+                "arg": {
+                  "$.agent": "sage-junior",
+                  "$.kind": null
+                },
+                "id": "malformed-1"
+              },
+              {
+                "tool": "evor_write_artifact",
+                "arg": {
+                  "$.agent": "sage-junior",
+                  "$.tick": 3
+                },
+                "arg_type": {
+                  "$.payload": "object"
+                },
+                "after": "malformed-1"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "fail": [
+      {
+        "id": "never-valid",
+        "kind": "trace",
+        "rule": {
+          "none_of": [
+            {
+              "tool": "evor_write_artifact"
+            }
+          ]
+        }
+      },
+      {
+        "id": "semantically-wrong",
+        "kind": "trace",
+        "rule": {
+          "any_of": [
+            {
+              "tool": "evor_write_artifact",
+              "arg": {
+                "$.agent": "sage-junior",
+                "$.tick": 2
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "wrong-tick",
+        "kind": "trace",
+        "rule": {
+          "any_of": [
+            {
+              "tool": "evor_write_artifact",
+              "arg": {
+                "$.agent": "sage-junior"
+              },
+              "not_arg": {
+                "$.tick": 3
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "fail_kind_map": {
+      "malformed-then-corrected": "wrong_args",
+      "never-valid": "wrong_args",
+      "semantically-wrong": "wrong_args",
+      "wrong-tick": "wrong_args"
+    }
+  }
+}

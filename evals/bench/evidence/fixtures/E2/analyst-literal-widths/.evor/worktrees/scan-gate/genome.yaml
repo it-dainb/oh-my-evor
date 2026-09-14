@@ -1,0 +1,7 @@
+node: scan-gate-0X
+seams:
+  model/backbone.py: stage width table
+config:
+  width_profile: narrow
+  batch_size: 8
+  max_steps: 12000

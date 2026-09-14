@@ -1,0 +1,245 @@
+{
+  "updated_at": "2026-08-24T00:12:00Z",
+  "nodes": {
+    "node-0001": {
+      "id": "node-0001",
+      "name": "cand-1",
+      "parent_ids": [],
+      "approach_family": "arch",
+      "hypothesis_id": "h-1",
+      "code_ref": "code/node-0001",
+      "genome_ref": "genome/node-0001",
+      "data_version_ref": "data-v1",
+      "config": {},
+      "metrics": {
+        "fmeasure": 0.415,
+        "precision": 0.0042
+      },
+      "eval_version": "v1",
+      "fitness_value": 0,
+      "status": "done",
+      "integrity_status": "passed",
+      "depth": 1
+    },
+    "node-0002": {
+      "id": "node-0002",
+      "name": "cand-2",
+      "parent_ids": [],
+      "approach_family": "arch",
+      "hypothesis_id": "h-2",
+      "code_ref": "code/node-0002",
+      "genome_ref": "genome/node-0002",
+      "data_version_ref": "data-v1",
+      "config": {},
+      "metrics": {
+        "fmeasure": 0.42,
+        "precision": 0.0044
+      },
+      "eval_version": "v1",
+      "fitness_value": 0,
+      "status": "done",
+      "integrity_status": "passed",
+      "depth": 1
+    },
+    "node-0003": {
+      "id": "node-0003",
+      "name": "cand-3",
+      "parent_ids": [],
+      "approach_family": "arch",
+      "hypothesis_id": "h-3",
+      "code_ref": "code/node-0003",
+      "genome_ref": "genome/node-0003",
+      "data_version_ref": "data-v1",
+      "config": {},
+      "metrics": {
+        "fmeasure": 0.425,
+        "precision": 0.0046
+      },
+      "eval_version": "v1",
+      "fitness_value": 0,
+      "status": "done",
+      "integrity_status": "passed",
+      "depth": 1
+    },
+    "node-0004": {
+      "id": "node-0004",
+      "name": "cand-4",
+      "parent_ids": [],
+      "approach_family": "arch",
+      "hypothesis_id": "h-4",
+      "code_ref": "code/node-0004",
+      "genome_ref": "genome/node-0004",
+      "data_version_ref": "data-v1",
+      "config": {},
+      "metrics": {
+        "fmeasure": 0.43,
+        "precision": 0.0048
+      },
+      "eval_version": "v1",
+      "fitness_value": 0,
+      "status": "done",
+      "integrity_status": "passed",
+      "depth": 1
+    },
+    "node-0005": {
+      "id": "node-0005",
+      "name": "cand-5",
+      "parent_ids": [],
+      "approach_family": "arch",
+      "hypothesis_id": "h-5",
+      "code_ref": "code/node-0005",
+      "genome_ref": "genome/node-0005",
+      "data_version_ref": "data-v1",
+      "config": {},
+      "metrics": {
+        "fmeasure": 0.435,
+        "precision": 0.005
+      },
+      "eval_version": "v1",
+      "fitness_value": 0,
+      "status": "done",
+      "integrity_status": "passed",
+      "depth": 1
+    },
+    "node-0006": {
+      "id": "node-0006",
+      "name": "cand-6",
+      "parent_ids": [],
+      "approach_family": "arch",
+      "hypothesis_id": "h-6",
+      "code_ref": "code/node-0006",
+      "genome_ref": "genome/node-0006",
+      "data_version_ref": "data-v1",
+      "config": {},
+      "metrics": {
+        "fmeasure": 0.44,
+        "precision": 0.0052
+      },
+      "eval_version": "v1",
+      "fitness_value": 0,
+      "status": "done",
+      "integrity_status": "passed",
+      "depth": 1
+    },
+    "node-0007": {
+      "id": "node-0007",
+      "name": "cand-7",
+      "parent_ids": [],
+      "approach_family": "arch",
+      "hypothesis_id": "h-7",
+      "code_ref": "code/node-0007",
+      "genome_ref": "genome/node-0007",
+      "data_version_ref": "data-v1",
+      "config": {},
+      "metrics": {
+        "fmeasure": 0.445,
+        "precision": 0.0054
+      },
+      "eval_version": "v1",
+      "fitness_value": 0,
+      "status": "done",
+      "integrity_status": "passed",
+      "depth": 1
+    },
+    "node-0008": {
+      "id": "node-0008",
+      "name": "cand-8",
+      "parent_ids": [],
+      "approach_family": "arch",
+      "hypothesis_id": "h-8",
+      "code_ref": "code/node-0008",
+      "genome_ref": "genome/node-0008",
+      "data_version_ref": "data-v1",
+      "config": {},
+      "metrics": {
+        "fmeasure": 0.45,
+        "precision": 0.0056
+      },
+      "eval_version": "v1",
+      "fitness_value": 0,
+      "status": "done",
+      "integrity_status": "passed",
+      "depth": 1
+    },
+    "node-0009": {
+      "id": "node-0009",
+      "name": "cand-9",
+      "parent_ids": [],
+      "approach_family": "arch",
+      "hypothesis_id": "h-9",
+      "code_ref": "code/node-0009",
+      "genome_ref": "genome/node-0009",
+      "data_version_ref": "data-v1",
+      "config": {},
+      "metrics": {
+        "fmeasure": 0.455,
+        "precision": 0.0058
+      },
+      "eval_version": "v1",
+      "fitness_value": 0,
+      "status": "done",
+      "integrity_status": "passed",
+      "depth": 1
+    },
+    "node-0010": {
+      "id": "node-0010",
+      "name": "cand-10",
+      "parent_ids": [],
+      "approach_family": "arch",
+      "hypothesis_id": "h-10",
+      "code_ref": "code/node-0010",
+      "genome_ref": "genome/node-0010",
+      "data_version_ref": "data-v1",
+      "config": {},
+      "metrics": {
+        "fmeasure": 0.46,
+        "precision": 0.006
+      },
+      "eval_version": "v1",
+      "fitness_value": 0,
+      "status": "done",
+      "integrity_status": "passed",
+      "depth": 1
+    },
+    "node-0011": {
+      "id": "node-0011",
+      "name": "cand-11",
+      "parent_ids": [],
+      "approach_family": "arch",
+      "hypothesis_id": "h-11",
+      "code_ref": "code/node-0011",
+      "genome_ref": "genome/node-0011",
+      "data_version_ref": "data-v1",
+      "config": {},
+      "metrics": {
+        "fmeasure": 0.465,
+        "precision": 0.0062
+      },
+      "eval_version": "v1",
+      "fitness_value": 0,
+      "status": "done",
+      "integrity_status": "passed",
+      "depth": 1
+    },
+    "node-0012": {
+      "id": "node-0012",
+      "name": "cand-12",
+      "parent_ids": [],
+      "approach_family": "arch",
+      "hypothesis_id": "h-12",
+      "code_ref": "code/node-0012",
+      "genome_ref": "genome/node-0012",
+      "data_version_ref": "data-v1",
+      "config": {},
+      "metrics": {
+        "fmeasure": 0.47,
+        "precision": 0.0064
+      },
+      "eval_version": "v1",
+      "fitness_value": 0,
+      "status": "done",
+      "integrity_status": "passed",
+      "depth": 1
+    }
+  }
+}

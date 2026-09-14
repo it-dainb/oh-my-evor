@@ -598,6 +598,92 @@ describe("lockEvaluate", () => {
   });
 });
 
+// ── lockEvaluate — O-01 worktree identity (item 1.5) ──────────────────────────
+// The cases above pass only because their runs have no tree.json, so the ref
+// resolves to itself. Once the node IS registered, `resolveNodeRef` returns the
+// UUID while the worktree on disk carries the slug Forge coined — the server
+// never hands the agent a UUID to name a directory with. Statting
+// `worktrees/<uuid>/` then reads a directory that never existed and reports a
+// materialized candidate as un-materialized.
+
+describe("lockEvaluate — worktree written under either node identity", () => {
+  const UUID = "3b578937-63e9-44f9-b015-1e63ee379bd7";
+  const SLUG = "immune-memory-07";
+  const MISSION = "m1";
+  const RUN = "run-o01";
+
+  function registerNode(): void {
+    const dir = join(tmpRoot, "runs", MISSION, RUN);
+    mkdirSync(dir, { recursive: true });
+    const node = {
+      id: UUID,
+      name: SLUG,
+      parent_ids: [],
+      approach_family: "training",
+      hypothesis_id: "h1",
+      code_ref: "c1",
+      genome_ref: "g1",
+      data_version_ref: "d1",
+      config: {},
+      metrics: {},
+      eval_version: "v1",
+      lesson_ids: [],
+      citations: [],
+      integrity_status: "pending",
+      status: "running",
+      is_crossover: false,
+      visit_count: 0,
+      depth: 0,
+      created_at: "2026-01-01T00:00:00Z",
+    };
+    writeFileSync(
+      join(dir, "tree.json"),
+      JSON.stringify({ nodes: { [UUID]: node }, updated_at: "2026-01-01T00:00:00Z" }),
+      "utf8",
+    );
+  }
+
+  function makeWorktree(identity: string): string {
+    const wt = join(tmpRoot, "worktrees", identity);
+    mkdirSync(wt, { recursive: true });
+    writeFileSync(join(wt, "evaluate.py"), "print('eval')\n", "utf8");
+    return wt;
+  }
+
+  it("locks a registered node's evaluate.py when the worktree carries the slug", () => {
+    registerNode();
+    const wt = makeWorktree(SLUG);
+
+    const result = lockEvaluate(RUN, SLUG, MISSION);
+
+    expect(result.ok).toBe(true);
+    expect(result.node_name).toBe(SLUG);
+    expect(existsSync(join(wt, "evaluate.py.lock"))).toBe(true);
+    expect(statSync(join(wt, "evaluate.py")).mode & 0o777).toBe(0o444);
+  });
+
+  it("still locks when the worktree carries the uuid", () => {
+    registerNode();
+    const wt = makeWorktree(UUID);
+
+    const result = lockEvaluate(RUN, SLUG, MISSION);
+
+    expect(result.ok).toBe(true);
+    expect(existsSync(join(wt, "evaluate.py.lock"))).toBe(true);
+  });
+
+  it("still fails when the worktree exists under NEITHER identity", () => {
+    // The safety property: resolution rescues a misfiled worktree, it never
+    // manufactures one. A genuinely un-materialized node fails as before.
+    registerNode();
+
+    const result = lockEvaluate(RUN, SLUG, MISSION);
+
+    expect(result.ok).toBe(false);
+    expect(result.error).toMatch(/not present/i);
+  });
+});
+
 // ── verifyArtifacts ───────────────────────────────────────────────────────────
 // Replaces the agent walking nodes/<id>/results.json by hand. Returns booleans
 // only — no path ever crosses to the agent.

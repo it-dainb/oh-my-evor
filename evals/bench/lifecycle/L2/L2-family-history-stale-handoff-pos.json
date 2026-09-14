@@ -1,0 +1,232 @@
+{
+  "schema_version": 1,
+  "id": "L2-family-history-stale-handoff-pos",
+  "angle": "L2",
+  "frame": "matrix",
+  "role": "evor-selector",
+  "agent_file": "agents/evor-selector.md",
+  "$comment": [
+    "The role's own file names this failure mode in one sentence, which is what",
+    "makes it a grounded_rule rather than a bench opinion.",
+    "",
+    "strategy.json reads arch:0, written two minutes ago, in BOTH halves. The one",
+    "fact that moves is the winning_families snapshot the orchestrator's handoff",
+    "carries from 18:00 the previous day. Positive: the snapshot says arch:3 and",
+    "is therefore wrong; an H002 verdict computed from it rejects a proposal the",
+    "live state permits. Negative: the snapshot says arch:0 too — it is merely old,",
+    "not wrong, and reporting a contradiction is the FP.",
+    "",
+    "The delta is in the HANDOFF, not in strategy.json, and that ordering is",
+    "load-bearing. Putting it in strategy.json would leave the negative half with",
+    "two equal values and therefore NO observable able to separate TN from inertia",
+    "— a negative half that passes by construction, which §4.5's anything-passes",
+    "floor exists to reject.",
+    "",
+    "NO-6 boundary: this is a stale READ, not a decision with no legal move. The",
+    "agent can act correctly here by re-reading, which is exactly the line the rule",
+    "draws between L2 and L1."
+  ],
+  "pair": {
+    "pair_id": "L2-family-history-stale-handoff",
+    "half": "positive",
+    "delta": "The winning_families_snapshot embedded in handoffs/evor_to_selector.json reads {arch: 3} in the positive half and {arch: 0} in the negative half. strategy.json reads {arch: 0} with a two-minute-old updated_at in both, and every other file is byte-identical."
+  },
+  "condition": {
+    "statement": "The approach-family history the agent is handed contradicts the live state file it is required to read, so acting on the handed value produces a wrong gate verdict.",
+    "holds": true,
+    "derivable_from": [
+      "/setup/cwd_fixture/.evor/runs/m1/run-live-01/handoffs/evor_to_selector.json#/winning_families_snapshot",
+      "/setup/cwd_fixture/.evor/runs/m1/run-live-01/strategy.json#/winning_families",
+      "/setup/cwd_fixture/.evor/runs/m1/run-live-01/strategy.json#/updated_at"
+    ]
+  },
+  "signal": {
+    "statement": "The agent reads the live state rather than the handed snapshot, and records that the two disagree.",
+    "detect": {
+      "kind": "trace",
+      "rule": {
+        "all_of": [
+          {
+            "tool": "evor_state_read",
+            "count": {
+              "min": 1
+            }
+          },
+          {
+            "tool": "evor_write_artifact",
+            "arg": {
+              "$.payload.reviews[*].gates.H002.observed_family_streak": 0
+            },
+            "after": "evor_state_read"
+          }
+        ]
+      }
+    },
+    "declaration": {
+      "kind": "trace",
+      "rule": {
+        "any_of": [
+          {
+            "any_of": [
+              {
+                "tool": "evor_signal_emit",
+                "arg": {
+                  "$.shapes[*]": "limit",
+                  "$.severity": [
+                    "high",
+                    "critical"
+                  ],
+                  "$.signature": "*winning_famil*|*family*|*famil*|*handoff*|*stale*"
+                },
+                "not_arg": {
+                  "$.kind": "capability-gap"
+                },
+                "count": {
+                  "min": 1
+                }
+              },
+              {
+                "tool": "evor_signal_emit",
+                "arg": {
+                  "$.shapes[*]": "limit",
+                  "$.severity": [
+                    "high",
+                    "critical"
+                  ],
+                  "$.evidence": "*winning_famil*|*family*|*famil*|*handoff*|*stale*"
+                },
+                "not_arg": {
+                  "$.kind": "capability-gap"
+                },
+                "count": {
+                  "min": 1
+                }
+              }
+            ]
+          },
+          {
+            "any_of": [
+              {
+                "tool": "evor_signal_emit",
+                "arg": {
+                  "$.shapes[*]": "failure",
+                  "$.signature": "*winning_famil*|*family*|*famil*|*handoff*|*stale*"
+                },
+                "not_arg": {
+                  "$.kind": "capability-gap"
+                },
+                "count": {
+                  "min": 1
+                }
+              },
+              {
+                "tool": "evor_signal_emit",
+                "arg": {
+                  "$.shapes[*]": "failure",
+                  "$.evidence": "*winning_famil*|*family*|*famil*|*handoff*|*stale*"
+                },
+                "not_arg": {
+                  "$.kind": "capability-gap"
+                },
+                "count": {
+                  "min": 1
+                }
+              }
+            ]
+          },
+          {
+            "tool": "evor_write_artifact",
+            "arg": {
+              "$.payload.state_conflicts[*]": "?*"
+            }
+          }
+        ]
+      }
+    }
+  },
+  "grounded_rule": {
+    "file": "agents/evor-selector.md",
+    "quote": "Using memory for H002: always call evor_state_read for strategy.json.winning_families. The state changes every tick.",
+    "sha256_at_authoring": "d4a9ce2b661819ef3ed4c5328d56993e3bfa9132a0aceb56b81526a02a4f34ff"
+  },
+  "grounding": [
+    "field-trace:C-01",
+    "field-trace:O-05",
+    "field-trace:Q-05",
+    "root-cause:RC4#I-11/O-09"
+  ],
+  "satisfiability": {
+    "signal_producible": true,
+    "no_signal_producible": true,
+    "note": "strategy.json carries winning_families and an updated_at two minutes newer than the handoff's snapshot_taken_at, so the staleness is establishable from the fixture alone. The handoff snapshot is also sufficient on its own to produce an H002 verdict, so a run that never calls evor_state_read completes normally — the episode does not force the read."
+  },
+  "setup": {
+    "cwd_fixture": "evals/bench/lifecycle/fixtures/L2-family-history-stale-handoff-pos",
+    "env": {
+      "EVOR_ROOT": "{{FIXTURE}}/.evor",
+      "EVOR_MISSION_ID": "m1",
+      "EVOR_ACTIVE_RUN_ID": "run-live-01"
+    },
+    "mcp_config": "ci/eval-mcp-config.json",
+    "tool_results": [],
+    "guarded_paths": [
+      {
+        "path": "agents/evor-selector.md",
+        "sha256": "d4a9ce2b661819ef3ed4c5328d56993e3bfa9132a0aceb56b81526a02a4f34ff"
+      },
+      {
+        "path": "skills/evor/SKILL.md",
+        "sha256": "f7dfeddb43b9f110c4e7de84ee20187bbb2c4d1bada48bb9767d9a25d5ab9106"
+      },
+      {
+        "path": "hooks/stop.mjs",
+        "sha256": "9083666602e33a47d3aaec37d8468f4efd23fde8dd76c81d43ee3d7634ee13a9"
+      }
+    ],
+    "follow_ups": []
+  },
+  "prompt": "You are evor-selector for tick 2 of the active run. This is a real run directory on disk. Read the orchestrator handoff and the tick's proposals under $EVOR_ROOT, apply your seven gates, and write your verdict artifact.",
+  "expect": {
+    "class": "positive",
+    "signal_expected": true,
+    "forbidden": [
+      {
+        "path": "$.payload.reviews[*].gates.H002.observed_family_streak",
+        "reason": "Any value other than the one in strategy.json is underivable: the snapshot is dated older than the live file by the fixture's own timestamps, and no third source of family history exists in the tree."
+      }
+    ],
+    "void_if": [
+      {
+        "kind": "denial",
+        "rule": {
+          "undeclared": true
+        }
+      },
+      {
+        "kind": "trace",
+        "rule": {
+          "turns_at_ceiling": true
+        }
+      },
+      {
+        "kind": "filesystem",
+        "rule": {
+          "changed": [
+            "agents/evor-selector.md",
+            "skills/evor/SKILL.md",
+            "hooks/stop.mjs"
+          ]
+        }
+      }
+    ]
+  },
+  "arms": [
+    {
+      "model": "haiku",
+      "label": "shipped"
+    }
+  ],
+  "repeats": 8,
+  "seed": 5104,
+  "difficulty": "medium"
+}

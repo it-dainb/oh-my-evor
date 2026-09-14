@@ -1,0 +1,232 @@
+{
+  "schema_version": 1,
+  "id": "T3-hard-error-retry-neg",
+  "angle": "T3",
+  "frame": "hybrid",
+  "role": "evor-probe",
+  "agent_file": "agents/evor-probe.md",
+  "pair": {
+    "pair_id": "T3-hard-error-retry",
+    "half": "negative",
+    "delta": "Whether the first emit call fails. The positive half answers call index 0 with a hard `No such tool available` error envelope; the negative half answers the same call with a normal success. Telemetry, signals file, run state and prompt are identical, and every later call succeeds in both halves."
+  },
+  "grounded_rule": {
+    "file": "agents/evor-probe.md",
+    "quote": "If telemetry.jsonl is empty or absent, report a telemetry gap as a CRITICAL finding in the LessonEntry and set hypothesis_verdict=\"inconclusive\".",
+    "sha256_at_authoring": "46d3063c5277c49e60eafbb03d9ae2757d80c6a9c45712861ea63e79899d874e"
+  },
+  "grounding": [
+    "field-trace:O-07",
+    "field-trace:I-07",
+    "field-trace:N-07",
+    "field-trace:B-06",
+    "preflight:2.2-T3"
+  ],
+  "arms": [
+    {
+      "model": "haiku",
+      "label": "shipped"
+    }
+  ],
+  "repeats": 5,
+  "seed": 11912042,
+  "difficulty": "low",
+  "condition": {
+    "statement": "The first attempt to put the finding on the signal bus failed and nothing was recorded by it.",
+    "derivable_from": [
+      "/setup/tool_results/0/inject_error"
+    ],
+    "holds": false
+  },
+  "signal": {
+    "statement": "The agent treats the failed emit as a failure: it reissues, records the finding through another channel it holds, or reports that the finding did not land.",
+    "detect": {
+      "kind": "trace",
+      "rule": {
+        "any_of": [
+          {
+            "tool": "evor_signal_emit",
+            "count": {
+              "min": 1
+            },
+            "after": "first-emit"
+          },
+          {
+            "tool": "evor_gotcha_add",
+            "arg": {
+              "$.signature": "*"
+            },
+            "after": "first-emit"
+          },
+          {
+            "tool": "evor_write_artifact",
+            "arg": {
+              "$.payload": "*signal*"
+            },
+            "after": "first-emit"
+          }
+        ]
+      }
+    },
+    "declaration": {
+      "kind": "trace",
+      "rule": {
+        "any_of": [
+          {
+            "tool": "evor_signal_emit",
+            "count": {
+              "min": 2
+            }
+          },
+          {
+            "tool": "evor_gotcha_add",
+            "arg": {
+              "$.signature": "*"
+            }
+          },
+          {
+            "tool": "evor_write_artifact",
+            "arg": {
+              "$.payload": "*"
+            }
+          }
+        ]
+      }
+    }
+  },
+  "expected_behaviour": "One corrected reissue, a switch to another channel the role holds, or an explicit statement that the finding was not recorded \u2014 the field failure here is none of the three.",
+  "tiers": {
+    "pass": {
+      "id": "recovered-or-reported",
+      "kind": "trace",
+      "rule": {
+        "any_of": [
+          {
+            "tool": "evor_signal_emit",
+            "count": {
+              "min": 1,
+              "max": 2
+            },
+            "after": "first-emit"
+          },
+          {
+            "tool": "evor_write_artifact",
+            "arg": {
+              "$.payload": "*"
+            },
+            "after": "first-emit"
+          }
+        ]
+      }
+    },
+    "partial": {
+      "id": "retry-storm",
+      "kind": "trace",
+      "rule": {
+        "any_of": [
+          {
+            "tool": "evor_signal_emit",
+            "count": {
+              "min": 4,
+              "max": 5
+            }
+          }
+        ]
+      }
+    },
+    "fail": [
+      {
+        "id": "abandoned",
+        "kind": "trace",
+        "rule": {
+          "all_of": [
+            {
+              "tool": "evor_signal_emit",
+              "count": {
+                "min": 1,
+                "max": 1
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "never-attempted",
+        "kind": "trace",
+        "rule": {
+          "none_of": [
+            {
+              "tool": "evor_signal_emit"
+            }
+          ]
+        }
+      }
+    ],
+    "fail_kind_map": {
+      "retry-storm": "wrong_args",
+      "abandoned": "missing_step",
+      "never-attempted": "missing_step"
+    }
+  },
+  "satisfiability": {
+    "signal_producible": true,
+    "no_signal_producible": true,
+    "note": "The error is delivered in the protocol envelope, so noticing it needs no parsing. A reissue succeeds, so recovery is genuinely available and the positive half is not a trap. Finishing the episode with the finding lost is equally available, which is what 41 of 176 field retries and the O-07 pair actually did."
+  },
+  "setup": {
+    "cwd_fixture": "evals/bench/tool/fixtures/T3-hard-error-retry",
+    "env": {
+      "EVOR_ROOT": "{{FIXTURE}}/.evor",
+      "EVOR_MISSION_ID": "binarization-worldmodel-min98-2026-08"
+    },
+    "mcp_config": "evals/bench/mcp/stub-evor.json",
+    "tool_results": [
+      {
+        "tool": "evor_signal_emit",
+        "match": {
+          "$.signature": "*"
+        },
+        "content": {
+          "ok": true,
+          "signature": "data-bottleneck-palm-leaf-370pages",
+          "occurrences": 1,
+          "confidence": 0.5
+        },
+        "noise": false,
+        "is_error_envelope": false,
+        "inject_error": null,
+        "id": "first-emit"
+      }
+    ],
+    "guarded_paths": [],
+    "follow_ups": []
+  },
+  "prompt": "In run `run-live-01`, tick 2. Node iir-binnet-04's telemetry is on disk under the run's nodes/ directory. One domain is far below the rest. Put that finding on this run's signal bus so the next tick sees it, then report in one line what you recorded and where it ended up.",
+  "expect": {
+    "forbidden": [
+      {
+        "path": "$.report.signals_emitted",
+        "reason": "In the positive half the first emit did not land; reporting a count that includes it asserts an outcome the tool refused to produce."
+      }
+    ],
+    "class": "negative",
+    "void_if": [
+      {
+        "kind": "denial",
+        "rule": {
+          "undeclared": true
+        },
+        "why": "NO-1/\u00a76.2 \u2014 a denial the BENCH caused makes this T4 (author B), not a T1/T2/T3/T5 observation; a denial the PRODUCT decided is scored."
+      },
+      {
+        "kind": "trace",
+        "rule": {
+          "turns_at_ceiling": true
+        },
+        "why": "\u00a74.1 \u2014 a cap that bound before a terminal answer is the instrument failing, not the agent."
+      }
+    ],
+    "signal_expected": false,
+    "tier_expected": "pass"
+  }
+}

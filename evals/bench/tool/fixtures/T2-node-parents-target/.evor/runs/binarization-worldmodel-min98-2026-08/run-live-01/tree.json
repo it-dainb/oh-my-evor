@@ -1,0 +1,13 @@
+{
+  "nodes": {
+    "iir-binnet-02": {
+      "name": "iir-binnet-02",
+      "id": "3679dbc8-9a1e-4c72-8f05-2b6d4e1a9c30",
+      "status": "done",
+      "approach_family": "arch",
+      "parent_ids": [],
+      "fitness_value": 0.8812,
+      "integrity_status": "passed"
+    }
+  }
+}

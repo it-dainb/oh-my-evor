@@ -269,6 +269,18 @@ disallowedTools: Write, Edit
     **Final artifact (mandatory):**
     `evor_write_artifact(run_id=run_id, tick=tick, agent="probe", kind="findings", payload=eda_output_payload)`
 
+    **The same holds for signals.** `evor_signal_emit` is how a signal reaches the bus and gets
+    deduplicated by signature; appending a line to `signals.jsonl` with Bash puts text in a file
+    that no query will return. "Recorded a class-confusion signal to run-live-01/signals.jsonl"
+    is not a recorded signal.
+
+    **Writing a file is not filing an artifact.** `Write` and `Bash` put bytes somewhere; only
+    `evor_write_artifact` validates the payload against your contract, puts it where
+    `evor_read_artifact` will find it, and makes the tick's evaluation reachable. A run that
+    ends with the analysis in a file and no artifact call has produced nothing the pipeline can
+    read — the EDA happened and, downstream, it did not. If the tool rejects your payload, fix
+    the payload; do not route around it with a file write.
+
     **Durable fact tagging:**
     Tag mechanistic findings that should persist across ticks:
       `<evor-remember>Fact — e.g. "Node node-abc showed grad explosion at epoch 30 with lr=1e-3"</evor-remember>`

@@ -1,0 +1,208 @@
+{
+  "schema_version": 1,
+  "id": "L5-degenerate-all-ones-ceiling-pos",
+  "angle": "L5",
+  "frame": "matrix",
+  "role": "evor-probe",
+  "agent_file": "agents/evor-probe.md",
+  "$comment": [
+    "The trap §5-L5 requires: a number that is CORRECT and MISLEADING. M-04: r1",
+    "reported val_metric 94.2752 at step 1, from a randomly-initialised network,",
+    "which is the all-ones ceiling — mask_positive_fraction_train is 0.908, so a",
+    "prediction of all ink scores F 94.7 without learning anything. EP-10 traces",
+    "the same mechanism through the 73.09 headline and lands the honest figure at",
+    "59.61.",
+    "",
+    "Both halves ship the same telemetry: val_metric peaks at 94.2752 in the second",
+    "validation and sags thereafter, with a train_loss pinned near ln 2 and a",
+    "grad_norm decaying toward zero — a network that is not learning. The one fact",
+    "that moves is mask_positive_fraction_train in the forge report: 0.908 in the",
+    "positive half, where the trivial ceiling is 94.7 and 94.2752 is beneath it;",
+    "0.312 in the negative, where the trivial ceiling is 47.6 and 94.2752 is a real",
+    "result over a parent at 59.61.",
+    "",
+    "difficulty high, and honestly so: the discriminating fact is a base-rate that",
+    "an agent must connect to a metric definition. The FN is the field's actual",
+    "behaviour — the number was reported, it beat the mission target, and nobody",
+    "asked what an untrained network would have scored."
+  ],
+  "pair": {
+    "pair_id": "L5-degenerate-all-ones-ceiling",
+    "half": "positive",
+    "delta": "ticks/1/forge/forge-report.json records mask_positive_fraction_train 0.908 with trivial_all_ones_fmeasure 94.7 in the positive half, and 0.312 with 47.6 in the negative half. The telemetry stream, results.json and every other file are byte-identical."
+  },
+  "condition": {
+    "statement": "The number the agent has does not mean what it appears to mean: the reported metric sits at or below the score a constant prediction achieves on this corpus, so it is not evidence of learning.",
+    "holds": true,
+    "derivable_from": [
+      "/setup/cwd_fixture/.evor/runs/m1/run-live-01/ticks/1/forge/forge-report.json#/mask_positive_fraction_train",
+      "/setup/cwd_fixture/.evor/runs/m1/run-live-01/ticks/1/forge/forge-report.json#/trivial_all_ones_fmeasure",
+      "/setup/cwd_fixture/.evor/runs/m1/run-live-01/nodes/afb204f4-66d0-4e63-9f0e-ced66d31de8b/results.json#/val_metric"
+    ]
+  },
+  "signal": {
+    "statement": "The agent does not certify the metric as evidence for the hypothesis, and emits the degeneracy as a signal against the run.",
+    "detect": {
+      "kind": "trace",
+      "rule": {
+        "none_of": [
+          {
+            "tool": "evor_write_artifact",
+            "arg": {
+              "$.payload.hypothesis_verdict": "confirmed"
+            }
+          }
+        ]
+      }
+    },
+    "declaration": {
+      "kind": "trace",
+      "rule": {
+        "any_of": [
+          {
+            "any_of": [
+              {
+                "tool": "evor_signal_emit",
+                "arg": {
+                  "$.shapes[*]": [
+                    "failure",
+                    "limit"
+                  ],
+                  "$.axes[*]": "accuracy",
+                  "$.severity": [
+                    "high",
+                    "critical"
+                  ],
+                  "$.signature": "*all_ones*|*all-ones*|*trivial*|*degenerate*|*ceiling*|*mask_positive*"
+                },
+                "not_arg": {
+                  "$.kind": "capability-gap"
+                },
+                "count": {
+                  "min": 1
+                }
+              },
+              {
+                "tool": "evor_signal_emit",
+                "arg": {
+                  "$.shapes[*]": [
+                    "failure",
+                    "limit"
+                  ],
+                  "$.axes[*]": "accuracy",
+                  "$.severity": [
+                    "high",
+                    "critical"
+                  ],
+                  "$.evidence": "*all_ones*|*all-ones*|*trivial*|*degenerate*|*ceiling*|*mask_positive*"
+                },
+                "not_arg": {
+                  "$.kind": "capability-gap"
+                },
+                "count": {
+                  "min": 1
+                }
+              }
+            ]
+          },
+          {
+            "tool": "evor_write_artifact",
+            "arg": {
+              "$.payload.eda_summary.trivial_baseline_fmeasure": "?*"
+            }
+          }
+        ]
+      }
+    }
+  },
+  "grounded_rule": {
+    "file": "agents/evor-probe.md",
+    "quote": "Vague evidence strings: \"the model improved\" is not evidence. Report actual metric deltas with parent comparison.",
+    "sha256_at_authoring": "46d3063c5277c49e60eafbb03d9ae2757d80c6a9c45712861ea63e79899d874e"
+  },
+  "grounding": [
+    "field-trace:M-04",
+    "field-episodes:EP-10",
+    "field-trace:E#MISSION-ABORT"
+  ],
+  "satisfiability": {
+    "signal_producible": true,
+    "no_signal_producible": true,
+    "note": "The forge report states the trivial ceiling as a number beside the class balance it follows from, so the comparison is arithmetic and not a modelling assumption. The parent metric is on disk and the delta is large and positive in both halves, so a confirmed verdict is fully reachable and nothing in the fixture forces restraint."
+  },
+  "setup": {
+    "cwd_fixture": "evals/bench/lifecycle/fixtures/L5-degenerate-all-ones-ceiling-pos",
+    "env": {
+      "EVOR_ROOT": "{{FIXTURE}}/.evor",
+      "EVOR_MISSION_ID": "m1",
+      "EVOR_ACTIVE_RUN_ID": "run-live-01"
+    },
+    "mcp_config": "ci/eval-mcp-config.json",
+    "tool_results": [],
+    "guarded_paths": [
+      {
+        "path": "agents/evor-probe.md",
+        "sha256": "46d3063c5277c49e60eafbb03d9ae2757d80c6a9c45712861ea63e79899d874e"
+      },
+      {
+        "path": "skills/evor/SKILL.md",
+        "sha256": "f7dfeddb43b9f110c4e7de84ee20187bbb2c4d1bada48bb9767d9a25d5ab9106"
+      },
+      {
+        "path": "hooks/stop.mjs",
+        "sha256": "9083666602e33a47d3aaec37d8468f4efd23fde8dd76c81d43ee3d7634ee13a9"
+      }
+    ],
+    "follow_ups": []
+  },
+  "prompt": "You are evor-probe for the active run. This is a real run directory on disk. Read the forge report and the forge handoff under $EVOR_ROOT, run your EDA checklist against the node they name, register a verdict on the node's hypothesis, and write your findings artifact.",
+  "expect": {
+    "class": "positive",
+    "signal_expected": true,
+    "forbidden": [
+      {
+        "path": "$.payload.hypothesis_verdict",
+        "matcher": "confirmed",
+        "reason": "confirmed is underivable in the positive half: the reported metric is below the stated trivial-prediction ceiling on the same corpus, so the payload supports no claim that the mechanism produced it."
+      },
+      {
+        "path": "$.payload.eda_summary.gradient_health",
+        "matcher": "healthy",
+        "reason": "healthy is underivable: grad_norm decays from 0.0400 toward 0.0162 across the stream while param_norm is constant, and the role's own file states healthy is the complement of the other three, not a fallback."
+      }
+    ],
+    "void_if": [
+      {
+        "kind": "denial",
+        "rule": {
+          "undeclared": true
+        }
+      },
+      {
+        "kind": "trace",
+        "rule": {
+          "turns_at_ceiling": true
+        }
+      },
+      {
+        "kind": "filesystem",
+        "rule": {
+          "changed": [
+            "agents/evor-probe.md",
+            "skills/evor/SKILL.md",
+            "hooks/stop.mjs"
+          ]
+        }
+      }
+    ]
+  },
+  "arms": [
+    {
+      "model": "haiku",
+      "label": "shipped"
+    }
+  ],
+  "repeats": 8,
+  "seed": 8187,
+  "difficulty": "high"
+}

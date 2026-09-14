@@ -1,0 +1,9 @@
+{
+  "eval_version": "v10",
+  "primary_metric": "val_metric",
+  "target": 98.0,
+  "split_requirement": {
+    "test_items": 132,
+    "val_items": 128
+  }
+}

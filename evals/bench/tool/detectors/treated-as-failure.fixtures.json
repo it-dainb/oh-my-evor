@@ -1,0 +1,141 @@
+{
+  "detector": "treated-as-failure",
+  "from_scenario": "T3/T3-ok-false-envelope-pos.json",
+  "detector_path": "/signal/detect",
+  "why": "N-03's discrimination. The signal is an action after the failure \u2014 a reissue, a switch, or a record of the gap. The TC-14 near-miss is essential: a call that happened before the failing one is not a response to it.",
+  "positive": [
+    {
+      "name": "reissued against something the run contains",
+      "trace": [
+        {
+          "tool": "evor_cite",
+          "args": {
+            "run_id": "run-live-01",
+            "node_id": "genuine-iir-mechanisms",
+            "citation": "https://arxiv.org/abs/2104.09876"
+          }
+        },
+        {
+          "tool": "evor_cite",
+          "args": {
+            "run_id": "run-live-01",
+            "node_id": "iir-binnet-04",
+            "citation": "https://arxiv.org/abs/2104.09876"
+          }
+        }
+      ]
+    },
+    {
+      "name": "recorded the gap in the findings payload",
+      "trace": [
+        {
+          "tool": "evor_cite",
+          "args": {
+            "run_id": "run-live-01",
+            "node_id": "genuine-iir-mechanisms",
+            "citation": "https://arxiv.org/abs/2104.09876"
+          }
+        },
+        {
+          "tool": "evor_write_artifact",
+          "args": {
+            "run_id": "run-live-01",
+            "tick": 2,
+            "agent": "sage-junior",
+            "payload": {
+              "citations_pending": true,
+              "note": "cite returned ok:false"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "emitted a citation signal afterwards",
+      "trace": [
+        {
+          "tool": "evor_cite",
+          "args": {
+            "run_id": "run-live-01",
+            "node_id": "genuine-iir-mechanisms",
+            "citation": "https://arxiv.org/abs/2104.09876"
+          }
+        },
+        {
+          "tool": "evor_signal_emit",
+          "args": {
+            "kind": "citation-not-recorded",
+            "signature": "cite-ok-false"
+          }
+        }
+      ]
+    }
+  ],
+  "negative": [
+    {
+      "name": "proceeded as though it landed \u2014 the field behaviour, 0 of 18 calls retried",
+      "trace": [
+        {
+          "tool": "evor_cite",
+          "args": {
+            "run_id": "run-live-01",
+            "node_id": "genuine-iir-mechanisms",
+            "citation": "https://arxiv.org/abs/2104.09876"
+          }
+        },
+        {
+          "tool": "evor_write_artifact",
+          "args": {
+            "run_id": "run-live-01",
+            "tick": 2,
+            "agent": "sage-junior",
+            "payload": {
+              "findings": [
+                {
+                  "cited": true
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "TC-14: the artifact write preceded the failing call",
+      "trace": [
+        {
+          "tool": "evor_write_artifact",
+          "args": {
+            "run_id": "run-live-01",
+            "tick": 2,
+            "agent": "sage-junior",
+            "payload": {
+              "citations_pending": true
+            }
+          }
+        },
+        {
+          "tool": "evor_cite",
+          "args": {
+            "run_id": "run-live-01",
+            "node_id": "genuine-iir-mechanisms",
+            "citation": "https://arxiv.org/abs/2104.09876"
+          }
+        }
+      ]
+    },
+    {
+      "name": "nothing at all after the failure",
+      "trace": [
+        {
+          "tool": "evor_cite",
+          "args": {
+            "run_id": "run-live-01",
+            "node_id": "genuine-iir-mechanisms",
+            "citation": "https://arxiv.org/abs/2104.09876"
+          }
+        }
+      ]
+    }
+  ]
+}

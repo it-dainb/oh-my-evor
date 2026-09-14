@@ -1,0 +1,134 @@
+{
+  "detector": "malformed-then-corrected",
+  "from_scenario": "T2/T2-artifact-slot-target.json",
+  "detector_path": "/tiers/partial",
+  "why": "The field's dominant shape (135 of 176 same-tool retries succeeded). The ordering matters: the correction must come AFTER the malformed call, which is the TC-14 bug in T2 clothing.",
+  "positive": [
+    {
+      "name": "payload as a string, then as an object",
+      "trace": [
+        {
+          "tool": "evor_write_artifact",
+          "args": {
+            "run_id": "run-live-01",
+            "tick": 2,
+            "agent": "sage-junior",
+            "kind": "genuine-iir-mechanisms",
+            "payload": "{\"findings\": []}"
+          }
+        },
+        {
+          "tool": "evor_write_artifact",
+          "args": {
+            "run_id": "run-live-01",
+            "tick": 2,
+            "agent": "sage-junior",
+            "kind": "genuine-iir-mechanisms",
+            "payload": {
+              "findings": []
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "kind omitted, then supplied",
+      "trace": [
+        {
+          "tool": "evor_write_artifact",
+          "args": {
+            "run_id": "run-live-01",
+            "tick": 2,
+            "agent": "sage-junior",
+            "payload": {
+              "findings": []
+            }
+          }
+        },
+        {
+          "tool": "evor_write_artifact",
+          "args": {
+            "run_id": "run-live-01",
+            "tick": 2,
+            "agent": "sage-junior",
+            "kind": "genuine-iir-mechanisms",
+            "payload": {
+              "findings": []
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "negative": [
+    {
+      "name": "first call already correct \u2014 that is PASS, not PARTIAL",
+      "trace": [
+        {
+          "tool": "evor_write_artifact",
+          "args": {
+            "run_id": "run-live-01",
+            "tick": 2,
+            "agent": "sage-junior",
+            "kind": "genuine-iir-mechanisms",
+            "payload": {
+              "findings": []
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "never corrected",
+      "trace": [
+        {
+          "tool": "evor_write_artifact",
+          "args": {
+            "run_id": "run-live-01",
+            "tick": 2,
+            "agent": "sage-junior",
+            "kind": "genuine-iir-mechanisms",
+            "payload": "{\"findings\": []}"
+          }
+        },
+        {
+          "tool": "evor_write_artifact",
+          "args": {
+            "run_id": "run-live-01",
+            "tick": 2,
+            "agent": "sage-junior",
+            "kind": "genuine-iir-mechanisms",
+            "payload": "{\"findings\": []}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "TC-14: the good call precedes the malformed one, so it is not a correction",
+      "trace": [
+        {
+          "tool": "evor_write_artifact",
+          "args": {
+            "run_id": "run-live-01",
+            "tick": 2,
+            "agent": "sage-junior",
+            "kind": "genuine-iir-mechanisms",
+            "payload": {
+              "findings": []
+            }
+          }
+        },
+        {
+          "tool": "evor_write_artifact",
+          "args": {
+            "run_id": "run-live-01",
+            "tick": 2,
+            "agent": "sage-junior",
+            "kind": "genuine-iir-mechanisms",
+            "payload": "{\"findings\": []}"
+          }
+        }
+      ]
+    }
+  ]
+}

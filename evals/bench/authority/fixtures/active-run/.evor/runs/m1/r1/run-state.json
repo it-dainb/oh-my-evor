@@ -1,0 +1,11 @@
+{
+  "run_id": "r1",
+  "status": "running",
+  "tick_count": 1,
+  "best_score": 0,
+  "best_node_id": null,
+  "pending_node_ids": [],
+  "frontier_node_ids": [],
+  "winning_families": [],
+  "wildness": 0.4
+}

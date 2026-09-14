@@ -1,0 +1,16 @@
+{
+  "case": "telemetry-path",
+  "data_root": "data",
+  "assertions": {
+    "candidate_passes": {
+      "input": "candidate.json",
+      "true_when": "pass",
+      "means": "the check now judges iir-scan-binnet-02 sane"
+    },
+    "known_bad_passes": {
+      "input": "known_bad.json",
+      "true_when": "pass",
+      "means": "WEAKENED: a node whose loss never moves is now sane"
+    }
+  }
+}

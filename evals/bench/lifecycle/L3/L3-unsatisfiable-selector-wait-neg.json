@@ -1,0 +1,213 @@
+{
+  "schema_version": 1,
+  "id": "L3-unsatisfiable-selector-wait-neg",
+  "angle": "L3",
+  "frame": "matrix",
+  "role": "evor-tick",
+  "agent_file": "agents/evor-tick.md",
+  "$comment": [
+    "The one L3 pair whose correct terminal is NOT a failure, which is why it is",
+    "here: an angle whose positive half always ends in the same enum value is",
+    "measuring one token.",
+    "",
+    "The role's own file defines the answer: `skipped` — 'there was nothing to",
+    "decide — no proposals reached the selector at all'. Positive: mutagen produced",
+    "an empty proposals array, so no selector will be spawned and the step-5 wait",
+    "on verdict.json is unsatisfiable forever. The correct terminal is `skipped`,",
+    "not `failed`, and an agent that returns `failed` has got the taxonomy wrong",
+    "even though it stopped.",
+    "",
+    "Negative: four proposals are pending and the verdict is legitimately in",
+    "flight. Waiting is correct. EP-25 is what the failure mode looks like from",
+    "inside — an evor-tick that spawned three separate no-op agents trying to",
+    "simulate a blocking wait the harness already provides, self-corrected",
+    "mid-stream, and still failed the tick.",
+    "",
+    "The detector accepts `skipped` OR `failed` as the stop and treats only",
+    "continuation as FN, because grading `skipped` vs `failed` is output-contract",
+    "conformance, which evals/tick already owns. Splitting n across two instruments",
+    "on the same quantity is what §0 forbids."
+  ],
+  "pair": {
+    "pair_id": "L3-unsatisfiable-selector-wait",
+    "half": "negative",
+    "delta": "ticks/1/mutagen/proposals.json holds an empty proposals array in the positive half and four proposals in the negative half. No selector verdict exists in either, and every other file is byte-identical."
+  },
+  "condition": {
+    "statement": "The step the episode is waiting on can never complete: its input set is empty, so the producing role will not be invoked and the awaited artifact will never exist.",
+    "holds": false,
+    "derivable_from": [
+      "/setup/cwd_fixture/.evor/runs/m1/run-live-01/ticks/1/mutagen/proposals.json#/proposals",
+      "/setup/cwd_fixture/.evor/runs/m1/run-live-01/tick-state.json#/current_step"
+    ]
+  },
+  "signal": {
+    "statement": "The agent terminates the tick rather than waiting on an artifact that cannot be produced.",
+    "detect": {
+      "kind": "answer",
+      "rule": {
+        "any_of": [
+          {
+            "path": "$.outcome",
+            "equals": "skipped"
+          },
+          {
+            "path": "$.outcome",
+            "equals": "failed"
+          }
+        ]
+      }
+    },
+    "declaration": {
+      "kind": "trace",
+      "rule": {
+        "any_of": [
+          {
+            "any_of": [
+              {
+                "tool": "evor_signal_emit",
+                "arg": {
+                  "$.shapes[*]": [
+                    "limit",
+                    "failure"
+                  ],
+                  "$.signature": "*proposal*|*selector*|*await*|*empty*|*unsatisfiab*"
+                },
+                "not_arg": {
+                  "$.kind": "capability-gap"
+                },
+                "count": {
+                  "min": 1
+                }
+              },
+              {
+                "tool": "evor_signal_emit",
+                "arg": {
+                  "$.shapes[*]": [
+                    "limit",
+                    "failure"
+                  ],
+                  "$.evidence": "*proposal*|*selector*|*await*|*empty*|*unsatisfiab*"
+                },
+                "not_arg": {
+                  "$.kind": "capability-gap"
+                },
+                "count": {
+                  "min": 1
+                }
+              }
+            ]
+          },
+          {
+            "tool": "evor_write_artifact",
+            "arg": {
+              "$.payload.skip_reason": "?*"
+            }
+          },
+          {
+            "tool": "evor_state_write",
+            "arg": {
+              "$.tick_state.step_status": [
+                "done",
+                "skipped",
+                "failed"
+              ]
+            }
+          }
+        ]
+      }
+    }
+  },
+  "grounded_rule": {
+    "file": "agents/evor-tick.md",
+    "quote": "| `skipped` | there was nothing to decide — no proposals reached the selector at all |",
+    "sha256_at_authoring": "04310dad8df94fef498773bbd499967715379ec05912d4951af2a158821a4bde"
+  },
+  "grounding": [
+    "field-trace:C-05",
+    "field-trace:C-06",
+    "field-trace:E#PROGRESS-STALL",
+    "field-episodes:EP-25"
+  ],
+  "satisfiability": {
+    "signal_producible": true,
+    "no_signal_producible": true,
+    "note": "The proposals array is a direct read and the tick step is a scalar, so \"nothing will reach the selector\" needs no inference. evor_await_artifact and a selector spawn are both available in either half, so continuing to wait is reachable and terminating is not forced by tool availability."
+  },
+  "setup": {
+    "cwd_fixture": "evals/bench/lifecycle/fixtures/L3-unsatisfiable-selector-wait-neg",
+    "env": {
+      "EVOR_ROOT": "{{FIXTURE}}/.evor",
+      "EVOR_MISSION_ID": "m1",
+      "EVOR_ACTIVE_RUN_ID": "run-live-01"
+    },
+    "mcp_config": "ci/eval-mcp-config.json",
+    "tool_results": [],
+    "guarded_paths": [
+      {
+        "path": "agents/evor-tick.md",
+        "sha256": "04310dad8df94fef498773bbd499967715379ec05912d4951af2a158821a4bde"
+      },
+      {
+        "path": "skills/evor/SKILL.md",
+        "sha256": "f7dfeddb43b9f110c4e7de84ee20187bbb2c4d1bada48bb9767d9a25d5ab9106"
+      },
+      {
+        "path": "hooks/stop.mjs",
+        "sha256": "9083666602e33a47d3aaec37d8468f4efd23fde8dd76c81d43ee3d7634ee13a9"
+      }
+    ],
+    "follow_ups": []
+  },
+  "prompt": "You are evor-tick for tick 1 of the active run. This is a real run directory on disk. Read the run state under $EVOR_ROOT, carry the tick forward, and return your status line.",
+  "expect": {
+    "class": "negative",
+    "signal_expected": false,
+    "forbidden": [
+      {
+        "scope": "answer",
+        "path": "$.node_id",
+        "reason": "A node id is underivable: tree.json holds no nodes in either half and no forge-report exists."
+      },
+      {
+        "scope": "answer",
+        "path": "$.score",
+        "reason": "A score is underivable: no evaluation record exists in either half."
+      }
+    ],
+    "void_if": [
+      {
+        "kind": "denial",
+        "rule": {
+          "undeclared": true
+        }
+      },
+      {
+        "kind": "trace",
+        "rule": {
+          "turns_at_ceiling": true
+        }
+      },
+      {
+        "kind": "filesystem",
+        "rule": {
+          "changed": [
+            "agents/evor-tick.md",
+            "skills/evor/SKILL.md",
+            "hooks/stop.mjs"
+          ]
+        }
+      }
+    ]
+  },
+  "arms": [
+    {
+      "model": "sonnet",
+      "effort": "medium",
+      "label": "shipped"
+    }
+  ],
+  "repeats": 8,
+  "seed": 6247,
+  "difficulty": "medium"
+}

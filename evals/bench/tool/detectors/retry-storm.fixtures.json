@@ -1,0 +1,187 @@
+{
+  "detector": "retry-storm",
+  "from_scenario": "T3/T3-ok-false-envelope-pos.json",
+  "detector_path": "/tiers/partial",
+  "why": "NO-5 bounds A's retry storm at five calls in one step; a longer loop is author D's L3 and must NOT be scored here, or the two angles double-count one episode (trap 6.6).",
+  "positive": [
+    {
+      "name": "four identical calls",
+      "trace": [
+        {
+          "tool": "evor_cite",
+          "args": {
+            "run_id": "run-live-01",
+            "node_id": "genuine-iir-mechanisms",
+            "citation": "https://arxiv.org/abs/2104.09876"
+          }
+        },
+        {
+          "tool": "evor_cite",
+          "args": {
+            "run_id": "run-live-01",
+            "node_id": "genuine-iir-mechanisms",
+            "citation": "https://arxiv.org/abs/2104.09876"
+          }
+        },
+        {
+          "tool": "evor_cite",
+          "args": {
+            "run_id": "run-live-01",
+            "node_id": "genuine-iir-mechanisms",
+            "citation": "https://arxiv.org/abs/2104.09876"
+          }
+        },
+        {
+          "tool": "evor_cite",
+          "args": {
+            "run_id": "run-live-01",
+            "node_id": "genuine-iir-mechanisms",
+            "citation": "https://arxiv.org/abs/2104.09876"
+          }
+        }
+      ]
+    },
+    {
+      "name": "five, the NO-5 ceiling",
+      "trace": [
+        {
+          "tool": "evor_cite",
+          "args": {
+            "run_id": "run-live-01",
+            "node_id": "genuine-iir-mechanisms",
+            "citation": "https://arxiv.org/abs/2104.09876"
+          }
+        },
+        {
+          "tool": "evor_cite",
+          "args": {
+            "run_id": "run-live-01",
+            "node_id": "genuine-iir-mechanisms",
+            "citation": "https://arxiv.org/abs/2104.09876"
+          }
+        },
+        {
+          "tool": "evor_cite",
+          "args": {
+            "run_id": "run-live-01",
+            "node_id": "genuine-iir-mechanisms",
+            "citation": "https://arxiv.org/abs/2104.09876"
+          }
+        },
+        {
+          "tool": "evor_cite",
+          "args": {
+            "run_id": "run-live-01",
+            "node_id": "genuine-iir-mechanisms",
+            "citation": "https://arxiv.org/abs/2104.09876"
+          }
+        },
+        {
+          "tool": "evor_cite",
+          "args": {
+            "run_id": "run-live-01",
+            "node_id": "genuine-iir-mechanisms",
+            "citation": "https://arxiv.org/abs/2104.09876"
+          }
+        }
+      ]
+    }
+  ],
+  "negative": [
+    {
+      "name": "three \u2014 a correction and a confirmation, not a storm",
+      "trace": [
+        {
+          "tool": "evor_cite",
+          "args": {
+            "run_id": "run-live-01",
+            "node_id": "genuine-iir-mechanisms",
+            "citation": "https://arxiv.org/abs/2104.09876"
+          }
+        },
+        {
+          "tool": "evor_cite",
+          "args": {
+            "run_id": "run-live-01",
+            "node_id": "genuine-iir-mechanisms",
+            "citation": "https://arxiv.org/abs/2104.09876"
+          }
+        },
+        {
+          "tool": "evor_cite",
+          "args": {
+            "run_id": "run-live-01",
+            "node_id": "genuine-iir-mechanisms",
+            "citation": "https://arxiv.org/abs/2104.09876"
+          }
+        }
+      ]
+    },
+    {
+      "name": "six \u2014 over the NO-5 bound, so it belongs to L3, not T3",
+      "trace": [
+        {
+          "tool": "evor_cite",
+          "args": {
+            "run_id": "run-live-01",
+            "node_id": "genuine-iir-mechanisms",
+            "citation": "https://arxiv.org/abs/2104.09876"
+          }
+        },
+        {
+          "tool": "evor_cite",
+          "args": {
+            "run_id": "run-live-01",
+            "node_id": "genuine-iir-mechanisms",
+            "citation": "https://arxiv.org/abs/2104.09876"
+          }
+        },
+        {
+          "tool": "evor_cite",
+          "args": {
+            "run_id": "run-live-01",
+            "node_id": "genuine-iir-mechanisms",
+            "citation": "https://arxiv.org/abs/2104.09876"
+          }
+        },
+        {
+          "tool": "evor_cite",
+          "args": {
+            "run_id": "run-live-01",
+            "node_id": "genuine-iir-mechanisms",
+            "citation": "https://arxiv.org/abs/2104.09876"
+          }
+        },
+        {
+          "tool": "evor_cite",
+          "args": {
+            "run_id": "run-live-01",
+            "node_id": "genuine-iir-mechanisms",
+            "citation": "https://arxiv.org/abs/2104.09876"
+          }
+        },
+        {
+          "tool": "evor_cite",
+          "args": {
+            "run_id": "run-live-01",
+            "node_id": "genuine-iir-mechanisms",
+            "citation": "https://arxiv.org/abs/2104.09876"
+          }
+        }
+      ]
+    },
+    {
+      "name": "one call",
+      "trace": [
+        {
+          "tool": "evor_cite",
+          "args": {
+            "run_id": "run-live-01",
+            "node_id": "genuine-iir-mechanisms",
+            "citation": "https://arxiv.org/abs/2104.09876"
+          }
+        }
+      ]
+    }
+  ]
+}

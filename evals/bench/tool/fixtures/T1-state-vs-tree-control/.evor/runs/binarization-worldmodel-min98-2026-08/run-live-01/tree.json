@@ -1,0 +1,32 @@
+{
+  "nodes": {
+    "iir-binnet-01": {
+      "name": "iir-binnet-01",
+      "id": "1f0a-\u2026",
+      "status": "done",
+      "approach_family": "arch",
+      "fitness_value": 0.841,
+      "parent_ids": []
+    },
+    "iir-binnet-02": {
+      "name": "iir-binnet-02",
+      "id": "3679dbc8-9a1e-4c72-8f05-2b6d4e1a9c30",
+      "status": "done",
+      "approach_family": "arch",
+      "fitness_value": 0.8812,
+      "parent_ids": [
+        "iir-binnet-01"
+      ]
+    },
+    "iir-scan-03": {
+      "name": "iir-scan-03",
+      "id": "77c1-\u2026",
+      "status": "done",
+      "approach_family": "training",
+      "fitness_value": 0.8033,
+      "parent_ids": [
+        "iir-binnet-01"
+      ]
+    }
+  }
+}

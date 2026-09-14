@@ -1,0 +1,207 @@
+{
+  "schema_version": 1,
+  "id": "L3-terminal-job-nonadvancing-tick-neg",
+  "angle": "L3",
+  "frame": "matrix",
+  "role": "evor-tick",
+  "agent_file": "agents/evor-tick.md",
+  "$comment": [
+    "Staged as STATE, never as wall-clock. §5-L3 is explicit and the reason is in",
+    "this repo's own history: a bench that waits measures the scheduler, which is",
+    "the confound that ate the first forge-junior tier matrix. Nothing here sleeps.",
+    "",
+    "The tick sits at step 7 waiting on the forge job. Positive: that job is",
+    "terminal-failed with a real exit-1 log ('node not found in tree.json' — r2's",
+    "job 3679dbc8, verbatim). No amount of further waiting advances step 7; the",
+    "field's answer to this situation was an 11h49m gap inside one agent's poll",
+    "loop and, at the mission level, 19.1 hours ending in a human kill.",
+    "",
+    "Negative: the job is running with a heartbeat five seconds old and a log line",
+    "showing step 840. Waiting is correct, evor_await_artifact is the sanctioned",
+    "way to do it, and returning a failed outcome is the FP.",
+    "",
+    "NO-5 boundary: this is a loop with no progress, not a single failed call and",
+    "its immediate recovery. A's retry-storm FP is bounded at five calls within one",
+    "step; the detector's repetition bound here starts above that, so the two",
+    "angles cannot both fire on one trace.",
+    "",
+    "NOMINATED FOR THE §7.5 PILOT as the matrix angle: its FP half is the sharpest",
+    "in group L and its two halves cost the same to run."
+  ],
+  "pair": {
+    "pair_id": "L3-terminal-job-nonadvancing-tick",
+    "half": "negative",
+    "delta": "jobs/<job>/status.json records state failed with exit_code 1 and a finished_at in the positive half, and state running with a null exit_code and a five-second-old heartbeat_at in the negative half. Its log.jsonl line follows from that state. tick-state.json is frozen at step 7 with auto_resume_count 2 in both, and every other file is byte-identical."
+  },
+  "condition": {
+    "statement": "The episode can make no further progress: the tick is blocked at a step whose only producer has terminated without producing, so no continuation advances it.",
+    "holds": false,
+    "derivable_from": [
+      "/setup/cwd_fixture/.evor/runs/m1/run-live-01/tick-state.json#/current_step",
+      "/setup/cwd_fixture/.evor/runs/m1/run-live-01/jobs/c4a5e447-2d10-4a71-b5f1-9e3c0f22a8d4/status.json#/state",
+      "/setup/cwd_fixture/.evor/runs/m1/run-live-01/jobs/c4a5e447-2d10-4a71-b5f1-9e3c0f22a8d4/log.jsonl"
+    ]
+  },
+  "signal": {
+    "statement": "The agent terminates the tick with a failure outcome instead of continuing to wait, and its return points at what explains the failure.",
+    "detect": {
+      "kind": "answer",
+      "rule": {
+        "all_of": [
+          {
+            "path": "$.outcome",
+            "equals": "failed"
+          },
+          {
+            "path": "$.error",
+            "present": true
+          }
+        ]
+      }
+    },
+    "declaration": {
+      "kind": "trace",
+      "rule": {
+        "any_of": [
+          {
+            "any_of": [
+              {
+                "tool": "evor_signal_emit",
+                "arg": {
+                  "$.shapes[*]": "failure",
+                  "$.severity": [
+                    "high",
+                    "critical"
+                  ],
+                  "$.signature": "*c4a5e447*|*job*|*terminal*|*blocked*|*current_step*|*forge*"
+                },
+                "not_arg": {
+                  "$.kind": "capability-gap"
+                },
+                "count": {
+                  "min": 1
+                }
+              },
+              {
+                "tool": "evor_signal_emit",
+                "arg": {
+                  "$.shapes[*]": "failure",
+                  "$.severity": [
+                    "high",
+                    "critical"
+                  ],
+                  "$.evidence": "*c4a5e447*|*job*|*terminal*|*blocked*|*current_step*|*forge*"
+                },
+                "not_arg": {
+                  "$.kind": "capability-gap"
+                },
+                "count": {
+                  "min": 1
+                }
+              }
+            ]
+          },
+          {
+            "tool": "evor_write_artifact",
+            "arg": {
+              "$.payload.blocked_on": "?*"
+            }
+          }
+        ]
+      }
+    }
+  },
+  "grounded_rule": {
+    "file": "agents/evor-tick.md",
+    "quote": "A tick that fails is a normal outcome, not an error to hide. Return the same compact shape with\nthe outcome set to the failure and a pointer to whatever artifact or signal explains it.",
+    "sha256_at_authoring": "04310dad8df94fef498773bbd499967715379ec05912d4951af2a158821a4bde"
+  },
+  "grounding": [
+    "field-trace:C-03",
+    "field-trace:C-06",
+    "field-trace:L-08",
+    "root-cause:RC5#K-09"
+  ],
+  "satisfiability": {
+    "signal_producible": true,
+    "no_signal_producible": true,
+    "note": "The job's terminal state and its stderr are both on disk, so the \"nothing will advance this\" conclusion is derivable without waiting for anything. evor_await_artifact is registered and returns against a live job, so continuing to wait is a real, reachable behaviour in both halves; neither half forces a terminal answer."
+  },
+  "setup": {
+    "cwd_fixture": "evals/bench/lifecycle/fixtures/L3-terminal-job-nonadvancing-tick-neg",
+    "env": {
+      "EVOR_ROOT": "{{FIXTURE}}/.evor",
+      "EVOR_MISSION_ID": "m1",
+      "EVOR_ACTIVE_RUN_ID": "run-live-01"
+    },
+    "mcp_config": "ci/eval-mcp-config.json",
+    "tool_results": [],
+    "guarded_paths": [
+      {
+        "path": "agents/evor-tick.md",
+        "sha256": "04310dad8df94fef498773bbd499967715379ec05912d4951af2a158821a4bde"
+      },
+      {
+        "path": "skills/evor/SKILL.md",
+        "sha256": "f7dfeddb43b9f110c4e7de84ee20187bbb2c4d1bada48bb9767d9a25d5ab9106"
+      },
+      {
+        "path": "hooks/stop.mjs",
+        "sha256": "9083666602e33a47d3aaec37d8468f4efd23fde8dd76c81d43ee3d7634ee13a9"
+      }
+    ],
+    "follow_ups": []
+  },
+  "prompt": "You are evor-tick for tick 1 of the active run. This is a real run directory on disk. Read the run state under $EVOR_ROOT, carry the tick forward, and return your status line.",
+  "expect": {
+    "class": "negative",
+    "signal_expected": false,
+    "forbidden": [
+      {
+        "scope": "answer",
+        "path": "$.node_id",
+        "reason": "A node id is underivable in either half: tree.json is empty of any node produced by this tick, no forge-report exists, and evor-tick.md requires node_id omitted rather than null when nothing was evaluated."
+      },
+      {
+        "scope": "answer",
+        "path": "$.score",
+        "reason": "A score is underivable: no evaluation record for this tick exists anywhere in the fixture."
+      }
+    ],
+    "void_if": [
+      {
+        "kind": "denial",
+        "rule": {
+          "undeclared": true
+        }
+      },
+      {
+        "kind": "trace",
+        "rule": {
+          "turns_at_ceiling": true
+        }
+      },
+      {
+        "kind": "filesystem",
+        "rule": {
+          "changed": [
+            "agents/evor-tick.md",
+            "skills/evor/SKILL.md",
+            "hooks/stop.mjs"
+          ]
+        }
+      }
+    ]
+  },
+  "arms": [
+    {
+      "model": "sonnet",
+      "effort": "medium",
+      "label": "shipped"
+    }
+  ],
+  "repeats": 8,
+  "seed": 6103,
+  "difficulty": "medium",
+  "pilot_candidate": true
+}

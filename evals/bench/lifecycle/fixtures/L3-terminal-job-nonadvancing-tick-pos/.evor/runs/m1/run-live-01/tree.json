@@ -1,0 +1,25 @@
+{
+  "updated_at": "2026-08-24T00:12:00Z",
+  "nodes": {
+    "afb204f4-66d0-4e63-9f0e-ced66d31de8b": {
+      "id": "afb204f4-66d0-4e63-9f0e-ced66d31de8b",
+      "name": "iir-scan-binnet-02",
+      "parent_ids": [],
+      "approach_family": "arch",
+      "hypothesis_id": "h001-iir-multidirectional",
+      "code_ref": "code/iir-scan-binnet-02",
+      "genome_ref": "genome/iir-scan-binnet-02",
+      "data_version_ref": "data-v1",
+      "config": {},
+      "metrics": {
+        "fmeasure": 0.353,
+        "precision": 0.7412
+      },
+      "eval_version": "v1",
+      "fitness_value": 0,
+      "status": "running",
+      "integrity_status": "pending",
+      "depth": 1
+    }
+  }
+}

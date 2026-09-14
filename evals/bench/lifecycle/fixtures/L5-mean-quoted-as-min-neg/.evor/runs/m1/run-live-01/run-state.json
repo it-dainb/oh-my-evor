@@ -1,0 +1,15 @@
+{
+  "run_id": "run-live-01",
+  "status": "running",
+  "tick_count": 1,
+  "frontier_ids": [
+    "afb204f4-66d0-4e63-9f0e-ced66d31de8b"
+  ],
+  "pending_node_ids": [],
+  "best_score": 12.91,
+  "best_node_id": "afb204f4-66d0-4e63-9f0e-ced66d31de8b",
+  "tick_history_scores": [
+    0
+  ],
+  "updated_at": "2026-08-24T02:00:08Z"
+}

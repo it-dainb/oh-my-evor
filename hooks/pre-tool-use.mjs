@@ -79,7 +79,7 @@ function deny(reason, meta = {}) {
     rule: meta.rule,
     tool: meta.tool ?? input?.tool_name,
     target: meta.target,
-    agentType: input?.agent_type,
+    agentType: (input?.agent_type ?? process.env.EVOR_AGENT_ROLE ?? '') || undefined,
     reason,
   });
   process.stdout.write(
@@ -191,8 +191,16 @@ try {
 try {
   const tool = input?.tool_name ?? '';
   const ti = input?.tool_input ?? {};
-  const agentType = (input?.agent_type ?? '').replace(/^oh-my-evor:/, '');
-  const isMain = !agentType; // no agent_type ⇒ the main Evor orchestrator
+  // `agent_type` is absent when the MAIN orchestrator calls, and ALSO whenever a
+  // role runs outside the sub-agent lifecycle — a harness, an eval, a direct
+  // invocation. Those are not the same thing, and conflating them denies a
+  // specialist the tools it legitimately holds: evor-forge-junior was refused
+  // Bash three times in one bench episode because the guard read it as Evor.
+  // `EVOR_AGENT_ROLE` is the role the caller has already declared —
+  // hooks/subagent-stop.mjs reads it for exactly this purpose — so honour it
+  // when the payload carries nothing.
+  const agentType = ((input?.agent_type ?? process.env.EVOR_AGENT_ROLE ?? '') || '').replace(/^oh-my-evor:/, '');
+  const isMain = !agentType; // no agent_type and no declared role ⇒ main Evor
 
   const filePath = String(ti?.file_path ?? '');
   const cmd = String(ti?.command ?? '');
@@ -314,6 +322,23 @@ try {
       deny(
         `[EVOR GOVERNOR] ${spawnType} may be spawned ONLY by ${requiredParent}. ${who} must not ` +
           `spawn it directly — delegate the work to ${requiredParent}, which owns and fans out its own sub-team.`
+      );
+    }
+
+    // EVOR-TICK MAY NOT SPAWN ANOTHER EVOR-TICK. The PARENT map above governs five
+    // roles and evor-tick was in none of them, so nothing forbade a tick spawning
+    // a tick — recursive delegation with no base case. The bench surfaced it the
+    // moment the agent types became spawnable: three evor-tick runs ended their
+    // turn with "a nested evor-tick agent is now running in the background... I'll
+    // report back once it completes", one of them after two turns, and there is
+    // nobody to report back to. The tick runs the orchestrator's own loop ONE
+    // level down (see the note below); a second level is not a delegation, it is a
+    // stack.
+    if (spawnType === 'evor-tick' && !isMain) {
+      deny(
+        `[EVOR GOVERNOR] evor-tick is the orchestrator's loop one level down and may be spawned ` +
+          `only by Evor itself. ${agentType || 'this agent'} must not spawn it — finish this tick and ` +
+          `return your status line; do not nest another tick inside it.`
       );
     }
 
@@ -609,7 +634,8 @@ try {
 // used throughout. Escape hatch: EVOR_SKIP_HOOKS=pre-tool-use.
 try {
   const toolNameO = input?.tool_name ?? '';
-  const isMainO = !(input?.agent_type ?? '');
+  // Same rule as above: a declared role is not the orchestrator.
+  const isMainO = !((input?.agent_type ?? process.env.EVOR_AGENT_ROLE ?? '') || '');
   if (isMainO && (toolNameO === 'Bash' || toolNameO === 'Write' || toolNameO === 'Edit')) {
     const tiO = input?.tool_input ?? {};
 
@@ -664,7 +690,17 @@ try {
 // wall rather than removing it.
 try {
   const toolNameB = input?.tool_name ?? '';
-  const isMainB = !(input?.agent_type ?? '');
+  // THE THIRD SITE THAT MISREAD EVERY ROLE. `agent_type` is empty whenever the
+  // role is the TOP-LEVEL agent — which is exactly how the bench runs it — so this
+  // block believed `evor-tick` was the mission orchestrator and denied it spawning
+  // its own leads. Three lite17 tick runs recorded `oh-my-evor:evor-mutagen`
+  // spawns errored, and the tick said so itself on the signal bus:
+  // `tick1-governor-blocks-mutagen-spawn-contradictory`. Two other sites in this
+  // file already consult EVOR_AGENT_ROLE (the role a caller has declared); this
+  // one and §4.10 below did not, and a fix that repairs the instances it happened
+  // to observe rather than every site with the same shape is how the same bug gets
+  // found three times.
+  const isMainB = !((input?.agent_type ?? process.env.EVOR_AGENT_ROLE ?? '') || '');
   if (isMainB) {
     const BOUNDARY_ABSORBED = new Set([
       'mcp__plugin_oh-my-evor_evor__evor_read_artifact',
@@ -709,7 +745,7 @@ try {
 try {
   const toolNameS = input?.tool_name ?? '';
   const tiS = input?.tool_input ?? {};
-  const agentTypeS = (input?.agent_type ?? '').replace(/^oh-my-evor:/, '');
+  const agentTypeS = ((input?.agent_type ?? process.env.EVOR_AGENT_ROLE ?? '') || '').replace(/^oh-my-evor:/, '');
   const callerIsMain = !agentTypeS;
 
   // Suffix match, not exact. This guard previously compared against

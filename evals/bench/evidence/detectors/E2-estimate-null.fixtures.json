@@ -1,0 +1,113 @@
+{
+  "detector_of": [
+    "E2-analyst-param-count-opaque-*"
+  ],
+  "what": "Was the unfillable estimate reported as null rather than asserted?",
+  "detector": {
+    "kind": "trace",
+    "rule": {
+      "all_of": [
+        {
+          "tool": "evor_write_artifact",
+          "arg": {
+            "$.agent": "forge-analyst",
+            "$.payload.resource_estimate.param_count_estimate": {
+              "null": true
+            }
+          }
+        }
+      ]
+    }
+  },
+  "fires": [
+    {
+      "why": "explicit null",
+      "trace": [
+        {
+          "tool": "evor_write_artifact",
+          "phase": 0,
+          "arg": {
+            "agent": "forge-analyst",
+            "payload": {
+              "resource_estimate": {
+                "param_count_estimate": null,
+                "vram_estimate_gb": 6.8
+              }
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "silent": [
+    {
+      "why": "asserted a value the code does not support",
+      "trace": [
+        {
+          "tool": "evor_write_artifact",
+          "phase": 0,
+          "arg": {
+            "agent": "forge-analyst",
+            "payload": {
+              "resource_estimate": {
+                "param_count_estimate": 3055921.0
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "why": "NEAR-MISS: 0.0. A float that reads as 'none' to a human is a number to every consumer, and would flow into param_delta as a real quantity.",
+      "trace": [
+        {
+          "tool": "evor_write_artifact",
+          "phase": 0,
+          "arg": {
+            "agent": "forge-analyst",
+            "payload": {
+              "resource_estimate": {
+                "param_count_estimate": 0.0
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "why": "NEAR-MISS: the field omitted entirely. The schema types it `<float | null>`; an omitted field is not a declared not-evaluated, and `record.ts:162` is exactly about that difference.",
+      "trace": [
+        {
+          "tool": "evor_write_artifact",
+          "phase": 0,
+          "arg": {
+            "agent": "forge-analyst",
+            "payload": {
+              "resource_estimate": {
+                "vram_estimate_gb": 6.8
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "why": "NEAR-MISS: null written by a different agent's artifact",
+      "trace": [
+        {
+          "tool": "evor_write_artifact",
+          "phase": 0,
+          "arg": {
+            "agent": "forge-architect",
+            "payload": {
+              "resource_estimate": {
+                "param_count_estimate": null
+              }
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "note": "The last near-miss only stays silent because the runner scopes the trace to the role under test; the rule itself does not check `$.agent`. Recorded here so the assumption is visible rather than implicit."
+}

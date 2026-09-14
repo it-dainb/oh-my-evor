@@ -1,0 +1,9 @@
+{
+  "job_id": "c4a5e447-2d10-4a71-b5f1-9e3c0f22a8d4",
+  "node_id": "afb204f4-66d0-4e63-9f0e-ced66d31de8b",
+  "state": "running",
+  "exit_code": null,
+  "started_at": "2026-08-24T01:30:08Z",
+  "finished_at": null,
+  "heartbeat_at": "2026-08-24T02:04:48Z"
+}

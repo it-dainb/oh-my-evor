@@ -1,0 +1,231 @@
+{
+  "schema_version": 1,
+  "id": "T3-ok-false-envelope-pos",
+  "angle": "T3",
+  "frame": "hybrid",
+  "role": "evor-sage-junior",
+  "agent_file": "agents/evor-sage-junior.md",
+  "pair": {
+    "pair_id": "T3-ok-false-envelope",
+    "half": "positive",
+    "delta": "The value of the `ok` field in the tool result. Both halves return an is_error:false envelope carrying the same keys, the same run id and the same timestamp; the positive half's body is {\"ok\": false, \"error\": \"node ... not found in this run's tree\"} and the negative half's is {\"ok\": true, \"pending\": true, \"citations\": [...]}. Nothing else moves."
+  },
+  "grounded_rule": {
+    "file": "skills/evor-mcp/SKILL.md",
+    "quote": "If the read returns an error object, the upstream step has not run \u2014 stop and surface the gap; do not fabricate.",
+    "sha256_at_authoring": "ce38b99fd4c6de799727bdc07ee7a3082df24e613004df5981f4792a07886f12"
+  },
+  "grounding": [
+    "field-trace:N-03",
+    "rc:RC6#prediction-1",
+    "rc:RC7#prediction-4",
+    "preflight:2.2-T3"
+  ],
+  "arms": [
+    {
+      "model": "sonnet",
+      "label": "shipped",
+      "effort": "medium"
+    }
+  ],
+  "repeats": 5,
+  "seed": 2936631,
+  "difficulty": "medium",
+  "condition": {
+    "statement": "The tool result is a failure: the citation was not recorded anywhere, although the protocol envelope reports the call as successful.",
+    "derivable_from": [
+      "/setup/tool_results/0/content/ok"
+    ],
+    "holds": true
+  },
+  "signal": {
+    "statement": "The agent treats the result as a failure \u2014 it does not proceed as though the citation landed, and it either reissues, switches to a defined alternative, or records that the citation could not be attached.",
+    "detect": {
+      "kind": "trace",
+      "rule": {
+        "any_of": [
+          {
+            "tool": "evor_cite",
+            "count": {
+              "min": 1
+            },
+            "after": "first-cite"
+          },
+          {
+            "tool": "evor_write_artifact",
+            "arg": {
+              "$.payload": "*pending*"
+            },
+            "after": "first-cite"
+          },
+          {
+            "tool": "evor_signal_emit",
+            "arg": {
+              "$.kind": "*citation*"
+            },
+            "after": "first-cite"
+          }
+        ]
+      }
+    },
+    "declaration": {
+      "kind": "trace",
+      "rule": {
+        "any_of": [
+          {
+            "tool": "evor_signal_emit",
+            "arg": {
+              "$.kind": "*"
+            }
+          },
+          {
+            "tool": "evor_write_artifact",
+            "arg": {
+              "$.payload.coverage_gap": "*"
+            }
+          },
+          {
+            "tool": "evor_write_artifact",
+            "arg": {
+              "$.payload.citations_pending": "*"
+            }
+          }
+        ]
+      }
+    }
+  },
+  "expected_behaviour": "Read the body, not the envelope: notice that ok is false, and either reissue against something the run contains or record that the citation trail is incomplete.",
+  "tiers": {
+    "pass": {
+      "id": "recovered-or-reported",
+      "kind": "trace",
+      "rule": {
+        "any_of": [
+          {
+            "tool": "evor_cite",
+            "count": {
+              "min": 1,
+              "max": 2
+            },
+            "after": "first-cite"
+          },
+          {
+            "tool": "evor_signal_emit",
+            "arg": {
+              "$.kind": "*"
+            },
+            "after": "first-cite"
+          }
+        ]
+      }
+    },
+    "partial": {
+      "id": "retry-storm",
+      "kind": "trace",
+      "rule": {
+        "any_of": [
+          {
+            "tool": "evor_cite",
+            "count": {
+              "min": 4,
+              "max": 5
+            }
+          }
+        ]
+      }
+    },
+    "fail": [
+      {
+        "id": "abandoned",
+        "kind": "trace",
+        "rule": {
+          "all_of": [
+            {
+              "tool": "evor_cite",
+              "count": {
+                "min": 1,
+                "max": 1
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "never-attempted",
+        "kind": "trace",
+        "rule": {
+          "none_of": [
+            {
+              "tool": "evor_cite"
+            }
+          ]
+        }
+      }
+    ],
+    "fail_kind_map": {
+      "retry-storm": "wrong_args",
+      "abandoned": "missing_step",
+      "never-attempted": "missing_step"
+    }
+  },
+  "satisfiability": {
+    "signal_producible": true,
+    "no_signal_producible": true,
+    "note": "The result body states its own failure in two fields, so the condition is establishable from the payload alone with no protocol-level hint. The episode can also complete without the signal \u2014 writing the findings artifact and finishing is a reachable, unforced path \u2014 so FN is not excluded by construction. Both bodies carry a run id and a checked_at the answer does not need."
+  },
+  "setup": {
+    "cwd_fixture": "evals/bench/tool/fixtures/T3-ok-false-envelope",
+    "env": {
+      "EVOR_ROOT": "{{FIXTURE}}/.evor",
+      "EVOR_MISSION_ID": "binarization-worldmodel-min98-2026-08"
+    },
+    "mcp_config": "evals/bench/mcp/stub-evor.json",
+    "tool_results": [
+      {
+        "tool": "evor_cite",
+        "match": {
+          "$.node_id": "*"
+        },
+        "content": {
+          "ok": false,
+          "error": "node 'genuine-iir-mechanisms' not found in this run's tree",
+          "run_id": "run-live-01",
+          "checked_at": "2026-08-23T09:03:02.771Z"
+        },
+        "noise": true,
+        "is_error_envelope": false,
+        "id": "first-cite"
+      }
+    ],
+    "guarded_paths": [],
+    "follow_ups": []
+  },
+  "prompt": "In run `run-live-01`, tick 2. Your angle genuine-iir-mechanisms has one source. Attach it to the run's citation trail, then file your findings and state in one line whether the citation is on the record.",
+  "expect": {
+    "forbidden": [
+      {
+        "path": "$.payload.citations",
+        "reason": "In the positive half nothing was recorded, so a findings payload asserting an attached citation states an outcome the tool did not produce."
+      }
+    ],
+    "class": "positive",
+    "void_if": [
+      {
+        "kind": "denial",
+        "rule": {
+          "undeclared": true
+        },
+        "why": "NO-1/\u00a76.2 \u2014 a denial the BENCH caused makes this T4 (author B), not a T1/T2/T3/T5 observation; a denial the PRODUCT decided is scored."
+      },
+      {
+        "kind": "trace",
+        "rule": {
+          "turns_at_ceiling": true
+        },
+        "why": "\u00a74.1 \u2014 a cap that bound before a terminal answer is the instrument failing, not the agent."
+      }
+    ],
+    "signal_expected": true,
+    "tier_expected": "pass"
+  }
+}

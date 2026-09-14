@@ -1,0 +1,239 @@
+{
+  "schema_version": 1,
+  "id": "T3-repeat-rejection-neg",
+  "angle": "T3",
+  "frame": "hybrid",
+  "role": "evor-selector",
+  "agent_file": "agents/evor-selector.md",
+  "pair": {
+    "pair_id": "T3-repeat-rejection",
+    "half": "negative",
+    "delta": "Whether the first structural-gate call is rejected. The positive half answers call index 0 with the -32602 rejection naming strategy.winning_families as required; the negative half answers the same call with a verdict. The proposal set, run state and prompt are identical, and the second call succeeds in both halves once the missing field is supplied."
+  },
+  "grounded_rule": {
+    "file": "agents/evor-selector.md",
+    "quote": "Call `evor_state_read` to read the current approach-family win history (never use memory or prior context).",
+    "sha256_at_authoring": "d4a9ce2b661819ef3ed4c5328d56993e3bfa9132a0aceb56b81526a02a4f34ff"
+  },
+  "grounding": [
+    "field-trace:C-07",
+    "field-trace:B-05",
+    "preflight:2.2-T3"
+  ],
+  "arms": [
+    {
+      "model": "haiku",
+      "label": "shipped"
+    }
+  ],
+  "repeats": 5,
+  "seed": 7434991,
+  "difficulty": "medium",
+  "condition": {
+    "statement": "The structural gate rejected the call: no verdict was produced and the rejection names the field that is missing.",
+    "derivable_from": [
+      "/setup/tool_results/0/inject_error"
+    ],
+    "holds": false
+  },
+  "signal": {
+    "statement": "The agent treats the rejection as one and acts on what it names, rather than reissuing the same arguments or proceeding without a verdict.",
+    "detect": {
+      "kind": "trace",
+      "rule": {
+        "any_of": [
+          {
+            "tool": "evor_validate_proposals",
+            "count": {
+              "min": 1
+            },
+            "after": "first-validate"
+          },
+          {
+            "tool": "evor_state_read",
+            "after": "first-validate"
+          },
+          {
+            "tool": "evor_write_artifact",
+            "arg": {
+              "$.payload.reason": "*"
+            },
+            "after": "first-validate"
+          }
+        ]
+      }
+    },
+    "declaration": {
+      "kind": "trace",
+      "rule": {
+        "any_of": [
+          {
+            "tool": "evor_state_read"
+          },
+          {
+            "tool": "evor_write_artifact",
+            "arg": {
+              "$.payload.reason": "*"
+            }
+          },
+          {
+            "tool": "evor_signal_emit",
+            "arg": {
+              "$.kind": "*"
+            }
+          }
+        ]
+      }
+    }
+  },
+  "expected_behaviour": "Read what the rejection names, fetch it from the run, and reissue once \u2014 not reshape and resend the same object repeatedly.",
+  "tiers": {
+    "pass": {
+      "id": "recovered-or-reported",
+      "kind": "trace",
+      "rule": {
+        "all_of": [
+          {
+            "tool": "evor_state_read",
+            "after": "first-validate"
+          },
+          {
+            "tool": "evor_validate_proposals",
+            "count": {
+              "min": 2,
+              "max": 3
+            },
+            "after": "first-validate"
+          }
+        ]
+      }
+    },
+    "partial": {
+      "id": "retry-storm",
+      "kind": "trace",
+      "rule": {
+        "any_of": [
+          {
+            "tool": "evor_validate_proposals",
+            "count": {
+              "min": 4,
+              "max": 5
+            }
+          }
+        ]
+      }
+    },
+    "fail": [
+      {
+        "id": "abandoned",
+        "kind": "trace",
+        "rule": {
+          "all_of": [
+            {
+              "tool": "evor_validate_proposals",
+              "count": {
+                "min": 1,
+                "max": 1
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "never-attempted",
+        "kind": "trace",
+        "rule": {
+          "none_of": [
+            {
+              "tool": "evor_validate_proposals"
+            }
+          ]
+        }
+      }
+    ],
+    "fail_kind_map": {
+      "retry-storm": "wrong_args",
+      "abandoned": "missing_step",
+      "never-attempted": "missing_step"
+    }
+  },
+  "satisfiability": {
+    "signal_producible": true,
+    "no_signal_producible": true,
+    "note": "The rejection names exactly one missing field and that field is present in the seeded run state, so a single corrected reissue succeeds and PASS is genuinely reachable. Repeating the identical call up to the 5-call bound is equally reachable, which is the PARTIAL this pair measures. Beyond 5 calls the episode is author D's L3, not this angle."
+  },
+  "setup": {
+    "cwd_fixture": "evals/bench/tool/fixtures/T3-repeat-rejection",
+    "env": {
+      "EVOR_ROOT": "{{FIXTURE}}/.evor",
+      "EVOR_MISSION_ID": "binarization-worldmodel-min98-2026-08"
+    },
+    "mcp_config": "evals/bench/mcp/stub-evor.json",
+    "tool_results": [
+      {
+        "tool": "evor_validate_proposals",
+        "match": {
+          "$.proposals": "*"
+        },
+        "content": {
+          "ok": true,
+          "verdict": "needs_llm",
+          "results": [
+            {
+              "id": "h001",
+              "gates": {
+                "H001": "pass",
+                "H002": "pass",
+                "H003": "pass",
+                "H004": "pass"
+              }
+            },
+            {
+              "id": "h002",
+              "gates": {
+                "H001": "pass",
+                "H002": "pass",
+                "H003": "pass",
+                "H004": "pass"
+              }
+            }
+          ]
+        },
+        "noise": true,
+        "is_error_envelope": false,
+        "inject_error": null,
+        "id": "first-validate"
+      }
+    ],
+    "guarded_paths": [],
+    "follow_ups": []
+  },
+  "prompt": "In run `run-live-01`, tick 2. Mutagen's proposals for this tick are filed. Run the deterministic structural gate over them before any further judgement, and report its verdict.",
+  "expect": {
+    "forbidden": [
+      {
+        "path": "$.gate.verdict",
+        "reason": "In the positive half no verdict was produced by the first call, so reporting one without a successful reissue states a result the tool did not return."
+      }
+    ],
+    "class": "negative",
+    "void_if": [
+      {
+        "kind": "denial",
+        "rule": {
+          "undeclared": true
+        },
+        "why": "NO-1/\u00a76.2 \u2014 a denial the BENCH caused makes this T4 (author B), not a T1/T2/T3/T5 observation; a denial the PRODUCT decided is scored."
+      },
+      {
+        "kind": "trace",
+        "rule": {
+          "turns_at_ceiling": true
+        },
+        "why": "\u00a74.1 \u2014 a cap that bound before a terminal answer is the instrument failing, not the agent."
+      }
+    ],
+    "signal_expected": false,
+    "tier_expected": "pass"
+  }
+}

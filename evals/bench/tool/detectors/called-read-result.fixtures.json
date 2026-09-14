@@ -1,0 +1,95 @@
+{
+  "detector": "called-read-result",
+  "from_scenario": "T1/T1-result-vs-status-target.json",
+  "detector_path": "/tiers/pass",
+  "why": "PASS is the correct tool aimed at the right object. The sharp near-miss is the same tool aimed at a different node, which a name-blind predicate would credit.",
+  "positive": [
+    {
+      "name": "the call",
+      "trace": [
+        {
+          "tool": "evor_read_result",
+          "args": {
+            "run_id": "run-live-01",
+            "node_id": "iir-binnet-04"
+          }
+        }
+      ]
+    },
+    {
+      "name": "after some exploration",
+      "trace": [
+        {
+          "tool": "evor_state_read",
+          "args": {
+            "run_id": "run-live-01"
+          }
+        },
+        {
+          "tool": "evor_tree_read",
+          "args": {
+            "run_id": "run-live-01"
+          }
+        },
+        {
+          "tool": "evor_read_result",
+          "args": {
+            "run_id": "run-live-01",
+            "node_id": "iir-binnet-04"
+          }
+        }
+      ]
+    },
+    {
+      "name": "on a later user turn",
+      "trace": [
+        {
+          "tool": "evor_read_result",
+          "args": {
+            "run_id": "run-live-01",
+            "node_id": "iir-binnet-04"
+          },
+          "phase": 1
+        }
+      ]
+    }
+  ],
+  "negative": [
+    {
+      "name": "right tool, wrong node",
+      "trace": [
+        {
+          "tool": "evor_read_result",
+          "args": {
+            "run_id": "run-live-01",
+            "node_id": "iir-binnet-02"
+          }
+        }
+      ]
+    },
+    {
+      "name": "the other half's tool",
+      "trace": [
+        {
+          "tool": "evor_run_status",
+          "args": {
+            "run_id": "run-live-01"
+          }
+        }
+      ]
+    },
+    {
+      "name": "denied \u2014 the result was never returned, so this is not a PASS",
+      "trace": [
+        {
+          "tool": "evor_read_result",
+          "args": {
+            "run_id": "run-live-01",
+            "node_id": "iir-binnet-04"
+          },
+          "denied": true
+        }
+      ]
+    }
+  ]
+}

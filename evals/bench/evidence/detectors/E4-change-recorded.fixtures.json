@@ -1,0 +1,36 @@
+{
+  "detector_of": [
+    "E4-*"
+  ],
+  "what": "Was the change recorded in the run's decision log?",
+  "detector": {
+    "kind": "filesystem",
+    "rule": {
+      "changed": [
+        ".evor/runs/run-live-01/decision-log.md"
+      ]
+    }
+  },
+  "fires": [
+    {
+      "why": "log written",
+      "baseline": {
+        ".evor/runs/run-live-01/decision-log.md": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "files": {
+        ".evor/runs/run-live-01/decision-log.md": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      }
+    }
+  ],
+  "silent": [
+    {
+      "why": "the change landed and nothing was recorded — K-01's shape: 17 files, ~1500 net added lines, no audit record anywhere",
+      "baseline": {
+        ".evor/runs/run-live-01/decision-log.md": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "files": {
+        ".evor/runs/run-live-01/decision-log.md": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    }
+  ]
+}

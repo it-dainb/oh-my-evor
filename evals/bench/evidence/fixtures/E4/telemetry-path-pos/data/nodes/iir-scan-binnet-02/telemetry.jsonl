@@ -1,0 +1,480 @@
+{"step": 25, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:05:03Z", "train_loss": 1.452927, "lr": 0.0003, "throughput": 38.4, "grad_norm": 0.059074}
+{"step": 50, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:05:07Z", "train_loss": 1.444907, "lr": 0.00029999, "throughput": 38.4, "grad_norm": 0.063842}
+{"step": 75, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:05:10Z", "train_loss": 1.436938, "lr": 0.00029997, "throughput": 38.4, "grad_norm": 0.0686}
+{"step": 100, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:05:14Z", "train_loss": 1.42902, "lr": 0.00029995, "throughput": 38.4, "grad_norm": 0.07334}
+{"step": 125, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:05:17Z", "train_loss": 1.421153, "lr": 0.00029992, "throughput": 38.4, "grad_norm": 0.078059}
+{"step": 150, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:05:21Z", "train_loss": 1.413337, "lr": 0.00029988, "throughput": 38.4, "grad_norm": 0.08275}
+{"step": 175, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:05:25Z", "train_loss": 1.405571, "lr": 0.00029984, "throughput": 38.4, "grad_norm": 0.087408}
+{"step": 200, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:05:28Z", "train_loss": 1.397855, "lr": 0.00029979, "throughput": 38.4, "grad_norm": 0.092027}
+{"step": 225, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:05:32Z", "train_loss": 1.390189, "lr": 0.00029974, "throughput": 38.4, "grad_norm": 0.096602}
+{"step": 250, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:05:35Z", "train_loss": 1.382572, "lr": 0.00029968, "throughput": 38.4, "grad_norm": 0.101129, "val_metric": 0.724097}
+{"step": 275, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:05:39Z", "train_loss": 1.375005, "lr": 0.00029961, "throughput": 38.4, "grad_norm": 0.1056}
+{"step": 300, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:05:42Z", "train_loss": 1.367485, "lr": 0.00029954, "throughput": 38.4, "grad_norm": 0.110012}
+{"step": 325, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:05:46Z", "train_loss": 1.360015, "lr": 0.00029946, "throughput": 38.4, "grad_norm": 0.11436}
+{"step": 350, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:05:50Z", "train_loss": 1.352592, "lr": 0.00029937, "throughput": 38.4, "grad_norm": 0.118637}
+{"step": 375, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:05:53Z", "train_loss": 1.345217, "lr": 0.00029928, "throughput": 38.4, "grad_norm": 0.12284}
+{"step": 400, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:06:57Z", "train_loss": 1.33789, "lr": 0.00029918, "throughput": 38.4, "grad_norm": 0.126963}
+{"step": 425, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:06:00Z", "train_loss": 1.33061, "lr": 0.00029907, "throughput": 38.4, "grad_norm": 0.131001}
+{"step": 450, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:06:04Z", "train_loss": 1.323377, "lr": 0.00029896, "throughput": 38.4, "grad_norm": 0.13495}
+{"step": 475, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:06:07Z", "train_loss": 1.31619, "lr": 0.00029884, "throughput": 38.4, "grad_norm": 0.138805}
+{"step": 500, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:06:11Z", "train_loss": 1.30905, "lr": 0.00029872, "throughput": 38.4, "grad_norm": 0.142563, "val_metric": 0.728036}
+{"step": 525, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:06:15Z", "train_loss": 1.301955, "lr": 0.00029859, "throughput": 38.4, "grad_norm": 0.146217}
+{"step": 550, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:06:18Z", "train_loss": 1.294906, "lr": 0.00029845, "throughput": 38.4, "grad_norm": 0.149764}
+{"step": 575, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:06:22Z", "train_loss": 1.287903, "lr": 0.0002983, "throughput": 38.4, "grad_norm": 0.153201}
+{"step": 600, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:06:25Z", "train_loss": 1.280945, "lr": 0.00029815, "throughput": 38.4, "grad_norm": 0.156522}
+{"step": 625, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:06:29Z", "train_loss": 1.274031, "lr": 0.000298, "throughput": 38.4, "grad_norm": 0.159725}
+{"step": 650, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:06:32Z", "train_loss": 1.267162, "lr": 0.00029783, "throughput": 38.4, "grad_norm": 0.162805}
+{"step": 675, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:06:36Z", "train_loss": 1.260337, "lr": 0.00029766, "throughput": 38.4, "grad_norm": 0.165758}
+{"step": 700, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:06:40Z", "train_loss": 1.253556, "lr": 0.00029749, "throughput": 38.4, "grad_norm": 0.168582}
+{"step": 725, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:06:43Z", "train_loss": 1.246819, "lr": 0.00029731, "throughput": 38.4, "grad_norm": 0.171273}
+{"step": 750, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:06:47Z", "train_loss": 1.240125, "lr": 0.00029712, "throughput": 38.4, "grad_norm": 0.173828, "val_metric": 0.731667}
+{"step": 775, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:06:50Z", "train_loss": 1.233474, "lr": 0.00029692, "throughput": 38.4, "grad_norm": 0.176244}
+{"step": 800, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:07:54Z", "train_loss": 1.226867, "lr": 0.00029672, "throughput": 38.4, "grad_norm": 0.178519}
+{"step": 825, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:07:57Z", "train_loss": 1.220301, "lr": 0.00029651, "throughput": 38.4, "grad_norm": 0.180648}
+{"step": 850, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:07:01Z", "train_loss": 1.213778, "lr": 0.0002963, "throughput": 38.4, "grad_norm": 0.182631}
+{"step": 875, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:07:05Z", "train_loss": 1.207297, "lr": 0.00029608, "throughput": 38.4, "grad_norm": 0.184465}
+{"step": 900, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:07:08Z", "train_loss": 1.200857, "lr": 0.00029586, "throughput": 38.4, "grad_norm": 0.186147}
+{"step": 925, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:07:12Z", "train_loss": 1.194459, "lr": 0.00029562, "throughput": 38.4, "grad_norm": 0.187675}
+{"step": 950, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:07:15Z", "train_loss": 1.188103, "lr": 0.00029538, "throughput": 38.4, "grad_norm": 0.189049}
+{"step": 975, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:07:19Z", "train_loss": 1.181787, "lr": 0.00029514, "throughput": 38.4, "grad_norm": 0.190266}
+{"step": 1000, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:07:22Z", "train_loss": 1.175512, "lr": 0.00029489, "throughput": 38.4, "grad_norm": 0.191324, "val_metric": 0.734849}
+{"step": 1025, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:07:26Z", "train_loss": 1.169277, "lr": 0.00029463, "throughput": 38.4, "grad_norm": 0.192224}
+{"step": 1050, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:07:30Z", "train_loss": 1.163082, "lr": 0.00029437, "throughput": 38.4, "grad_norm": 0.192963}
+{"step": 1075, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:07:33Z", "train_loss": 1.156927, "lr": 0.0002941, "throughput": 38.4, "grad_norm": 0.19354}
+{"step": 1100, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:07:37Z", "train_loss": 1.150812, "lr": 0.00029382, "throughput": 38.4, "grad_norm": 0.193956}
+{"step": 1125, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:07:40Z", "train_loss": 1.144736, "lr": 0.00029354, "throughput": 38.4, "grad_norm": 0.194209}
+{"step": 1150, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:07:44Z", "train_loss": 1.1387, "lr": 0.00029325, "throughput": 38.4, "grad_norm": 0.1943}
+{"step": 1175, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:07:47Z", "train_loss": 1.132702, "lr": 0.00029296, "throughput": 38.4, "grad_norm": 0.194227}
+{"step": 1200, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:08:51Z", "train_loss": 1.126742, "lr": 0.00029266, "throughput": 38.4, "grad_norm": 0.193992}
+{"step": 1225, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:08:55Z", "train_loss": 1.120822, "lr": 0.00029235, "throughput": 38.4, "grad_norm": 0.193595}
+{"step": 1250, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:08:58Z", "train_loss": 1.114939, "lr": 0.00029204, "throughput": 38.4, "grad_norm": 0.193035, "val_metric": 0.737461}
+{"step": 1275, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:08:02Z", "train_loss": 1.109094, "lr": 0.00029172, "throughput": 38.4, "grad_norm": 0.192314}
+{"step": 1300, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:08:05Z", "train_loss": 1.103287, "lr": 0.0002914, "throughput": 38.4, "grad_norm": 0.191433}
+{"step": 1325, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:08:09Z", "train_loss": 1.097517, "lr": 0.00029107, "throughput": 38.4, "grad_norm": 0.190392}
+{"step": 1350, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:08:12Z", "train_loss": 1.091784, "lr": 0.00029073, "throughput": 38.4, "grad_norm": 0.189192}
+{"step": 1375, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:08:16Z", "train_loss": 1.086088, "lr": 0.00029039, "throughput": 38.4, "grad_norm": 0.187836}
+{"step": 1400, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:08:20Z", "train_loss": 1.080429, "lr": 0.00029004, "throughput": 38.4, "grad_norm": 0.186325}
+{"step": 1425, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:08:23Z", "train_loss": 1.074806, "lr": 0.00028968, "throughput": 38.4, "grad_norm": 0.18466}
+{"step": 1450, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:08:27Z", "train_loss": 1.06922, "lr": 0.00028932, "throughput": 38.4, "grad_norm": 0.182843}
+{"step": 1475, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:08:30Z", "train_loss": 1.063669, "lr": 0.00028895, "throughput": 38.4, "grad_norm": 0.180877}
+{"step": 1500, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:08:34Z", "train_loss": 1.058155, "lr": 0.00028858, "throughput": 38.4, "grad_norm": 0.178763, "val_metric": 0.739401}
+{"step": 1525, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:08:37Z", "train_loss": 1.052675, "lr": 0.0002882, "throughput": 38.4, "grad_norm": 0.176505}
+{"step": 1550, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:08:41Z", "train_loss": 1.047231, "lr": 0.00028782, "throughput": 38.4, "grad_norm": 0.174105}
+{"step": 1575, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:08:45Z", "train_loss": 1.041822, "lr": 0.00028743, "throughput": 38.4, "grad_norm": 0.171565}
+{"step": 1600, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:09:48Z", "train_loss": 1.036448, "lr": 0.00028703, "throughput": 38.4, "grad_norm": 0.168889}
+{"step": 1625, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:09:52Z", "train_loss": 1.031108, "lr": 0.00028663, "throughput": 38.4, "grad_norm": 0.16608}
+{"step": 1650, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:09:55Z", "train_loss": 1.025803, "lr": 0.00028622, "throughput": 38.4, "grad_norm": 0.16314}
+{"step": 1675, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:09:59Z", "train_loss": 1.020532, "lr": 0.00028581, "throughput": 38.4, "grad_norm": 0.160074}
+{"step": 1700, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:09:02Z", "train_loss": 1.015295, "lr": 0.00028539, "throughput": 38.4, "grad_norm": 0.156885}
+{"step": 1725, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:09:06Z", "train_loss": 1.010092, "lr": 0.00028496, "throughput": 38.4, "grad_norm": 0.153577}
+{"step": 1750, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:09:10Z", "train_loss": 1.004922, "lr": 0.00028453, "throughput": 38.4, "grad_norm": 0.150153, "val_metric": 0.740596}
+{"step": 1775, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:09:13Z", "train_loss": 0.999785, "lr": 0.00028409, "throughput": 38.4, "grad_norm": 0.146618}
+{"step": 1800, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:09:17Z", "train_loss": 0.994681, "lr": 0.00028365, "throughput": 38.4, "grad_norm": 0.142975}
+{"step": 1825, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:09:20Z", "train_loss": 0.989611, "lr": 0.0002832, "throughput": 38.4, "grad_norm": 0.139229}
+{"step": 1850, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:09:24Z", "train_loss": 0.984573, "lr": 0.00028275, "throughput": 38.4, "grad_norm": 0.135385}
+{"step": 1875, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:09:27Z", "train_loss": 0.979567, "lr": 0.00028229, "throughput": 38.4, "grad_norm": 0.131446}
+{"step": 1900, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:09:31Z", "train_loss": 0.974594, "lr": 0.00028182, "throughput": 38.4, "grad_norm": 0.127417}
+{"step": 1925, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:09:35Z", "train_loss": 0.969652, "lr": 0.00028135, "throughput": 38.4, "grad_norm": 0.123303}
+{"step": 1950, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:09:38Z", "train_loss": 0.964743, "lr": 0.00028087, "throughput": 38.4, "grad_norm": 0.11911}
+{"step": 1975, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:09:42Z", "train_loss": 0.959865, "lr": 0.00028039, "throughput": 38.4, "grad_norm": 0.11484}
+{"step": 2000, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:10:45Z", "train_loss": 0.955018, "lr": 0.0002799, "throughput": 38.4, "grad_norm": 0.1105, "val_metric": 0.741}
+{"step": 2025, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:10:49Z", "train_loss": 0.950203, "lr": 0.00027941, "throughput": 38.4, "grad_norm": 0.106095}
+{"step": 2050, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:10:52Z", "train_loss": 0.945418, "lr": 0.00027891, "throughput": 38.4, "grad_norm": 0.10163}
+{"step": 2075, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:10:56Z", "train_loss": 0.940665, "lr": 0.00027841, "throughput": 38.4, "grad_norm": 0.09711}
+{"step": 2100, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:10:00Z", "train_loss": 0.935942, "lr": 0.0002779, "throughput": 38.4, "grad_norm": 0.092539}
+{"step": 2125, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:10:03Z", "train_loss": 0.931249, "lr": 0.00027738, "throughput": 38.4, "grad_norm": 0.087925}
+{"step": 2150, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:10:07Z", "train_loss": 0.926587, "lr": 0.00027686, "throughput": 38.4, "grad_norm": 0.083271}
+{"step": 2175, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:10:10Z", "train_loss": 0.921954, "lr": 0.00027633, "throughput": 38.4, "grad_norm": 0.078583}
+{"step": 2200, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:10:14Z", "train_loss": 0.917352, "lr": 0.0002758, "throughput": 38.4, "grad_norm": 0.073868}
+{"step": 2225, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:10:17Z", "train_loss": 0.912779, "lr": 0.00027526, "throughput": 38.4, "grad_norm": 0.069129}
+{"step": 2250, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:10:21Z", "train_loss": 0.908235, "lr": 0.00027472, "throughput": 38.4, "grad_norm": 0.064373, "val_metric": 0.740596}
+{"step": 2275, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:10:25Z", "train_loss": 0.903721, "lr": 0.00027417, "throughput": 38.4, "grad_norm": 0.059606}
+{"step": 2300, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:10:28Z", "train_loss": 0.899236, "lr": 0.00027362, "throughput": 38.4, "grad_norm": 0.054832}
+{"step": 2325, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:10:32Z", "train_loss": 0.89478, "lr": 0.00027306, "throughput": 38.4, "grad_norm": 0.058542}
+{"step": 2350, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:10:35Z", "train_loss": 0.890352, "lr": 0.0002725, "throughput": 38.4, "grad_norm": 0.063311}
+{"step": 2375, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:10:39Z", "train_loss": 0.885953, "lr": 0.00027193, "throughput": 38.4, "grad_norm": 0.06807}
+{"step": 2400, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:11:42Z", "train_loss": 0.881582, "lr": 0.00027135, "throughput": 38.4, "grad_norm": 0.072813}
+{"step": 2425, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:11:46Z", "train_loss": 0.87724, "lr": 0.00027077, "throughput": 38.4, "grad_norm": 0.077534}
+{"step": 2450, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:11:50Z", "train_loss": 0.872925, "lr": 0.00027019, "throughput": 38.4, "grad_norm": 0.082228}
+{"step": 2475, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:11:53Z", "train_loss": 0.868638, "lr": 0.0002696, "throughput": 38.4, "grad_norm": 0.08689}
+{"step": 2500, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:11:57Z", "train_loss": 0.864379, "lr": 0.000269, "throughput": 38.4, "grad_norm": 0.091514, "val_metric": 0.739401}
+{"step": 2525, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:11:00Z", "train_loss": 0.860147, "lr": 0.0002684, "throughput": 38.4, "grad_norm": 0.096095}
+{"step": 2550, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:11:04Z", "train_loss": 0.855942, "lr": 0.0002678, "throughput": 38.4, "grad_norm": 0.100627}
+{"step": 2575, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:11:07Z", "train_loss": 0.851765, "lr": 0.00026719, "throughput": 38.4, "grad_norm": 0.105105}
+{"step": 2600, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:11:11Z", "train_loss": 0.847614, "lr": 0.00026657, "throughput": 38.4, "grad_norm": 0.109524}
+{"step": 2625, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:11:15Z", "train_loss": 0.84349, "lr": 0.00026595, "throughput": 38.4, "grad_norm": 0.113878}
+{"step": 2650, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:11:18Z", "train_loss": 0.839393, "lr": 0.00026533, "throughput": 38.4, "grad_norm": 0.118164}
+{"step": 2675, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:11:22Z", "train_loss": 0.835322, "lr": 0.0002647, "throughput": 38.4, "grad_norm": 0.122375}
+{"step": 2700, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:11:25Z", "train_loss": 0.831277, "lr": 0.00026406, "throughput": 38.4, "grad_norm": 0.126507}
+{"step": 2725, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:11:29Z", "train_loss": 0.827258, "lr": 0.00026342, "throughput": 38.4, "grad_norm": 0.130555}
+{"step": 2750, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:11:32Z", "train_loss": 0.823265, "lr": 0.00026278, "throughput": 38.4, "grad_norm": 0.134514, "val_metric": 0.737461}
+{"step": 2775, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:11:36Z", "train_loss": 0.819298, "lr": 0.00026213, "throughput": 38.4, "grad_norm": 0.13838}
+{"step": 2800, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:12:40Z", "train_loss": 0.815356, "lr": 0.00026147, "throughput": 38.4, "grad_norm": 0.142149}
+{"step": 2825, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:12:43Z", "train_loss": 0.81144, "lr": 0.00026081, "throughput": 38.4, "grad_norm": 0.145815}
+{"step": 2850, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:12:47Z", "train_loss": 0.807549, "lr": 0.00026015, "throughput": 38.4, "grad_norm": 0.149374}
+{"step": 2875, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:12:50Z", "train_loss": 0.803683, "lr": 0.00025948, "throughput": 38.4, "grad_norm": 0.152823}
+{"step": 2900, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:12:54Z", "train_loss": 0.799841, "lr": 0.00025881, "throughput": 38.4, "grad_norm": 0.156158}
+{"step": 2925, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:12:57Z", "train_loss": 0.796025, "lr": 0.00025813, "throughput": 38.4, "grad_norm": 0.159374}
+{"step": 2950, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:12:01Z", "train_loss": 0.792233, "lr": 0.00025745, "throughput": 38.4, "grad_norm": 0.162467}
+{"step": 2975, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:12:05Z", "train_loss": 0.788466, "lr": 0.00025676, "throughput": 38.4, "grad_norm": 0.165435}
+{"step": 3000, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:12:08Z", "train_loss": 0.784723, "lr": 0.00025607, "throughput": 38.4, "grad_norm": 0.168274, "val_metric": 0.734849}
+{"step": 3025, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:12:12Z", "train_loss": 0.781003, "lr": 0.00025537, "throughput": 38.4, "grad_norm": 0.17098}
+{"step": 3050, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:12:15Z", "train_loss": 0.777308, "lr": 0.00025467, "throughput": 38.4, "grad_norm": 0.17355}
+{"step": 3075, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:12:19Z", "train_loss": 0.773637, "lr": 0.00025396, "throughput": 38.4, "grad_norm": 0.175982}
+{"step": 3100, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:12:22Z", "train_loss": 0.769989, "lr": 0.00025325, "throughput": 38.4, "grad_norm": 0.178272}
+{"step": 3125, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:12:26Z", "train_loss": 0.766365, "lr": 0.00025254, "throughput": 38.4, "grad_norm": 0.180418}
+{"step": 3150, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:12:30Z", "train_loss": 0.762764, "lr": 0.00025182, "throughput": 38.4, "grad_norm": 0.182417}
+{"step": 3175, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:12:33Z", "train_loss": 0.759186, "lr": 0.0002511, "throughput": 38.4, "grad_norm": 0.184268}
+{"step": 3200, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:13:37Z", "train_loss": 0.755632, "lr": 0.00025037, "throughput": 38.4, "grad_norm": 0.185967}
+{"step": 3225, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:13:40Z", "train_loss": 0.7521, "lr": 0.00024964, "throughput": 38.4, "grad_norm": 0.187513}
+{"step": 3250, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:13:44Z", "train_loss": 0.748591, "lr": 0.0002489, "throughput": 38.4, "grad_norm": 0.188904, "val_metric": 0.731667}
+{"step": 3275, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:13:47Z", "train_loss": 0.745104, "lr": 0.00024816, "throughput": 38.4, "grad_norm": 0.190138}
+{"step": 3300, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:13:51Z", "train_loss": 0.74164, "lr": 0.00024742, "throughput": 38.4, "grad_norm": 0.191214}
+{"step": 3325, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:13:55Z", "train_loss": 0.738198, "lr": 0.00024667, "throughput": 38.4, "grad_norm": 0.192131}
+{"step": 3350, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:13:58Z", "train_loss": 0.734779, "lr": 0.00024592, "throughput": 38.4, "grad_norm": 0.192888}
+{"step": 3375, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:13:02Z", "train_loss": 0.731381, "lr": 0.00024516, "throughput": 38.4, "grad_norm": 0.193484}
+{"step": 3400, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:13:05Z", "train_loss": 0.728005, "lr": 0.0002444, "throughput": 38.4, "grad_norm": 0.193918}
+{"step": 3425, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:13:09Z", "train_loss": 0.724651, "lr": 0.00024363, "throughput": 38.4, "grad_norm": 0.194189}
+{"step": 3450, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:13:12Z", "train_loss": 0.721319, "lr": 0.00024286, "throughput": 38.4, "grad_norm": 0.194298}
+{"step": 3475, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:13:16Z", "train_loss": 0.718008, "lr": 0.00024209, "throughput": 38.4, "grad_norm": 0.194244}
+{"step": 3500, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:13:20Z", "train_loss": 0.714718, "lr": 0.00024131, "throughput": 38.4, "grad_norm": 0.194027, "val_metric": 0.728036}
+{"step": 3525, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:13:23Z", "train_loss": 0.71145, "lr": 0.00024053, "throughput": 38.4, "grad_norm": 0.193647}
+{"step": 3550, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:13:27Z", "train_loss": 0.708203, "lr": 0.00023975, "throughput": 38.4, "grad_norm": 0.193106}
+{"step": 3575, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:13:30Z", "train_loss": 0.704976, "lr": 0.00023896, "throughput": 38.4, "grad_norm": 0.192403}
+{"step": 3600, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:14:34Z", "train_loss": 0.70177, "lr": 0.00023817, "throughput": 38.4, "grad_norm": 0.191539}
+{"step": 3625, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:14:37Z", "train_loss": 0.698585, "lr": 0.00023737, "throughput": 38.4, "grad_norm": 0.190516}
+{"step": 3650, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:14:41Z", "train_loss": 0.695421, "lr": 0.00023657, "throughput": 38.4, "grad_norm": 0.189334}
+{"step": 3675, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:14:45Z", "train_loss": 0.692276, "lr": 0.00023577, "throughput": 38.4, "grad_norm": 0.187995}
+{"step": 3700, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:14:48Z", "train_loss": 0.689152, "lr": 0.00023496, "throughput": 38.4, "grad_norm": 0.186501}
+{"step": 3725, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:14:52Z", "train_loss": 0.686049, "lr": 0.00023415, "throughput": 38.4, "grad_norm": 0.184853}
+{"step": 3750, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:14:55Z", "train_loss": 0.682965, "lr": 0.00023334, "throughput": 38.4, "grad_norm": 0.183053, "val_metric": 0.724097}
+{"step": 3775, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:14:59Z", "train_loss": 0.679901, "lr": 0.00023252, "throughput": 38.4, "grad_norm": 0.181103}
+{"step": 3800, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:14:02Z", "train_loss": 0.676856, "lr": 0.0002317, "throughput": 38.4, "grad_norm": 0.179006}
+{"step": 3825, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:14:06Z", "train_loss": 0.673832, "lr": 0.00023087, "throughput": 38.4, "grad_norm": 0.176764}
+{"step": 3850, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:14:10Z", "train_loss": 0.670826, "lr": 0.00023004, "throughput": 38.4, "grad_norm": 0.174379}
+{"step": 3875, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:14:13Z", "train_loss": 0.667841, "lr": 0.00022921, "throughput": 38.4, "grad_norm": 0.171855}
+{"step": 3900, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:14:17Z", "train_loss": 0.664874, "lr": 0.00022837, "throughput": 38.4, "grad_norm": 0.169194}
+{"step": 3925, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:14:20Z", "train_loss": 0.661926, "lr": 0.00022754, "throughput": 38.4, "grad_norm": 0.166399}
+{"step": 3950, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:14:24Z", "train_loss": 0.658998, "lr": 0.00022669, "throughput": 38.4, "grad_norm": 0.163474}
+{"step": 3975, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:14:27Z", "train_loss": 0.656088, "lr": 0.00022585, "throughput": 38.4, "grad_norm": 0.160422}
+{"step": 4000, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:15:31Z", "train_loss": 0.653197, "lr": 0.000225, "throughput": 38.4, "grad_norm": 0.157247, "val_metric": 0.72}
+{"step": 4025, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:15:35Z", "train_loss": 0.650325, "lr": 0.00022415, "throughput": 38.4, "grad_norm": 0.153952}
+{"step": 4050, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:15:38Z", "train_loss": 0.647471, "lr": 0.00022329, "throughput": 38.4, "grad_norm": 0.15054}
+{"step": 4075, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:15:42Z", "train_loss": 0.644635, "lr": 0.00022244, "throughput": 38.4, "grad_norm": 0.147017}
+{"step": 4100, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:15:45Z", "train_loss": 0.641818, "lr": 0.00022157, "throughput": 38.4, "grad_norm": 0.143386}
+{"step": 4125, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:15:49Z", "train_loss": 0.639019, "lr": 0.00022071, "throughput": 38.4, "grad_norm": 0.139652}
+{"step": 4150, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:15:52Z", "train_loss": 0.636238, "lr": 0.00021984, "throughput": 38.4, "grad_norm": 0.135818}
+{"step": 4175, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:15:56Z", "train_loss": 0.633474, "lr": 0.00021897, "throughput": 38.4, "grad_norm": 0.13189}
+{"step": 4200, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:15:00Z", "train_loss": 0.630729, "lr": 0.0002181, "throughput": 38.4, "grad_norm": 0.127871}
+{"step": 4225, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:15:03Z", "train_loss": 0.628001, "lr": 0.00021722, "throughput": 38.4, "grad_norm": 0.123766}
+{"step": 4250, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:15:07Z", "train_loss": 0.625291, "lr": 0.00021634, "throughput": 38.4, "grad_norm": 0.119581, "val_metric": 0.72}
+{"step": 4275, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:15:10Z", "train_loss": 0.622598, "lr": 0.00021546, "throughput": 38.4, "grad_norm": 0.11532}
+{"step": 4300, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:15:14Z", "train_loss": 0.619923, "lr": 0.00021458, "throughput": 38.4, "grad_norm": 0.110988}
+{"step": 4325, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:15:17Z", "train_loss": 0.617264, "lr": 0.00021369, "throughput": 38.4, "grad_norm": 0.10659}
+{"step": 4350, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:15:21Z", "train_loss": 0.614623, "lr": 0.0002128, "throughput": 38.4, "grad_norm": 0.102131}
+{"step": 4375, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:15:25Z", "train_loss": 0.611999, "lr": 0.00021191, "throughput": 38.4, "grad_norm": 0.097616}
+{"step": 4400, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:16:28Z", "train_loss": 0.609392, "lr": 0.00021101, "throughput": 38.4, "grad_norm": 0.093051}
+{"step": 4425, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:16:32Z", "train_loss": 0.606802, "lr": 0.00021011, "throughput": 38.4, "grad_norm": 0.088441}
+{"step": 4450, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:16:35Z", "train_loss": 0.604228, "lr": 0.00020921, "throughput": 38.4, "grad_norm": 0.083792}
+{"step": 4475, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:16:39Z", "train_loss": 0.601671, "lr": 0.00020831, "throughput": 38.4, "grad_norm": 0.079108}
+{"step": 4500, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:16:42Z", "train_loss": 0.59913, "lr": 0.0002074, "throughput": 38.4, "grad_norm": 0.074395, "val_metric": 0.72}
+{"step": 4525, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:16:46Z", "train_loss": 0.596606, "lr": 0.00020649, "throughput": 38.4, "grad_norm": 0.069658}
+{"step": 4550, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:16:50Z", "train_loss": 0.594098, "lr": 0.00020558, "throughput": 38.4, "grad_norm": 0.064904}
+{"step": 4575, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:16:53Z", "train_loss": 0.591606, "lr": 0.00020467, "throughput": 38.4, "grad_norm": 0.060138}
+{"step": 4600, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:16:57Z", "train_loss": 0.58913, "lr": 0.00020376, "throughput": 38.4, "grad_norm": 0.055365}
+{"step": 4625, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:16:00Z", "train_loss": 0.58667, "lr": 0.00020284, "throughput": 38.4, "grad_norm": 0.05801}
+{"step": 4650, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:16:04Z", "train_loss": 0.584226, "lr": 0.00020192, "throughput": 38.4, "grad_norm": 0.06278}
+{"step": 4675, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:16:07Z", "train_loss": 0.581797, "lr": 0.000201, "throughput": 38.4, "grad_norm": 0.06754}
+{"step": 4700, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:16:11Z", "train_loss": 0.579385, "lr": 0.00020007, "throughput": 38.4, "grad_norm": 0.072285}
+{"step": 4725, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:16:15Z", "train_loss": 0.576987, "lr": 0.00019914, "throughput": 38.4, "grad_norm": 0.077009}
+{"step": 4750, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:16:18Z", "train_loss": 0.574606, "lr": 0.00019822, "throughput": 38.4, "grad_norm": 0.081706, "val_metric": 0.72}
+{"step": 4775, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:16:22Z", "train_loss": 0.572239, "lr": 0.00019729, "throughput": 38.4, "grad_norm": 0.086372}
+{"step": 4800, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:17:25Z", "train_loss": 0.569888, "lr": 0.00019635, "throughput": 38.4, "grad_norm": 0.091001}
+{"step": 4825, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:17:29Z", "train_loss": 0.567552, "lr": 0.00019542, "throughput": 38.4, "grad_norm": 0.095586}
+{"step": 4850, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:17:32Z", "train_loss": 0.565231, "lr": 0.00019448, "throughput": 38.4, "grad_norm": 0.100124}
+{"step": 4875, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:17:36Z", "train_loss": 0.562925, "lr": 0.00019354, "throughput": 38.4, "grad_norm": 0.104608}
+{"step": 4900, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:17:40Z", "train_loss": 0.560633, "lr": 0.0001926, "throughput": 38.4, "grad_norm": 0.109034}
+{"step": 4925, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:17:43Z", "train_loss": 0.558357, "lr": 0.00019166, "throughput": 38.4, "grad_norm": 0.113396}
+{"step": 4950, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:17:47Z", "train_loss": 0.556095, "lr": 0.00019072, "throughput": 38.4, "grad_norm": 0.11769}
+{"step": 4975, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:17:50Z", "train_loss": 0.553848, "lr": 0.00018977, "throughput": 38.4, "grad_norm": 0.121909}
+{"step": 5000, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:17:54Z", "train_loss": 0.551615, "lr": 0.00018882, "throughput": 38.4, "grad_norm": 0.12605, "val_metric": 0.72}
+{"step": 5025, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:17:57Z", "train_loss": 0.549396, "lr": 0.00018787, "throughput": 38.4, "grad_norm": 0.130108}
+{"step": 5050, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:17:01Z", "train_loss": 0.547192, "lr": 0.00018692, "throughput": 38.4, "grad_norm": 0.134077}
+{"step": 5075, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:17:05Z", "train_loss": 0.545002, "lr": 0.00018597, "throughput": 38.4, "grad_norm": 0.137954}
+{"step": 5100, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:17:08Z", "train_loss": 0.542826, "lr": 0.00018502, "throughput": 38.4, "grad_norm": 0.141733}
+{"step": 5125, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:17:12Z", "train_loss": 0.540664, "lr": 0.00018406, "throughput": 38.4, "grad_norm": 0.145411}
+{"step": 5150, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:17:15Z", "train_loss": 0.538516, "lr": 0.0001831, "throughput": 38.4, "grad_norm": 0.148983}
+{"step": 5175, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:17:19Z", "train_loss": 0.536382, "lr": 0.00018215, "throughput": 38.4, "grad_norm": 0.152444}
+{"step": 5200, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:18:22Z", "train_loss": 0.534262, "lr": 0.00018119, "throughput": 38.4, "grad_norm": 0.155792}
+{"step": 5225, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:18:26Z", "train_loss": 0.532155, "lr": 0.00018023, "throughput": 38.4, "grad_norm": 0.159021}
+{"step": 5250, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:18:30Z", "train_loss": 0.530062, "lr": 0.00017926, "throughput": 38.4, "grad_norm": 0.162129, "val_metric": 0.72}
+{"step": 5275, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:18:33Z", "train_loss": 0.527982, "lr": 0.0001783, "throughput": 38.4, "grad_norm": 0.165111}
+{"step": 5300, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:18:37Z", "train_loss": 0.525916, "lr": 0.00017734, "throughput": 38.4, "grad_norm": 0.167964}
+{"step": 5325, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:18:40Z", "train_loss": 0.523863, "lr": 0.00017637, "throughput": 38.4, "grad_norm": 0.170685}
+{"step": 5350, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:18:44Z", "train_loss": 0.521823, "lr": 0.0001754, "throughput": 38.4, "grad_norm": 0.173271}
+{"step": 5375, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:18:47Z", "train_loss": 0.519796, "lr": 0.00017443, "throughput": 38.4, "grad_norm": 0.175718}
+{"step": 5400, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:18:51Z", "train_loss": 0.517783, "lr": 0.00017347, "throughput": 38.4, "grad_norm": 0.178024}
+{"step": 5425, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:18:55Z", "train_loss": 0.515782, "lr": 0.0001725, "throughput": 38.4, "grad_norm": 0.180186}
+{"step": 5450, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:18:58Z", "train_loss": 0.513794, "lr": 0.00017152, "throughput": 38.4, "grad_norm": 0.182202}
+{"step": 5475, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:18:02Z", "train_loss": 0.511819, "lr": 0.00017055, "throughput": 38.4, "grad_norm": 0.184069}
+{"step": 5500, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:18:05Z", "train_loss": 0.509857, "lr": 0.00016958, "throughput": 38.4, "grad_norm": 0.185785, "val_metric": 0.72}
+{"step": 5525, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:18:09Z", "train_loss": 0.507907, "lr": 0.00016861, "throughput": 38.4, "grad_norm": 0.187348}
+{"step": 5550, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:18:12Z", "train_loss": 0.50597, "lr": 0.00016763, "throughput": 38.4, "grad_norm": 0.188756}
+{"step": 5575, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:18:16Z", "train_loss": 0.504046, "lr": 0.00016666, "throughput": 38.4, "grad_norm": 0.190008}
+{"step": 5600, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:19:20Z", "train_loss": 0.502133, "lr": 0.00016568, "throughput": 38.4, "grad_norm": 0.191102}
+{"step": 5625, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:19:23Z", "train_loss": 0.500233, "lr": 0.0001647, "throughput": 38.4, "grad_norm": 0.192037}
+{"step": 5650, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:19:27Z", "train_loss": 0.498346, "lr": 0.00016373, "throughput": 38.4, "grad_norm": 0.192812}
+{"step": 5675, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:19:30Z", "train_loss": 0.49647, "lr": 0.00016275, "throughput": 38.4, "grad_norm": 0.193426}
+{"step": 5700, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:19:34Z", "train_loss": 0.494607, "lr": 0.00016177, "throughput": 38.4, "grad_norm": 0.193877}
+{"step": 5725, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:19:37Z", "train_loss": 0.492755, "lr": 0.00016079, "throughput": 38.4, "grad_norm": 0.194167}
+{"step": 5750, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:19:41Z", "train_loss": 0.490916, "lr": 0.00015981, "throughput": 38.4, "grad_norm": 0.194294, "val_metric": 0.72}
+{"step": 5775, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:19:45Z", "train_loss": 0.489088, "lr": 0.00015883, "throughput": 38.4, "grad_norm": 0.194258}
+{"step": 5800, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:19:48Z", "train_loss": 0.487272, "lr": 0.00015785, "throughput": 38.4, "grad_norm": 0.194059}
+{"step": 5825, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:19:52Z", "train_loss": 0.485468, "lr": 0.00015687, "throughput": 38.4, "grad_norm": 0.193697}
+{"step": 5850, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:19:55Z", "train_loss": 0.483675, "lr": 0.00015589, "throughput": 38.4, "grad_norm": 0.193174}
+{"step": 5875, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:19:59Z", "train_loss": 0.481894, "lr": 0.00015491, "throughput": 38.4, "grad_norm": 0.192489}
+{"step": 5900, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:19:02Z", "train_loss": 0.480124, "lr": 0.00015393, "throughput": 38.4, "grad_norm": 0.191643}
+{"step": 5925, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:19:06Z", "train_loss": 0.478366, "lr": 0.00015295, "throughput": 38.4, "grad_norm": 0.190638}
+{"step": 5950, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:19:10Z", "train_loss": 0.476619, "lr": 0.00015196, "throughput": 38.4, "grad_norm": 0.189473}
+{"step": 5975, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:19:13Z", "train_loss": 0.474883, "lr": 0.00015098, "throughput": 38.4, "grad_norm": 0.188152}
+{"step": 6000, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:20:17Z", "train_loss": 0.473159, "lr": 0.00015, "throughput": 38.4, "grad_norm": 0.186675, "val_metric": 0.72}
+{"step": 6025, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:20:20Z", "train_loss": 0.471446, "lr": 0.00014902, "throughput": 38.4, "grad_norm": 0.185044}
+{"step": 6050, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:20:24Z", "train_loss": 0.469743, "lr": 0.00014804, "throughput": 38.4, "grad_norm": 0.183261}
+{"step": 6075, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:20:27Z", "train_loss": 0.468052, "lr": 0.00014705, "throughput": 38.4, "grad_norm": 0.181328}
+{"step": 6100, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:20:31Z", "train_loss": 0.466371, "lr": 0.00014607, "throughput": 38.4, "grad_norm": 0.179247}
+{"step": 6125, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:20:35Z", "train_loss": 0.464702, "lr": 0.00014509, "throughput": 38.4, "grad_norm": 0.177021}
+{"step": 6150, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:20:38Z", "train_loss": 0.463043, "lr": 0.00014411, "throughput": 38.4, "grad_norm": 0.174652}
+{"step": 6175, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:20:42Z", "train_loss": 0.461394, "lr": 0.00014313, "throughput": 38.4, "grad_norm": 0.172143}
+{"step": 6200, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:20:45Z", "train_loss": 0.459757, "lr": 0.00014215, "throughput": 38.4, "grad_norm": 0.169497}
+{"step": 6225, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:20:49Z", "train_loss": 0.458129, "lr": 0.00014117, "throughput": 38.4, "grad_norm": 0.166717}
+{"step": 6250, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:20:52Z", "train_loss": 0.456513, "lr": 0.00014019, "throughput": 38.4, "grad_norm": 0.163807, "val_metric": 0.72}
+{"step": 6275, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:20:56Z", "train_loss": 0.454907, "lr": 0.00013921, "throughput": 38.4, "grad_norm": 0.160769}
+{"step": 6300, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:20:00Z", "train_loss": 0.453311, "lr": 0.00013823, "throughput": 38.4, "grad_norm": 0.157607}
+{"step": 6325, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:20:03Z", "train_loss": 0.451725, "lr": 0.00013725, "throughput": 38.4, "grad_norm": 0.154325}
+{"step": 6350, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:20:07Z", "train_loss": 0.45015, "lr": 0.00013627, "throughput": 38.4, "grad_norm": 0.150926}
+{"step": 6375, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:20:10Z", "train_loss": 0.448584, "lr": 0.0001353, "throughput": 38.4, "grad_norm": 0.147416}
+{"step": 6400, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:21:14Z", "train_loss": 0.447029, "lr": 0.00013432, "throughput": 38.4, "grad_norm": 0.143796}
+{"step": 6425, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:21:17Z", "train_loss": 0.445484, "lr": 0.00013334, "throughput": 38.4, "grad_norm": 0.140073}
+{"step": 6450, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:21:21Z", "train_loss": 0.443949, "lr": 0.00013237, "throughput": 38.4, "grad_norm": 0.13625}
+{"step": 6475, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:21:25Z", "train_loss": 0.442423, "lr": 0.00013139, "throughput": 38.4, "grad_norm": 0.132332}
+{"step": 6500, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:21:28Z", "train_loss": 0.440908, "lr": 0.00013042, "throughput": 38.4, "grad_norm": 0.128323, "val_metric": 0.72}
+{"step": 6525, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:21:32Z", "train_loss": 0.439402, "lr": 0.00012945, "throughput": 38.4, "grad_norm": 0.124228}
+{"step": 6550, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:21:35Z", "train_loss": 0.437906, "lr": 0.00012848, "throughput": 38.4, "grad_norm": 0.120051}
+{"step": 6575, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:21:39Z", "train_loss": 0.436419, "lr": 0.0001275, "throughput": 38.4, "grad_norm": 0.115799}
+{"step": 6600, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:21:42Z", "train_loss": 0.434943, "lr": 0.00012653, "throughput": 38.4, "grad_norm": 0.111474}
+{"step": 6625, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:21:46Z", "train_loss": 0.433475, "lr": 0.00012557, "throughput": 38.4, "grad_norm": 0.107083}
+{"step": 6650, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:21:50Z", "train_loss": 0.432017, "lr": 0.0001246, "throughput": 38.4, "grad_norm": 0.102631}
+{"step": 6675, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:21:53Z", "train_loss": 0.430569, "lr": 0.00012363, "throughput": 38.4, "grad_norm": 0.098122}
+{"step": 6700, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:21:57Z", "train_loss": 0.429129, "lr": 0.00012266, "throughput": 38.4, "grad_norm": 0.093563}
+{"step": 6725, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:21:00Z", "train_loss": 0.4277, "lr": 0.0001217, "throughput": 38.4, "grad_norm": 0.088957}
+{"step": 6750, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:21:04Z", "train_loss": 0.426279, "lr": 0.00012074, "throughput": 38.4, "grad_norm": 0.084312, "val_metric": 0.72}
+{"step": 6775, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:21:07Z", "train_loss": 0.424867, "lr": 0.00011977, "throughput": 38.4, "grad_norm": 0.079631}
+{"step": 6800, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:22:11Z", "train_loss": 0.423465, "lr": 0.00011881, "throughput": 38.4, "grad_norm": 0.074921}
+{"step": 6825, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:22:15Z", "train_loss": 0.422071, "lr": 0.00011785, "throughput": 38.4, "grad_norm": 0.070188}
+{"step": 6850, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:22:18Z", "train_loss": 0.420687, "lr": 0.0001169, "throughput": 38.4, "grad_norm": 0.065435}
+{"step": 6875, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:22:22Z", "train_loss": 0.419311, "lr": 0.00011594, "throughput": 38.4, "grad_norm": 0.06067}
+{"step": 6900, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:22:25Z", "train_loss": 0.417944, "lr": 0.00011498, "throughput": 38.4, "grad_norm": 0.055897}
+{"step": 6925, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:22:29Z", "train_loss": 0.416586, "lr": 0.00011403, "throughput": 38.4, "grad_norm": 0.057477}
+{"step": 6950, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:22:32Z", "train_loss": 0.415237, "lr": 0.00011308, "throughput": 38.4, "grad_norm": 0.062248}
+{"step": 6975, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:22:36Z", "train_loss": 0.413897, "lr": 0.00011213, "throughput": 38.4, "grad_norm": 0.06701}
+{"step": 7000, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:22:40Z", "train_loss": 0.412565, "lr": 0.00011118, "throughput": 38.4, "grad_norm": 0.071757, "val_metric": 0.72}
+{"step": 7025, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:22:43Z", "train_loss": 0.411241, "lr": 0.00011023, "throughput": 38.4, "grad_norm": 0.076483}
+{"step": 7050, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:22:47Z", "train_loss": 0.409926, "lr": 0.00010928, "throughput": 38.4, "grad_norm": 0.081184}
+{"step": 7075, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:22:50Z", "train_loss": 0.40862, "lr": 0.00010834, "throughput": 38.4, "grad_norm": 0.085854}
+{"step": 7100, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:22:54Z", "train_loss": 0.407322, "lr": 0.0001074, "throughput": 38.4, "grad_norm": 0.090486}
+{"step": 7125, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:22:57Z", "train_loss": 0.406033, "lr": 0.00010646, "throughput": 38.4, "grad_norm": 0.095077}
+{"step": 7150, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:22:01Z", "train_loss": 0.404751, "lr": 0.00010552, "throughput": 38.4, "grad_norm": 0.09962}
+{"step": 7175, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:22:05Z", "train_loss": 0.403478, "lr": 0.00010458, "throughput": 38.4, "grad_norm": 0.104111}
+{"step": 7200, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:23:08Z", "train_loss": 0.402213, "lr": 0.00010365, "throughput": 38.4, "grad_norm": 0.108544}
+{"step": 7225, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:23:12Z", "train_loss": 0.400957, "lr": 0.00010271, "throughput": 38.4, "grad_norm": 0.112913}
+{"step": 7250, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:23:15Z", "train_loss": 0.399708, "lr": 0.00010178, "throughput": 38.4, "grad_norm": 0.117214, "val_metric": 0.72}
+{"step": 7275, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:23:19Z", "train_loss": 0.398468, "lr": 0.00010086, "throughput": 38.4, "grad_norm": 0.121443}
+{"step": 7300, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:23:22Z", "train_loss": 0.397235, "lr": 9.993e-05, "throughput": 38.4, "grad_norm": 0.125593}
+{"step": 7325, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:23:26Z", "train_loss": 0.39601, "lr": 9.9e-05, "throughput": 38.4, "grad_norm": 0.12966}
+{"step": 7350, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:23:30Z", "train_loss": 0.394794, "lr": 9.808e-05, "throughput": 38.4, "grad_norm": 0.133639}
+{"step": 7375, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:23:33Z", "train_loss": 0.393585, "lr": 9.716e-05, "throughput": 38.4, "grad_norm": 0.137527}
+{"step": 7400, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:23:37Z", "train_loss": 0.392384, "lr": 9.624e-05, "throughput": 38.4, "grad_norm": 0.141317}
+{"step": 7425, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:23:40Z", "train_loss": 0.39119, "lr": 9.533e-05, "throughput": 38.4, "grad_norm": 0.145006}
+{"step": 7450, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:23:44Z", "train_loss": 0.390004, "lr": 9.442e-05, "throughput": 38.4, "grad_norm": 0.14859}
+{"step": 7475, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:23:47Z", "train_loss": 0.388826, "lr": 9.351e-05, "throughput": 38.4, "grad_norm": 0.152064}
+{"step": 7500, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:23:51Z", "train_loss": 0.387656, "lr": 9.26e-05, "throughput": 38.4, "grad_norm": 0.155424, "val_metric": 0.72}
+{"step": 7525, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:23:55Z", "train_loss": 0.386493, "lr": 9.169e-05, "throughput": 38.4, "grad_norm": 0.158667}
+{"step": 7550, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:23:58Z", "train_loss": 0.385337, "lr": 9.079e-05, "throughput": 38.4, "grad_norm": 0.161788}
+{"step": 7575, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:23:02Z", "train_loss": 0.384189, "lr": 8.989e-05, "throughput": 38.4, "grad_norm": 0.164785}
+{"step": 7600, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:24:05Z", "train_loss": 0.383049, "lr": 8.899e-05, "throughput": 38.4, "grad_norm": 0.167652}
+{"step": 7625, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:24:09Z", "train_loss": 0.381915, "lr": 8.809e-05, "throughput": 38.4, "grad_norm": 0.170388}
+{"step": 7650, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:24:12Z", "train_loss": 0.380789, "lr": 8.72e-05, "throughput": 38.4, "grad_norm": 0.172989}
+{"step": 7675, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:24:16Z", "train_loss": 0.379671, "lr": 8.631e-05, "throughput": 38.4, "grad_norm": 0.175452}
+{"step": 7700, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:24:20Z", "train_loss": 0.378559, "lr": 8.542e-05, "throughput": 38.4, "grad_norm": 0.177774}
+{"step": 7725, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:24:23Z", "train_loss": 0.377455, "lr": 8.454e-05, "throughput": 38.4, "grad_norm": 0.179952}
+{"step": 7750, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:24:27Z", "train_loss": 0.376357, "lr": 8.366e-05, "throughput": 38.4, "grad_norm": 0.181984, "val_metric": 0.72}
+{"step": 7775, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:24:30Z", "train_loss": 0.375267, "lr": 8.278e-05, "throughput": 38.4, "grad_norm": 0.183868}
+{"step": 7800, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:24:34Z", "train_loss": 0.374184, "lr": 8.19e-05, "throughput": 38.4, "grad_norm": 0.185601}
+{"step": 7825, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:24:37Z", "train_loss": 0.373108, "lr": 8.103e-05, "throughput": 38.4, "grad_norm": 0.187181}
+{"step": 7850, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:24:41Z", "train_loss": 0.372038, "lr": 8.016e-05, "throughput": 38.4, "grad_norm": 0.188607}
+{"step": 7875, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:24:45Z", "train_loss": 0.370976, "lr": 7.929e-05, "throughput": 38.4, "grad_norm": 0.189876}
+{"step": 7900, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:24:48Z", "train_loss": 0.36992, "lr": 7.843e-05, "throughput": 38.4, "grad_norm": 0.190988}
+{"step": 7925, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:24:52Z", "train_loss": 0.368871, "lr": 7.756e-05, "throughput": 38.4, "grad_norm": 0.191941}
+{"step": 7950, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:24:55Z", "train_loss": 0.367829, "lr": 7.671e-05, "throughput": 38.4, "grad_norm": 0.192733}
+{"step": 7975, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:24:59Z", "train_loss": 0.366794, "lr": 7.585e-05, "throughput": 38.4, "grad_norm": 0.193365}
+{"step": 8000, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:25:02Z", "train_loss": 0.365765, "lr": 7.5e-05, "throughput": 38.4, "grad_norm": 0.193835, "val_metric": 0.72}
+{"step": 8025, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:25:06Z", "train_loss": 0.364743, "lr": 7.415e-05, "throughput": 38.4, "grad_norm": 0.194143}
+{"step": 8050, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:25:10Z", "train_loss": 0.363728, "lr": 7.331e-05, "throughput": 38.4, "grad_norm": 0.194288}
+{"step": 8075, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:25:13Z", "train_loss": 0.362719, "lr": 7.246e-05, "throughput": 38.4, "grad_norm": 0.19427}
+{"step": 8100, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:25:17Z", "train_loss": 0.361716, "lr": 7.163e-05, "throughput": 38.4, "grad_norm": 0.194089}
+{"step": 8125, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:25:20Z", "train_loss": 0.36072, "lr": 7.079e-05, "throughput": 38.4, "grad_norm": 0.193746}
+{"step": 8150, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:25:24Z", "train_loss": 0.359731, "lr": 6.996e-05, "throughput": 38.4, "grad_norm": 0.19324}
+{"step": 8175, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:25:27Z", "train_loss": 0.358748, "lr": 6.913e-05, "throughput": 38.4, "grad_norm": 0.192573}
+{"step": 8200, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:25:31Z", "train_loss": 0.357771, "lr": 6.83e-05, "throughput": 38.4, "grad_norm": 0.191745}
+{"step": 8225, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:25:35Z", "train_loss": 0.3568, "lr": 6.748e-05, "throughput": 38.4, "grad_norm": 0.190758}
+{"step": 8250, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:25:38Z", "train_loss": 0.355836, "lr": 6.666e-05, "throughput": 38.4, "grad_norm": 0.189611, "val_metric": 0.72}
+{"step": 8275, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:25:42Z", "train_loss": 0.354878, "lr": 6.585e-05, "throughput": 38.4, "grad_norm": 0.188307}
+{"step": 8300, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:25:45Z", "train_loss": 0.353926, "lr": 6.504e-05, "throughput": 38.4, "grad_norm": 0.186847}
+{"step": 8325, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:25:49Z", "train_loss": 0.35298, "lr": 6.423e-05, "throughput": 38.4, "grad_norm": 0.185234}
+{"step": 8350, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:25:52Z", "train_loss": 0.35204, "lr": 6.343e-05, "throughput": 38.4, "grad_norm": 0.183467}
+{"step": 8375, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:25:56Z", "train_loss": 0.351106, "lr": 6.263e-05, "throughput": 38.4, "grad_norm": 0.181551}
+{"step": 8400, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:26:00Z", "train_loss": 0.350179, "lr": 6.183e-05, "throughput": 38.4, "grad_norm": 0.179486}
+{"step": 8425, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:26:03Z", "train_loss": 0.349257, "lr": 6.104e-05, "throughput": 38.4, "grad_norm": 0.177276}
+{"step": 8450, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:26:07Z", "train_loss": 0.348341, "lr": 6.025e-05, "throughput": 38.4, "grad_norm": 0.174923}
+{"step": 8475, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:26:10Z", "train_loss": 0.347431, "lr": 5.947e-05, "throughput": 38.4, "grad_norm": 0.17243}
+{"step": 8500, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:26:14Z", "train_loss": 0.346527, "lr": 5.869e-05, "throughput": 38.4, "grad_norm": 0.169799, "val_metric": 0.72}
+{"step": 8525, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:26:17Z", "train_loss": 0.345629, "lr": 5.791e-05, "throughput": 38.4, "grad_norm": 0.167034}
+{"step": 8550, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:26:21Z", "train_loss": 0.344737, "lr": 5.714e-05, "throughput": 38.4, "grad_norm": 0.164138}
+{"step": 8575, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:26:25Z", "train_loss": 0.34385, "lr": 5.637e-05, "throughput": 38.4, "grad_norm": 0.161114}
+{"step": 8600, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:26:28Z", "train_loss": 0.342969, "lr": 5.56e-05, "throughput": 38.4, "grad_norm": 0.157965}
+{"step": 8625, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:26:32Z", "train_loss": 0.342094, "lr": 5.484e-05, "throughput": 38.4, "grad_norm": 0.154697}
+{"step": 8650, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:26:35Z", "train_loss": 0.341224, "lr": 5.408e-05, "throughput": 38.4, "grad_norm": 0.151311}
+{"step": 8675, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:26:39Z", "train_loss": 0.34036, "lr": 5.333e-05, "throughput": 38.4, "grad_norm": 0.147812}
+{"step": 8700, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:26:42Z", "train_loss": 0.339501, "lr": 5.258e-05, "throughput": 38.4, "grad_norm": 0.144205}
+{"step": 8725, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:26:46Z", "train_loss": 0.338648, "lr": 5.184e-05, "throughput": 38.4, "grad_norm": 0.140493}
+{"step": 8750, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:26:50Z", "train_loss": 0.337801, "lr": 5.11e-05, "throughput": 38.4, "grad_norm": 0.136681, "val_metric": 0.72}
+{"step": 8775, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:26:53Z", "train_loss": 0.336959, "lr": 5.036e-05, "throughput": 38.4, "grad_norm": 0.132774}
+{"step": 8800, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:27:57Z", "train_loss": 0.336122, "lr": 4.963e-05, "throughput": 38.4, "grad_norm": 0.128774}
+{"step": 8825, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:27:00Z", "train_loss": 0.335291, "lr": 4.89e-05, "throughput": 38.4, "grad_norm": 0.124689}
+{"step": 8850, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:27:04Z", "train_loss": 0.334465, "lr": 4.818e-05, "throughput": 38.4, "grad_norm": 0.120521}
+{"step": 8875, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:27:07Z", "train_loss": 0.333645, "lr": 4.746e-05, "throughput": 38.4, "grad_norm": 0.116276}
+{"step": 8900, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:27:11Z", "train_loss": 0.332829, "lr": 4.675e-05, "throughput": 38.4, "grad_norm": 0.11196}
+{"step": 8925, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:27:15Z", "train_loss": 0.332019, "lr": 4.604e-05, "throughput": 38.4, "grad_norm": 0.107576}
+{"step": 8950, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:27:18Z", "train_loss": 0.331215, "lr": 4.533e-05, "throughput": 38.4, "grad_norm": 0.10313}
+{"step": 8975, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:27:22Z", "train_loss": 0.330415, "lr": 4.463e-05, "throughput": 38.4, "grad_norm": 0.098627}
+{"step": 9000, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:27:25Z", "train_loss": 0.32962, "lr": 4.393e-05, "throughput": 38.4, "grad_norm": 0.094073, "val_metric": 0.72}
+{"step": 9025, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:27:29Z", "train_loss": 0.328831, "lr": 4.324e-05, "throughput": 38.4, "grad_norm": 0.089473}
+{"step": 9050, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:27:32Z", "train_loss": 0.328047, "lr": 4.255e-05, "throughput": 38.4, "grad_norm": 0.084832}
+{"step": 9075, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:27:36Z", "train_loss": 0.327268, "lr": 4.187e-05, "throughput": 38.4, "grad_norm": 0.080155}
+{"step": 9100, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:27:40Z", "train_loss": 0.326493, "lr": 4.119e-05, "throughput": 38.4, "grad_norm": 0.075448}
+{"step": 9125, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:27:43Z", "train_loss": 0.325724, "lr": 4.052e-05, "throughput": 38.4, "grad_norm": 0.070716}
+{"step": 9150, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:27:47Z", "train_loss": 0.32496, "lr": 3.985e-05, "throughput": 38.4, "grad_norm": 0.065966}
+{"step": 9175, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:27:50Z", "train_loss": 0.3242, "lr": 3.919e-05, "throughput": 38.4, "grad_norm": 0.061202}
+{"step": 9200, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:28:54Z", "train_loss": 0.323446, "lr": 3.853e-05, "throughput": 38.4, "grad_norm": 0.056429}
+{"step": 9225, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:28:57Z", "train_loss": 0.322696, "lr": 3.787e-05, "throughput": 38.4, "grad_norm": 0.056945}
+{"step": 9250, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:28:01Z", "train_loss": 0.321952, "lr": 3.722e-05, "throughput": 38.4, "grad_norm": 0.061717, "val_metric": 0.72}
+{"step": 9275, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:28:05Z", "train_loss": 0.321212, "lr": 3.658e-05, "throughput": 38.4, "grad_norm": 0.06648}
+{"step": 9300, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:28:08Z", "train_loss": 0.320476, "lr": 3.594e-05, "throughput": 38.4, "grad_norm": 0.071229}
+{"step": 9325, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:28:12Z", "train_loss": 0.319746, "lr": 3.53e-05, "throughput": 38.4, "grad_norm": 0.075958}
+{"step": 9350, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:28:15Z", "train_loss": 0.31902, "lr": 3.467e-05, "throughput": 38.4, "grad_norm": 0.080662}
+{"step": 9375, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:28:19Z", "train_loss": 0.318299, "lr": 3.405e-05, "throughput": 38.4, "grad_norm": 0.085335}
+{"step": 9400, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:28:22Z", "train_loss": 0.317582, "lr": 3.343e-05, "throughput": 38.4, "grad_norm": 0.089972}
+{"step": 9425, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:28:26Z", "train_loss": 0.31687, "lr": 3.281e-05, "throughput": 38.4, "grad_norm": 0.094568}
+{"step": 9450, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:28:30Z", "train_loss": 0.316163, "lr": 3.22e-05, "throughput": 38.4, "grad_norm": 0.099116}
+{"step": 9475, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:28:33Z", "train_loss": 0.31546, "lr": 3.16e-05, "throughput": 38.4, "grad_norm": 0.103613}
+{"step": 9500, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:28:37Z", "train_loss": 0.314762, "lr": 3.1e-05, "throughput": 38.4, "grad_norm": 0.108052, "val_metric": 0.72}
+{"step": 9525, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:28:40Z", "train_loss": 0.314068, "lr": 3.04e-05, "throughput": 38.4, "grad_norm": 0.112429}
+{"step": 9550, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:28:44Z", "train_loss": 0.313379, "lr": 2.981e-05, "throughput": 38.4, "grad_norm": 0.116738}
+{"step": 9575, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:28:47Z", "train_loss": 0.312694, "lr": 2.923e-05, "throughput": 38.4, "grad_norm": 0.120975}
+{"step": 9600, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:29:51Z", "train_loss": 0.312014, "lr": 2.865e-05, "throughput": 38.4, "grad_norm": 0.125134}
+{"step": 9625, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:29:55Z", "train_loss": 0.311338, "lr": 2.807e-05, "throughput": 38.4, "grad_norm": 0.129211}
+{"step": 9650, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:29:58Z", "train_loss": 0.310666, "lr": 2.75e-05, "throughput": 38.4, "grad_norm": 0.1332}
+{"step": 9675, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:29:02Z", "train_loss": 0.309999, "lr": 2.694e-05, "throughput": 38.4, "grad_norm": 0.137098}
+{"step": 9700, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:29:05Z", "train_loss": 0.309336, "lr": 2.638e-05, "throughput": 38.4, "grad_norm": 0.140899}
+{"step": 9725, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:29:09Z", "train_loss": 0.308677, "lr": 2.583e-05, "throughput": 38.4, "grad_norm": 0.1446}
+{"step": 9750, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:29:12Z", "train_loss": 0.308023, "lr": 2.528e-05, "throughput": 38.4, "grad_norm": 0.148196, "val_metric": 0.72}
+{"step": 9775, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:29:16Z", "train_loss": 0.307372, "lr": 2.474e-05, "throughput": 38.4, "grad_norm": 0.151682}
+{"step": 9800, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:29:20Z", "train_loss": 0.306726, "lr": 2.42e-05, "throughput": 38.4, "grad_norm": 0.155055}
+{"step": 9825, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:29:23Z", "train_loss": 0.306084, "lr": 2.367e-05, "throughput": 38.4, "grad_norm": 0.158311}
+{"step": 9850, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:29:27Z", "train_loss": 0.305446, "lr": 2.314e-05, "throughput": 38.4, "grad_norm": 0.161446}
+{"step": 9875, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:29:30Z", "train_loss": 0.304812, "lr": 2.262e-05, "throughput": 38.4, "grad_norm": 0.164457}
+{"step": 9900, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:29:34Z", "train_loss": 0.304183, "lr": 2.21e-05, "throughput": 38.4, "grad_norm": 0.167339}
+{"step": 9925, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:29:37Z", "train_loss": 0.303557, "lr": 2.159e-05, "throughput": 38.4, "grad_norm": 0.17009}
+{"step": 9950, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:29:41Z", "train_loss": 0.302936, "lr": 2.109e-05, "throughput": 38.4, "grad_norm": 0.172706}
+{"step": 9975, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:29:45Z", "train_loss": 0.302318, "lr": 2.059e-05, "throughput": 38.4, "grad_norm": 0.175184}
+{"step": 10000, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:30:48Z", "train_loss": 0.301704, "lr": 2.01e-05, "throughput": 38.4, "grad_norm": 0.177522, "val_metric": 0.72}
+{"step": 10025, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:30:52Z", "train_loss": 0.301095, "lr": 1.961e-05, "throughput": 38.4, "grad_norm": 0.179717}
+{"step": 10050, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:30:55Z", "train_loss": 0.300489, "lr": 1.913e-05, "throughput": 38.4, "grad_norm": 0.181765}
+{"step": 10075, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:30:59Z", "train_loss": 0.299887, "lr": 1.865e-05, "throughput": 38.4, "grad_norm": 0.183665}
+{"step": 10100, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:30:02Z", "train_loss": 0.299289, "lr": 1.818e-05, "throughput": 38.4, "grad_norm": 0.185415}
+{"step": 10125, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:30:06Z", "train_loss": 0.298695, "lr": 1.771e-05, "throughput": 38.4, "grad_norm": 0.187013}
+{"step": 10150, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:30:10Z", "train_loss": 0.298105, "lr": 1.725e-05, "throughput": 38.4, "grad_norm": 0.188456}
+{"step": 10175, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:30:13Z", "train_loss": 0.297518, "lr": 1.68e-05, "throughput": 38.4, "grad_norm": 0.189743}
+{"step": 10200, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:30:17Z", "train_loss": 0.296936, "lr": 1.635e-05, "throughput": 38.4, "grad_norm": 0.190872}
+{"step": 10225, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:30:20Z", "train_loss": 0.296357, "lr": 1.591e-05, "throughput": 38.4, "grad_norm": 0.191842}
+{"step": 10250, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:30:24Z", "train_loss": 0.295781, "lr": 1.547e-05, "throughput": 38.4, "grad_norm": 0.192653, "val_metric": 0.72}
+{"step": 10275, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:30:27Z", "train_loss": 0.29521, "lr": 1.504e-05, "throughput": 38.4, "grad_norm": 0.193303}
+{"step": 10300, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:30:31Z", "train_loss": 0.294642, "lr": 1.461e-05, "throughput": 38.4, "grad_norm": 0.193791}
+{"step": 10325, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:30:35Z", "train_loss": 0.294078, "lr": 1.419e-05, "throughput": 38.4, "grad_norm": 0.194116}
+{"step": 10350, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:30:38Z", "train_loss": 0.293517, "lr": 1.378e-05, "throughput": 38.4, "grad_norm": 0.19428}
+{"step": 10375, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:30:42Z", "train_loss": 0.29296, "lr": 1.337e-05, "throughput": 38.4, "grad_norm": 0.19428}
+{"step": 10400, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:31:45Z", "train_loss": 0.292407, "lr": 1.297e-05, "throughput": 38.4, "grad_norm": 0.194117}
+{"step": 10425, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:31:49Z", "train_loss": 0.291857, "lr": 1.257e-05, "throughput": 38.4, "grad_norm": 0.193792}
+{"step": 10450, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:31:52Z", "train_loss": 0.291311, "lr": 1.218e-05, "throughput": 38.4, "grad_norm": 0.193305}
+{"step": 10475, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:31:56Z", "train_loss": 0.290768, "lr": 1.18e-05, "throughput": 38.4, "grad_norm": 0.192656}
+{"step": 10500, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:31:00Z", "train_loss": 0.290229, "lr": 1.142e-05, "throughput": 38.4, "grad_norm": 0.191846, "val_metric": 0.72}
+{"step": 10525, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:31:03Z", "train_loss": 0.289693, "lr": 1.105e-05, "throughput": 38.4, "grad_norm": 0.190876}
+{"step": 10550, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:31:07Z", "train_loss": 0.289161, "lr": 1.068e-05, "throughput": 38.4, "grad_norm": 0.189747}
+{"step": 10575, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:31:10Z", "train_loss": 0.288632, "lr": 1.032e-05, "throughput": 38.4, "grad_norm": 0.18846}
+{"step": 10600, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:31:14Z", "train_loss": 0.288106, "lr": 9.96e-06, "throughput": 38.4, "grad_norm": 0.187018}
+{"step": 10625, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:31:17Z", "train_loss": 0.287584, "lr": 9.61e-06, "throughput": 38.4, "grad_norm": 0.185421}
+{"step": 10650, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:31:21Z", "train_loss": 0.287065, "lr": 9.27e-06, "throughput": 38.4, "grad_norm": 0.183672}
+{"step": 10675, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:31:25Z", "train_loss": 0.28655, "lr": 8.93e-06, "throughput": 38.4, "grad_norm": 0.181772}
+{"step": 10700, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:31:28Z", "train_loss": 0.286038, "lr": 8.6e-06, "throughput": 38.4, "grad_norm": 0.179724}
+{"step": 10725, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:31:32Z", "train_loss": 0.285529, "lr": 8.28e-06, "throughput": 38.4, "grad_norm": 0.17753}
+{"step": 10750, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:31:35Z", "train_loss": 0.285024, "lr": 7.96e-06, "throughput": 38.4, "grad_norm": 0.175193, "val_metric": 0.72}
+{"step": 10775, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:31:39Z", "train_loss": 0.284521, "lr": 7.65e-06, "throughput": 38.4, "grad_norm": 0.172715}
+{"step": 10800, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:32:42Z", "train_loss": 0.284022, "lr": 7.34e-06, "throughput": 38.4, "grad_norm": 0.170099}
+{"step": 10825, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:32:46Z", "train_loss": 0.283526, "lr": 7.04e-06, "throughput": 38.4, "grad_norm": 0.167349}
+{"step": 10850, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:32:50Z", "train_loss": 0.283034, "lr": 6.75e-06, "throughput": 38.4, "grad_norm": 0.164467}
+{"step": 10875, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:32:53Z", "train_loss": 0.282544, "lr": 6.46e-06, "throughput": 38.4, "grad_norm": 0.161457}
+{"step": 10900, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:32:57Z", "train_loss": 0.282058, "lr": 6.18e-06, "throughput": 38.4, "grad_norm": 0.158322}
+{"step": 10925, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:32:00Z", "train_loss": 0.281575, "lr": 5.9e-06, "throughput": 38.4, "grad_norm": 0.155067}
+{"step": 10950, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:32:04Z", "train_loss": 0.281095, "lr": 5.63e-06, "throughput": 38.4, "grad_norm": 0.151694}
+{"step": 10975, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:32:07Z", "train_loss": 0.280618, "lr": 5.37e-06, "throughput": 38.4, "grad_norm": 0.148208}
+{"step": 11000, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:32:11Z", "train_loss": 0.280144, "lr": 5.11e-06, "throughput": 38.4, "grad_norm": 0.144613, "val_metric": 0.72}
+{"step": 11025, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:32:15Z", "train_loss": 0.279673, "lr": 4.86e-06, "throughput": 38.4, "grad_norm": 0.140912}
+{"step": 11050, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:32:18Z", "train_loss": 0.279205, "lr": 4.62e-06, "throughput": 38.4, "grad_norm": 0.137111}
+{"step": 11075, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:32:22Z", "train_loss": 0.27874, "lr": 4.38e-06, "throughput": 38.4, "grad_norm": 0.133214}
+{"step": 11100, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:32:25Z", "train_loss": 0.278278, "lr": 4.14e-06, "throughput": 38.4, "grad_norm": 0.129225}
+{"step": 11125, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:32:29Z", "train_loss": 0.27782, "lr": 3.92e-06, "throughput": 38.4, "grad_norm": 0.125148}
+{"step": 11150, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:32:32Z", "train_loss": 0.277364, "lr": 3.7e-06, "throughput": 38.4, "grad_norm": 0.12099}
+{"step": 11175, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:32:36Z", "train_loss": 0.276911, "lr": 3.49e-06, "throughput": 38.4, "grad_norm": 0.116753}
+{"step": 11200, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:33:40Z", "train_loss": 0.276461, "lr": 3.28e-06, "throughput": 38.4, "grad_norm": 0.112444}
+{"step": 11225, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:33:43Z", "train_loss": 0.276013, "lr": 3.08e-06, "throughput": 38.4, "grad_norm": 0.108068}
+{"step": 11250, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:33:47Z", "train_loss": 0.275569, "lr": 2.88e-06, "throughput": 38.4, "grad_norm": 0.103629, "val_metric": 0.72}
+{"step": 11275, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:33:50Z", "train_loss": 0.275128, "lr": 2.69e-06, "throughput": 38.4, "grad_norm": 0.099132}
+{"step": 11300, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:33:54Z", "train_loss": 0.274689, "lr": 2.51e-06, "throughput": 38.4, "grad_norm": 0.094583}
+{"step": 11325, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:33:57Z", "train_loss": 0.274253, "lr": 2.34e-06, "throughput": 38.4, "grad_norm": 0.089988}
+{"step": 11350, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:33:01Z", "train_loss": 0.273821, "lr": 2.17e-06, "throughput": 38.4, "grad_norm": 0.085351}
+{"step": 11375, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:33:05Z", "train_loss": 0.27339, "lr": 2e-06, "throughput": 38.4, "grad_norm": 0.080678}
+{"step": 11400, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:33:08Z", "train_loss": 0.272963, "lr": 1.85e-06, "throughput": 38.4, "grad_norm": 0.075974}
+{"step": 11425, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:33:12Z", "train_loss": 0.272538, "lr": 1.7e-06, "throughput": 38.4, "grad_norm": 0.071245}
+{"step": 11450, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:33:15Z", "train_loss": 0.272116, "lr": 1.55e-06, "throughput": 38.4, "grad_norm": 0.066496}
+{"step": 11475, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:33:19Z", "train_loss": 0.271697, "lr": 1.41e-06, "throughput": 38.4, "grad_norm": 0.061733}
+{"step": 11500, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:33:22Z", "train_loss": 0.271281, "lr": 1.28e-06, "throughput": 38.4, "grad_norm": 0.056962, "val_metric": 0.72}
+{"step": 11525, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:33:26Z", "train_loss": 0.270867, "lr": 1.16e-06, "throughput": 38.4, "grad_norm": 0.056413}
+{"step": 11550, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:33:30Z", "train_loss": 0.270456, "lr": 1.04e-06, "throughput": 38.4, "grad_norm": 0.061185}
+{"step": 11575, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:33:33Z", "train_loss": 0.270047, "lr": 9.3e-07, "throughput": 38.4, "grad_norm": 0.065949}
+{"step": 11600, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:34:37Z", "train_loss": 0.269641, "lr": 8.2e-07, "throughput": 38.4, "grad_norm": 0.0707}
+{"step": 11625, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:34:40Z", "train_loss": 0.269238, "lr": 7.2e-07, "throughput": 38.4, "grad_norm": 0.075431}
+{"step": 11650, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:34:44Z", "train_loss": 0.268838, "lr": 6.3e-07, "throughput": 38.4, "grad_norm": 0.080138}
+{"step": 11675, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:34:47Z", "train_loss": 0.268439, "lr": 5.4e-07, "throughput": 38.4, "grad_norm": 0.084815}
+{"step": 11700, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:34:51Z", "train_loss": 0.268044, "lr": 4.6e-07, "throughput": 38.4, "grad_norm": 0.089457}
+{"step": 11725, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:34:55Z", "train_loss": 0.267651, "lr": 3.9e-07, "throughput": 38.4, "grad_norm": 0.094057}
+{"step": 11750, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:34:58Z", "train_loss": 0.267261, "lr": 3.2e-07, "throughput": 38.4, "grad_norm": 0.098612, "val_metric": 0.72}
+{"step": 11775, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:34:02Z", "train_loss": 0.266873, "lr": 2.6e-07, "throughput": 38.4, "grad_norm": 0.103114}
+{"step": 11800, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:34:05Z", "train_loss": 0.266487, "lr": 2.1e-07, "throughput": 38.4, "grad_norm": 0.10756}
+{"step": 11825, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:34:09Z", "train_loss": 0.266104, "lr": 1.6e-07, "throughput": 38.4, "grad_norm": 0.111944}
+{"step": 11850, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:34:12Z", "train_loss": 0.265724, "lr": 1.2e-07, "throughput": 38.4, "grad_norm": 0.116261}
+{"step": 11875, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:34:16Z", "train_loss": 0.265346, "lr": 8e-08, "throughput": 38.4, "grad_norm": 0.120506}
+{"step": 11900, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:34:20Z", "train_loss": 0.26497, "lr": 5e-08, "throughput": 38.4, "grad_norm": 0.124674}
+{"step": 11925, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:34:23Z", "train_loss": 0.264597, "lr": 3e-08, "throughput": 38.4, "grad_norm": 0.12876}
+{"step": 11950, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:34:27Z", "train_loss": 0.264226, "lr": 1e-08, "throughput": 38.4, "grad_norm": 0.13276}
+{"step": 11975, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:34:30Z", "train_loss": 0.263858, "lr": 0.0, "throughput": 38.4, "grad_norm": 0.136668}
+{"step": 12000, "run_id": "run-live-01", "node_id": "iir-scan-binnet-02", "timestamp": "2026-08-24T01:35:34Z", "train_loss": 0.263492, "lr": 0.0, "throughput": 38.4, "grad_norm": 0.14048, "val_metric": 0.72}

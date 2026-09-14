@@ -1,0 +1,15 @@
+{
+  "nodes": {
+    "iir-binnet-04": {
+      "name": "iir-binnet-04",
+      "id": "c41e8a70-2b16-4a55-9f31-6d8e0b2c7a49",
+      "status": "running",
+      "approach_family": "arch",
+      "parent_ids": [
+        "iir-binnet-02"
+      ],
+      "citations": [],
+      "integrity_status": "pending"
+    }
+  }
+}

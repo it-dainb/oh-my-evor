@@ -1,0 +1,10 @@
+{
+  "tick": 3,
+  "agent": "sage",
+  "validated": true,
+  "payload": {
+    "angles": [
+      "genuine-iir-mechanisms"
+    ]
+  }
+}

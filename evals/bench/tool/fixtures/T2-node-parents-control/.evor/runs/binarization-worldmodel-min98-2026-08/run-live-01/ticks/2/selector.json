@@ -1,0 +1,16 @@
+{
+  "tick": 2,
+  "agent": "selector",
+  "validated": true,
+  "payload": {
+    "verdict": "approved",
+    "winner": {
+      "id": "h001",
+      "approach_family": "arch",
+      "derives_from": null,
+      "hypothesis": {
+        "prediction": "min-domain F rises by 4 points at equal latency"
+      }
+    }
+  }
+}

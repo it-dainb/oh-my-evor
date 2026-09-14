@@ -252,7 +252,14 @@ export function buildSelectorTask() {
  *
  * @returns {{events: object[], result: object, model: string, cost_usd: number, wall_ms: number}}
  */
-export function runLive({ prompt, model, effort, maxTurns, timeoutMs, env, mcpConfigPath, allowedTools }) {
+export function runLive({ prompt, model, effort, maxTurns, timeoutMs, env, mcpConfigPath, allowedTools, cwd, settingsPath, agentsJson, pluginDir, tolerateError = false }) {
+  // A PROMPT MAY NOT OPEN WITH A DASH. `-p` will not accept an option-looking
+  // token as its value, so the CLI exits 1 with `unknown option` and no output —
+  // indistinguishable, from the outside, from a model that said nothing. Name it
+  // here rather than let it arrive as an unreadable harness error.
+  if (/^-/.test(prompt)) {
+    throw new Error(`prompt starts with '-' (${JSON.stringify(prompt.slice(0, 40))}) — the CLI parses it as a flag; strip leading frontmatter or dashes before calling runLive`);
+  }
   const args = [
     '-p', prompt,
     '--model', model,
@@ -264,6 +271,19 @@ export function runLive({ prompt, model, effort, maxTurns, timeoutMs, env, mcpCo
     '--allowedTools', allowedTools.join(','),
   ];
   if (effort) args.push('--effort', effort);
+  // REGISTER THE ROLES THE ROLE IS TOLD TO DELEGATE TO (defect 23).
+  // Without this the bench runs every role as a top-level agent, so
+  // `oh-my-evor:evor-*` types do not exist, `SubagentStart`/`SubagentStop` never
+  // fire, and every role emits a high-severity `capability-gap` about the gap —
+  // which the group-L declarations then counted as a declaration on BOTH halves
+  // of the same pair. `--agents` takes {name: {description, prompt, model, tools}}
+  // and the spawned type is addressable by bare name; verified live.
+  // The sandbox plugin, under its real name. See the note at the call site.
+  if (pluginDir) args.push('--plugin-dir', pluginDir);
+  if (agentsJson) args.push('--agents', agentsJson);
+  // The product's own PreToolUse guard, scoped to the sandbox. Without it the
+  // governance angles grade prose compliance instead of the gate they name.
+  if (settingsPath) args.push('--settings', settingsPath);
 
   const t0 = Date.now();
   let raw;
@@ -272,12 +292,69 @@ export function runLive({ prompt, model, effort, maxTurns, timeoutMs, env, mcpCo
       encoding: 'utf8',
       timeout: timeoutMs ?? 600000,
       maxBuffer: 64 * 1024 * 1024,
-      env: { ...process.env, ...env },
+      // THE SANDBOX IS ONLY A SANDBOX IF THE PROCESS RUNS IN IT. Without this
+      // the child inherits the repo root, so every relative Read/Glob/Bash the
+      // agent issues addresses the LIVE TREE. `A3-best-score-pos` said so in
+      // its answer — "no file matching iir-binnet-01 exists in the repo" — and
+      // three bench fixtures were mutated by pilot runs writing through it.
+      // Callers that want the repo pass nothing and inherit, as before.
+      ...(cwd ? { cwd } : {}),
+      env: {
+        ...process.env,
+        // THE BENCH WAS MEASURING THE OPERATOR'S CLAUDE.md, NOT THE ROLE'S.
+        //
+        // `claude -p` loads the user's global CLAUDE.md as memory, and on this
+        // machine that file is the oh-my-claudecode orchestration layer — "delegate
+        // to executor", "route SDK questions to document-specialist", "prefer the
+        // lightest path". Every scored bench run since the pilot has read it.
+        // Verified by asking a bare `claude -p` to quote its first memory heading:
+        // it answered "# oh-my-claudecode - Intelligent Multi-Agent Orchestration".
+        //
+        // `--system-prompt` does NOT suppress it — memory is injected separately
+        // from the default system prompt, checked. `--bare` and `--safe-mode` do,
+        // but both disable hooks, and the product's PreToolUse guard is the thing
+        // half these angles measure. Isolating CLAUDE_CONFIG_DIR breaks auth.
+        // This env var is the only lever that removes the contamination and leaves
+        // hooks and credentials alone.
+        CLAUDE_CODE_DISABLE_CLAUDE_MDS: '1',
+        // THE PRODUCT'S STOP HOOK CAN ONLY MISFIRE HERE, and my own fix loaded it.
+        // `--plugin-dir` brought all of hooks.json into force — which is what finally
+        // gave SubagentStart/SubagentStop to the roles, and brought `Stop` along.
+        //
+        // `hooks/stop.mjs` blocks when the tick is incomplete, up to 8 times, and never
+        // for a `pending_node_ids` violation. Every fixture in this corpus DEPICTS a
+        // mid-tick state — that is the point of them — so a role asked one question
+        // about that state trips the hook on its way out, every time, and is handed a
+        // content-free notice with no new instruction. The agents describe it exactly:
+        // "This is the fourth identical hook notice with no new content or instruction",
+        // "I'm receiving repeated feedback from your stop hook with no new information".
+        // Nine records across lite19 and lite22 say so in their final answer, and it is
+        // the mechanism behind the `prompt_not_delivered` voids and part of the
+        // `no terminal JSON answer` ones: the last message replies to the hook, not the
+        // task.
+        //
+        // The hook is doing its job; the bench put it somewhere it cannot do anything
+        // else. Disabled through the product's OWN documented kill switch
+        // (hooks/stop.mjs:7) rather than by filtering hooks.json, so exactly one named
+        // hook is excluded and the rest of the reflex layer stays in force.
+        //
+        // Stop discipline deserves an angle that measures it deliberately, with a
+        // fixture whose tick is COMPLETE so a block is a finding rather than a
+        // certainty. None exists today.
+        EVOR_SKIP_HOOKS: [process.env.EVOR_SKIP_HOOKS, 'stop'].filter(Boolean).join(','),
+        ...env,
+      },
     });
   } catch (e) {
     raw = e.stdout ?? '';
     if (!raw) {
-      throw new Error(`live call failed and produced no output: ${e.message}`);
+      // NAME THE EXIT, NOT THE COMMAND. `e.message` for execFileSync opens with
+      // the entire argv, so a 40KB prompt buried the one fact that identifies
+      // the failure. L1 voided in six consecutive runs behind that prefix.
+      const st = e.status ?? e.code ?? '?';
+      const sig = e.signal ? ` signal=${e.signal}` : '';
+      const err = String(e.stderr ?? '').trim().slice(0, 400) || '(stderr empty)';
+      throw new Error(`live call failed and produced no output: exit=${st}${sig} stderr=${err}`);
     }
   }
   const wall_ms = Date.now() - t0;
@@ -298,7 +375,14 @@ export function runLive({ prompt, model, effort, maxTurns, timeoutMs, env, mcpCo
 
   const result = events.find((e) => e.type === 'result');
   if (!result) throw new Error('live call produced no result event — the run did not complete');
-  if (result.is_error) {
+  // `tolerateError` is for callers that must INSPECT a failed run rather than
+  // abort on it. ci/bench-run.mjs needs this: a run that ends at the turn
+  // ceiling, or that accumulated permission denials, is VOID under §4.1 — a
+  // fact about the harness, not a wrong answer from the model. Throwing here
+  // would collapse that distinction into a generic harness error and lose the
+  // trace that proves which it was. Default stays throw: a live eval that
+  // degrades to a pass when the model is unreachable is worse than none.
+  if (result.is_error && !tolerateError) {
     throw new Error(`CLI reported an error: ${String(result.result ?? '').slice(0, 400)}`);
   }
 

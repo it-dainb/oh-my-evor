@@ -1,0 +1,18 @@
+{
+  "run_id": "run-live-01",
+  "mission_id": "binarization-worldmodel-min98-2026-08",
+  "status": "running",
+  "tick_count": 2,
+  "started_at": "2026-08-23T07:09:59.004Z",
+  "updated_at": "2026-08-23T09:40:11.552Z",
+  "best_score": 0.8812,
+  "best_node": "iir-binnet-02",
+  "strategy": {
+    "exploration_temp": 0.62,
+    "winning_families": [
+      "arch",
+      "training"
+    ],
+    "wildness": 0.4
+  }
+}

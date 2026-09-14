@@ -1,0 +1,9 @@
+{
+  "job_id": "j-7f4a21",
+  "node_id": "iir-binnet-02",
+  "state": "done",
+  "exit_code": 0,
+  "started_at": "2026-08-23T09:28:53.101Z",
+  "finished_at": "2026-08-23T09:41:55.744Z",
+  "pid": 418822
+}

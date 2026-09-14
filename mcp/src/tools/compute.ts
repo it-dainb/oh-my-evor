@@ -288,6 +288,36 @@ export function gotchasList(
 // ── Tool registrations ────────────────────────────────────────────────────────
 
 /**
+ * The directory a node's worktree actually lives in — O-01 (item 1.5), the
+ * `worktrees/<id>/evaluate.py` half of the slug/UUID split-brain.
+ *
+ * Forge creates `.evor/worktrees/<node_id>` under the only identity it holds:
+ * the name it coined. The server owns the UUID entirely and never returns one
+ * (`evor_record_node` answers `{ok, name}`), so a worktree on disk is always
+ * slug-named. Every server-side reader then resolved that name to the UUID and
+ * statted `worktrees/<uuid>/`, a directory that never existed, and reported the
+ * candidate as un-materialized — the same false-negative shape O-01 recorded
+ * for `nodes/<id>/telemetry.jsonl`, one directory over.
+ *
+ * Returns only a directory that EXISTS. When none does, the canonical (first)
+ * identity is returned so the caller's not-found handling is unchanged: this
+ * can rescue a worktree filed under the other identity and can never
+ * manufacture one.
+ */
+function worktreeDir(evorRoot: string, ...refs: (string | null | undefined)[]): string {
+  const identities = refs.filter(
+    (v, i, a): v is string => !!v && a.indexOf(v) === i,
+  );
+  for (const identity of identities) {
+    const dir = join(evorRoot, "worktrees", identity);
+    try {
+      if (existsSync(dir)) return dir;
+    } catch { /* unreadable under this identity — try the next one */ }
+  }
+  return join(evorRoot, "worktrees", identities[0] ?? "");
+}
+
+/**
  * Lock a node's evaluate.py: make it read-only and record its sha256 fingerprint
  * for later integrity verification. Replaces the agent shelling out `sha256sum`
  * + `chmod 444` (the hash is persisted internally and never surfaced).
@@ -308,7 +338,7 @@ export function lockEvaluate(
       error: `node '${nodeRef}' is not in this run's tree — check the name with evor_tree_read.`,
     };
   }
-  const worktree = join(getEvorRoot(), "worktrees", nodeId);
+  const worktree = worktreeDir(getEvorRoot(), nodeId, nodeRef);
   const evalPath = join(worktree, "evaluate.py");
   if (!existsSync(evalPath)) {
     return {
@@ -1060,7 +1090,10 @@ export function registerComputeTools(server: McpServer): void {
       try {
         resolvedCandidates = candidates.map((c) => {
           const nodeId = resolveNodeRef(run_id, c.node_name, missionId);
-          const worktree = join(evorRoot, "worktrees", nodeId);
+          // Same O-01 resolution as lockEvaluate: dispatching a UUID-named
+          // worktree that was created under the slug launches training against
+          // an empty directory.
+          const worktree = worktreeDir(evorRoot, nodeId, c.node_name);
           return { node_id: nodeId, worktree, eval_version: c.eval_version };
         });
       } catch (e) {

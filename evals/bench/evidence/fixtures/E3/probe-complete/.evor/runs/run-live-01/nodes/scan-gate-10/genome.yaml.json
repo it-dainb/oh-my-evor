@@ -1,0 +1,7 @@
+{
+  "node": "scan-gate-10",
+  "config": {
+    "max_steps": 12000,
+    "log_every": 25
+  }
+}

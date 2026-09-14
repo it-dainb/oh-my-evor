@@ -1,0 +1,29 @@
+{
+  "tick": 2,
+  "agent": "mutagen",
+  "validated": true,
+  "payload": {
+    "proposals": [
+      {
+        "id": "h001",
+        "approach_family": "arch",
+        "hypothesis": {
+          "prediction": "min-domain F rises 4 points at equal latency"
+        },
+        "parent_ids": [
+          "iir-binnet-02"
+        ]
+      },
+      {
+        "id": "h002",
+        "approach_family": "data-augmentation",
+        "hypothesis": {
+          "prediction": "synthetic degradation lifts palmleaf_khmer by 6 points"
+        },
+        "parent_ids": [
+          "iir-binnet-02"
+        ]
+      }
+    ]
+  }
+}

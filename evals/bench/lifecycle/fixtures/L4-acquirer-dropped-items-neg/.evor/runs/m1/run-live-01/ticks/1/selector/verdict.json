@@ -1,0 +1,11 @@
+{
+  "tick": 1,
+  "reviews": [
+    {
+      "proposal_id": "p-001",
+      "critic_review": {
+        "verdict": "approved"
+      }
+    }
+  ]
+}

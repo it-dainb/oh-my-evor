@@ -1,0 +1,93 @@
+{
+  "detector": "node-named-parents",
+  "from_scenario": "T2/T2-node-parents-control.json",
+  "detector_path": "/tiers/pass",
+  "why": "Lane E: a slug was passed where a UUID was required and the job failed outright; the server's surface is name-only in the other direction. The control half's correct answer is an empty list, which is exactly the value an agent under pressure to fill fields will not produce.",
+  "positive": [
+    {
+      "name": "a root candidate, parents empty",
+      "trace": [
+        {
+          "tool": "evor_record_node",
+          "args": {
+            "run_id": "run-live-01",
+            "node": {
+              "name": "iir-binnet-05",
+              "parent_ids": [],
+              "approach_family": "arch"
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "negative": [
+    {
+      "name": "a parent invented",
+      "trace": [
+        {
+          "tool": "evor_record_node",
+          "args": {
+            "run_id": "run-live-01",
+            "node": {
+              "name": "iir-binnet-05",
+              "parent_ids": [
+                "iir-binnet-02"
+              ],
+              "approach_family": "arch"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "the uuid passed instead of a name",
+      "trace": [
+        {
+          "tool": "evor_record_node",
+          "args": {
+            "run_id": "run-live-01",
+            "node": {
+              "name": "iir-binnet-05",
+              "parent_ids": [
+                "3679dbc8-9a1e-4c72-8f05-2b6d4e1a9c30"
+              ],
+              "approach_family": "arch"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "parent_ids sent as a string",
+      "trace": [
+        {
+          "tool": "evor_record_node",
+          "args": {
+            "run_id": "run-live-01",
+            "node": {
+              "name": "iir-binnet-05",
+              "parent_ids": "[]",
+              "approach_family": "arch"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "no name coined",
+      "trace": [
+        {
+          "tool": "evor_record_node",
+          "args": {
+            "run_id": "run-live-01",
+            "node": {
+              "parent_ids": [],
+              "approach_family": "arch"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

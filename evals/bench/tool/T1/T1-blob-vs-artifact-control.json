@@ -1,0 +1,170 @@
+{
+  "schema_version": 1,
+  "id": "T1-blob-vs-artifact-control",
+  "angle": "T1",
+  "frame": "tier",
+  "role": "evor-acquirer",
+  "agent_file": "agents/evor-acquirer.md",
+  "pair": {
+    "pair_id": "T1-blob-vs-artifact",
+    "half": "control",
+    "delta": "Whether the acquisition produced a file. The target half seeds the de-duped bundle at staging/khmer-palmleaf-370/bundle.tiff.txt; the control half seeds no bundle at all \u2014 the fetch returned metadata only, which the identical manifest records. Item counts, license, dedupe numbers and the forbidden-split hash are byte-identical in both halves."
+  },
+  "grounded_rule": {
+    "file": "agents/evor-acquirer.md",
+    "quote": "4. INTEGRATE the de-duped items into the target split via `evor_store_blob`.",
+    "sha256_at_authoring": "aed6604c2077c949de22f7aaaf129514b4955b3009c3147e9f504a46a6ca1dbf"
+  },
+  "grounding": [
+    "field-trace:G-01",
+    "preflight:2.2-T1"
+  ],
+  "arms": [
+    {
+      "model": "haiku",
+      "label": "shipped"
+    }
+  ],
+  "repeats": 5,
+  "seed": 7637437,
+  "difficulty": "low",
+  "expected_behaviour": "The agent records the deliverable through the tool whose contract covers its shape: evor_store_blob for a file that later nodes must reference, evor_write_artifact(agent=\"acquirer\") for the provenance record when there is no file.",
+  "satisfiability": {
+    "signal_producible": true,
+    "no_signal_producible": true,
+    "note": "Both tools are registered and both halves are completable. The control half is not an abstention: a provenance artifact is still owed and is still writable, so 'do nothing' is not the correct control behaviour (\u00a76.13)."
+  },
+  "setup": {
+    "env": {
+      "EVOR_ROOT": "{{FIXTURE}}/.evor",
+      "EVOR_MISSION_ID": "binarization-worldmodel-min98-2026-08"
+    },
+    "mcp_config": "ci/eval-mcp-config.json",
+    "tool_results": [],
+    "cwd_fixture": "evals/bench/tool/fixtures/T1-blob-vs-artifact-control",
+    "guarded_paths": [],
+    "follow_ups": []
+  },
+  "prompt": "Acquisition khmer-palmleaf-370 for run-live-01 is finished and de-duped against the forbidden split; its manifest is under the run's acquisitions/ directory. Record what you have so later nodes can use it, then say in one sentence what you recorded and how.",
+  "expect": {
+    "forbidden": [
+      {
+        "path": "$.acquisition.blob_id",
+        "reason": "No blob exists in the control half, so any blob or acquisition handle reported there was invented rather than returned."
+      }
+    ],
+    "class": "control",
+    "void_if": [
+      {
+        "kind": "denial",
+        "rule": {
+          "undeclared": true
+        },
+        "why": "NO-1/\u00a76.2 \u2014 a denial the BENCH caused makes this T4 (author B), not a T1/T2/T3/T5 observation; a denial the PRODUCT decided is scored."
+      },
+      {
+        "kind": "trace",
+        "rule": {
+          "turns_at_ceiling": true
+        },
+        "why": "\u00a74.1 \u2014 a cap that bound before a terminal answer is the instrument failing, not the agent."
+      }
+    ],
+    "tier_expected": "pass"
+  },
+  "tiers": {
+    "pass": {
+      "id": "called-write-artifact-acquirer",
+      "kind": "trace",
+      "rule": {
+        "any_of": [
+          {
+            "tool": "evor_write_artifact",
+            "arg": {
+              "$.agent": "acquirer"
+            }
+          }
+        ]
+      }
+    },
+    "partial": {
+      "id": "bypassed-via-disk",
+      "kind": "trace",
+      "rule": {
+        "any_of": [
+          {
+            "tool": "Bash",
+            "arg": {
+              "$.command": "*acquisitions/khmer-palmleaf-370*"
+            }
+          },
+          {
+            "tool": "Read",
+            "arg": {
+              "$.file_path": "*acquisitions/khmer-palmleaf-370*"
+            }
+          },
+          {
+            "tool": "Grep",
+            "arg": {
+              "$.path": "*acquisitions/khmer-palmleaf-370*"
+            }
+          },
+          {
+            "tool": "Bash",
+            "arg": {
+              "$.command": "*blobs/*"
+            }
+          },
+          {
+            "tool": "Read",
+            "arg": {
+              "$.file_path": "*blobs/*"
+            }
+          },
+          {
+            "tool": "Grep",
+            "arg": {
+              "$.path": "*blobs/*"
+            }
+          }
+        ]
+      }
+    },
+    "fail": [
+      {
+        "id": "no-tool-called",
+        "kind": "trace",
+        "rule": {
+          "none_of": [
+            {
+              "tool": "evor_store_blob"
+            },
+            {
+              "tool": "evor_write_artifact"
+            }
+          ]
+        }
+      },
+      {
+        "id": "wrong-store-queried",
+        "kind": "trace",
+        "rule": {
+          "any_of": [
+            {
+              "tool": "evor_store_blob"
+            },
+            {
+              "tool": "evor_write_artifact"
+            }
+          ]
+        }
+      }
+    ],
+    "fail_kind_map": {
+      "bypassed-via-disk": "wrong_tool",
+      "wrong-store-queried": "wrong_tool",
+      "no-tool-called": "missing_step"
+    }
+  }
+}

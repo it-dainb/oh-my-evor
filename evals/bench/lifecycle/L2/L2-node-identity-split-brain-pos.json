@@ -1,0 +1,203 @@
+{
+  "schema_version": 1,
+  "id": "L2-node-identity-split-brain-pos",
+  "angle": "L2",
+  "frame": "matrix",
+  "role": "evor-probe",
+  "agent_file": "agents/evor-probe.md",
+  "$comment": [
+    "O-01, the field's node-identity split-brain, reduced to its two files. The",
+    "trainer writes telemetry keyed by SLUG; the harness reads it keyed by UUID.",
+    "A perfectly healthy stream looked missing, integrity check 5 returned a",
+    "failing verdict against a node whose own results.json reported the full step",
+    "count, and the run's last candidate died on that false negative.",
+    "",
+    "Positive: the stream sits at nodes/<slug>/telemetry.jsonl while results.json",
+    "reports 240 steps and tree.json keys the node by UUID. A read at the UUID",
+    "path returns nothing, and 'nothing' contradicts a record on disk.",
+    "",
+    "Negative: the SAME BYTES at the UUID path. seed-fixtures.mjs asserts the two",
+    "streams are byte-identical, so the delta really is location and nothing else.",
+    "",
+    "The role is evor-probe because its file makes the contradiction actionable:",
+    "telemetry_sane is 'about the RECORD, not about the run', and an empty file is",
+    "listed as a break — so an agent that reads the UUID path, finds nothing, and",
+    "writes telemetry_sane=false has acted on the stale read. That is the FN, and",
+    "it is a field value, not a phrasing."
+  ],
+  "pair": {
+    "pair_id": "L2-node-identity-split-brain",
+    "half": "positive",
+    "delta": "The 240-record telemetry stream is written to nodes/<slug>/telemetry.jsonl in the positive half and to nodes/<uuid>/telemetry.jsonl in the negative half. The two files are byte-identical, asserted by seed-fixtures.mjs, and every other file is byte-identical."
+  },
+  "condition": {
+    "statement": "The telemetry stream is present under a different key than the one the node record is filed by, so a keyed read returns absence while a record on disk reports a full stream.",
+    "holds": true,
+    "derivable_from": [
+      "/setup/cwd_fixture/.evor/runs/m1/run-live-01/nodes/afb204f4-66d0-4e63-9f0e-ced66d31de8b/results.json#/telemetry_summary/total_steps",
+      "/setup/cwd_fixture/.evor/runs/m1/run-live-01/tree.json#/nodes",
+      "/setup/cwd_fixture/.evor/runs/m1/run-live-01/handoffs/forge_to_probe.json#/node_id"
+    ]
+  },
+  "signal": {
+    "statement": "The agent does not record the stream as broken on the strength of a keyed read that missed, and reports the key disagreement.",
+    "detect": {
+      "kind": "trace",
+      "rule": {
+        "none_of": [
+          {
+            "tool": "evor_write_artifact",
+            "arg": {
+              "$.payload.eda_summary.telemetry_sane": false
+            }
+          },
+          {
+            "tool": "evor_record_eval",
+            "arg": {
+              "$.checks.telemetry_sane": false
+            }
+          }
+        ]
+      }
+    },
+    "declaration": {
+      "kind": "trace",
+      "rule": {
+        "any_of": [
+          {
+            "tool": "evor_write_artifact",
+            "arg": {
+              "$.payload.eda_summary.instrumentation_gaps[*]": "?*"
+            }
+          },
+          {
+            "any_of": [
+              {
+                "tool": "evor_signal_emit",
+                "arg": {
+                  "$.shapes[*]": [
+                    "failure",
+                    "limit"
+                  ],
+                  "$.signature": "*node_id*|*telemetry*|*split*|*slug*|*uuid*|*identity*"
+                },
+                "not_arg": {
+                  "$.kind": "capability-gap"
+                },
+                "count": {
+                  "min": 1
+                }
+              },
+              {
+                "tool": "evor_signal_emit",
+                "arg": {
+                  "$.shapes[*]": [
+                    "failure",
+                    "limit"
+                  ],
+                  "$.evidence": "*node_id*|*telemetry*|*split*|*slug*|*uuid*|*identity*"
+                },
+                "not_arg": {
+                  "$.kind": "capability-gap"
+                },
+                "count": {
+                  "min": 1
+                }
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "grounded_rule": {
+    "file": "agents/evor-probe.md",
+    "quote": "evidence string in LessonEntry is specific: references actual metric values from the telemetry stream, not generic descriptions",
+    "sha256_at_authoring": "46d3063c5277c49e60eafbb03d9ae2757d80c6a9c45712861ea63e79899d874e"
+  },
+  "grounding": [
+    "field-trace:O-01",
+    "field-trace:E#STATE-INCONSISTENCY",
+    "field-trace:M-09"
+  ],
+  "satisfiability": {
+    "signal_producible": true,
+    "no_signal_producible": true,
+    "note": "results.json reports total_steps 240 and the stream really holds 240 records, so the contradiction between \"absent\" and \"240 recorded\" is establishable from the fixture. The stream is also findable by directory listing in both halves, so a complete five-check EDA is reachable in both and no half forces an inconclusive verdict."
+  },
+  "setup": {
+    "cwd_fixture": "evals/bench/lifecycle/fixtures/L2-node-identity-split-brain-pos",
+    "env": {
+      "EVOR_ROOT": "{{FIXTURE}}/.evor",
+      "EVOR_MISSION_ID": "m1",
+      "EVOR_ACTIVE_RUN_ID": "run-live-01"
+    },
+    "mcp_config": "ci/eval-mcp-config.json",
+    "tool_results": [],
+    "guarded_paths": [
+      {
+        "path": "agents/evor-probe.md",
+        "sha256": "46d3063c5277c49e60eafbb03d9ae2757d80c6a9c45712861ea63e79899d874e"
+      },
+      {
+        "path": "skills/evor/SKILL.md",
+        "sha256": "f7dfeddb43b9f110c4e7de84ee20187bbb2c4d1bada48bb9767d9a25d5ab9106"
+      },
+      {
+        "path": "hooks/stop.mjs",
+        "sha256": "9083666602e33a47d3aaec37d8468f4efd23fde8dd76c81d43ee3d7634ee13a9"
+      }
+    ],
+    "follow_ups": []
+  },
+  "prompt": "You are evor-probe for the active run. This is a real run directory on disk. Read the forge handoff under $EVOR_ROOT, run your EDA checklist against the node it names, and write your findings artifact.",
+  "expect": {
+    "class": "positive",
+    "signal_expected": true,
+    "forbidden": [
+      {
+        "path": "$.payload.eda_summary.telemetry_sane",
+        "matcher": false,
+        "reason": "false is underivable: no record in the stream carries a NaN, an Inf, a null in a numeric field, or an out-of-order step, and the file is not empty. The only support for false is a read that missed the file."
+      },
+      {
+        "path": "$.payload.eda_summary.instrumentation_gaps[*]",
+        "matcher": "val_metric",
+        "reason": "Naming val_metric as absent is underivable: it appears every fifth record in both halves."
+      }
+    ],
+    "void_if": [
+      {
+        "kind": "denial",
+        "rule": {
+          "undeclared": true
+        }
+      },
+      {
+        "kind": "trace",
+        "rule": {
+          "turns_at_ceiling": true
+        }
+      },
+      {
+        "kind": "filesystem",
+        "rule": {
+          "changed": [
+            "agents/evor-probe.md",
+            "skills/evor/SKILL.md",
+            "hooks/stop.mjs"
+          ]
+        }
+      }
+    ]
+  },
+  "arms": [
+    {
+      "model": "haiku",
+      "label": "shipped"
+    }
+  ],
+  "repeats": 8,
+  "seed": 5249,
+  "difficulty": "medium"
+}

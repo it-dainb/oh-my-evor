@@ -1,0 +1,1 @@
+{"signal_id":"sig-4c1f0a9b21de","kind":"acquisition-items-dropped","signature":"acquirer-unparseable-37-of-260","shapes":["limit"],"axes":["data"],"severity":"high","occurrences":1,"confidence":0.9,"source":"evor-acquirer","tick":1,"evidence":{"requested":260,"ingested":223,"dropped_unparseable":37},"first_seen":"2026-08-24T00:51:02Z","last_seen":"2026-08-24T00:51:02Z"}

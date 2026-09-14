@@ -24285,7 +24285,9 @@ function registerArtifactTools(server) {
       // bad call. Format hints would only make that more diagnosable; resolving
       // from the active run removes the failure mode entirely (rubric rule 1).
       run_id: external_exports.string().optional().describe("Active run identifier"),
-      tick: external_exports.number().int().min(0).describe("Current tick number"),
+      tick: external_exports.number().int().min(0).describe(
+        "Tick this artifact belongs to: the tick IN PROGRESS, which is run-state's tick_count + 1. tick_count is the number of COMPLETED ticks, so passing it unchanged files the artifact against the tick that already finished. Prefer the tick your spawn prompt names; derive it only when it is absent."
+      ),
       agent: external_exports.enum(VALID_AGENTS).describe("Agent writing the artifact (determines path and validation schema)"),
       kind: external_exports.string().optional().describe(
         "Kind slug: required for sage-junior (finding kind) and acquirer (source slug)"
@@ -24323,7 +24325,12 @@ function registerArtifactTools(server) {
   server.tool(
     "evor_read_artifact",
     [
-      "Read and validate a tick artifact written by an upstream agent.",
+      "Read and validate an agent's OWN OUTPUT for a tick \u2014 its report, findings or proposals,",
+      "stored at ticks/<tick>/<agent>.json. This is the store for 'what did Forge produce',",
+      "'what did Probe conclude', 'what did Sage-junior find'.",
+      "NOT the store for a message one agent addressed to another: that is evor_read_handoff",
+      "(handoffs/<from>_to_<to>.json). If you want an agent's job report, result or artifact",
+      "for a tick, it is here \u2014 a job report is the producing agent's artifact, not a handoff.",
       "Returns {ok:true,validated,payload}, or {ok:false,error:'not found'} when the upstream",
       "agent hasn't produced it yet \u2014 a strong signal to stop and surface the gap,",
       "not proceed on assumptions. Path mapping is identical to evor_write_artifact."
@@ -24560,7 +24567,12 @@ function registerLineageTools(server) {
   server.tool(
     "evor_read_handoff",
     [
-      "Read a handoff written by a prior agent. Three routing modes:",
+      "Read a MESSAGE one agent addressed to another \u2014 the context it chose to pass on,",
+      "not the work it produced. An agent's own report, findings or result for a tick is an",
+      "ARTIFACT and is read with evor_read_artifact; only reach here when you want what was",
+      "explicitly handed over. A handoff exists only if the sender wrote one; an artifact",
+      "exists whenever the agent completed its step, so prefer evor_read_artifact when you",
+      "are asking what an upstream agent did. Three routing modes:",
       "from_agent+to_agent \u2192 within-tick JSON handoff (handoffs/<from>_to_<to>.json);",
       "tick \u2192 tick-N.md markdown handoff;",
       "neither \u2192 latest tick handoff (highest tick number found).",
@@ -24779,6 +24791,19 @@ function gotchasList(kind, scope, minConfidence, evorRoot, runDir) {
   if (runDir) args.push("--run-dir", runDir);
   return callPythonModule("evor", args, { timeout: 3e4 });
 }
+function worktreeDir(evorRoot, ...refs) {
+  const identities = refs.filter(
+    (v, i, a) => !!v && a.indexOf(v) === i
+  );
+  for (const identity of identities) {
+    const dir = (0, import_path17.join)(evorRoot, "worktrees", identity);
+    try {
+      if ((0, import_fs16.existsSync)(dir)) return dir;
+    } catch {
+    }
+  }
+  return (0, import_path17.join)(evorRoot, "worktrees", identities[0] ?? "");
+}
 function lockEvaluate(runId, nodeRef, missionId) {
   const nodeId = tryResolveNodeRef(runId, nodeRef, missionId);
   if (nodeId === null) {
@@ -24788,7 +24813,7 @@ function lockEvaluate(runId, nodeRef, missionId) {
       error: `node '${nodeRef}' is not in this run's tree \u2014 check the name with evor_tree_read.`
     };
   }
-  const worktree = (0, import_path17.join)(getEvorRoot(), "worktrees", nodeId);
+  const worktree = worktreeDir(getEvorRoot(), nodeId, nodeRef);
   const evalPath = (0, import_path17.join)(worktree, "evaluate.py");
   if (!(0, import_fs16.existsSync)(evalPath)) {
     return {
@@ -25282,7 +25307,7 @@ function registerComputeTools(server) {
       try {
         resolvedCandidates = candidates.map((c) => {
           const nodeId = resolveNodeRef(run_id, c.node_name, missionId);
-          const worktree = (0, import_path17.join)(evorRoot, "worktrees", nodeId);
+          const worktree = worktreeDir(evorRoot, nodeId, c.node_name);
           return { node_id: nodeId, worktree, eval_version: c.eval_version };
         });
       } catch (e) {

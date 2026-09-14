@@ -1,0 +1,184 @@
+{
+  "schema_version": 1,
+  "id": "T2-signal-evidence-control",
+  "angle": "T2",
+  "frame": "tier",
+  "role": "evor-probe",
+  "agent_file": "agents/evor-probe.md",
+  "pair": {
+    "pair_id": "T2-signal-evidence",
+    "half": "control",
+    "delta": "Which recorded quantity breaches the run's contract. The target half's telemetry line reads latency_cpu_4k_s 1.83 against a 1.0 gate with val_min_domain_f at 44.10; the control half's line reads latency_cpu_4k_s 0.83 (inside the gate) with val_min_domain_f at 3.527 against a target of 98. Step, loss, val_metric, gpu latency, node and timestamp are identical, as is the contract."
+  },
+  "grounded_rule": {
+    "file": "agents/evor-probe.md",
+    "quote": "hypothesis_verdict is one of \"confirmed\", \"refuted\", \"inconclusive\" \u2014 never left null",
+    "sha256_at_authoring": "46d3063c5277c49e60eafbb03d9ae2757d80c6a9c45712861ea63e79899d874e"
+  },
+  "grounding": [
+    "field-trace:B-05",
+    "field-trace:D#3.1c",
+    "rc:RC7#prediction-2",
+    "preflight:2.2-T2"
+  ],
+  "arms": [
+    {
+      "model": "haiku",
+      "label": "shipped"
+    }
+  ],
+  "repeats": 5,
+  "seed": 14864324,
+  "difficulty": "medium",
+  "expected_behaviour": "The agent emits one signal whose `shapes` and `axes` are drawn from the closed facet sets, whose `severity` is one of the four allowed values, and whose `evidence` carries the number actually breaching the contract in this half.",
+  "satisfiability": {
+    "signal_producible": true,
+    "no_signal_producible": true,
+    "note": "evor_signal_emit is registered and every required field is derivable from the seeded telemetry line and goal contract. Both halves contain exactly one breach, so the correct evidence value is determinate; the telemetry line carries four other numbers that are within contract and must not be the evidence. The facets are graded on enum membership only, never on which facet was chosen, so no judgement call is being scored."
+  },
+  "setup": {
+    "env": {
+      "EVOR_ROOT": "{{FIXTURE}}/.evor",
+      "EVOR_MISSION_ID": "binarization-worldmodel-min98-2026-08"
+    },
+    "mcp_config": "ci/eval-mcp-config.json",
+    "tool_results": [],
+    "cwd_fixture": "evals/bench/tool/fixtures/T2-signal-evidence-control",
+    "guarded_paths": [],
+    "follow_ups": []
+  },
+  "prompt": "In run `run-live-01`, tick 2. Node iir-binnet-04's telemetry is on disk under the run's nodes/ directory and the run's goal contract states its gates. Exactly one recorded quantity is outside contract. Put it on this run's signal bus so the next tick sees it.",
+  "expect": {
+    "forbidden": [
+      {
+        "path": "$.evidence.*",
+        "reason": "Any quantity not present in the seeded telemetry line is underivable; the line is the only measurement in the fixture."
+      }
+    ],
+    "class": "control",
+    "void_if": [
+      {
+        "kind": "denial",
+        "rule": {
+          "undeclared": true
+        },
+        "why": "NO-1/\u00a76.2 \u2014 a denial the BENCH caused makes this T4 (author B), not a T1/T2/T3/T5 observation; a denial the PRODUCT decided is scored."
+      },
+      {
+        "kind": "trace",
+        "rule": {
+          "turns_at_ceiling": true
+        },
+        "why": "\u00a74.1 \u2014 a cap that bound before a terminal answer is the instrument failing, not the agent."
+      }
+    ],
+    "tier_expected": "pass"
+  },
+  "tiers": {
+    "pass": {
+      "id": "signal-well-formed",
+      "kind": "trace",
+      "rule": {
+        "all_of": [
+          {
+            "tool": "evor_signal_emit",
+            "arg": {
+              "$.shapes[*]": "limit|opportunity|failure|trend",
+              "$.axes[*]": "memory|compute|accuracy|stability|data|generalization|cost",
+              "$.severity": "low|medium|high|critical",
+              "$.signature": "?*",
+              "$.evidence": "*3.527*"
+            },
+            "arg_type": {
+              "$.shapes": "array",
+              "$.axes": "array",
+              "$.evidence": "object"
+            }
+          }
+        ]
+      }
+    },
+    "partial": {
+      "id": "malformed-then-corrected",
+      "kind": "trace",
+      "rule": {
+        "any_of": [
+          {
+            "all_of": [
+              {
+                "tool": "evor_signal_emit",
+                "arg_type": {
+                  "$.shapes": "string"
+                },
+                "id": "malformed-0"
+              },
+              {
+                "tool": "evor_signal_emit",
+                "arg": {
+                  "$.evidence": "*3.527*"
+                },
+                "arg_type": {
+                  "$.shapes": "array"
+                },
+                "after": "malformed-0"
+              }
+            ]
+          },
+          {
+            "all_of": [
+              {
+                "tool": "evor_signal_emit",
+                "arg": {
+                  "$.shapes[*]": "!limit|opportunity|failure|trend"
+                },
+                "id": "malformed-1"
+              },
+              {
+                "tool": "evor_signal_emit",
+                "arg": {
+                  "$.evidence": "*3.527*"
+                },
+                "arg_type": {
+                  "$.shapes": "array"
+                },
+                "after": "malformed-1"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "fail": [
+      {
+        "id": "never-valid",
+        "kind": "trace",
+        "rule": {
+          "none_of": [
+            {
+              "tool": "evor_signal_emit"
+            }
+          ]
+        }
+      },
+      {
+        "id": "semantically-wrong",
+        "kind": "trace",
+        "rule": {
+          "any_of": [
+            {
+              "tool": "evor_signal_emit",
+              "arg": {
+                "$.evidence": "*0.83*"
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "fail_kind_map": {
+      "malformed-then-corrected": "wrong_args",
+      "never-valid": "wrong_args",
+      "semantically-wrong": "wrong_args"
+    }
+  }
+}

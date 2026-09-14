@@ -1,0 +1,14 @@
+{
+  "tick": 2,
+  "current_step": 4,
+  "step_status": "running",
+  "integrity_verdict": null,
+  "auto_resume_count": 0,
+  "step_history": [
+    1,
+    2,
+    3,
+    4
+  ],
+  "updated_at": "2026-08-24T02:05:00Z"
+}

@@ -288,7 +288,11 @@ export function registerArtifactTools(server: McpServer): void {
       // bad call. Format hints would only make that more diagnosable; resolving
       // from the active run removes the failure mode entirely (rubric rule 1).
       run_id: z.string().optional().describe("Active run identifier"),
-      tick: z.number().int().min(0).describe("Current tick number"),
+      tick: z.number().int().min(0).describe(
+        "Tick this artifact belongs to: the tick IN PROGRESS, which is run-state's " +
+        "tick_count + 1. tick_count is the number of COMPLETED ticks, so passing it " +
+        "unchanged files the artifact against the tick that already finished. " +
+        "Prefer the tick your spawn prompt names; derive it only when it is absent."),
       agent: z
         .enum(VALID_AGENTS)
         .describe("Agent writing the artifact (determines path and validation schema)"),
@@ -337,7 +341,12 @@ export function registerArtifactTools(server: McpServer): void {
   server.tool(
     "evor_read_artifact",
     [
-      "Read and validate a tick artifact written by an upstream agent.",
+      "Read and validate an agent's OWN OUTPUT for a tick — its report, findings or proposals,",
+      "stored at ticks/<tick>/<agent>.json. This is the store for 'what did Forge produce',",
+      "'what did Probe conclude', 'what did Sage-junior find'.",
+      "NOT the store for a message one agent addressed to another: that is evor_read_handoff",
+      "(handoffs/<from>_to_<to>.json). If you want an agent's job report, result or artifact",
+      "for a tick, it is here — a job report is the producing agent's artifact, not a handoff.",
       "Returns {ok:true,validated,payload}, or {ok:false,error:'not found'} when the upstream",
       "agent hasn't produced it yet — a strong signal to stop and surface the gap,",
       "not proceed on assumptions. Path mapping is identical to evor_write_artifact.",

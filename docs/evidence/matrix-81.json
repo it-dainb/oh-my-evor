@@ -3294,7 +3294,13 @@
      "status": "correct",
      "cli_cost_usd": 0.3764
     }
-   ]
+   ],
+   "stale": {
+    "since": "2026-09-06",
+    "agent_sha256_now": "a39fe703f9e90d57",
+    "reason": "The agent file changed after the 8.1 run: this role gained a capability-gap disclosure channel, closed-set kind vocabulary and severity-by-consequence guidance during the evor-eval-bench loop. The tier comparison in §3 was measured against the PREVIOUS text and no longer describes what ships. The numbers are not wrong about what they measured; they are no longer about this agent. Amended 2026-09-07: the role now also states that `evor_validate_proposals` is a call it makes rather than something that happens to its payload. The row stays stale; only the sha it went stale AT is re-recorded, so a later edit cannot hide inside this withdrawal. Amended 2026-09-11b: the role now states that `kind` is a REGISTRY rather than a closed set, matching agents/references/signal-protocol.md and the schema, which the four agent files had contradicted.",
+    "action": "re-measure this role before citing its §3 row"
+   }
   },
   {
    "role": "evor-probe",
@@ -3965,7 +3971,13 @@
      "status": "correct",
      "cli_cost_usd": 0.4847
     }
-   ]
+   ],
+   "stale": {
+    "since": "2026-09-06",
+    "agent_sha256_now": "46d3063c5277c49e",
+    "reason": "The agent file changed after the 8.1 run: this role gained a capability-gap disclosure channel, closed-set kind vocabulary and severity-by-consequence guidance during the evor-eval-bench loop. The tier comparison in §3 was measured against the PREVIOUS text and no longer describes what ships. The numbers are not wrong about what they measured; they are no longer about this agent.",
+    "action": "re-measure this role before citing its §3 row"
+   }
   },
   {
    "role": "evor-sage-junior",
@@ -5678,7 +5690,13 @@
      "status": "incorrect",
      "cli_cost_usd": 0.0157
     }
-   ]
+   ],
+   "stale": {
+    "since": "2026-09-06",
+    "agent_sha256_now": "04310dad8df94fef",
+    "reason": "The agent file changed after the 8.1 run: this role gained a capability-gap disclosure channel, closed-set kind vocabulary and severity-by-consequence guidance during the evor-eval-bench loop. The tier comparison in §3 was measured against the PREVIOUS text and no longer describes what ships. The numbers are not wrong about what they measured; they are no longer about this agent. Amended 2026-09-06: the file changed again — evor-tick's exploration section now says run state comes from the evor tools rather than from Glob/Grep/Read. The row was already stale; recording the new sha keeps this edit from hiding inside the previous one, which is what the gate is for. Amended 2026-09-11: the role now also states that a contradiction it acts on must be named in a signal carrying the disagreeing object, since declining to trust a stale record is invisible to a reader. The row stays stale; only the sha it went stale AT is re-recorded. Amended 2026-09-11b: the pointer rule and the failed-tick section contradicted each other; the failed-tick section now defers to the pointer rule, and the `kind` closed-set claim is corrected to a registry.",
+    "action": "re-measure this role before citing its §3 row"
+   }
   }
  ]
 }

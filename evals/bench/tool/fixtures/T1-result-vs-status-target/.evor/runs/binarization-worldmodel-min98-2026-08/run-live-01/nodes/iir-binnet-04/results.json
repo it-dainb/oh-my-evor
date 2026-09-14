@@ -1,0 +1,21 @@
+{
+  "node_id": "iir-binnet-04",
+  "run_id": "run-live-01",
+  "eval_version": "v10",
+  "recorded_at": "2026-08-23T11:41:55.881Z",
+  "evaluator_sha256": "3dc2f7da3919c0b1a5e4f6d2c8b7a09e13f5d4c6b8a2e0f1937d5c4b6a8e2f10",
+  "wall_clock_s": 782.4,
+  "gpu_hours": 0.217,
+  "fitness_value": 0.9041,
+  "constraint_ok": true,
+  "metrics": {
+    "val_metric": 96.32,
+    "val_min_domain_f": 12.91,
+    "latency_cpu_4k_s": 0.83,
+    "latency_gpu_ms": 41.2
+  },
+  "per_domain": {
+    "palmleaf_khmer": 3.527,
+    "dibco2017": 96.1
+  }
+}

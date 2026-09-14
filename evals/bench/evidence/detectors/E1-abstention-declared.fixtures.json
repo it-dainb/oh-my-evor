@@ -1,0 +1,123 @@
+{
+  "detector_of": [
+    "E1-*-pos"
+  ],
+  "what": "Did the abstention get recorded through a channel the role already has?",
+  "detector": {
+    "kind": "trace",
+    "rule": {
+      "any_of": [
+        {
+          "tool": "evor_signal_emit",
+          "arg": {
+            "$.kind": "no-evidence-for-angle"
+          }
+        },
+        {
+          "tool": "evor_write_artifact",
+          "arg": {
+            "$.agent": "sage-junior",
+            "$.payload.findings": {
+              "empty": true
+            },
+            "$.payload.fallback_used": {
+              "not": false
+            }
+          }
+        },
+        {
+          "tool": "evor_write_artifact",
+          "arg": {
+            "$.agent": "sage-junior",
+            "$.payload.findings[*].quorum_met": false
+          }
+        }
+      ]
+    }
+  },
+  "fires": [
+    {
+      "why": "the declared leaf channel",
+      "trace": [
+        {
+          "tool": "evor_signal_emit",
+          "phase": 0,
+          "arg": {
+            "kind": "no-evidence-for-angle",
+            "signature": "no-evidence-trocr-handwriting-cer"
+          }
+        }
+      ]
+    },
+    {
+      "why": "empty findings WITH the path attempted recorded",
+      "trace": [
+        {
+          "tool": "evor_write_artifact",
+          "phase": 0,
+          "arg": {
+            "agent": "sage-junior",
+            "payload": {
+              "findings": [],
+              "fallback_used": "semantic-scholar,arxiv,exa"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "why": "a finding was reported but explicitly not quorate",
+      "trace": [
+        {
+          "tool": "evor_write_artifact",
+          "phase": 0,
+          "arg": {
+            "agent": "sage-junior",
+            "payload": {
+              "findings": [
+                {
+                  "quorum_met": false,
+                  "trust_level": "indicative"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "silent": [
+    {
+      "why": "INERTIA: a bare empty list with nothing recorded. D§3.2 found ten degenerate finals including two verbatim 'Now writing the artifact.' and one empty; crediting those as principled refusal is the mirror image of the tick fixture's defect.",
+      "trace": [
+        {
+          "tool": "evor_write_artifact",
+          "phase": 0,
+          "arg": {
+            "agent": "sage-junior",
+            "payload": {
+              "findings": [],
+              "fallback_used": false
+            }
+          }
+        }
+      ]
+    },
+    {
+      "why": "INERTIA: nothing was written at all",
+      "trace": []
+    },
+    {
+      "why": "NEAR-MISS: the promoted kind, which SAGE emits and the leaf cannot. The preflight taxonomy's own worked example detects on this.",
+      "trace": [
+        {
+          "tool": "evor_signal_emit",
+          "phase": 0,
+          "arg": {
+            "kind": "no-evidence-found"
+          }
+        }
+      ]
+    }
+  ]
+}

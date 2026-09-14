@@ -1,0 +1,27 @@
+{
+  "tick": 1,
+  "proposals": [
+    {
+      "proposal_id": "p-001",
+      "approach_family": "arch",
+      "parent_node_ids": [],
+      "idea": "Widen the IIR scan to four directions and share the gate weights across passes.",
+      "hypothesis": {
+        "id": "h-p-001",
+        "statement": "Multi-directional IIR scanning recovers stroke continuity the single-pass variant drops.",
+        "prediction": "min_domain_f improves by 3-6 points on palmleaf_khmer without regressing dibco_2017."
+      },
+      "citations": [],
+      "wildness": 0.35,
+      "critic_review": {
+        "h001_one_hypothesis": "pass",
+        "h002_family_streak": "pass",
+        "h003_intra_tick_diversity": "pass",
+        "integrity_risk": "pass",
+        "instrumentation_check": "pass",
+        "schema_valid": "pass",
+        "verdict": "approved"
+      }
+    }
+  ]
+}

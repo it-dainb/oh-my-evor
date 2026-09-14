@@ -1,0 +1,15 @@
+{
+  "nodes": {
+    "iir-binnet-05": {
+      "name": "iir-binnet-05",
+      "id": "b7d2c410-55af-4e09-9a13-0c8e6f2d17b4",
+      "status": "pending",
+      "approach_family": "arch",
+      "parent_ids": [
+        "iir-binnet-02"
+      ],
+      "worktree": ".evor/worktrees/iir-binnet-05",
+      "integrity_status": "pending"
+    }
+  }
+}

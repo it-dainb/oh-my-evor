@@ -1,0 +1,1 @@
+{"signal_id":"sig-77b2ce03f4a1","kind":"acquisition-complete","signature":"acquirer-ingested-260-of-260","shapes":["trend"],"axes":["data"],"severity":"low","occurrences":1,"confidence":0.9,"source":"evor-acquirer","tick":1,"evidence":{"requested":260,"ingested":260,"dropped_unparseable":0},"first_seen":"2026-08-24T00:51:02Z","last_seen":"2026-08-24T00:51:02Z"}

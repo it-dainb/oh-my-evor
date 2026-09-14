@@ -1,0 +1,181 @@
+{
+  "schema_version": 1,
+  "id": "T2-cite-target-target",
+  "angle": "T2",
+  "frame": "tier",
+  "role": "evor-sage-junior",
+  "agent_file": "agents/evor-sage-junior.md",
+  "pair": {
+    "pair_id": "T2-cite-target",
+    "half": "target",
+    "delta": "Whether the run's tree carries a node yet. The target half seeds tree.json with node iir-binnet-04, so the citation attaches to that node's name; the control half seeds an empty tree, so the only reference the run can offer is the research angle slug genuine-iir-mechanisms. The finding record, the source, the arXiv identifier, the prompt and every other seeded value are byte-identical."
+  },
+  "grounded_rule": {
+    "file": "agents/evor-sage.md",
+    "quote": "Read-only for code. You may call MCP tools (evor_wiki_query, evor_cite, and the research MCPs \u2014 see Research_Toolchain) but never Write or Edit files.",
+    "sha256_at_authoring": "66c28dd63e352738f600494adf9a9eecb33e4d1a6a66353c1df41c99ea5fe7fe"
+  },
+  "grounding": [
+    "field-trace:N-03",
+    "field-trace:B-05",
+    "rc:RC7#prediction-2",
+    "preflight:2.2-T2"
+  ],
+  "arms": [
+    {
+      "model": "sonnet",
+      "label": "shipped",
+      "effort": "medium"
+    }
+  ],
+  "repeats": 5,
+  "seed": 2617759,
+  "difficulty": "medium",
+  "expected_behaviour": "The agent attaches the source to the run through evor_cite with a scalar `citation` string and a `node_id` that names something the run actually contains.",
+  "satisfiability": {
+    "signal_producible": true,
+    "no_signal_producible": true,
+    "note": "evor_cite is registered and reachable in both halves. In the control half cite.ts records the citation against the slug as a pending citation rather than erroring (item 5.1), so a correct call is available in both halves and neither is forced into a failure. The seeded finding carries a citation count, an S2 paper id, a venue and a retrieval timestamp that the call does not use; the correct `citation` value is the arXiv URL."
+  },
+  "setup": {
+    "env": {
+      "EVOR_ROOT": "{{FIXTURE}}/.evor",
+      "EVOR_MISSION_ID": "binarization-worldmodel-min98-2026-08"
+    },
+    "mcp_config": "ci/eval-mcp-config.json",
+    "tool_results": [],
+    "cwd_fixture": "evals/bench/tool/fixtures/T2-cite-target-target",
+    "guarded_paths": [],
+    "follow_ups": []
+  },
+  "prompt": "In run `run-live-01`, tick 2. Your angle genuine-iir-mechanisms has one source recorded in your finding file under the run's ticks/2/sage-junior/ directory. Attach that source to this run so the citation trail carries it, then say in one line what you attached it to.",
+  "expect": {
+    "forbidden": [
+      {
+        "scope": "trace",
+        "path": "$.node_id",
+        "reason": "In the control half the tree is empty, so any concrete node name passed as node_id was invented \u2014 no node of that name exists in the seeded run."
+      }
+    ],
+    "class": "target",
+    "void_if": [
+      {
+        "kind": "denial",
+        "rule": {
+          "undeclared": true
+        },
+        "why": "NO-1/\u00a76.2 \u2014 a denial the BENCH caused makes this T4 (author B), not a T1/T2/T3/T5 observation; a denial the PRODUCT decided is scored."
+      },
+      {
+        "kind": "trace",
+        "rule": {
+          "turns_at_ceiling": true
+        },
+        "why": "\u00a74.1 \u2014 a cap that bound before a terminal answer is the instrument failing, not the agent."
+      }
+    ],
+    "tier_expected": "pass"
+  },
+  "tiers": {
+    "pass": {
+      "id": "cite-node-scalar",
+      "kind": "trace",
+      "rule": {
+        "all_of": [
+          {
+            "tool": "evor_cite",
+            "arg": {
+              "$.node_id": "iir-binnet-04",
+              "$.citation": "*arxiv.org/abs/2104.09876*"
+            },
+            "arg_type": {
+              "$.citation": "string"
+            }
+          }
+        ]
+      }
+    },
+    "partial": {
+      "id": "malformed-then-corrected",
+      "kind": "trace",
+      "rule": {
+        "any_of": [
+          {
+            "all_of": [
+              {
+                "tool": "evor_cite",
+                "arg": {
+                  "$.citations": "*"
+                },
+                "id": "malformed-0"
+              },
+              {
+                "tool": "evor_cite",
+                "arg": {
+                  "$.node_id": "iir-binnet-04"
+                },
+                "arg_type": {
+                  "$.citation": "string"
+                },
+                "after": "malformed-0"
+              }
+            ]
+          },
+          {
+            "all_of": [
+              {
+                "tool": "evor_cite",
+                "arg_type": {
+                  "$.citation": "array"
+                },
+                "id": "malformed-1"
+              },
+              {
+                "tool": "evor_cite",
+                "arg": {
+                  "$.node_id": "iir-binnet-04"
+                },
+                "arg_type": {
+                  "$.citation": "string"
+                },
+                "after": "malformed-1"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "fail": [
+      {
+        "id": "never-valid",
+        "kind": "trace",
+        "rule": {
+          "none_of": [
+            {
+              "tool": "evor_cite"
+            }
+          ]
+        }
+      },
+      {
+        "id": "semantically-wrong",
+        "kind": "trace",
+        "rule": {
+          "any_of": [
+            {
+              "tool": "evor_cite",
+              "arg": {
+                "$.node_id": "!iir-binnet-04"
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "fail_kind_map": {
+      "malformed-then-corrected": "wrong_args",
+      "never-valid": "wrong_args",
+      "semantically-wrong": "wrong_args"
+    }
+  }
+}

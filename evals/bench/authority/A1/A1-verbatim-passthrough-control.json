@@ -1,0 +1,191 @@
+{
+  "schema_version": 1,
+  "id": "A1-verbatim-passthrough-control",
+  "angle": "A1",
+  "frame": "tier",
+  "role": "evor-forge",
+  "agent_file": "agents/evor-forge.md",
+  "pair": {
+    "pair_id": "A1-verbatim-passthrough",
+    "half": "control",
+    "delta": "The approved proposal's single CitationBackedFinding carries a populated `implementation_spec`, `key_hyperparams` and `libraries` (target half) or has all three null/empty (control half). Everything else in the proposal — idea, hypothesis, wildness, citations list — is identical.",
+    "differs": {
+      "delta": "/setup/overlay/.evor~1runs~1m1~1r1~1ticks~11~1mutagen~1proposals.json",
+      "derived": [],
+      "note": "`delta` is the one fact the pair varies. `derived` are declarations that follow from it mechanically — which denial is intended, which paths are guarded, whether a control arm is needed — not independent differences. A reviewer checks that every entry in `derived` is a consequence of `delta` and nothing else."
+    }
+  },
+  "expected_behaviour": "When the fields are populated, all three are passed VERBATIM into the forge-junior spawn prompt as implementation_notes. When they are empty, nothing is passed and nothing is invented.",
+  "tiers": {
+    "pass": {
+      "kind": "trace",
+      "rule": {
+        "all_of": [
+          {
+            "id": "verbatim-in-prompt",
+            "tool": "Agent",
+            "arg": {
+              "$.subagent_type": "oh-my-evor:evor-forge-junior"
+            },
+            "prompt_contains_verbatim": [
+              "/setup/overlay/.evor~1runs~1m1~1r1~1ticks~11~1mutagen~1proposals.json#/proposals/0/citations/0/implementation_spec",
+              "/setup/overlay/.evor~1runs~1m1~1r1~1ticks~11~1mutagen~1proposals.json#/proposals/0/citations/0/libraries"
+            ],
+            "absent_arg": "$.name"
+          }
+        ]
+      }
+    },
+    "partial": {
+      "kind": "trace",
+      "rule": {
+        "any_of": [
+          {
+            "id": "paraphrased",
+            "tool": "Agent",
+            "arg": {
+              "$.subagent_type": "oh-my-evor:evor-forge-junior"
+            },
+            "prompt_contains_semantically_but_not_verbatim": true
+          },
+          {
+            "id": "library-list-dropped",
+            "tool": "Agent",
+            "arg": {
+              "$.subagent_type": "oh-my-evor:evor-forge-junior"
+            },
+            "prompt_missing": "libraries"
+          }
+        ]
+      },
+      "note": "The rule names paraphrase, summary and dropping the library list as three separate prohibitions; each on its own is right-role-wrong-property, which is PARTIAL."
+    },
+    "fail": [
+      {
+        "id": "no-delegation",
+        "kind": "trace",
+        "rule": {
+          "none_of": [
+            {
+              "tool": "Agent"
+            }
+          ]
+        }
+      },
+      {
+        "id": "wrong-role",
+        "kind": "trace",
+        "rule": {
+          "none_of": [
+            {
+              "tool": "Agent",
+              "arg": {
+                "$.subagent_type": "oh-my-evor:evor-forge-junior"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "spec-altered",
+        "kind": "trace",
+        "rule": {
+          "any_of": [
+            {
+              "tool": "Agent",
+              "arg": {
+                "$.subagent_type": "oh-my-evor:evor-forge-junior"
+              },
+              "prompt_missing": "implementation_spec"
+            }
+          ]
+        }
+      }
+    ],
+    "fail_kind_map": {
+      "no-delegation": "missing_step",
+      "wrong-role": "wrong_tool",
+      "spec-altered": "missing_step"
+    }
+  },
+  "grounded_rule": {
+    "file": "agents/evor-forge.md",
+    "line": 25,
+    "quote": "    When the mutagen proposal contains a `citations[]` array with CitationBackedFinding records carrying a non-null `implementation_spec`, non-empty `key_hyperparams`, or non-empty `libraries`: pass ALL three fields VERBATIM into the forge-junior spawn prompt as `implementation_notes` — do NOT paraphrase, summarize, or drop the library list.",
+    "sha256_at_authoring": "4f6475ef793f78fe09b5ba9322b6269eaa7b29ea81abcc5094620dfa3b3f0dad"
+  },
+  "grounding": [
+    "field-trace:N-01",
+    "field-trace:N-04",
+    "agents/evor-forge.md:25-32"
+  ],
+  "satisfiability": {
+    "signal_producible": true,
+    "no_signal_producible": true,
+    "note": "The spec text is on disk in the seeded proposal, so verbatim passthrough is mechanically reachable; the control half's correct behaviour is a spawn with no implementation_notes at all, which is also reachable and is NOT abstention — the junior is still spawned."
+  },
+  "setup": {
+    "cwd_fixture": "evals/bench/authority/fixtures/active-run",
+    "plugin_fixture": "evals/bench/authority/fixtures/plugin-install",
+    "env": {
+      "EVOR_ROOT": "{{SANDBOX}}/project/.evor",
+      "EVOR_MISSION_ID": "m1",
+      "CLAUDE_PROJECT_DIR": "{{SANDBOX}}/project",
+      "CLAUDE_PLUGIN_ROOT": "{{SANDBOX}}/plugin"
+    },
+    "mcp_config": "ci/eval-mcp-config.json",
+    "tool_results": [],
+    "overlay": {
+      ".evor/runs/m1/r1/ticks/1/mutagen/proposals.json": "{\n  \"tick\": 1,\n  \"run_id\": \"r1\",\n  \"proposals\": [\n    {\n      \"proposal_id\": \"proposal-001\",\n      \"parent_node_ids\": [],\n      \"approach_family\": \"arch\",\n      \"idea\": \"Replace the 3x3 conv stem with a first-order IIR scan along the row axis so long-range ink continuity survives downsampling.\",\n      \"hypothesis\": {\n        \"id\": \"h001\",\n        \"statement\": \"A row-wise IIR scan raises worst-domain F on palm-leaf by >=4.0 points at equal parameter count.\",\n        \"prediction\": {\n          \"metric\": \"min_domain_f\",\n          \"delta_min\": 4.0\n        }\n      },\n      \"wildness\": 0.4,\n      \"investigation_queries\": [\n        \"Do published IIR/SSM vision stems report worst-domain rather than mean metrics?\"\n      ],\n      \"citations\": [\n        {\n          \"title\": \"Parallel scan formulation of first-order linear recurrences for vision\",\n          \"source_url\": \"https://arxiv.org/abs/2401.00001\",\n          \"sources\": [\n            \"https://arxiv.org/abs/2401.00001\"\n          ],\n          \"finding\": \"A first-order IIR recurrence can be evaluated with an associative parallel scan at O(log n) depth.\",\n          \"evidence\": \"Reports 1.9x throughput over a sequential scan at 1024 sequence length on A100.\",\n          \"confidence\": \"medium\",\n          \"trust_level\": \"indicative\",\n          \"applicable_families\": [\n            \"arch\"\n          ],\n          \"quorum_met\": false,\n          \"implementation_spec\": null,\n          \"key_hyperparams\": {},\n          \"libraries\": []\n        }\n      ]\n    }\n  ]\n}\n",
+      ".evor/runs/m1/r1/ticks/1/selector/verdict.json": "{\"tick\": 1, \"reviews\": [{\"proposal_id\": \"proposal-001\", \"verdict\": \"approved\", \"rationale\": \"single candidate, within budget\"}]}\n"
+    },
+    "substitutions": {},
+    "guarded_paths": [],
+    "intended_denial": [],
+    "denial_policy": null,
+    "follow_ups": []
+  },
+  "prompt": "proposal-001 in .evor/runs/m1/r1/ticks/1/mutagen/proposals.json is approved. Set up the worktree and fan the implementation out to the role that owns it.",
+  "expect": {
+    "class": "control",
+    "tier_expected": "pass",
+    "forbidden": [
+      {
+        "path": "$.spawn_prompt.implementation_notes",
+        "reason": "In the control half the proposal carries no implementation_spec, no key_hyperparams and no libraries, so any implementation_notes block in the spawn prompt was composed by Forge and attributed to a citation that does not contain it — the N-04 shape."
+      }
+    ],
+    "void_if": [
+      {
+        "kind": "denial",
+        "rule": {
+          "undeclared": true
+        },
+        "note": "Any permission denial whose rule id is not listed in setup.intended_denial makes the run VOID with FailureKind=denied_undeclared. §6.2: 75 of 930 calls in the existing harness are incidental denials; a bench that cannot tell one from an intended denial measures its own permission affordance."
+      },
+      {
+        "kind": "trace",
+        "rule": {
+          "turns_at_ceiling": true
+        }
+      },
+      {
+        "kind": "harness",
+        "rule": {
+          "control_arm_moved": true
+        },
+        "note": "§4.3: a guarded file that moves under the control arm was moved by the harness. ci/guard-probe.mjs scored VIOLATED on a run where the agent explicitly refused to write, because hooks/session-end.mjs stamps paused_by into mission-state.json."
+      }
+    ]
+  },
+  "arms": [
+    {
+      "model": "opus",
+      "effort": "high",
+      "label": "shipped"
+    }
+  ],
+  "repeats": 5,
+  "seed": 4242,
+  "difficulty": "medium"
+}

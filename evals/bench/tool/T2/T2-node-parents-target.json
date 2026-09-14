@@ -1,0 +1,155 @@
+{
+  "schema_version": 1,
+  "id": "T2-node-parents-target",
+  "angle": "T2",
+  "frame": "tier",
+  "role": "evor-forge",
+  "agent_file": "agents/evor-forge.md",
+  "pair": {
+    "pair_id": "T2-node-parents",
+    "half": "target",
+    "delta": "Whether the approved proposal derives from an existing node. The target half seeds tree.json with iir-binnet-02 and a selector verdict whose winner sets derives_from to it; the control half seeds an empty tree and the same verdict with derives_from null, so the candidate is a root. Approach family, hypothesis wording, proposal id, tick and prompt are identical."
+  },
+  "grounded_rule": {
+    "file": "skills/evor/SKILL.md",
+    "quote": "Pass the proposal by NAME. Do NOT pass raw `node_id` UUIDs or internal path literals.",
+    "sha256_at_authoring": "f7dfeddb43b9f110c4e7de84ee20187bbb2c4d1bada48bb9767d9a25d5ab9106"
+  },
+  "grounding": [
+    "field-trace:E",
+    "field-trace:O-01",
+    "preflight:2.2-T2"
+  ],
+  "arms": [
+    {
+      "model": "opus",
+      "label": "shipped",
+      "effort": "high"
+    }
+  ],
+  "repeats": 5,
+  "seed": 8751293,
+  "difficulty": "medium",
+  "expected_behaviour": "The agent records the candidate with evor_record_node, coining a readable name and naming parents by their names \u2014 never by the internal uuid, and never inventing a parent the run does not have.",
+  "satisfiability": {
+    "signal_producible": true,
+    "no_signal_producible": true,
+    "note": "evor_record_node is registered and accepts an empty parent_ids list, so the control half has an expressible correct call and is not an abstention. The seeded tree carries the parent's uuid, fitness value and integrity status; the uuid is present precisely so that passing it is a reachable failure."
+  },
+  "setup": {
+    "env": {
+      "EVOR_ROOT": "{{FIXTURE}}/.evor",
+      "EVOR_MISSION_ID": "binarization-worldmodel-min98-2026-08"
+    },
+    "mcp_config": "ci/eval-mcp-config.json",
+    "tool_results": [],
+    "cwd_fixture": "evals/bench/tool/fixtures/T2-node-parents-target",
+    "guarded_paths": [],
+    "follow_ups": []
+  },
+  "prompt": "In run `run-live-01`, tick 2. The selector's verdict for this tick is on disk under the run's ticks/2/ directory and it approved proposal h001. Register the candidate in the evolution tree so it can be launched, then state the name you registered.",
+  "expect": {
+    "forbidden": [
+      {
+        "path": "$.node.parent_ids",
+        "reason": "In the control half the tree is empty and the verdict names no parent, so any non-empty parent list was invented."
+      }
+    ],
+    "class": "target",
+    "void_if": [
+      {
+        "kind": "denial",
+        "rule": {
+          "undeclared": true
+        },
+        "why": "NO-1/\u00a76.2 \u2014 a denial the BENCH caused makes this T4 (author B), not a T1/T2/T3/T5 observation; a denial the PRODUCT decided is scored."
+      },
+      {
+        "kind": "trace",
+        "rule": {
+          "turns_at_ceiling": true
+        },
+        "why": "\u00a74.1 \u2014 a cap that bound before a terminal answer is the instrument failing, not the agent."
+      }
+    ],
+    "tier_expected": "pass"
+  },
+  "tiers": {
+    "pass": {
+      "id": "node-named-parents",
+      "kind": "trace",
+      "rule": {
+        "all_of": [
+          {
+            "tool": "evor_record_node",
+            "arg": {
+              "$.node.parent_ids[*]": "iir-binnet-02",
+              "$.node.name": "?*"
+            },
+            "arg_type": {
+              "$.node.parent_ids": "array"
+            }
+          }
+        ]
+      }
+    },
+    "partial": {
+      "id": "malformed-then-corrected",
+      "kind": "trace",
+      "rule": {
+        "any_of": [
+          {
+            "all_of": [
+              {
+                "tool": "evor_record_node",
+                "arg": {
+                  "$.node.parent_ids[*]": "3679dbc8-9a1e-4c72-8f05-2b6d4e1a9c30"
+                },
+                "id": "malformed-0"
+              },
+              {
+                "tool": "evor_record_node",
+                "arg": {
+                  "$.node.parent_ids[*]": "iir-binnet-02"
+                },
+                "after": "malformed-0"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "fail": [
+      {
+        "id": "never-valid",
+        "kind": "trace",
+        "rule": {
+          "none_of": [
+            {
+              "tool": "evor_record_node"
+            }
+          ]
+        }
+      },
+      {
+        "id": "semantically-wrong",
+        "kind": "trace",
+        "rule": {
+          "any_of": [
+            {
+              "tool": "evor_record_node",
+              "arg": {
+                "$.node.parent_ids[*]": "3679dbc8-9a1e-4c72-8f05-2b6d4e1a9c30"
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "fail_kind_map": {
+      "malformed-then-corrected": "wrong_args",
+      "never-valid": "wrong_args",
+      "semantically-wrong": "wrong_args"
+    }
+  }
+}

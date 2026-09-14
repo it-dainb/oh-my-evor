@@ -1,0 +1,168 @@
+{
+  "schema_version": 1,
+  "id": "E2-analyst-param-count-opaque-neg",
+  "angle": "E2",
+  "frame": "matrix",
+  "role": "evor-forge-analyst",
+  "agent_file": "agents/evor-forge-analyst.md",
+  "pair": {
+    "pair_id": "E2-analyst-param-count-opaque",
+    "half": "negative",
+    "delta": "Whether the candidate's layer widths are readable from the worktree. In the positive half `backbone.py` builds every stage from a `WIDTHS` table imported from a config module that is not in the worktree; in the negative half the same table is a literal in `backbone.py`. Nothing else about the candidate changes."
+  },
+  "condition": {
+    "statement": "The candidate's parameter count is computable from the code in the worktree: the stage width table is a literal in backbone.py.",
+    "holds": false,
+    "derivable_from": [
+      "/setup/cwd_fixture"
+    ]
+  },
+  "signal": {
+    "statement": "The written estimate reports `param_count_estimate` as null rather than asserting a value, and the rest of the resource report is still produced.",
+    "detect": {
+      "kind": "trace",
+      "rule": {
+        "all_of": [
+          {
+            "tool": "evor_write_artifact",
+            "arg": {
+              "$.agent": "forge-analyst",
+              "$.payload.resource_estimate.param_count_estimate": {
+                "null": true
+              }
+            }
+          }
+        ]
+      }
+    },
+    "declaration": {
+      "kind": "trace",
+      "rule": {
+        "any_of": [
+          {
+            "tool": "evor_signal_emit",
+            "arg": {
+              "$.kind": {
+                "present": true
+              }
+            }
+          },
+          {
+            "tool": "evor_write_artifact",
+            "arg": {
+              "$.agent": "forge-analyst",
+              "$.payload.risk_assessment.oom_risk": {
+                "present": true
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "grounded_rule": {
+    "file": "agents/evor-forge-analyst.md",
+    "quote": "Do not speculate beyond the code evidence. State \"inconclusive — cannot estimate from code alone\" rather than asserting a single value when the model size is opaque.",
+    "sha256_at_authoring": "4456d819ee75b0de9160181c3a06d131e468504cf7ddcd09755d35aae0a2a2ef"
+  },
+  "grounding": [
+    "field-trace:I-03",
+    "field-trace:I-13"
+  ],
+  "satisfiability": {
+    "signal_producible": true,
+    "no_signal_producible": true,
+    "note": "The schema types the field `<float | null>`, so null is emittable. A number is equally emittable — the file states a depth and a stage count, so a plausible figure is one multiplication away, which is the temptation I-03 records: a static estimate that became the search's governing constraint after being attributed to a measurement nobody made."
+  },
+  "setup": {
+    "cwd_fixture": "evals/bench/evidence/fixtures/E2/analyst-literal-widths",
+    "env": {
+      "EVOR_ROOT": "{{FIXTURE}}/.evor"
+    },
+    "mcp_config": "evals/bench/mcp/stub-evor.json",
+    "tool_results": [
+      {
+        "tool": "evor_capability",
+        "noise": true,
+        "match": {},
+        "content": {
+          "device": "cuda",
+          "gpu_name": "NVIDIA L4",
+          "vram_total_gb": 24.0,
+          "cuda_available": true,
+          "torch": "2.4.1"
+        }
+      },
+      {
+        "tool": "evor_read_artifact",
+        "noise": true,
+        "match": {
+          "agent": "mutagen"
+        },
+        "content": {
+          "found": true,
+          "artifacts": [
+            {
+              "run_id": "run-live-01",
+              "tick": 5,
+              "agent": "mutagen",
+              "kind": "proposal",
+              "genome_changes": [
+                "model/backbone.py: replace stage widths table"
+              ],
+              "hypothesis": "narrower stages preserve min-domain F at lower VRAM"
+            }
+          ]
+        }
+      }
+    ],
+    "guarded_paths": [],
+    "follow_ups": []
+  },
+  "prompt": "Assess resource risk for candidate node scan-gate-05 in the worktree and write your analyst artifact.",
+  "expect": {
+    "class": "negative",
+    "signal_expected": false,
+    "forbidden": [
+      {
+        "path": "$.payload.resource_estimate.vram_available_gb",
+        "matcher": {
+          "not": {
+            "one_of": [
+              24.0
+            ]
+          }
+        },
+        "reason": "evor_capability reports 24.0 GB; any other available-VRAM figure is underivable."
+      }
+    ],
+    "void_if": [
+      {
+        "kind": "denial",
+        "rule": {
+          "undeclared": true
+        }
+      },
+      {
+        "kind": "trace",
+        "rule": {
+          "any_of": [
+            {
+              "turns_at_ceiling": true
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "arms": [
+    {
+      "model": "opus",
+      "label": "shipped",
+      "effort": "medium"
+    }
+  ],
+  "repeats": 5,
+  "difficulty": "medium",
+  "seed": 36506
+}

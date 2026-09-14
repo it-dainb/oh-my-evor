@@ -107,6 +107,39 @@ function signalSignature(kind, evidence) {
   return kind + ':' + createHash('sha256').update(text, 'utf8').digest('hex').slice(0, 16);
 }
 
+/**
+ * Every directory name the node `ref` may legitimately live under (O-01).
+ *
+ * `evor_record_eval` takes the node's NAME on the wire — the slug the agent
+ * coined — and `recordEval` resolves it through tree.json before writing
+ * `nodes/<uuid>/`. Statting `nodes/<slug>/` therefore reads a directory that
+ * never existed, and the check reports a node the server had just written as
+ * missing its results: a false negative against healthy work.
+ *
+ * Mirrors `evor/node_identity.py::node_aliases` and the TypeScript reader in
+ * `verifyArtifacts`. Returns `[ref]` when the tree cannot answer — an unknown
+ * ref keeps the caller's existing behaviour rather than minting a second
+ * identity, and only paths that EXIST ever satisfy a check, so this can rescue
+ * a misfiled artifact and can never manufacture one.
+ */
+function nodeAliases(runId, ref) {
+  const aliases = [ref];
+  try {
+    const tree = JSON.parse(readFileSync(join(runDir(runId), 'tree.json'), 'utf8'));
+    const raw = tree?.nodes ?? {};
+    const entries = Array.isArray(raw) ? raw : Object.values(raw);
+    for (const entry of entries) {
+      if (!entry || typeof entry !== 'object') continue;
+      if (entry.id !== ref && entry.name !== ref) continue;
+      for (const alias of [entry.id, entry.name]) {
+        if (alias && !aliases.includes(String(alias))) aliases.push(String(alias));
+      }
+      break;
+    }
+  } catch { /* tree absent or corrupt — the ref is all we know */ }
+  return aliases;
+}
+
 const warnings = [];
 
 // ── evor_record_eval — verify results.json and telemetry.jsonl ───────────────
@@ -115,17 +148,23 @@ if (bareTool === 'record_eval') {
   const nodeId = toolInput.node_id ?? '';
 
   if (nodeId) {
-    const nodeDir = join(runDir(runId), 'nodes', nodeId);
-    const resultsPath = join(nodeDir, 'results.json');
-    const telemetryPath = join(nodeDir, 'telemetry.jsonl');
+    const aliases = nodeAliases(runId, nodeId);
+    const present = (rel, minBytes) => aliases.some((alias) => {
+      try {
+        const p = join(runDir(runId), 'nodes', alias, rel);
+        return existsSync(p) && statSync(p).size > minBytes;
+      } catch {
+        return false; // unreadable under this identity — try the next one
+      }
+    });
 
-    if (!existsSync(resultsPath)) {
+    if (!present('results.json', -1)) {
       warnings.push(
         `results.json missing for node ${nodeId} — evor_record_eval may not have written it`
       );
     }
 
-    if (!existsSync(telemetryPath) || statSync(telemetryPath).size === 0) {
+    if (!present('telemetry.jsonl', 0)) {
       warnings.push(
         `telemetry.jsonl missing or empty for node ${nodeId} — ` +
           'ensure Forge called evor_telemetry_ingest after training completed'
@@ -288,7 +327,9 @@ try {
           mkdirSync: fsMkdir, renameSync: fsRename } = await import('fs');
   const { randomBytes: rndBytes } = await import('crypto');
 
-  const agentTypeR = String(input?.agent_type ?? '').replace(/^oh-my-evor:/, '');
+  // Same invariant as pre-tool-use: a top-level role has no `agent_type`, so the
+  // declared role is the fallback. See the note at pre-tool-use.mjs isMainB.
+  const agentTypeR = String(input?.agent_type ?? process.env.EVOR_AGENT_ROLE ?? '').replace(/^oh-my-evor:/, '');
   const bareToolR  = toolName.replace(/^mcp__plugin_oh-my-evor_evor__/, '').replace(/^evor_/, '');
   const toolResp   = input?.tool_response ?? {};
   const toolInpR   = input?.tool_input ?? {};
