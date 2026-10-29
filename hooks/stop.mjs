@@ -441,6 +441,47 @@ try {
     }
   }
 
+  // (f) A completed tick with no tick_record.
+  //
+  // The circuit breaker (consecutive FAILED ticks) and the plateau window (ticks
+  // with no improvement) read `run_state.tick_records` and nothing else. Before
+  // `evor_state_write({tick_record})` existed nothing wrote per-tick history at
+  // all — the plateau checks read an always-empty list — so an unrecorded tick is
+  // invisible to both limits. This is debt the orchestrator can discharge in the
+  // same turn, with one call, which is the only kind a Stop guard may demand.
+  //
+  // Counted against max(tick_count, the finished tick in tick-state) so a missed
+  // record is still caught after main has moved on to the next tick.
+  //
+  if (isMissionLive(missionState, runState)) {
+    const completed = Math.max(
+      Number.isInteger(runState?.tick_count) ? runState.tick_count : 0,
+      tickStateForDrift && isTickFinished(tickStateForDrift) && Number.isInteger(tickStateForDrift.tick)
+        ? tickStateForDrift.tick : 0,
+    );
+    const recorded = new Set(
+      (Array.isArray(runState?.tick_records) ? runState.tick_records : [])
+        .map(r => r?.tick).filter(Number.isInteger),
+    );
+    // Count from the FIRST recorded tick — or, for a run that has never recorded
+    // one, from the latest completed tick only. Every run in flight when records
+    // were introduced has none, and demanding ticks 1..N from it would ask main
+    // for outcomes it cannot honestly reconstruct; the only truthful answer
+    // would be a guess. One tick of debt starts the series, and every gap after
+    // that is caught.
+    const start = recorded.size > 0 ? Math.min(...recorded) : completed;
+    const unrecorded = [];
+    for (let t = Math.max(1, start); t <= completed; t++) if (!recorded.has(t)) unrecorded.push(t);
+    if (unrecorded.length > 0) {
+      const shown = unrecorded.slice(0, 5).join(', ') + (unrecorded.length > 5 ? ', ...' : '');
+      debtReasons.push(
+        `tick(s) ${shown} finished with no tick_record. Call ` +
+          `evor_state_write({tick_record:{tick, outcome, score?}}) for each — the circuit ` +
+          `breaker and plateau window read these records and nothing else.`
+      );
+    }
+  }
+
   // (e) Sub-agent tasks still running within this tick — forward-compatible check.
   // If the orchestrator writes pending_subagent_ids[] to tick-state.json when spawning
   // Task sub-agents, the stop hook blocks until they complete.

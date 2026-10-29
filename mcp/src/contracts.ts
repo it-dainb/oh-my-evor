@@ -162,8 +162,11 @@ export const GoalContractSchema = z.object({
   budget: z.object({
     max_iterations: z.number().int().positive(),
     plateau_window: z.number().int().positive(),
+    // Consecutive FAILED ticks before the run stops — not a tick count.
     circuit_breaker: z.number().int().positive(),
-    max_cost_usd: z.number().min(0),
+    // Optional: absent = no spend ceiling (local-only). 0 permits no spend and
+    // stops the run before tick 1, so the validator rejects it.
+    max_cost_usd: z.number().min(0).optional(),
     max_wall_clock_hours: z.number().optional(),
     max_gpu_hours: z.number().optional(),
   }),

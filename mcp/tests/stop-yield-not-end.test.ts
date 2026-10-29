@@ -45,7 +45,10 @@ function runStop({ tickState, subagents = [], pendingNodeIds = [] }: Opts) {
   mkdirSync(runDir, { recursive: true });
   writeFileSync(join(root, ".evor", "active-run.json"), JSON.stringify({ run_id: "r1", mission_id: "m1" }));
   writeFileSync(join(runDir, "mission-state.json"), JSON.stringify({ status: "running" }));
-  writeFileSync(join(runDir, "run-state.json"), JSON.stringify({ tick_count: 1, pending_node_ids: pendingNodeIds }));
+  // tick_count is COMPLETED ticks (artifact.ts says so). This said 1 while tick 1 was
+  // still in flight, which the unrecorded-tick guard correctly read as a finished,
+  // unrecorded tick 1.
+  writeFileSync(join(runDir, "run-state.json"), JSON.stringify({ tick_count: 0, pending_node_ids: pendingNodeIds }));
   if (tickState) writeFileSync(join(runDir, "tick-state.json"), JSON.stringify(tickState));
 
   // The hook locates subagents as a sibling of the transcript the payload names.

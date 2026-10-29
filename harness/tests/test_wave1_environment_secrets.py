@@ -32,6 +32,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+from datetime import datetime, timezone
 import os
 import re
 import signal
@@ -506,7 +507,11 @@ class TestR03Reproducibility:
                 "gpu_arch": None, "gpu_name": None, "vram_gb": None,
                 "supported_dtypes": ["fp32"], "available_libs": [],
                 "cuda_version": None, "cpu_only": True,
-                "probed_at": "2026-07-06T00:00:00+00:00",
+                # Relative to NOW. init_run refuses a profile older than its probe
+                # age limit (2160h), and this was a fixed 2026-07-06 — so the test
+                # passed in September and started failing on the calendar, the
+                # clock rot that mimics a regression.
+                "probed_at": datetime.now(timezone.utc).isoformat(),
             })
         )
         run_init_run(str(answers), run_id_arg="run-fixed", evor_root_arg=str(evor_root))

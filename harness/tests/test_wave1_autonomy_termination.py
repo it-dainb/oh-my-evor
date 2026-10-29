@@ -185,8 +185,16 @@ def test_k06_coverage_target_above_maximum_is_rejected(tmp_path: Path) -> None:
     )
 
 
-def test_k06_circuit_breaker_below_max_iterations_is_flagged(tmp_path: Path) -> None:
-    """circuit_breaker 8 vs max_iterations 200: the advertised budget is unreachable."""
+def test_k06_circuit_breaker_below_max_iterations_is_accepted(tmp_path: Path) -> None:
+    """circuit_breaker 8 vs max_iterations 200: the normal case, and it must validate.
+
+    This case used to assert the opposite — "the run is cut off at 4% of its
+    stated budget" — which was true while the stop path implemented the breaker
+    as `tick >= circuit_breaker`. The setup interview asks for "max consecutive
+    failures", the breaker now counts consecutive FAILED ticks, and a breaker of
+    8 no longer stops a healthy run at tick 8. Every mission had been setting
+    breaker = budget to get past this check, which disabled it.
+    """
     contract = _contract_dict(
         budget={
             "max_iterations": 200,
@@ -196,9 +204,24 @@ def test_k06_circuit_breaker_below_max_iterations_is_flagged(tmp_path: Path) -> 
         }
     )
     report = validate_run(_write_run(tmp_path, contract=contract))
+    assert not _has_failing_check(report, "circuit_breaker"), (
+        f"validate_run rejected a breaker below the budget. failing checks: {_failing(report)}"
+    )
+
+
+def test_k06_circuit_breaker_longer_than_the_budget_is_flagged(tmp_path: Path) -> None:
+    """The hazard that remains: 11 consecutive failures cannot happen in 10 ticks."""
+    contract = _contract_dict(
+        budget={
+            "max_iterations": 10,
+            "plateau_window": 5,
+            "circuit_breaker": 11,
+            "max_cost_usd": 100.0,
+        }
+    )
+    report = validate_run(_write_run(tmp_path, contract=contract))
     assert _has_failing_check(report, "circuit_breaker"), (
-        "validate_run accepted circuit_breaker=8 with max_iterations=200 — the run "
-        f"is cut off at 4% of its stated budget. failing checks: {_failing(report)}"
+        f"a breaker that can never trip validated. failing checks: {_failing(report)}"
     )
 
 

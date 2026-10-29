@@ -138,15 +138,19 @@ loop); **sonnet** for leads and for any role that renders a verdict or handles e
 
 <Parallel_Execution>
 If `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` is set in the environment:
-- Multiple Forge agents run in parallel, one per SELECTED proposal (up to ResourcePlan.concurrency).
+- Multiple Forge agents run in parallel, one per SELECTED proposal, at most
+  `resource_plan.concurrency` AT ONCE — read it with `evor_state_read` (setup records it in run
+  state; absent means 1). Selected proposals beyond that forge sequentially; concurrency limits
+  simultaneity, never how many candidates a tick owes.
   Every proposal the selector marked `selected` owes a trained and evaluated node; `winner`
   is the primary for lineage, not the only candidate. Check what is still owed with
   `evor_tick_completeness({tick})` before reporting a terminal outcome — the SubagentStop
   hook blocks a `"scored"` return that still owes one.
-- **If `ResourcePlan.concurrency` is not available, treat it as 1 and forge sequentially —
-  do not silently drop the rest.** The plan is cited here four times and was persisted
-  nowhere in the run, so the limit had no value to read; a tick then forged the winner and
-  dropped the other selected proposal into an undefined `carry_forward` key.
+- **If `resource_plan` is absent from run state, treat concurrency as 1 and forge
+  sequentially — do not silently drop the rest.** Until v1.2.9 the plan was cited here four
+  times and persisted nowhere: setup computed it, printed "Estimated concurrency: N", and had
+  no field to write it to. A tick then forged the winner and dropped the other selected
+  proposal into an undefined `carry_forward` key.
 - Evor manages the shared task-board via `evor_state_write` for inter-agent coordination.
 - **Do not wait on `job_complete` or `self_heal_event` — nothing emits them.** They are
   documented in `ARCHITECTURE.md` and have zero producers anywhere in the codebase, so an
@@ -167,6 +171,19 @@ run Steps 0-9 yourself. For each tick, spawn the boundary and await its status:
 `Task(subagent_type="oh-my-evor:evor-tick", description="Tick <n>", prompt="Run dir: <run_dir>. Tick: <n>. Execute exactly one tick end to end, then return a compact status.")`
 
 Then record the returned status, decide continue / stop / meta-evolve, and spawn the next tick.
+
+**Record every terminal outcome, once, as soon as the tick returns it:**
+
+```
+evor_state_write({ run_id, tick_record: { tick: <n>, outcome: "<scored|rejected|skipped|failed>", score: <best fitness, if any node was evaluated> } })
+```
+
+This is not bookkeeping. The circuit breaker (consecutive FAILED ticks) and the plateau
+window (ticks with no improvement) read these records and nothing else, so a tick you do
+not record is a tick neither limit can see. Before this field existed, nothing wrote the
+per-tick history at all: the plateau checks read an always-empty list, and the breaker was
+implemented as a tick cap because there was nothing for it to count. The Stop hook flags a
+finished tick with no record, so this cannot silently fall off.
 
 **`outcome: "yielding"` is NOT a finished tick.** It means the boundary is waiting on an
 agent or artifact and the tick is still in flight. Do not record it as an outcome, do not
@@ -208,7 +225,7 @@ Use `TaskUpdate` to mark each tick's step progress as the loop advances.
 Read the current tree state via `evor_tree_read`. Apply UCB1 selection policy (or the current selection policy from run state) to choose the parent node(s) for this tick.
 
 ```
-selected = evor_select(run_id, strategy=current_strategy, count=ResourcePlan.concurrency)
+selected = evor_select(run_id, strategy=current_strategy, count=run_state.resource_plan.concurrency)  # absent → 1
 ```
 
 If the frontier has ≥2 nodes from distinct lineages with scores within 10% of each other, flag to Mutagen that a crossover proposal is eligible this tick.
@@ -574,7 +591,7 @@ before acting — the restore block is a navigation aid, not the authoritative s
 - Wake by blocking on the launching Task (`TaskOutput(task_id, block:true)`) or by
   `Monitor`ing the job's `status.json`. There is no `job_complete` or
   `self_heal_event` signal — those names appear in the docs and nothing emits them.
-- Do not spawn more Forge agents than ResourcePlan.concurrency.
+- Do not run more Forge agents AT ONCE than `resource_plan.concurrency`; queue the rest.
 - Respect budget.max_wall_clock_hours and budget.max_gpu_hours if set.
 - Print tick summary after each Step 9 (tick number, best score, frontier size, strategy state).
 - Use `TaskUpdate` to mark each tick complete in the task list after Step 9.

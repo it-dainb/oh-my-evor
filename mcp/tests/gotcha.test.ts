@@ -9,14 +9,19 @@
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtempSync, rmSync, mkdirSync, writeFileSync, existsSync } from "fs";
-import { join, resolve } from "path";
+import { dirname, join, resolve } from "path";
+import { fileURLToPath } from "url";
 import { tmpdir } from "os";
 
 import { gotchaQuery, gotchaAdd, storeBlob } from "../src/tools/gotcha.js";
 import { ensureRunDirs, resolveRunPaths } from "../src/run-store.js";
 
-const HARNESS_DIR = resolve(process.cwd(), "../harness");
-const BRIDGE_DIR = resolve(process.cwd(), "bridge");
+// Anchored to this file. Resolving from process.cwd() assumed vitest runs from
+// mcp/ (true under `npm test`, false from the repo root), and from the root these
+// paths pointed one level too high: tests failed or, worse, silently skipped.
+const TEST_DIR = dirname(fileURLToPath(import.meta.url));
+const HARNESS_DIR = resolve(TEST_DIR, "../../harness");
+const BRIDGE_DIR = resolve(TEST_DIR, "../bridge");
 
 // ── Lifecycle ────────────────────────────────────────────────────────────────
 

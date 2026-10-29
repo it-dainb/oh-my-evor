@@ -784,7 +784,8 @@ def check_stop_condition(
       worst-angle-plateau   — open_ended: no improvement signal (treated as open_ended)
       coverage-target       — coverage >= coverage_target
 
-    Circuit-breaker override: tick >= budget.circuit_breaker (always stops regardless).
+    Circuit-breaker override: N consecutive FAILED ticks (always stops regardless).
+    Universal limits, after the type's goal check: max_iterations, plateau_window.
 
     Returns StopVerdict with should_stop + reason + run metrics.
     """
@@ -862,11 +863,47 @@ def check_stop_condition(
             frontier_count=frontier_count, budget_remaining=budget_remaining,
         )
 
-    # ── Circuit-breaker override (always wins) ─────────────────────────────────
-    if tick >= budget.circuit_breaker:
+    # ── Per-tick records: one {tick, outcome, score?} per completed tick ─────
+    #
+    # Written by `evor_state_write({tick_record: ...})` once each tick reports a
+    # terminal outcome. The universal limits below read these and nothing else.
+    # `tick_history_scores` — which the type-specific plateau checks read — was
+    # written by NOTHING, and `evor_state_write` is strict and did not accept the
+    # key, so every history-based stop in this function was unreachable.
+    records = sorted(
+        (
+            r for r in (run_state.get("tick_records") or [])
+            if isinstance(r, dict) and isinstance(r.get("tick"), int)
+        ),
+        key=lambda r: r["tick"],
+    )
+
+    # ── Circuit breaker: N CONSECUTIVE FAILED ticks (always wins) ─────────────
+    #
+    # The setup interview asks "Do you want a circuit breaker (max consecutive
+    # failures)?" This was `tick >= circuit_breaker` — an absolute tick cap that
+    # counted nothing. A breaker of 8 on a 120-tick budget stopped the run at
+    # tick 8 while it was still improving, so the validator (K-06) rejected any
+    # breaker below the budget, and every mission set it EQUAL to the budget —
+    # which accidentally made it the only working iteration limit, because
+    # max_iterations was not enforced for most stop types (see below).
+    #
+    # `failed` only: a tick whose proposals were all rejected, or that had
+    # nothing to decide, did not break — it found nothing, which is what the
+    # plateau window is for. A breaker is for an environment that keeps falling
+    # over, not for a search that keeps coming up empty.
+    failed_streak = 0
+    for r in reversed(records):
+        if r.get("outcome") != "failed":
+            break
+        failed_streak += 1
+    if budget.circuit_breaker > 0 and failed_streak >= budget.circuit_breaker:
         return StopVerdict(
             should_stop=True,
-            reason=f"circuit_breaker: tick {tick} >= circuit_breaker {budget.circuit_breaker}",
+            reason=(
+                f"circuit_breaker: {failed_streak} consecutive failed ticks "
+                f">= circuit_breaker {budget.circuit_breaker}"
+            ),
             tick_count=tick,
             best_score=best_score,
             frontier_count=frontier_count,
@@ -969,6 +1006,47 @@ def check_stop_condition(
             return StopVerdict(
                 should_stop=True,
                 reason=f"coverage-target: coverage {coverage:.4f} >= target {coverage_target:.4f}",
+                tick_count=tick, best_score=best_score,
+                frontier_count=frontier_count, budget_remaining=budget_remaining,
+            )
+
+    # ── Universal budget limits ────────────────────────────────────────────────
+    #
+    # After the stop type's own GOAL check, so a mission that reaches its target
+    # on its last permitted tick is reported as reaching its target.
+    #
+    # The interview asks "How many iterations should Evor run at most?" and
+    # "What is the plateau window (ticks with no improvement before stopping)?"
+    # as questions about EVERY mission. The stop path enforced max_iterations
+    # only for `maximize-under-budget` and the plateau window only for
+    # `worst-angle-plateau`. For a `target` mission neither was ever checked.
+    if tick >= budget.max_iterations:
+        return StopVerdict(
+            should_stop=True,
+            reason=f"max_iterations: tick {tick} >= max_iterations {budget.max_iterations}",
+            tick_count=tick, best_score=best_score,
+            frontier_count=frontier_count, budget_remaining=budget_remaining,
+        )
+
+    window = budget.plateau_window
+    if window > 0 and len(records) >= window:
+        # Improvement = a tick whose score beats every score recorded before it.
+        # A tick with no score (failed / rejected / skipped) improved nothing.
+        best_before: float | None = None
+        last_improved_at = 0  # index into records, 1-based; 0 = never
+        for i, r in enumerate(records, start=1):
+            score = r.get("score")
+            if isinstance(score, (int, float)) and (best_before is None or score > best_before):
+                best_before = float(score)
+                last_improved_at = i
+        since = len(records) - last_improved_at
+        if since >= window:
+            return StopVerdict(
+                should_stop=True,
+                reason=(
+                    f"plateau: {since} ticks without improvement >= plateau_window {window}"
+                    + (f" (best {best_before:.4f})" if best_before is not None else " (no tick has scored)")
+                ),
                 tick_count=tick, best_score=best_score,
                 frontier_count=frontier_count, budget_remaining=budget_remaining,
             )

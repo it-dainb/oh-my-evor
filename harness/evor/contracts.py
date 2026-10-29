@@ -308,8 +308,13 @@ class Budget(BaseEvorModel):
 
     max_iterations: int
     plateau_window: int
+    # Consecutive FAILED ticks before the run stops — not a tick count.
     circuit_breaker: int
-    max_cost_usd: float
+    # Spend ceiling in USD. None = no ceiling (local-only runs have nothing to
+    # cap). Required-and-non-zero left a local mission no honest value: 0 stops
+    # the run before tick 1 ("a ceiling of 0 permits no spend") and the validator
+    # rejects it, so missions shipped a nominal $10000 to get through.
+    max_cost_usd: Optional[float] = None
     max_wall_clock_hours: Optional[float] = None
     max_gpu_hours: Optional[float] = None
 

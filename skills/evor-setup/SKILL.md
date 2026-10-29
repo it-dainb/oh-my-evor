@@ -173,8 +173,17 @@ Metric options for your task:
 "How many iterations (ticks) should Evor run at most? What is the plateau window (ticks with no improvement before stopping)? Do you want a circuit breaker (max consecutive failures)?"
 → Set `budget.max_iterations` (default 50).
 → Set `budget.plateau_window` (default 8).
-→ Set `budget.circuit_breaker` (default 5).
-→ Ask: "Is this local-only or do you have cloud GPU available?" → set `budget.max_cost_usd` (0 = local-only).
+→ Set `budget.circuit_breaker` (default 5). It counts CONSECUTIVE FAILED ticks — a tick whose
+  outcome is `failed` — and is not a tick count. A breaker below `max_iterations` is the normal
+  case. (It used to be implemented as `tick >= circuit_breaker`, so a breaker of 8 stopped a
+  healthy run at tick 8, and the validator rejected anything below the budget. Both are fixed;
+  do not set it equal to `max_iterations` to get past a check — that disables it.)
+  `max_iterations` and `plateau_window` apply to EVERY mission, whatever its stop condition.
+→ Ask: "Is this local-only or do you have cloud GPU available?" → for cloud, set
+  `budget.max_cost_usd` to a positive ceiling. For local-only, OMIT the field — absent means no
+  ceiling. Do NOT set 0: a ceiling of 0 permits no spend, so the run stops before its first
+  tick, and the validator rejects it. (This line used to say "0 = local-only", the schema made
+  the field required, and missions shipped a nominal $10000 to get through.)
 → Optionally: set `budget.max_wall_clock_hours` and `budget.max_gpu_hours`.
 
 **Q7 — Framework**
@@ -273,7 +282,20 @@ Parse output to populate a ResourcePlan:
 - `gpu_ids`: indices of detected GPUs (empty if none).
 - `cpu_fallback`: true if no GPU detected.
 - `vram_per_job_gb`: estimated from free GPU memory / concurrency.
-- Set `budget.max_cost_usd=0` if local-only (no cloud configured).
+- Omit `budget.max_cost_usd` if local-only (no cloud configured) — absent means no ceiling.
+
+Then RECORD it — the tick reads this back, and until v1.2.9 there was nowhere to put it, so the
+"Estimated concurrency" printed below was computed and thrown away:
+
+```
+evor_state_write({ run_id, resource_plan: {
+  concurrency: <N>, reason: "<free VRAM vs expected per-job VRAM>",
+  gpu_ids: [...], vram_per_job_gb: <x>, cpu_fallback: <bool> } })
+```
+
+`concurrency` is how many candidates may train AT ONCE. Use 1 unless free VRAM comfortably holds
+several jobs; per-job VRAM is not known until a candidate runs, so err low. It bounds simultaneity
+only — a tick still forges every selected proposal, one after another if need be.
 
 Print a summary:
 ```
@@ -343,7 +365,9 @@ If any metric constraint or guard in the contract references a class→domain ma
 </Materialize_Anchors>
 
 <EvalSuite_Initialization>
-Create the initial EvalSuite v1 (Addendum v2 Pillar 3).
+Create the initial EvalSuite v1 (Addendum v2 Pillar 3). **Call it AFTER `evor_freeze_splits`** —
+the suite's domains are read from the frozen test split, so calling it first gets one placeholder
+domain, `primary`, in place of the real ones.
 
 Call `evor_init_eval_suite` with the mission details:
 
@@ -355,7 +379,11 @@ evor_init_eval_suite({
 })
 ```
 
-This derives initial domains from `task_description`, creates an EvalSuite record, and initializes the angle registry with one entry per initial domain.
+This takes one domain per distinct value of the frozen split's `per_sample_domains`, creates an
+EvalSuite record, and initializes an EMPTY angle registry (angles are discovered during the run).
+If no split is frozen yet it falls back to a single `primary` domain. (This paragraph used to say
+domains were derived from `task_description` and that the registry got one entry per domain;
+neither was true. A 22-domain mission got a one-domain suite.)
 
 ## Materialize and seal the canonical evaluator
 
@@ -429,10 +457,16 @@ Run a 5-step smoke-train to verify the environment is functional.
 
 Call `evor_preflight({ mission_id: "<mission_id>" })`.
 
-The preflight runs a micro-train (10 random samples, 2-layer MLP, 5 steps) and verifies:
-1. Loss at step 5 < loss at step 1 (training is working).
-2. GPU util > 0% if GPU detected (GPU is accessible).
-3. No OOM or import errors.
+The preflight verifies:
+1. PyTorch imports (`import_ok`).
+2. A GPU is visible if one is expected (`gpu_active`).
+
+It does NOT verify that training works. `loss_decreasing` needs a candidate worktree for its
+micro-train, and none exists at setup, so it always comes back `null` and is listed under
+`unverified` in the result. Report it to the user as **not run**, never as passed. (This section
+used to promise a 5-step micro-train and a decreasing loss; at setup the micro-train cannot
+execute, and nothing later checks for a *decreasing* loss — integrity check 5 only rejects
+NaN, Inf or constant loss.)
 
 **On failure:** Use `AskUserQuestion`:
 "Preflight failed: <error>. Do you want to override and proceed anyway?
@@ -517,7 +551,6 @@ After consent:
        "max_iterations": 50,
        "plateau_window": 8,
        "circuit_breaker": 5,
-       "max_cost_usd": 0,
        "max_wall_clock_hours": null,
        "max_gpu_hours": null
      },

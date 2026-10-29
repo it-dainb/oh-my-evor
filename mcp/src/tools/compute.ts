@@ -737,8 +737,10 @@ export function registerComputeTools(server: McpServer): void {
   server.tool(
     "evor_preflight",
     "Smoke-test the run environment before committing GPU time. "
-    + "Two modes: mode='full' (default) runs the 5-step micro-train + import/GPU checks — "
-    + "checks: import_ok, loss_decreasing, gpu_active; returns {run_id, checks, passed}. "
+    + "Two modes: mode='full' (default) checks import_ok and gpu_active, and reports "
+    + "loss_decreasing — which is ALWAYS null at setup: the micro-train needs a candidate "
+    + "worktree and none exists yet. A null check is listed in `unverified`; it was not "
+    + "run and must not be read as passed. Returns {run_id, checks, passed, unverified?}. "
     + "mode='env_only' checks imports + env variables only — fast, no GPU required, "
     + "safe to call on CPU-only nodes or before evor_capability. "
     + "Pass no_gpu_check=true to skip GPU utilisation even in full mode.",
@@ -881,7 +883,9 @@ export function registerComputeTools(server: McpServer): void {
   // ── evor_init_eval_suite ────────────────────────────────────────────────────
   server.tool(
     "evor_init_eval_suite",
-    "Create the initial evaluation suite for a new mission. "
+    "Create the initial evaluation suite for a new mission. Call AFTER evor_freeze_splits: "
+    + "its domains are read from the frozen test split (one per distinct per-sample domain), "
+    + "and before a freeze it can only produce a single placeholder 'primary' domain. "
     + "Returns {eval_version, mission_id, domains, created_at}.",
     {
       mission_id: z.string().describe("Mission identifier"),

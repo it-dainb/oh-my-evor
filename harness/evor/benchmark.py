@@ -238,25 +238,58 @@ class BenchmarkManager:
     ) -> EvalSuite:
         """Create the first EvalSuite from scratch (no parent required).
 
-        Derives a single 'primary' domain from *task_description*.
-        Writes ``eval-suites/<eval_version>.json`` and
-        ``angle-registry.json`` (empty angles list for open-ended readiness).
+        Domains come from the FROZEN SPLIT: one per distinct value of
+        ``frozen-splits/<eval_version>-test.json``'s ``per_sample_domains``.
+        Only when no split has been frozen yet, or it records no domains, is a
+        single placeholder 'primary' domain used.
 
-        Called by ``python -m evor.benchmark init-eval-suite`` during setup.
+        This used to say it "derives a single 'primary' domain from
+        task_description" and did exactly that, whatever the data: a mission whose
+        frozen test split held 22 real domains got a suite with one. The sealed
+        evaluator still enforced all 22, so scores were right, but every
+        open-ended angle and coverage figure keyed off the suite described a
+        one-domain mission. `freeze.py` already derives the domains from the
+        frozen samples themselves — never from the caller — so that is the source.
+
+        Writes ``eval-suites/<eval_version>.json`` and ``angle-registry.json``
+        (empty angles list for open-ended readiness).
+
+        Called by ``python -m evor.benchmark init-eval-suite`` during setup, AFTER
+        ``evor_freeze_splits``.
         """
-        primary_domain = Domain(
-            domain_id="primary",
-            description=task_description,
-            metric_specs=[],
-            sota_source=None,
-            added_at_eval_version=eval_version,
-        )
+        domain_ids: list[str] = []
+        split_path = run_dir / "frozen-splits" / f"{eval_version}-test.json"
+        try:
+            per_sample = json.loads(split_path.read_text()).get("per_sample_domains") or {}
+            domain_ids = sorted({str(d) for d in per_sample.values() if d})
+        except (OSError, ValueError):
+            domain_ids = []  # no split frozen yet — the placeholder below applies
+
+        if domain_ids:
+            domains = [
+                Domain(
+                    domain_id=domain_id,
+                    description=f"{domain_id} (from the frozen {eval_version} test split)",
+                    metric_specs=[],
+                    sota_source=None,
+                    added_at_eval_version=eval_version,
+                )
+                for domain_id in domain_ids
+            ]
+        else:
+            domains = [Domain(
+                domain_id="primary",
+                description=task_description,
+                metric_specs=[],
+                sota_source=None,
+                added_at_eval_version=eval_version,
+            )]
 
         suite = EvalSuite(
             eval_version=eval_version,
             mission_id=mission_id,
             parent_eval_version=None,
-            domains=[primary_domain],
+            domains=domains,
             split_hashes={},
             created_at=datetime.now(timezone.utc).isoformat(),
             created_by="user",

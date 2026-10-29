@@ -25,10 +25,15 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { spawnSync } from "child_process";
 import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from "fs";
-import { join, resolve } from "path";
+import { dirname, join, resolve } from "path";
+import { fileURLToPath } from "url";
 import { tmpdir } from "os";
 
-const HOOKS_DIR = resolve(process.cwd(), "../hooks");
+// Anchored to this file. Resolving from process.cwd() assumed vitest runs from
+// mcp/ (true under `npm test`, false from the repo root), and from the root these
+// paths pointed one level too high: tests failed or, worse, silently skipped.
+const TEST_DIR = dirname(fileURLToPath(import.meta.url));
+const HOOKS_DIR = resolve(TEST_DIR, "../../hooks");
 const RESOLVER = join(HOOKS_DIR, "lib", "active-run.mjs");
 const SUBAGENT_STOP = join(HOOKS_DIR, "subagent-stop.mjs");
 
