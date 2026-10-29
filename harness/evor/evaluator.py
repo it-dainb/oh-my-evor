@@ -116,6 +116,9 @@ def _compute_fitness(result: EvaluationResult, goal: GoalContract) -> float:
     return result.fitness_value
 
 
+from .eval_contract import build_argv, EVAL_ENV_VARS
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Subprocess isolation helpers
 # ─────────────────────────────────────────────────────────────────────────────
@@ -130,9 +133,11 @@ def _build_cmd(
     On Linux, attempt unshare --mount for read-only worktree bind-mount.
     Falls back to plain subprocess if unshare is unavailable.
     """
-    base_cmd = [sys.executable, str(eval_script)]
-    if eval_domains:
-        base_cmd += ["--eval-domains"] + eval_domains
+    # 1.2-style collapse: argv is DERIVED from the contract, never asserted here.
+    # This function and evor.scaffold_evaluator disagreed about it — the runner
+    # passed no positional args, the generator required two — and the generated
+    # evaluator exited 2 with a usage error every time it was launched.
+    base_cmd = build_argv(eval_script, eval_domains)
 
     if sys.platform == "linux":
         # Optional hardening: unshare --mount isolates the mount namespace.
@@ -162,8 +167,9 @@ def _build_env(
 ) -> dict[str, str]:
     """Build the subprocess environment.
 
-    Sets EVOR_NODE_ID, EVOR_RUN_ID, EVOR_WORKTREE, EVOR_MISSION_TYPE, and
-    EVOR_EVAL_VERSION for the eval subprocess.  When run_dir is provided also
+    Sets the variables named in `eval_contract.EVAL_ENV_VARS` — the evaluator
+    contract's environment, which an evaluator may rely on and beyond which it
+    may rely on nothing.  When run_dir is provided also
     exports EVOR_TELEMETRY_PATH = run_dir/nodes/<node_id>/telemetry.jsonl so
     that the candidate training code can append telemetry records using only
     stdlib os+json — no evor import required (§19 clean).
@@ -178,6 +184,18 @@ def _build_env(
         tel_path = run_dir / "nodes" / node.id / "telemetry.jsonl"
         tel_path.parent.mkdir(parents=True, exist_ok=True)
         env["EVOR_TELEMETRY_PATH"] = str(tel_path)
+        # skills/evor-setup/SKILL.md tells the evaluator author "the frozen split
+        # path is provided via the run environment — do not hardcode it", and
+        # nothing exported it. An evaluator may rely on EVAL_ENV_VARS and on
+        # nothing else, so the promise is kept here rather than withdrawn there.
+        env["EVOR_RUN_DIR"] = str(run_dir)
+        # NOTE ON SCOPE: this env is the EVAL subprocess's only. Training is
+        # launched by forge-junior through Bash, where none of these are set —
+        # `agents/evor-forge.md` claimed the harness exported EVOR_TELEMETRY_PATH
+        # "before training starts", which was never true of training, so Forge
+        # built the path from the node NAME and split one node across two
+        # directories. Forge now passes through the `telemetry_path` that
+        # `evor_record_node` grants. Do not read this block as covering training.
     return env
 
 

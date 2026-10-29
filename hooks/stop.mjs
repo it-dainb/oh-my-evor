@@ -23,12 +23,14 @@
  *   EVOR_ACTIVE_RUN_ID unset      → exit 0  (guard inert; non-evor session)
  *   run-state.json missing        → exit 0  (run not yet initialised; safe)
  *   run-state.json corrupt        → exit 0  (fail-open; log to stderr)
- *   pending_node_ids non-empty    → exit 2  (continuation guard)
- *   behavioral debt detected      → exit 2  (drift-guard; lists offending nodes)
+ *   pending_node_ids non-empty    → block   (continuation guard)
+ *   behavioral debt detected      → block   (drift-guard; lists offending nodes)
+ *   blocked HARD_CEILING times    → exit 0  (livelock release; debt stays on disk)
  *   any hook internal error       → exit 0  (FAIL-OPEN — never crash-block)
  *
- * Exit code 2 causes Claude Code to surface stdout as a system-reminder and
- * prevent the session from stopping.
+ * A block is `{"decision":"block","reason":...}` on stdout with exit 0 — the JSON
+ * hook protocol. Exit 2 would make Claude Code read the reason from stderr, which
+ * is how this hook spent 497 turns blocking with an empty message.
  */
 
 import { existsSync, readFileSync, writeFileSync, mkdirSync, statSync } from 'fs';
@@ -36,6 +38,8 @@ import { join } from 'path';
 import { randomBytes } from 'crypto';
 import { resolveActiveRun, resolveEvorRoot } from './lib/active-run.mjs';
 import { isMissionLive, isTickFinished } from './lib/run-status.mjs';
+import { isYieldingStop, recordedWait, liveSubagents } from './lib/waiting.mjs';
+import { resolveNodeArtifact } from './lib/node-identity.mjs';
 
 // ── Kill switches ─────────────────────────────────────────────────────────────
 // DISABLE_EVOR: truthy value disables the entire evor hook layer.
@@ -90,12 +94,66 @@ try {
   }
 } catch { /* fail-open — a corrupt mission-state must not block the user */ }
 
+// ── Yield gate: a stop with live children is not an end ──────────────────────
+// Claude Code re-activates an agent when a background agent it spawned reports
+// back — the CLI shows "Waiting for N background agents to finish". An agent
+// that ends its turn there has YIELDED, not finished, and every guard below is
+// asking it for work that is in flight somewhere else.
+//
+// Both field failures were this. In the second, the drift guard demanded tick
+// 1's Mutagen artifact 16 seconds into tick 1, from the orchestrator — which is
+// forbidden to produce it (the tick boundary owns that spawn). The orchestrator
+// could not comply without committing the exact violation the guard exists to
+// detect, so it burned attempts until the operator disabled the hook outright
+// with EVOR_SKIP_HOOKS=stop, which disarms every legitimate guard here too.
+//
+// So this runs BEFORE the block counter: a yield must not consume attempts.
+try {
+  let tickStateForYield = null;
+  try {
+    const tsp = join(runDir, 'tick-state.json');
+    if (existsSync(tsp)) tickStateForYield = JSON.parse(readFileSync(tsp, 'utf8'));
+  } catch { /* unreadable tick-state falls through to the subagent scan */ }
+
+  if (isYieldingStop(payloadForContinuation, tickStateForYield)) {
+    const wait = recordedWait(tickStateForYield);
+    const live = liveSubagents(payloadForContinuation?.session_id, payloadForContinuation?.transcript_path);
+    process.stderr.write(
+      `[evor:stop] yielding, not ending — ` +
+        (wait ? `waiting on ${wait.on}` : `${live.length} live sub-agent(s)`) +
+        `. Guards not evaluated.\n`
+    );
+    process.exit(0);
+  }
+} catch (err) {
+  // FAIL-OPEN in the permissive direction on purpose: misreading a yield as an
+  // end is what produced 497 blocked stops, and the debt survives on disk for
+  // the next stop either way.
+  process.stderr.write(`[evor:stop] yield check failed (allowing stop): ${err.message}\n`);
+  process.exit(0);
+}
+
 // ── §17D / §15E: Block-count escalation guard ────────────────────────────────
-// Per-session file tracks how many times this hook has blocked. Once the model
-// is already in a blocked stop (stop_hook_active=true) and we've blocked ≥2×,
-// we release to avoid an infinite fight. Each exit-2 message includes the
-// kill-switch guidance so the user can always override: EVOR_SKIP_HOOKS=stop.
-const sessionId = (process.env.CLAUDE_SESSION_ID ?? 'nosession').slice(0, 24);
+// Per-session file tracks how many times this hook has blocked, so a guard that
+// the model cannot satisfy still terminates. Two ceilings, both absolute:
+//   SOFT_CEILING — drift-only debt releases here.
+//   HARD_CEILING — EVERYTHING releases here, pending_node_ids included.
+// The previous code had no hard ceiling: pending_node_ids was declared a
+// structural invariant that "can never be overridden by repeated stopping", so
+// its branch fell through to block again, forever. Measured in the
+// binarization-worldmodel-recall-2026-09 run: count reached 497 against a single
+// pending node the model had no way to record, and every one of those turns was
+// spent re-reading the same blocked stop. A guard the agent cannot discharge is
+// a livelock, not an invariant — the debt survives in run-state.json either way,
+// and the next session's guard re-raises it. Blocking 497 times does not record
+// the node; it only burns the context that might have.
+const SOFT_CEILING = 8;
+const HARD_CEILING = 25;
+// session_id arrives on the STDIN payload; CLAUDE_SESSION_ID is not set for Stop
+// hooks in this build, which collapsed every session onto one 'nosession' file.
+const sessionId = String(
+  payloadForContinuation?.session_id ?? process.env.CLAUDE_SESSION_ID ?? 'nosession'
+).slice(0, 24);
 const blockCountPath = join(runDir, `stop-blocks-${sessionId}.json`);
 
 let blockCount = 0;
@@ -104,47 +162,59 @@ try {
   blockCount = typeof bcData?.count === 'number' ? bcData.count : 0;
 } catch { /* no file yet — first block */ }
 
-if (stopHookActive) {
-  // Model is already stopped and trying again — increment and potentially release.
-  // For drift-only debt: release after 8 consecutive blocks (match [Attempt X/8] message).
-  // For pending_node_ids violations: NEVER release — broken tree state is a structural
-  // invariant that cannot be overridden by repeated stopping.
-  blockCount++;
+/** Read pending_node_ids without assuming run-state.json is loadable yet. */
+function hasPendingNodes() {
   try {
-    mkdirSync(runDir, { recursive: true });
-    writeFileSync(blockCountPath, JSON.stringify({ count: blockCount, updated_at: new Date().toISOString() }));
-  } catch { /* state write failure is non-fatal */ }
-
-  // Check pending_node_ids before releasing — if non-empty, never release
-  if (blockCount >= 8) {
-    // Only release if there are no pending nodes (structural invariant takes priority)
-    let hasPendingNodes = false;
-    try {
-      if (existsSync(runStatePath)) {
-        const rs = JSON.parse(readFileSync(runStatePath, 'utf8'));
-        const pids = Array.isArray(rs?.pending_node_ids) ? rs.pending_node_ids : [];
-        hasPendingNodes = pids.length > 0;
-      }
-    } catch { /* fail-open — treat as no pending nodes */ }
-
-    if (!hasPendingNodes) {
-      process.exit(0); // drift-only debt: release after 8 consecutive blocks
-    }
-    // else: pending nodes present — fall through and let continuation guard block
+    if (!existsSync(runStatePath)) return false;
+    const rs = JSON.parse(readFileSync(runStatePath, 'utf8'));
+    return (Array.isArray(rs?.pending_node_ids) ? rs.pending_node_ids : []).length > 0;
+  } catch {
+    return false; // fail-open
   }
 }
 
-// Helper: wrap any exit-2 message with escalation info
+// Ceiling check runs unconditionally, not only when stop_hook_active is set.
+// stop_hook_active is the platform's signal and it is not guaranteed; the
+// persisted count is ours and always is.
+if (blockCount >= HARD_CEILING) {
+  process.stderr.write(
+    `[evor:stop] released after ${blockCount} blocked stops (hard ceiling ${HARD_CEILING}). ` +
+      `Outstanding debt remains recorded in run-state.json.\n`
+  );
+  process.exit(0);
+}
+if (blockCount >= SOFT_CEILING && !hasPendingNodes()) {
+  process.exit(0); // drift-only debt: release at the soft ceiling
+}
+
+/**
+ * Block the stop.
+ *
+ * Emits the JSON hook protocol on stdout and exits 0 — NOT exit 2. Exit 2 makes
+ * Claude Code read the reason from STDERR, and this hook has always written its
+ * message to stdout, so every block surfaced to the model as:
+ *
+ *     Stop hook error: [node "$CLAUDE_PLUGIN_ROOT"/hooks/stop.mjs]: No stderr output
+ *
+ * — a block with no stated reason. The model could not act on what it could not
+ * read, so it emitted a filler line and stopped again, and the loop above did
+ * the rest. `subagent-stop.mjs` and `pre-tool-use.mjs` already use the JSON
+ * protocol; this was the one hook left on the exit-code path.
+ */
 function blockStop(message) {
   const attempt = blockCount + 1;
-  const suffix = `\n\n[Attempt ${attempt}/8] To force-stop regardless, set EVOR_SKIP_HOOKS=stop.`;
-  process.stdout.write(message + suffix);
-  // Record this block
+  const reason =
+    message +
+    `\n\n[Attempt ${attempt}/${HARD_CEILING}] To force-stop regardless, set EVOR_SKIP_HOOKS=stop.`;
+  process.stdout.write(JSON.stringify({ decision: 'block', reason }) + '\n');
+  // Mirrored to stderr so the reason is in the session log even if the JSON
+  // protocol is not honoured by the host.
+  process.stderr.write(reason + '\n');
   try {
     mkdirSync(runDir, { recursive: true });
     writeFileSync(blockCountPath, JSON.stringify({ count: attempt, updated_at: new Date().toISOString() }));
   } catch { /* non-fatal */ }
-  process.exit(2);
+  process.exit(0);
 }
 
 if (!existsSync(runStatePath)) process.exit(0);
@@ -259,10 +329,20 @@ try {
           continue; // skip telemetry check; integrity is the primary debt
         }
 
-        // (b) Evaluated node missing telemetry
-        const telemetryPath = join(runDir, 'nodes', nodeId, 'telemetry.jsonl');
+        // (b) Evaluated node missing telemetry.
+        //
+        // Resolved across BOTH identities (O-01). This built `nodes/<uuid>/`
+        // only, which is the same guess that once failed a node holding 12,000
+        // well-formed telemetry records — the trainer had filed them under the
+        // slug. A guard that reports a trained node as missing telemetry fails
+        // in the direction of "the candidate is bad", which is the worst
+        // direction a silent path miss can fail in.
+        const telemetryPath = resolveNodeArtifact(
+          join(runDir, 'nodes', nodeId, 'telemetry.jsonl'),
+          node,
+        );
         let telemetryMissing = false;
-        if (!existsSync(telemetryPath)) {
+        if (!telemetryPath) {
           telemetryMissing = true;
         } else {
           try {
@@ -311,12 +391,19 @@ try {
   // tree nodes are absent. This is the enforcement teeth behind the SKILL's
   // Orchestrator_Contract: a tick that leaves no proposals/verdict/node on disk was
   // done inline and must be redone via real Task spawns.
-  if (isMissionLive(missionState, runState)) {
-    let curTick = null;
-    const tsPath = join(runDir, 'tick-state.json');
-    if (existsSync(tsPath)) {
-      try { curTick = JSON.parse(readFileSync(tsPath, 'utf8'))?.tick ?? null; } catch (_) { /* ignore */ }
-    }
+  // Scoped to a FINISHED tick. These predicates ask whether the roster's output
+  // reached disk; mid-tick the answer is legitimately "not yet", and asking it
+  // early is how the guard demanded a Mutagen artifact 16 seconds into tick 1.
+  // "Did you skip the roster?" is only answerable once the tick is over.
+  let tickStateForDrift = null;
+  try {
+    const tsp = join(runDir, 'tick-state.json');
+    if (existsSync(tsp)) tickStateForDrift = JSON.parse(readFileSync(tsp, 'utf8'));
+  } catch (_) { /* ignore */ }
+  const tickOver = tickStateForDrift === null || isTickFinished(tickStateForDrift);
+
+  if (isMissionLive(missionState, runState) && tickOver) {
+    const curTick = tickStateForDrift?.tick ?? null;
 
     let nodeCount = 0;
     if (existsSync(treePath)) {

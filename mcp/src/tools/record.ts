@@ -400,18 +400,41 @@ export function registerRecordTools(server: McpServer): void {
         );
       }
       const { pendingRemaining } = recordNode(run_id, filledNode, missionId);
+      // The ONE path the caller is given, and the reason it is given one.
+      //
+      // Forge must export EVOR_TELEMETRY_PATH to the training subprocess, and it
+      // only ever holds the NAME — this tool's whole contract is that an agent
+      // never handles an internal id. So it built the path from the name, which
+      // is how a single node ended up with two directories: the agent surface
+      // wrote `nodes/n001-depthwise-unet/telemetry.jsonl` while the server wrote
+      // `nodes/cf9f0020-…/results.json`. Integrity check 5 then failed a node
+      // that had 12,000 well-formed telemetry records, under the other name.
+      //
+      // Granting the canonical path removes the construction, and with it the
+      // choice. No internal id is exposed: the uuid appears inside an opaque
+      // path the caller is meant to pass through, not to parse or to rebuild.
+      const telemetryPath = join(
+        resolveRunPaths(run_id, missionId).nodesDir,
+        filledNode.id,
+        "telemetry.jsonl",
+      );
       return {
         content: [
           {
             type: "text" as const,
-            // Return ONLY the name — never the internal id or filesystem path. On
+            // The name is what identifies the node downstream — never the id. On
             // collision the name may differ from what was asked; the caller uses
-            // THIS value downstream.
+            // THIS value.
             text: JSON.stringify({
               ok: true,
               name: filledNode.name,
               run_id,
               pending_remaining: pendingRemaining,
+              telemetry_path: telemetryPath,
+              telemetry_note:
+                "Export this EXACTLY as EVOR_TELEMETRY_PATH for the training subprocess. " +
+                "Do not rebuild it from the node name — that is what split one node across " +
+                "two directories and failed a node with 12,000 telemetry records.",
             }),
           },
         ],

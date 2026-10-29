@@ -704,15 +704,55 @@ class SelectorReview(BaseEvorModel):
 class SelectorVerdict(BaseEvorModel):
     """Canonical Selector verdict artifact (ticks/<tick>/selector/verdict.json).
 
-    One review per proposal in the tick, plus the winning proposal_id (or None
-    if no proposal was selected). This is the single accepted shape — see the
-    module docstring in evor/artifacts.py for the drift this replaces.
+    One review per proposal in the tick. EVERY review with ``selected=True`` is a
+    candidate the tick owes a trained and evaluated node; ``winner`` is the
+    primary among them, used for lineage ordering.
+
+    Selecting more than one is the point. ``evor-selector.md`` used to say
+    "``selected`` is true for at most one review", while ``skills/evor/SKILL.md``
+    said "one Forge per approved proposal (up to ResourcePlan.concurrency)" — two
+    documents, two beliefs about how many candidates a tick trains, and the
+    limiting parameter (``concurrency``) was persisted nowhere in the run. In the
+    field the selector approved h001 AND h003, wrote ``selected=True`` on both,
+    and this schema accepted it because nothing checked. Only h001 was forged;
+    h003 was parked in a ``carry_forward`` key that is defined in no skill, no
+    agent file and no contract, and nothing ever read it. An approved hypothesis
+    was silently dropped.
+
+    So the multi-select is now the declared shape AND it is checked: the winner
+    must be one of the selected, and a non-empty selection must name one.
     """
 
     model_config = ConfigDict(strict=True, exclude_none=True, extra="forbid")
 
     reviews: list[SelectorReview]
     winner: Optional[str] = None
+
+    @model_validator(mode="after")
+    def _winner_is_among_the_selected(self) -> "SelectorVerdict":
+        selected = [r.proposal_id for r in self.reviews if r.selected]
+        if selected and self.winner is None:
+            raise ValueError(
+                f"{len(selected)} proposal(s) selected but no winner named. The winner "
+                f"orders lineage; pick one of {selected}."
+            )
+        if self.winner is not None and self.winner not in selected:
+            raise ValueError(
+                f"winner {self.winner!r} is not among the selected proposals {selected}. "
+                f"A winner that was not selected is a candidate nothing will forge."
+            )
+        approved_unselected = [
+            r.proposal_id for r in self.reviews
+            if r.critic_review.verdict == "approved" and not r.selected
+        ]
+        if approved_unselected:
+            raise ValueError(
+                f"proposal(s) {approved_unselected} passed every gate and were not selected. "
+                f"An approved proposal is a candidate the tick owes a node — select it, or "
+                f"reject it with a rejection_reason saying why. Dropping it silently is how "
+                f"h003 disappeared into an undefined carry_forward key."
+            )
+        return self
 
 
 class MutationProposal(BaseEvorModel):

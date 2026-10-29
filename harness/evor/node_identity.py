@@ -138,3 +138,30 @@ def resolve_node_artifact_by_ref(
         if candidate.exists():
             return candidate
     return None
+
+
+def canonical_node_id(run_dir: Path, ref: str, tree: Optional[dict] = None) -> str:
+    """The uuid ``ref`` denotes, for a WRITER choosing a directory name.
+
+    Every resolver above exists to rescue a read. This is the other half, and the
+    one that stops the split being created: a writer handed either identity gets
+    the canonical one, so ``nodes/<identity>/`` has a single spelling per node.
+
+    Aliasing readers was the right rescue for the runs already on disk, and it is
+    not a fix — while any writer can mint a second directory, every reader needs
+    the rescue forever. ``ref`` is returned unchanged when the tree does not know
+    it: an unknown ref is the caller's existing not-found case, not ours to
+    invent an identity for.
+    """
+    import json as _json
+
+    run_dir = Path(run_dir)
+    if tree is None:
+        try:
+            tree = _json.loads((run_dir / "tree.json").read_text())
+        except Exception:  # noqa: BLE001
+            return ref
+    for alias in aliases_from_tree(tree, ref):
+        # aliases_from_tree returns [id, name]; the id is first and canonical.
+        return alias
+    return ref

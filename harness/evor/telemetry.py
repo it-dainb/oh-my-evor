@@ -24,6 +24,8 @@ from __future__ import annotations
 import csv
 import json
 from pathlib import Path
+
+from .node_identity import resolve_node_artifact_by_ref
 from typing import Any
 
 
@@ -57,7 +59,14 @@ class TelemetryCallback:
         self._run_dir = run_dir
 
         if run_dir is not None:
-            self._telemetry_path = run_dir / "nodes" / node_id / "telemetry.jsonl"
+            declared = run_dir / "nodes" / node_id / "telemetry.jsonl"
+            # O-01 (item 1.5): `node_id` may be either identity, and both occur on
+            # disk in the same run. Resolve across them, and fall back to the
+            # DECLARED path when the file exists under neither — a caller that
+            # reports "not yet written" must keep reporting exactly that, which is
+            # what stops this rescue from degrading into "pass when missing".
+            resolved = resolve_node_artifact_by_ref(run_dir, node_id, "telemetry.jsonl")
+            self._telemetry_path = resolved if resolved is not None else declared
         else:
             self._telemetry_path = Path("nodes") / node_id / "telemetry.jsonl"
 

@@ -21904,7 +21904,8 @@ function callPythonModule(module2, args, opts) {
     encoding: "utf8",
     timeout: opts?.timeout ?? 3e4,
     env: { ..._pythonEnv(), ...opts?.extraEnv },
-    cwd: opts?.cwd
+    cwd: opts?.cwd,
+    ...opts?.stdin === void 0 ? {} : { input: opts.stdin }
   });
   return _parseSpawnResult(result);
 }
@@ -22301,18 +22302,25 @@ function registerRecordTools(server) {
         );
       }
       const { pendingRemaining } = recordNode(run_id, filledNode, missionId);
+      const telemetryPath = (0, import_path6.join)(
+        resolveRunPaths(run_id, missionId).nodesDir,
+        filledNode.id,
+        "telemetry.jsonl"
+      );
       return {
         content: [
           {
             type: "text",
-            // Return ONLY the name — never the internal id or filesystem path. On
+            // The name is what identifies the node downstream — never the id. On
             // collision the name may differ from what was asked; the caller uses
-            // THIS value downstream.
+            // THIS value.
             text: JSON.stringify({
               ok: true,
               name: filledNode.name,
               run_id,
-              pending_remaining: pendingRemaining
+              pending_remaining: pendingRemaining,
+              telemetry_path: telemetryPath,
+              telemetry_note: "Export this EXACTLY as EVOR_TELEMETRY_PATH for the training subprocess. Do not rebuild it from the node name \u2014 that is what split one node across two directories and failed a node with 12,000 telemetry records."
             })
           }
         ]
@@ -23691,14 +23699,15 @@ var import_fs11 = require("fs");
 var import_path12 = require("path");
 function telemetryIngest(runId, nodeId, records, missionId) {
   const paths = resolveRunPaths(runId, missionId);
-  const nodeDir = (0, import_path12.join)(paths.nodesDir, nodeId);
+  const canonicalId = resolveNodeRef(runId, nodeId, missionId);
+  const nodeDir = (0, import_path12.join)(paths.nodesDir, canonicalId);
   if (!(0, import_fs11.existsSync)(nodeDir)) {
     (0, import_fs11.mkdirSync)(nodeDir, { recursive: true });
   }
   const now = (/* @__PURE__ */ new Date()).toISOString();
   const filled = records.map((r) => ({
     ...r,
-    node_id: r.node_id || nodeId,
+    node_id: r.node_id || canonicalId,
     run_id: r.run_id || runId,
     timestamp: r.timestamp || now
   }));
@@ -24645,9 +24654,80 @@ function registerLineageTools(server) {
 }
 
 // src/tools/compute.ts
-var import_fs16 = require("fs");
+var import_fs18 = require("fs");
 var import_crypto4 = require("crypto");
+var import_path19 = require("path");
+
+// ../hooks/lib/tick-completeness.mjs
+var import_fs17 = require("fs");
+var import_path18 = require("path");
+
+// ../hooks/lib/node-identity.mjs
+var import_fs16 = require("fs");
 var import_path17 = require("path");
+function nodeAliases(node) {
+  const out = [];
+  for (const candidate of [node?.id, node?.name]) {
+    if (candidate && !out.includes(String(candidate))) out.push(String(candidate));
+  }
+  return out;
+}
+function resolveNodeArtifact(path, node, extraAliases = []) {
+  if ((0, import_fs16.existsSync)(path)) return path;
+  const artifact = (0, import_path17.basename)(path);
+  const parent = (0, import_path17.dirname)(path);
+  const container = (0, import_path17.dirname)(parent);
+  const seen = /* @__PURE__ */ new Set([(0, import_path17.basename)(parent)]);
+  for (const alias of [...nodeAliases(node), ...extraAliases]) {
+    if (seen.has(alias)) continue;
+    seen.add(alias);
+    const candidate = (0, import_path17.join)(container, alias, artifact);
+    if ((0, import_fs16.existsSync)(candidate)) return candidate;
+  }
+  return null;
+}
+
+// ../hooks/lib/tick-completeness.mjs
+function readJson(path) {
+  try {
+    return (0, import_fs17.existsSync)(path) ? JSON.parse((0, import_fs17.readFileSync)(path, "utf8")) : null;
+  } catch {
+    return null;
+  }
+}
+function selectedProposals(runDir, tick) {
+  const verdict = readJson((0, import_path18.join)(runDir, "ticks", String(tick), "selector", "verdict.json"));
+  const reviews = Array.isArray(verdict?.reviews) ? verdict.reviews : [];
+  return reviews.filter((r) => r?.selected).map((r) => String(r?.proposal_id ?? "")).filter(Boolean);
+}
+function treeNodes(runDir) {
+  const tree = readJson((0, import_path18.join)(runDir, "tree.json"));
+  const raw = tree?.nodes ?? {};
+  return Array.isArray(raw) ? raw : Object.values(raw);
+}
+function owed(runDir, tick) {
+  const selected = selectedProposals(runDir, tick);
+  if (selected.length === 0) return [];
+  const nodes = treeNodes(runDir);
+  const out = [];
+  for (const proposalId of selected) {
+    const node = nodes.find((n) => n && String(n.hypothesis_id ?? "") === proposalId);
+    if (!node) {
+      out.push({ proposal_id: proposalId, missing: ["node"] });
+      continue;
+    }
+    const missing = [];
+    if (!(0, import_fs17.existsSync)((0, import_path18.join)(runDir, "evaluations", `${node.id}.json`))) missing.push("integrity_verdict");
+    if (typeof node.fitness_value !== "number") missing.push("fitness");
+    if (!resolveNodeArtifact((0, import_path18.join)(runDir, "nodes", String(node.id), "telemetry.jsonl"), node)) {
+      missing.push("telemetry");
+    }
+    if (missing.length) out.push({ proposal_id: proposalId, node_id: node.id, node_name: node.name, missing });
+  }
+  return out;
+}
+
+// src/tools/compute.ts
 function ok2(data) {
   return { content: [{ type: "text", text: JSON.stringify(data) }] };
 }
@@ -24796,13 +24876,13 @@ function worktreeDir(evorRoot, ...refs) {
     (v, i, a) => !!v && a.indexOf(v) === i
   );
   for (const identity of identities) {
-    const dir = (0, import_path17.join)(evorRoot, "worktrees", identity);
+    const dir = (0, import_path19.join)(evorRoot, "worktrees", identity);
     try {
-      if ((0, import_fs16.existsSync)(dir)) return dir;
+      if ((0, import_fs18.existsSync)(dir)) return dir;
     } catch {
     }
   }
-  return (0, import_path17.join)(evorRoot, "worktrees", identities[0] ?? "");
+  return (0, import_path19.join)(evorRoot, "worktrees", identities[0] ?? "");
 }
 function lockEvaluate(runId, nodeRef, missionId) {
   const nodeId = tryResolveNodeRef(runId, nodeRef, missionId);
@@ -24814,8 +24894,8 @@ function lockEvaluate(runId, nodeRef, missionId) {
     };
   }
   const worktree = worktreeDir(getEvorRoot(), nodeId, nodeRef);
-  const evalPath = (0, import_path17.join)(worktree, "evaluate.py");
-  if (!(0, import_fs16.existsSync)(evalPath)) {
+  const evalPath = (0, import_path19.join)(worktree, "evaluate.py");
+  if (!(0, import_fs18.existsSync)(evalPath)) {
     return {
       ok: false,
       node_name: nodeRef,
@@ -24825,15 +24905,15 @@ function lockEvaluate(runId, nodeRef, missionId) {
   let contractHash = "";
   try {
     const { runDir } = resolveRunPaths(runId, missionId);
-    const contractPath = (0, import_path17.join)(runDir, "goal-contract.json");
-    if ((0, import_fs16.existsSync)(contractPath)) {
-      const contract = JSON.parse((0, import_fs16.readFileSync)(contractPath, "utf8"));
+    const contractPath = (0, import_path19.join)(runDir, "goal-contract.json");
+    if ((0, import_fs18.existsSync)(contractPath)) {
+      const contract = JSON.parse((0, import_fs18.readFileSync)(contractPath, "utf8"));
       contractHash = typeof contract.eval_script_hash === "string" ? contract.eval_script_hash : "";
     }
   } catch {
   }
   try {
-    const hash = (0, import_crypto4.createHash)("sha256").update((0, import_fs16.readFileSync)(evalPath)).digest("hex");
+    const hash = (0, import_crypto4.createHash)("sha256").update((0, import_fs18.readFileSync)(evalPath)).digest("hex");
     if (contractHash && contractHash !== hash) {
       return {
         ok: false,
@@ -24841,8 +24921,8 @@ function lockEvaluate(runId, nodeRef, missionId) {
         error: "this node's evaluate.py does not match the mission's locked evaluation script \u2014 it must be an exact copy of the canonical evaluator, not a modified or re-authored one"
       };
     }
-    (0, import_fs16.writeFileSync)((0, import_path17.join)(worktree, "evaluate.py.lock"), hash, "utf8");
-    (0, import_fs16.chmodSync)(evalPath, 292);
+    (0, import_fs18.writeFileSync)((0, import_path19.join)(worktree, "evaluate.py.lock"), hash, "utf8");
+    (0, import_fs18.chmodSync)(evalPath, 292);
     return { ok: true, node_name: nodeRef };
   } catch {
     return { ok: false, node_name: nodeRef, error: "could not lock evaluate.py" };
@@ -24855,8 +24935,8 @@ function verifyArtifacts(runId, nodeRef, missionId) {
   const present = (rel, minBytes) => {
     for (const identity of identities) {
       try {
-        const p = (0, import_path17.join)(runDir, "nodes", identity, rel);
-        if ((0, import_fs16.existsSync)(p) && (0, import_fs16.statSync)(p).size > minBytes) return true;
+        const p = (0, import_path19.join)(runDir, "nodes", identity, rel);
+        if ((0, import_fs18.existsSync)(p) && (0, import_fs18.statSync)(p).size > minBytes) return true;
       } catch {
       }
     }
@@ -24868,7 +24948,7 @@ function verifyArtifacts(runId, nodeRef, missionId) {
 }
 function appendDecision2(runDir, what, why) {
   try {
-    (0, import_fs16.appendFileSync)(
+    (0, import_fs18.appendFileSync)(
       `${runDir}/decision-log.md`,
       `- \`${(/* @__PURE__ */ new Date()).toISOString()}\` **${what}** \u2014 ${why}
 `
@@ -24878,9 +24958,9 @@ function appendDecision2(runDir, what, why) {
 }
 function patchGoalContract(runDir, patch) {
   const contractPath = `${runDir}/goal-contract.json`;
-  if (!(0, import_fs16.existsSync)(contractPath)) return;
+  if (!(0, import_fs18.existsSync)(contractPath)) return;
   try {
-    const contract = JSON.parse((0, import_fs16.readFileSync)(contractPath, "utf8"));
+    const contract = JSON.parse((0, import_fs18.readFileSync)(contractPath, "utf8"));
     const changes = [];
     for (const [k, v] of Object.entries(patch)) {
       if (v && contract[k] !== v) {
@@ -24892,7 +24972,7 @@ function patchGoalContract(runDir, patch) {
       }
     }
     if (changes.length) {
-      (0, import_fs16.writeFileSync)(contractPath, JSON.stringify(contract, null, 2), "utf8");
+      (0, import_fs18.writeFileSync)(contractPath, JSON.stringify(contract, null, 2), "utf8");
       appendDecision2(
         runDir,
         `sealed goal-contract mutated: ${changes.join(", ")}`,
@@ -24902,10 +24982,26 @@ function patchGoalContract(runDir, patch) {
   } catch {
   }
 }
+function digestEvaluator(runDir, evalVersion) {
+  const base = (0, import_path19.join)(runDir, "eval-suites");
+  const candidates = [(0, import_path19.join)(base, `${evalVersion}.py`), (0, import_path19.join)(base, "score_plugin.py")];
+  const files = {};
+  const acc = (0, import_crypto4.createHash)("sha256");
+  for (const path of candidates) {
+    if (!(0, import_fs18.existsSync)(path)) continue;
+    const digest = (0, import_crypto4.createHash)("sha256").update((0, import_fs18.readFileSync)(path)).digest("hex");
+    files[(0, import_path19.basename)(path)] = digest;
+    acc.update((0, import_path19.basename)(path));
+    acc.update(Buffer.from([0]));
+    acc.update(digest);
+    acc.update("\n");
+  }
+  return { hash: acc.digest("hex"), files };
+}
 function registerComputeTools(server) {
   server.tool(
     "evor_run_start",
-    "Launch candidate node as a detached background job. Returns {status, job_id} instantly \u2014 poll progress with evor_run_status.",
+    "EVALUATES an ALREADY-TRAINED candidate: runs the sealed evaluate.py against the worktree as a detached background job. It does NOT train. Training is written and run by evor-forge-junior, and its weights must be on disk before you call this \u2014 calling it on an untrained worktree scores whatever is there, usually as a failure. Returns {status, job_id} instantly \u2014 poll progress with evor_run_status.",
     {
       run_id: external_exports.string().describe("Active run identifier"),
       node_id: external_exports.string().describe("The node's name (e.g. 'immune-memory-02')"),
@@ -24932,9 +25028,9 @@ function registerComputeTools(server) {
         try {
           const arPath = getActiveRunPath();
           let existing = {};
-          if ((0, import_fs16.existsSync)(arPath)) {
+          if ((0, import_fs18.existsSync)(arPath)) {
             try {
-              existing = JSON.parse((0, import_fs16.readFileSync)(arPath, "utf8"));
+              existing = JSON.parse((0, import_fs18.readFileSync)(arPath, "utf8"));
             } catch {
             }
           }
@@ -24946,17 +25042,17 @@ function registerComputeTools(server) {
           };
           if (missionId && !ar.mission_id) ar.mission_id = missionId;
           const arTmp = `${arPath}.tmp`;
-          (0, import_fs16.writeFileSync)(arTmp, JSON.stringify(ar, null, 2), "utf8");
-          (0, import_fs16.renameSync)(arTmp, arPath);
+          (0, import_fs18.writeFileSync)(arTmp, JSON.stringify(ar, null, 2), "utf8");
+          (0, import_fs18.renameSync)(arTmp, arPath);
         } catch {
         }
       }
       try {
-        const msPath = (0, import_path17.join)(resolvedDir, "mission-state.json");
+        const msPath = (0, import_path19.join)(resolvedDir, "mission-state.json");
         let ms = {};
-        if ((0, import_fs16.existsSync)(msPath)) {
+        if ((0, import_fs18.existsSync)(msPath)) {
           try {
-            ms = JSON.parse((0, import_fs16.readFileSync)(msPath, "utf8"));
+            ms = JSON.parse((0, import_fs18.readFileSync)(msPath, "utf8"));
           } catch {
           }
         }
@@ -24966,10 +25062,10 @@ function registerComputeTools(server) {
           ms.updated_at = (/* @__PURE__ */ new Date()).toISOString();
           ms.entered_at = ms.updated_at;
           const msTmp = `${msPath}.tmp`;
-          (0, import_fs16.writeFileSync)(msTmp, JSON.stringify(ms, null, 2), "utf8");
-          (0, import_fs16.renameSync)(msTmp, msPath);
-          (0, import_fs16.appendFileSync)(
-            (0, import_path17.join)(resolvedDir, "transitions.jsonl"),
+          (0, import_fs18.writeFileSync)(msTmp, JSON.stringify(ms, null, 2), "utf8");
+          (0, import_fs18.renameSync)(msTmp, msPath);
+          (0, import_fs18.appendFileSync)(
+            (0, import_path19.join)(resolvedDir, "transitions.jsonl"),
             JSON.stringify({
               at: ms.updated_at,
               entity: "mission",
@@ -25004,8 +25100,8 @@ function registerComputeTools(server) {
       if (!resolvedJobId) {
         try {
           const arPath = getActiveRunPath();
-          if ((0, import_fs16.existsSync)(arPath)) {
-            const ar = JSON.parse((0, import_fs16.readFileSync)(arPath, "utf8"));
+          if ((0, import_fs18.existsSync)(arPath)) {
+            const ar = JSON.parse((0, import_fs18.readFileSync)(arPath, "utf8"));
             if (typeof ar.job_id === "string") resolvedJobId = ar.job_id;
           }
         } catch {
@@ -25041,7 +25137,7 @@ function registerComputeTools(server) {
         return err2(result.error ?? "evor capability failed");
       }
       try {
-        const cap = JSON.parse((0, import_fs16.readFileSync)((0, import_path17.join)(root, "capability.json"), "utf8"));
+        const cap = JSON.parse((0, import_fs18.readFileSync)((0, import_path19.join)(root, "capability.json"), "utf8"));
         return ok2(cap);
       } catch {
         return err2(
@@ -25151,8 +25247,8 @@ function registerComputeTools(server) {
       const result = initEvalSuite(mission_id, eval_version, task_description, runDir);
       if (!result.ok) return err2(result.error ?? "evor_init_eval_suite failed");
       const evalScriptPath = `${runDir}/eval-suites/${eval_version}.py`;
-      if ((0, import_fs16.existsSync)(evalScriptPath)) {
-        const hash = (0, import_crypto4.createHash)("sha256").update((0, import_fs16.readFileSync)(evalScriptPath)).digest("hex");
+      if ((0, import_fs18.existsSync)(evalScriptPath)) {
+        const hash = (0, import_crypto4.createHash)("sha256").update((0, import_fs18.readFileSync)(evalScriptPath)).digest("hex");
         patchGoalContract(runDir, { eval_script_hash: hash });
       }
       return ok2(result.data);
@@ -25160,7 +25256,7 @@ function registerComputeTools(server) {
   );
   server.tool(
     "evor_seal_eval_script",
-    "Hash the canonical evaluator script (eval-suites/<eval_version>.py) and lock its sha256 into goal-contract.json so the integrity gate's no_eval_shift check verifies against a real value. Call once after the canonical evaluator is written.",
+    "Hash the canonical evaluator \u2014 EVERY file it comprises, per the evaluator contract, which for the generated shape is the harness AND the mission's score_plugin.py \u2014 and lock the digest into goal-contract.json so the integrity gate's no_eval_shift check verifies against a real value. Call once after the canonical evaluator is written.",
     {
       run_id: external_exports.string().describe("Active run identifier"),
       eval_version: external_exports.string().describe("Eval version string (e.g. v1)"),
@@ -25170,17 +25266,17 @@ function registerComputeTools(server) {
       const resolvedMission = mission_id ?? process.env.EVOR_MISSION_ID;
       const { runDir } = resolveRunPaths(run_id, resolvedMission);
       const evalScriptPath = `${runDir}/eval-suites/${eval_version}.py`;
-      if (!(0, import_fs16.existsSync)(evalScriptPath)) {
+      if (!(0, import_fs18.existsSync)(evalScriptPath)) {
         return err2(
           "no evaluation script found for this version \u2014 write the canonical evaluator before sealing it, then try again."
         );
       }
-      const content = (0, import_fs16.readFileSync)(evalScriptPath);
-      const hash = (0, import_crypto4.createHash)("sha256").update(content).digest("hex");
+      const content = (0, import_fs18.readFileSync)(evalScriptPath);
+      const { hash, files } = digestEvaluator(runDir, eval_version);
       const receiptPath = `${runDir}/eval-suites/${eval_version}.sealed.json`;
       let receipt = null;
       try {
-        receipt = JSON.parse((0, import_fs16.readFileSync)(receiptPath, "utf8"));
+        receipt = JSON.parse((0, import_fs18.readFileSync)(receiptPath, "utf8"));
       } catch {
         receipt = null;
       }
@@ -25190,10 +25286,10 @@ function registerComputeTools(server) {
         );
       }
       try {
-        if ((0, import_fs16.statSync)(evalScriptPath).nlink > 1) {
+        if ((0, import_fs18.statSync)(evalScriptPath).nlink > 1) {
           const tmp = `${evalScriptPath}.seal-tmp`;
-          (0, import_fs16.writeFileSync)(tmp, content);
-          (0, import_fs16.renameSync)(tmp, evalScriptPath);
+          (0, import_fs18.writeFileSync)(tmp, content);
+          (0, import_fs18.renameSync)(tmp, evalScriptPath);
         }
       } catch (e) {
         return err2(
@@ -25202,14 +25298,86 @@ function registerComputeTools(server) {
       }
       patchGoalContract(runDir, { eval_script_hash: hash });
       try {
-        (0, import_fs16.writeFileSync)(
+        (0, import_fs18.writeFileSync)(
           receiptPath,
-          JSON.stringify({ eval_version, hash, sealed_at: (/* @__PURE__ */ new Date()).toISOString() }, null, 2),
+          JSON.stringify(
+            { eval_version, hash, files, sealed_at: (/* @__PURE__ */ new Date()).toISOString() },
+            null,
+            2
+          ),
           "utf8"
         );
       } catch {
       }
-      return ok2({ ok: true, eval_version });
+      return ok2({ ok: true, eval_version, hash, files });
+    }
+  );
+  server.tool(
+    "evor_tick_completeness",
+    'What this tick still owes: every proposal the selector SELECTED needs a trained, evaluated, integrity-checked node, not just the winner. Returns the undischarged ones. Call it before returning a terminal outcome \u2014 the SubagentStop guard checks the same thing and will block a "scored" return that still owes a candidate.',
+    {
+      run_id: external_exports.string().optional().describe("Active run identifier; resolved from the active run when omitted"),
+      tick: external_exports.number().int().min(1).describe("The tick to check"),
+      mission_id: external_exports.string().optional().describe("Mission id; resolved from the active run when omitted")
+    },
+    async ({ run_id, tick, mission_id }) => {
+      let resolvedRun;
+      try {
+        resolvedRun = resolveRunId(run_id);
+      } catch (e) {
+        return err2(String(e instanceof Error ? e.message : e));
+      }
+      const { runDir } = resolveRunPaths(resolvedRun, mission_id ?? process.env.EVOR_MISSION_ID);
+      const selected = selectedProposals(runDir, tick);
+      const debt = owed(runDir, tick);
+      return ok2({
+        ok: true,
+        tick,
+        selected,
+        complete: debt.length === 0,
+        owed: debt,
+        // Said explicitly because "complete: true" with an empty selection is the
+        // shape that let an entire tick pass having forged nothing.
+        note: selected.length === 0 ? "the selector selected NOTHING this tick \u2014 complete is vacuous; outcome should be 'rejected' or 'skipped', not 'scored'" : void 0
+      });
+    }
+  );
+  server.tool(
+    "evor_write_eval_script",
+    "Write the canonical evaluator into the run \u2014 the file every node will share. This is the owning writer for eval-suites/<eval_version>.py and for score_plugin.py; direct Write/Edit under .evor/runs/ is denied by design. Validates that the source compiles and conforms to the evaluator contract (no positional argv, prints one JSON object) before writing. Seal it afterwards with evor_seal_eval_script, which anchors every file the evaluator comprises.",
+    {
+      run_id: external_exports.string().describe("Active run identifier"),
+      eval_version: external_exports.string().describe("Eval version this evaluator is for (e.g. v1)"),
+      source: external_exports.string().min(1).describe("Complete Python source of the file"),
+      target: external_exports.enum(["evaluator", "score_plugin"]).default("evaluator").describe(
+        "'evaluator' writes eval-suites/<eval_version>.py; 'score_plugin' writes eval-suites/score_plugin.py, the mission-owned metric of the generated shape"
+      ),
+      mission_id: external_exports.string().optional().describe("Mission id; resolved from the active run when omitted")
+    },
+    async ({ run_id, eval_version, source, target, mission_id }) => {
+      const resolvedMission = mission_id ?? process.env.EVOR_MISSION_ID;
+      const { runDir } = resolveRunPaths(run_id, resolvedMission);
+      const dir = (0, import_path19.join)(runDir, "eval-suites");
+      const name = target === "score_plugin" ? "score_plugin.py" : `${eval_version}.py`;
+      const dest = (0, import_path19.join)(dir, name);
+      const receipt = (0, import_path19.join)(dir, `${eval_version}.sealed.json`);
+      if ((0, import_fs18.existsSync)(receipt)) {
+        return err2(
+          `${eval_version} is already sealed. Replacing the evaluator under a sealed anchor would retroactively revalidate every score measured with the old one. Write a NEW eval_version so existing scores keep the evaluator they were measured with.`
+        );
+      }
+      const check2 = callPythonModule("evor.eval_contract_writer", [
+        "write",
+        "--run-dir",
+        runDir,
+        "--eval-version",
+        eval_version,
+        "--target",
+        target,
+        "--stdin-source"
+      ], { stdin: source });
+      if (!check2.ok) return err2(check2.error ?? "evaluator source rejected");
+      return ok2({ ok: true, path: dest, ...check2.data ?? {} });
     }
   );
   server.tool(
@@ -25288,7 +25456,7 @@ function registerComputeTools(server) {
   );
   server.tool(
     "evor_forge_dispatch_batch",
-    "Dispatch multiple candidate training jobs in parallel to the compute backend. Returns job_ids for all candidates immediately without waiting for completion. Poll each job with evor_run_status. Use instead of sequential evor_run_start calls when VRAM allows parallel training.",
+    "Dispatch multiple candidate EVALUATION jobs in parallel to the compute backend. Same path as evor_run_start (it does NOT train) \u2014 each candidate must already be trained with weights on disk. Returns job_ids for all candidates immediately without waiting for completion. Poll each job with evor_run_status. Use instead of sequential evor_run_start calls when VRAM allows parallel evaluation.",
     {
       run_id: external_exports.string().describe("Active run identifier"),
       candidates: external_exports.array(external_exports.object({
@@ -25395,8 +25563,8 @@ function registerComputeTools(server) {
 }
 
 // src/tools/gotcha.ts
-var import_fs17 = require("fs");
-var import_path18 = require("path");
+var import_fs19 = require("fs");
+var import_path20 = require("path");
 var import_os4 = require("os");
 function gotchaQuery(params) {
   const evorRoot = params.evorRoot ?? getEvorRoot();
@@ -25436,9 +25604,9 @@ function gotchaAdd(params) {
   let tmpDir = null;
   let payloadFile = null;
   try {
-    tmpDir = (0, import_fs17.mkdtempSync)((0, import_path18.join)((0, import_os4.tmpdir)(), "evor-gotcha-"));
-    payloadFile = (0, import_path18.join)(tmpDir, "payload.json");
-    (0, import_fs17.writeFileSync)(
+    tmpDir = (0, import_fs19.mkdtempSync)((0, import_path20.join)((0, import_os4.tmpdir)(), "evor-gotcha-"));
+    payloadFile = (0, import_path20.join)(tmpDir, "payload.json");
+    (0, import_fs19.writeFileSync)(
       payloadFile,
       JSON.stringify({
         kind: params.kind,
@@ -25472,11 +25640,11 @@ function gotchaAdd(params) {
     result = callBridge("gotcha_bridge.py", bridgeArgs);
   } finally {
     try {
-      if (payloadFile) (0, import_fs17.unlinkSync)(payloadFile);
+      if (payloadFile) (0, import_fs19.unlinkSync)(payloadFile);
     } catch {
     }
     try {
-      if (tmpDir) (0, import_fs17.rmdirSync)(tmpDir);
+      if (tmpDir) (0, import_fs19.rmdirSync)(tmpDir);
     } catch {
     }
   }
@@ -25494,8 +25662,8 @@ function gotchaAdd(params) {
 }
 function storeBlob(params) {
   const runDir = resolveRunPaths(params.runId, params.missionId).runDir;
-  if (!(0, import_fs17.existsSync)(runDir)) {
-    (0, import_fs17.mkdirSync)(runDir, { recursive: true });
+  if (!(0, import_fs19.existsSync)(runDir)) {
+    (0, import_fs19.mkdirSync)(runDir, { recursive: true });
   }
   let srcPath = params.path;
   let tmpDir = null;
@@ -25505,9 +25673,9 @@ function storeBlob(params) {
       return { ok: false, error: "one of 'path' or 'content' is required" };
     }
     try {
-      tmpDir = (0, import_fs17.mkdtempSync)((0, import_path18.join)((0, import_os4.tmpdir)(), "evor-blob-"));
-      tmpFile = (0, import_path18.join)(tmpDir, "blob.bin");
-      (0, import_fs17.writeFileSync)(tmpFile, params.content, "utf8");
+      tmpDir = (0, import_fs19.mkdtempSync)((0, import_path20.join)((0, import_os4.tmpdir)(), "evor-blob-"));
+      tmpFile = (0, import_path20.join)(tmpDir, "blob.bin");
+      (0, import_fs19.writeFileSync)(tmpFile, params.content, "utf8");
       srcPath = tmpFile;
     } catch (err3) {
       return {
@@ -25530,11 +25698,11 @@ function storeBlob(params) {
     result = callBridge("store_blob_bridge.py", bridgeArgs);
   } finally {
     try {
-      if (tmpFile) (0, import_fs17.unlinkSync)(tmpFile);
+      if (tmpFile) (0, import_fs19.unlinkSync)(tmpFile);
     } catch {
     }
     try {
-      if (tmpDir) (0, import_fs17.rmdirSync)(tmpDir);
+      if (tmpDir) (0, import_fs19.rmdirSync)(tmpDir);
     } catch {
     }
   }

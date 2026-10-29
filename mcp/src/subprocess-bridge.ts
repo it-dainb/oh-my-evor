@@ -102,13 +102,18 @@ function _parseSpawnResult(result: SpawnSyncReturns<string>): PyResult {
 export function callPythonModule(
   module: string,
   args: string[],
-  opts?: { timeout?: number; cwd?: string; extraEnv?: Record<string, string> }
+  /** `stdin` is written to the module's stdin — for payloads too large or too
+   *  quoting-hostile for argv, such as an evaluator's whole source. It lives in
+   *  opts rather than as a positional so the 21 existing call sites, which pass
+   *  opts third, keep working. */
+  opts?: { timeout?: number; cwd?: string; extraEnv?: Record<string, string>; stdin?: string }
 ): PyResult {
   const result = spawnSync(pythonBin(), ["-m", module, ...args], {
     encoding: "utf8",
     timeout: opts?.timeout ?? 30_000,
     env: { ..._pythonEnv() as Record<string, string>, ...opts?.extraEnv },
     cwd: opts?.cwd,
+    ...(opts?.stdin === undefined ? {} : { input: opts.stdin }),
   });
   return _parseSpawnResult(result);
 }

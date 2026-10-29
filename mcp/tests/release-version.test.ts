@@ -36,6 +36,24 @@ describe("release version — one fact, one writer", () => {
     ).toBe(RELEASE);
   });
 
+  it("the marketplace catalog advertises this release", () => {
+    // The catalog is what a marketplace consumer reads to decide whether an
+    // update exists. It sat at 1.1.0 through seven releases — the 1.2.2 release
+    // commit touched package.json and plugin.json and not this — because no gate
+    // named it. A catalog that advertises 1.1.0 for a 1.2.8 plugin either hides
+    // the update or, worse, makes the installed copy look newer than the source
+    // it came from.
+    const catalog = read(".claude-plugin/marketplace.json");
+    expect(
+      catalog.plugins?.[0]?.version,
+      `marketplace.json's plugin entry disagrees with plugin.json (${RELEASE})`,
+    ).toBe(RELEASE);
+    expect(
+      catalog.version,
+      `marketplace.json's top-level version disagrees with plugin.json (${RELEASE})`,
+    ).toBe(RELEASE);
+  });
+
   it("CHANGELOG's newest entry is this release", () => {
     const changelog = readFileSync(resolve(REPO_ROOT, "CHANGELOG.md"), "utf8");
     const first = /^## \[(\d+\.\d+\.\d+)\]/m.exec(changelog);

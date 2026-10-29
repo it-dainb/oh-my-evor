@@ -35,12 +35,17 @@ import json
 from pathlib import Path
 from typing import Any
 
-SCORE_PLUGIN_FILENAME = "score_plugin.py"
+from .eval_contract import (  # the contract owns these; this module derives
+    SCORE_PLUGIN_FILENAME,
+    SHAPE_GENERATED,
+    capability_gap,
+    evaluator_digest,
+)
 
 #: Bumped when the emitted harness changes shape. A regenerated evaluator that
 #: does not byte-match its seal is either tampering or a version skew, and the
 #: two must be distinguishable — otherwise every upgrade looks like an attack.
-HARNESS_VERSION = 1
+HARNESS_VERSION = 2
 
 _PLUGIN_TEMPLATE = '''"""score(pred, gt) — THE ONLY FILE THIS MISSION WRITES.
 
@@ -128,6 +133,7 @@ PER_SAMPLE_DOMAINS = {json.dumps(per_sample_domains, sort_keys=True)}
 CONSTRAINTS = {json.dumps(constraints, sort_keys=True)}
 FITNESS_MODE = {contract.get("fitness_mode", "aggregate")!r}
 METRICS = {json.dumps(metric_names)}
+EVAL_VERSION = {eval_version!r}
 
 
 def _load_split(split_dir: Path) -> dict[str, bytes]:
@@ -202,11 +208,43 @@ def _apply_gates(agg: dict[str, float], per_domain: dict[str, dict[str, float]])
     return violations
 
 
+def _resolve_dirs() -> tuple[Path, Path]:
+    """Locate the split and the predictions WITHOUT positional arguments.
+
+    The evaluator contract is `python <eval_script>` plus an optional
+    `--eval-domains`; the runner passes nothing else. This file lives at
+    `<run_dir>/eval-suites/<v>.py`, so the run directory is two parents up, and
+    EVOR_RUN_DIR states it explicitly when the runner exported it.
+
+    Requiring `<split_dir> <pred_dir>` is what made the generated evaluator exit
+    2 with a usage error under the runner that launches it, every time.
+    """
+    import os
+    here = Path(__file__).resolve()
+    run_dir = Path(os.environ.get("EVOR_RUN_DIR") or here.parent.parent)
+    return (
+        run_dir / "frozen-splits" / f"{{EVAL_VERSION}}-test",
+        Path(os.environ.get("EVOR_PRED_DIR") or (run_dir / "predictions" / EVAL_VERSION)),
+    )
+
+
 def main() -> int:
-    if len(sys.argv) < 3:
-        print(json.dumps({{"error": "usage: evaluate.py <split_dir> <pred_dir>"}}))
+    import argparse
+    ap = argparse.ArgumentParser(add_help=False)
+    ap.add_argument("--eval-domains", nargs="*", default=None)
+    args, _unknown = ap.parse_known_args()
+
+    split_dir, pred_dir = _resolve_dirs()
+    if not split_dir.is_dir():
+        print(json.dumps({{"error": f"frozen split not found at {{split_dir}}"}}))
         return 2
-    split_dir, pred_dir = Path(sys.argv[1]), Path(sys.argv[2])
+    if not pred_dir.is_dir():
+        print(json.dumps({{
+            "error": f"no predictions at {{pred_dir}}. This is the GENERATED evaluator "
+                     f"shape: it scores prediction files and does not run inference. "
+                     f"Write them there, or seal an authored evaluator instead.",
+        }}))
+        return 2
 
     gt_items = _load_split(split_dir)
     per_item: dict[str, dict[str, float]] = {{}}
@@ -215,6 +253,12 @@ def main() -> int:
         if not pred_path.exists():
             continue
         per_item[item_id] = score(pred_path.read_bytes(), gt, label_semantics=LABEL_SEMANTICS)
+
+    if args.eval_domains:
+        keep = set(args.eval_domains)
+        per_item = {{
+            k: v for k, v in per_item.items() if PER_SAMPLE_DOMAINS.get(k) in keep
+        }}
 
     agg = _aggregate(per_item)
     per_domain = _per_domain(per_item)
@@ -267,6 +311,33 @@ def scaffold_evaluator(
             frozen_split = json.loads(split_path.read_text())
         except Exception:  # noqa: BLE001
             frozen_split = {}
+
+    # ── Shape check (the contract owns this) ──────────────────────────────
+    #
+    # The generated shape scores prediction FILES; it never loads a model, so
+    # latency and VRAM are out of its reach however the scoring is written. A
+    # contract that gates on them therefore requires the AUTHORED shape.
+    #
+    # Refusing here is the whole point. `_apply_gates` skips a constraint whose
+    # metric is None, so generating anyway does not fail the gate — it SKIPS it,
+    # and the run reports a pass it never earned. In the field a mission declared
+    # three such gates and the scaffolded evaluator would have silently honoured
+    # none of them.
+    gap = capability_gap(contract, SHAPE_GENERATED)
+    if gap:
+        return {
+            "error": (
+                "this contract cannot be served by the generated evaluator: it gates on "
+                + ", ".join(gap)
+                + " — properties of the model EXECUTING, which cannot be recovered from "
+                "prediction files. Author the evaluator instead (it loads the candidate's "
+                "model via the worktree interface) and write it with evor_write_eval_script, "
+                "which seals the same file set. Generating anyway would emit gates that are "
+                "skipped rather than enforced."
+            ),
+            "required_shape": "authored",
+            "unmeasurable_metrics": gap,
+        }
 
     target_dir = run_dir / "eval-suites"
     target_dir.mkdir(parents=True, exist_ok=True)
@@ -322,7 +393,19 @@ def verify_harness_unmodified(run_dir: Path, eval_version: str = "v1") -> dict[s
     )
     actual = harness_path.read_text()
     if expected == actual:
-        return {"ok": True, "matches": True}
+        # Regeneration proves the HARNESS is untouched. It says nothing about the
+        # mission's `score_plugin.py`, which the harness imports and which
+        # actually decides every score — a hand-edit there left custody
+        # reporting "intact". Custody is over the evaluator's whole file set, so
+        # the digest is reported alongside and the caller compares it to the
+        # anchor rather than inferring integrity from the harness alone.
+        digest = evaluator_digest(run_dir, eval_version)
+        return {
+            "ok": True,
+            "matches": True,
+            "evaluator_hash": digest.get("hash"),
+            "files": digest.get("files", {}),
+        }
     return {
         "ok": False,
         "matches": False,

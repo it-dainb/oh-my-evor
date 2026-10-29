@@ -138,7 +138,15 @@ loop); **sonnet** for leads and for any role that renders a verdict or handles e
 
 <Parallel_Execution>
 If `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` is set in the environment:
-- Multiple Forge agents run in parallel, one per approved proposal (up to ResourcePlan.concurrency).
+- Multiple Forge agents run in parallel, one per SELECTED proposal (up to ResourcePlan.concurrency).
+  Every proposal the selector marked `selected` owes a trained and evaluated node; `winner`
+  is the primary for lineage, not the only candidate. Check what is still owed with
+  `evor_tick_completeness({tick})` before reporting a terminal outcome — the SubagentStop
+  hook blocks a `"scored"` return that still owes one.
+- **If `ResourcePlan.concurrency` is not available, treat it as 1 and forge sequentially —
+  do not silently drop the rest.** The plan is cited here four times and was persisted
+  nowhere in the run, so the limit had no value to read; a tick then forged the winner and
+  dropped the other selected proposal into an undefined `carry_forward` key.
 - Evor manages the shared task-board via `evor_state_write` for inter-agent coordination.
 - **Do not wait on `job_complete` or `self_heal_event` — nothing emits them.** They are
   documented in `ARCHITECTURE.md` and have zero producers anywhere in the codebase, so an
@@ -159,6 +167,20 @@ run Steps 0-9 yourself. For each tick, spawn the boundary and await its status:
 `Task(subagent_type="oh-my-evor:evor-tick", description="Tick <n>", prompt="Run dir: <run_dir>. Tick: <n>. Execute exactly one tick end to end, then return a compact status.")`
 
 Then record the returned status, decide continue / stop / meta-evolve, and spawn the next tick.
+
+**`outcome: "yielding"` is NOT a finished tick.** It means the boundary is waiting on an
+agent or artifact and the tick is still in flight. Do not record it as an outcome, do not
+advance the tick counter, and above all **do not spawn a replacement tick agent** — the
+existing one will be re-activated when what it is waiting on reports, and re-spawning
+throws away everything it already knows. Idle via `Monitor` on the artifact named in
+`waiting_on`, or simply end your turn; a yield from a sub-agent means the platform still
+owes you a wake-up.
+
+This is the failure that cost a real mission its tick-1 boundary. The return contract had
+no word for waiting, so a tick blocked at step 5 reported `outcome: "failed"` with
+"No blocking primitive available to hold turn across this compute-bound async boundary" —
+three times — and main correctly concluded, from what it was told, that the tick had died.
+Only a terminal outcome (`scored` / `rejected` / `skipped` / `failed`) ends a tick.
 Keep nothing else. Do not read artifacts, tree, or state that the boundary already read — if
 you need detail, it is behind an `evor_read_artifact` pointer the boundary returned.
 

@@ -225,15 +225,32 @@ disallowedTools: Write, Edit
             "rejection_reason": null
           },
           "selected": true,
-          "selection_note": "<why this proposal was/was not chosen as the tick's winner>"
+          "selection_note": "<why this proposal was or was not selected; for the winner, why it leads>"
         }
       ],
-      "winner": "<proposal_id of the selected proposal, or null if none was selected>"
+      "winner": "<proposal_id of the PRIMARY selected proposal — must be one of the selected; null only when nothing was selected>"
     }
     ```
     One entry in `reviews` per proposal evaluated this tick, in the order received.
-    `selected` is true for at most one review — the one whose `proposal_id` also
-    appears as top-level `winner`. Do NOT add a top-level `critic_approved` field
+
+    **`selected` is true for EVERY proposal that passed the gates, not just one.**
+    Each selected proposal is a candidate the tick owes a trained and evaluated
+    node; `winner` is the primary among them and orders lineage. It must be one
+    of the selected.
+
+    "At most one selected" is what this file used to say, while
+    `skills/evor/SKILL.md` said "one Forge per approved proposal (up to
+    `ResourcePlan.concurrency`)" — two documents, two beliefs about how many
+    candidates a tick trains. In the field you approved h001 AND h003, marked
+    both selected (correctly, by the SKILL's rule; in violation of this file's),
+    and the write-time validator accepted it because nothing checked. Only h001
+    was forged. h003 was parked in a `carry_forward` key defined in no skill, no
+    agent file and no contract, and nothing ever read it.
+
+    An approved proposal you do not select is an approved proposal that
+    disappears. So: select it, or reject it with a `rejection_reason` that says
+    why. `SelectorVerdict` now rejects the third option — approved, unselected,
+    unexplained — and rejects a winner who is not among the selected. Do NOT add a top-level `critic_approved` field
     to a review record and do NOT rename `reviews` (e.g. `per_proposal_reviews`)
     or hoist gate results out of `critic_review` to the top level of a review —
     these are the exact shapes the write-time validator rejects.

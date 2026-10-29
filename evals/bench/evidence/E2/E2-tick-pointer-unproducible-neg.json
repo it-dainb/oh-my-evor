@@ -51,7 +51,7 @@
   "grounded_rule": {
     "file": "agents/evor-tick.md",
     "quote": "Return the same compact shape with the outcome set to the failure and a pointer to whatever artifact or signal explains it.",
-    "sha256_at_authoring": "04310dad8df94fef498773bbd499967715379ec05912d4951af2a158821a4bde"
+    "sha256_at_authoring": "5e03b287f6d8b814588bf0b0d119350ec72d47c074f8aff6bd7f8f1705e66f6b"
   },
   "grounding": [
     "docs/v1.2.2-plan.md#1.2",

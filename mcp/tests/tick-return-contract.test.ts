@@ -20,7 +20,7 @@
 
 import { describe, it, expect } from "vitest";
 import { spawnSync } from "child_process";
-import { readFileSync, mkdtempSync, rmSync } from "fs";
+import { readFileSync, mkdtempSync, mkdirSync, rmSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join, dirname, resolve } from "path";
 import { fileURLToPath } from "url";
@@ -220,5 +220,75 @@ describe("the contract is reachable at runtime", () => {
     for (const outcome of ["scored", "failed"]) {
       expect(md).toMatch(new RegExp(`"${outcome}"`));
     }
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// The tick may not return while its own tick is mid-flight
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// The Stop hook's incomplete-tick guard exempts subagents ("only main owns tick
+// completion"), which was true before evor-tick became the boundary that runs
+// the 9 steps. In binarization-worldmodel-recall-2026-09 the tick spawned Forge,
+// ended its turn while Forge was still writing, and reported "mid-flight" as an
+// outcome — three times in one session, with nothing to stop it.
+
+describe("evor-tick may not return mid-flight", () => {
+  /** A run whose tick-state says the tick is at `step`, and the env pointing at it. */
+  function runWithTick(step: number, statusStr = "running") {
+    const root = mkdtempSync(join(tmpdir(), "evor-tick-midflight-"));
+    const runDir = join(root, ".evor", "runs", "m1", "r1");
+    mkdirSync(runDir, { recursive: true });
+    writeFileSync(join(root, ".evor", "active-run.json"), JSON.stringify({ run_id: "r1", mission_id: "m1" }));
+    writeFileSync(join(runDir, "mission-state.json"), JSON.stringify({ status: "running" }));
+    writeFileSync(join(runDir, "run-state.json"), JSON.stringify({ tick_count: 1, pending_node_ids: [] }));
+    writeFileSync(
+      join(runDir, "tick-state.json"),
+      JSON.stringify({ tick: 1, current_step: step, step_status: statusStr }),
+    );
+    return { root, env: { EVOR_ROOT: join(root, ".evor"), CLAUDE_PLUGIN_ROOT: resolve(HOOKS, "..") } };
+  }
+
+  const CONFORMING = JSON.stringify({ tick: 1, outcome: "failed", error: "forge still running" });
+
+  it("blocks a conforming return when tick-state is still mid-flight", () => {
+    freshScope();
+    const { root, env } = runWithTick(4);
+    const r = run({ last_assistant_message: CONFORMING }, env);
+    rmSync(root, { recursive: true, force: true });
+    // A conforming return is what makes this case load-bearing: the shape check
+    // passes, so only the mid-flight guard can be what blocked it.
+    expect(r.json?.decision).toBe("block");
+    expect(r.json?.reason).toMatch(/mid-flight/);
+    expect(r.json?.reason).toMatch(/TaskOutput|Monitor/);
+  });
+
+  it("releases after the retry cap, so a tick that truly cannot finish gets through", () => {
+    freshScope();
+    const { root, env } = runWithTick(4);
+    expect(run({ last_assistant_message: CONFORMING }, env).json?.decision).toBe("block");
+    expect(run({ last_assistant_message: CONFORMING }, env).json?.decision).toBe("block");
+    const third = run({ last_assistant_message: CONFORMING }, env);
+    rmSync(root, { recursive: true, force: true });
+    expect(third.json).toBeNull();
+    expect(third.code).toBe(0);
+  });
+
+  it("allows a return once the tick reached step 9", () => {
+    freshScope();
+    const { root, env } = runWithTick(9, "done");
+    const r = run({ last_assistant_message: JSON.stringify({ tick: 1, outcome: "scored", score: 1 }) }, env);
+    rmSync(root, { recursive: true, force: true });
+    expect(r.json).toBeNull();
+    expect(r.code).toBe(0);
+  });
+
+  it("does not touch non-tick agents", () => {
+    freshScope();
+    const { root, env } = runWithTick(4);
+    const r = run({ agent_type: "oh-my-evor:evor-mutagen", last_assistant_message: "short" }, env);
+    rmSync(root, { recursive: true, force: true });
+    expect(r.json).toBeNull();
+    expect(r.code).toBe(0);
   });
 });
