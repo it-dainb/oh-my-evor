@@ -257,3 +257,23 @@ describe("research edge — Sage reads the queries Mutagen wrote", () => {
     expect(read("oh-my-evor:evor-sage", "forge").permissionDecision).toBe("deny");
   });
 });
+
+describe("a reviewer's scratchpad is not candidate code", () => {
+  // The forge-critic wrote a check script to its session scratchpad and was refused
+  // "author-code" with the target <worktree>/EOF — the heredoc delimiter read as a
+  // path (binarization mission, tick 4).
+  const bash = (command: string) => call({
+    hook_event_name: "PreToolUse", agent_type: "oh-my-evor:evor-forge-critic",
+    tool_name: "Bash", tool_input: { command },
+  }).hook;
+
+  it("lets a critic write a script to its scratchpad", () => {
+    const d = bash("cd /w/.evor/worktrees/t4 && cat > /tmp/claude-1006/-p/s1/scratchpad/check.py <<'EOF'\nprint(1)\nEOF");
+    expect(d.permissionDecision).not.toBe("deny");
+  });
+
+  it("still refuses a critic writing code into a worktree", () => {
+    const d = bash("cat > /w/.evor/worktrees/t4/model/x.py <<'EOF'\nprint(1)\nEOF");
+    expect(d.permissionDecision).toBe("deny");
+  });
+});

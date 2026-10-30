@@ -161,7 +161,9 @@ If `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` is set in the environment:
   happens in a backgrounded session whatever you pass, do not end your turn: call
   `evor_wait({ artifact: { tick, agent }, producer_agent_id: <agentId from the spawn result> })`
   for the artifact that child owes, and call it again while it returns `done:false`. On
-  `producer_stopped: true` the child exited without writing it: resume it or record the gap. Wait on a job with `evor_wait({ job_id })` and on a process with
+  `producer_stopped: true` the child exited without writing it: resume it or record the gap.
+  A child with no artifact slot (forge-junior) is waited on with `evor_wait({ agent_id:
+  <its agentId> })`, which returns the child's final message as `result`. Wait on a job with `evor_wait({ job_id })` and on a process with
   `evor_wait({ pid })`. Every other wait depends on a notice reaching you, and in the 2026-10-30
   binarization mission one sat queued for 80 minutes. `evor_await_artifact` still records WHAT is
   awaited so a long wait is distinguishable from a stall. (`TaskOutput(block:true)`, which this

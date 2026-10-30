@@ -340,11 +340,16 @@ export function lockEvaluate(
   // A verification function: an unknown node is a reportable failure, not a
   // crash. Its return type already carries `error` for exactly this.
   const nodeId = tryResolveNodeRef(runId, nodeRef, missionId);
-  if (nodeId === null) {
+  // The evaluator is placed and locked during worktree setup, BEFORE
+  // evor_record_node registers the node. Requiring registration made the
+  // documented order fail every time (binarization mission, tick 4: four refusals).
+  // The lock lives in the worktree, so a worktree named for the node is enough.
+  const namedWorktree = /^[A-Za-z0-9._-]+$/.test(nodeRef) && existsSync(join(getEvorRoot(), "worktrees", nodeRef));
+  if (nodeId === null && !namedWorktree) {
     return {
       ok: false,
       node_name: nodeRef,
-      error: `node '${nodeRef}' is not in this run's tree — check the name with evor_tree_read.`,
+      error: `node '${nodeRef}' is not in this run's tree and has no worktree — check the name with evor_tree_read.`,
     };
   }
   const worktree = worktreeDir(getEvorRoot(), nodeId, nodeRef);

@@ -10,7 +10,7 @@ import { spawn } from "child_process";
 import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from "fs";
 import { join, dirname } from "path";
 import { tmpdir } from "os";
-import { registerWaitTools, waitFor, pidAlive, MAX_WAIT_S, agentStopped } from "../src/tools/wait.js";
+import { registerWaitTools, waitFor, pidAlive, MAX_WAIT_S, agentStopped, agentOutcome } from "../src/tools/wait.js";
 import { utimesSync } from "fs";
 import { ensureRunDirs, resolveRunPaths } from "../src/run-store.js";
 
@@ -156,6 +156,29 @@ describe("agentStopped", () => {
   it("is false for an unknown or malformed id", () => {
     expect(agentStopped("nope", mkdtempSync(join(tmpdir(), "evor-proj-")))).toBe(false);
     expect(agentStopped("../etc")).toBe(false);
+  });
+});
+
+describe("agentOutcome — wait for a child with no artifact and read its result", () => {
+  // forge-junior has no artifact slot; with every spawn async (CLI 2.1.314) Forge
+  // had no way to wait for it and read what it reported (binarization, tick 4).
+  it("returns the child's final message once it stopped", () => {
+    const projects = mkdtempSync(join(tmpdir(), "evor-proj-"));
+    const dir = join(projects, "p", "s", "subagents");
+    mkdirSync(dir, { recursive: true });
+    const f = join(dir, "agent-jun1.jsonl");
+    writeFileSync(f, JSON.stringify({ type: "assistant", message: { stop_reason: "end_turn",
+      content: [{ type: "text", text: "trained; best.ckpt at /x" }] } }) + "\n");
+    const t = (Date.now() - 60_000) / 1000;
+    utimesSync(f, t, t);
+    expect(agentOutcome("jun1", projects)).toEqual({ stopped: true, found: true, text: "trained; best.ckpt at /x" });
+    expect(agentOutcome("nobody", projects)).toEqual({ stopped: false, found: false });
+    rmSync(projects, { recursive: true, force: true });
+  });
+
+  it("tells a caller waiting on a forge-junior artifact to wait on the agent instead", async () => {
+    const r = await call({ run_id: RUN, mission_id: MISSION, artifact: { tick: 4, agent: "forge-junior" }, wait_s: 0 });
+    expect(r.isError).toBe(true);
   });
 });
 

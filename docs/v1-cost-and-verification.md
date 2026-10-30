@@ -29,7 +29,7 @@ of the thing it names.
 | evor-selector | opus | **haiku** | ships — **not** re-measured at 8.1 (legacy cases.json path) |
 | evor-forge-junior | sonnet | sonnet **`effort: low`** | ships — **not** re-measured at 8.1 (legacy cases.json path) |
 | evor-tick | — (new) | sonnet | ships; benchmarked at 8.1 — sonnet 80.0% vs haiku 20.0% — **row STALE, see below** |
-| evor-forge-critic | opus | opus | reverted — arms unpaired |
+| evor-forge-critic | opus | opus | reverted — arms unpaired — **row STALE, see below** |
 | evor-forge-analyst | opus | opus | reverted — 93.5% |
 | evor-sage-junior | sonnet | sonnet | reverted on figures 8.1 does not reproduce (78.2% / 83.6%) — **row STALE, see below** |
 | evor-forge-architect | opus | opus | reverted on a regression that **does not reproduce** at 8.1 (CI [+0.0, +0.0]) |
@@ -43,6 +43,9 @@ channel, a closed-set `kind` vocabulary and severity-by-consequence guidance;
 probe additionally gained explicit "a file write is not a filed artifact / an
 appended line is not an emitted signal" rules, and tick gained the no-borrowed-
 artifact-slot and job-accounting sections.
+
+`evor-forge-critic` is stale since 2026-10-30 too: it now reviews by reading only and routes
+execution evidence through Forge.
 
 `evor-sage-junior` is stale since 2026-10-30 too: it now states that `applicable_families`
 is a closed set.

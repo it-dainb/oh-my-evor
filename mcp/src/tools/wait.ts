@@ -41,9 +41,24 @@ const STOPPED_QUIET_MS = 15_000;
  * STOPPED_QUIET_MS. Anything unreadable counts as running, so the wait goes on.
  */
 export function agentStopped(agentId: string, projectsDir = join(homedir(), ".claude", "projects"), now = Date.now()): boolean {
-  if (!/^[A-Za-z0-9_-]+$/.test(agentId)) return false;
+  return agentOutcome(agentId, projectsDir, now).stopped;
+}
+
+/**
+ * Whether the agent stopped, and its final message when it did. A child with no
+ * artifact slot (forge-junior) reports only through that message, and an async
+ * spawn delivers it as a notice after the parent's turn ends. Returning it here
+ * lets the parent wait for the child and read its result in the same turn, which
+ * is what a foreground spawn used to do.
+ */
+export function agentOutcome(
+  agentId: string,
+  projectsDir = join(homedir(), ".claude", "projects"),
+  now = Date.now(),
+): { stopped: boolean; found: boolean; text?: string } {
+  if (!/^[A-Za-z0-9_-]+$/.test(agentId)) return { stopped: false, found: false };
   let projects: string[];
-  try { projects = readdirSync(projectsDir); } catch { return false; }
+  try { projects = readdirSync(projectsDir); } catch { return { stopped: false, found: false }; }
   for (const proj of projects) {
     let sessions: string[];
     try { sessions = readdirSync(join(projectsDir, proj)); } catch { continue; }
@@ -51,17 +66,23 @@ export function agentStopped(agentId: string, projectsDir = join(homedir(), ".cl
       const path = join(projectsDir, proj, sess, "subagents", `agent-${agentId}.jsonl`);
       if (!existsSync(path)) continue;
       try {
-        if (now - statSync(path).mtimeMs < STOPPED_QUIET_MS) return false;
+        if (now - statSync(path).mtimeMs < STOPPED_QUIET_MS) return { stopped: false, found: true };
         const lines = readFileSync(path, "utf8").trimEnd().split("\n");
         const last = JSON.parse(lines[lines.length - 1]);
         const reason = last?.message?.stop_reason;
-        return last?.type === "assistant" && typeof reason === "string" && reason !== "tool_use";
+        const stopped = last?.type === "assistant" && typeof reason === "string" && reason !== "tool_use";
+        if (!stopped) return { stopped: false, found: true };
+        const content = last?.message?.content;
+        const text = Array.isArray(content)
+          ? content.filter((c: { type?: string }) => c?.type === "text").map((c: { text?: string }) => c.text ?? "").join("\n")
+          : typeof content === "string" ? content : "";
+        return { stopped: true, found: true, text };
       } catch {
-        return false;
+        return { stopped: false, found: true };
       }
     }
   }
-  return false;
+  return { stopped: false, found: false };
 }
 
 type Probe = () => { done: boolean; detail?: Record<string, unknown>; error?: string };
@@ -110,6 +131,10 @@ export function registerWaitTools(server: McpServer): void {
         })
         .optional()
         .describe("Wait for this tick artifact to be written"),
+      agent_id: z.string().optional().describe(
+        "Wait for this child agent (the agentId in its spawn result) to finish, and return its " +
+          "final message as `result`. For children with no artifact slot, e.g. forge-junior.",
+      ),
       producer_agent_id: z.string().optional().describe(
         "With artifact: the agentId of the child that owes it (from the spawn result). If that " +
           "child stops without writing it, the wait returns at once with producer_stopped:true " +
@@ -119,10 +144,24 @@ export function registerWaitTools(server: McpServer): void {
         .describe(`Seconds to wait at most (default ${DEFAULT_WAIT_S}, max ${MAX_WAIT_S})`),
       mission_id: z.string().optional().describe("Mission id; resolved from the active run when omitted"),
     },
-    async ({ run_id, job_id, pid, artifact, wait_s, mission_id, producer_agent_id }) => {
-      const given = [job_id, pid, artifact].filter((v) => v !== undefined).length;
-      if (given !== 1) return err("give exactly one of job_id, pid, artifact");
+    async ({ run_id, job_id, pid, artifact, wait_s, mission_id, producer_agent_id, agent_id }) => {
+      const given = [job_id, pid, artifact, agent_id].filter((v) => v !== undefined).length;
+      if (given !== 1) return err("give exactly one of job_id, pid, artifact, agent_id");
       const waitS = wait_s ?? DEFAULT_WAIT_S;
+
+      if (agent_id !== undefined) {
+        let outcome = agentOutcome(agent_id);
+        const r = await waitFor(() => {
+          outcome = agentOutcome(agent_id);
+          return { done: outcome.stopped };
+        }, waitS);
+        if (!outcome.found) return err(`no transcript found for agent ${agent_id}; pass the agentId from its spawn result`);
+        return ok({
+          ...r,
+          condition: `agent:${agent_id}`,
+          ...(r.done ? { result: outcome.text ?? "" } : { next: "still working — call evor_wait again" }),
+        });
+      }
 
       if (pid !== undefined) {
         const r = await waitFor(() => ({ done: !pidAlive(pid) }), waitS);
@@ -161,6 +200,9 @@ export function registerWaitTools(server: McpServer): void {
       const agent = artifact!.agent.replace(/^(oh-my-evor:)?evor-/, "");
       if (!(VALID_AGENTS as readonly string[]).includes(agent)) {
         return err(`unknown artifact agent ${JSON.stringify(artifact!.agent)}; one of ${VALID_AGENTS.join(", ")}`);
+      }
+      if (agent === "forge-junior") {
+        return err("forge-junior has no artifact slot: it reports through its final message. Wait with evor_wait({ agent_id: <its agentId> }), which returns that message as `result`.");
       }
       if ((agent === "sage-junior" || agent === "acquirer") && !artifact!.kind) {
         return err(`${agent} artifacts are per kind: pass artifact.kind (the junior's angle slug or the acquirer's source slug)`);

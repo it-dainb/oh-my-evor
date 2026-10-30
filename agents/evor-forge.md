@@ -177,6 +177,12 @@ skills: [oh-my-evor:evor-mcp]
            worktree=".evor/worktrees/<node_id>") → {status, job_id}.
       Store job_id for polling. Use only evor_run_status for all status queries.
 
+    Waiting on your sub-agents: a spawn may come back "Async agent launched" (it always does
+    on CLI 2.1.314). Do not end your turn. forge-junior has no artifact slot, so wait with
+    evor_wait(agent_id=<its agentId>), which returns its final report as `result`. For critic,
+    architect and analyst, wait on their artifact:
+    evor_wait(artifact={tick, agent: "forge-critic"}, producer_agent_id=<its agentId>).
+
     Phase 7 — Wait
       Call evor_wait(job_id=job_id) and call it again while it returns done:false, until the
       job's state is terminal (succeeded, failed, oom, diverged). Wait on training that
@@ -261,7 +267,15 @@ skills: [oh-my-evor:evor-mcp]
   </Team_Protocol>
 
   <Worktree_Setup_Protocol>
-    Set up the worktree before spawning forge-junior.
+    forge-junior sets up the worktree as its FIRST step; tell it in its spawn prompt
+    (parent node name, new node name, worktree path). The governor denies you every step
+    below that writes a `.py` file (copying the evaluator and the parent's seams is a
+    `.py` write), because only forge-junior writes candidate code. In the 2026-10-30
+    binarization mission Forge attempted this setup itself, was denied twice, and then
+    handed it to forge-junior anyway. After the junior reports, you call
+    `evor_lock_evaluate(node=node_id)` to verify and lock the evaluator it placed.
+
+    The steps forge-junior follows:
 
     1. Create an isolated git worktree:
        ```bash
@@ -269,8 +283,8 @@ skills: [oh-my-evor:evor-mcp]
        ```
     2. Verify the worktree is clean (no uncommitted changes from parent branch).
     3. Copy or link the parent node's genome.yaml as the starting point.
-    4. Copy the canonical evaluator into the worktree as `evaluate.py`. Never author or edit it — call `evor_lock_evaluate(node=node_id)` immediately after placement to verify and lock it.
-    5. Pass the worktree path and genome.yaml path to forge-junior.
+    4. Copy the canonical evaluator into the worktree as `evaluate.py`. Never author or edit it; Forge locks it with `evor_lock_evaluate(node=node_id)` once the junior reports.
+    5. Report the worktree path and genome.yaml path back to Forge with the rest of the work.
   </Worktree_Setup_Protocol>
 
   <Genome_Materialization_Protocol>

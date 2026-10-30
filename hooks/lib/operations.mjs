@@ -82,6 +82,9 @@ const GRANTS = {
   'evor-forge-analyst': { may: ['write-artifact'] },
 };
 
+/** A Claude Code session scratchpad: /tmp/claude-<uid>/<project>/<session>/scratchpad/… */
+const SCRATCHPAD = /^\/tmp\/claude-[^/]+\/[^/]+\/[^/]+\/scratchpad(\/|$)/;
+
 /**
  * What a role may do. Unknown roles — including every generic agent type — get
  * the empty grant, which is why 4.3 hands a generic child its SPAWNER's set:
@@ -111,6 +114,11 @@ export function scopeFor(agentType, operation) {
  */
 export function operationFor({ tool, targets = [], runsTraining = false }) {
   if (runsTraining) return 'run-training';
+  // An agent's session scratchpad is neither candidate code nor run state. The
+  // forge-critic of the 2026-10-30 binarization mission wrote a check script
+  // there, to load the candidate strictly and verify its cost model, and was
+  // refused as "author-code". A reviewer that cannot verify is reduced to reading.
+  targets = targets.filter((t) => !SCRATCHPAD.test(t));
   // Retrieval of a KNOWN source is not discovery. The arxiv fetch verbs name a
   // paper you already have the id of; everything else is a search.
   if (/arxiv/i.test(tool) && /get_paper|download_paper|read_paper/i.test(tool)) {
