@@ -104,6 +104,21 @@ def _humanize_validation_error(exc: ValidationError) -> str:
 _PROBE_MAX_AGE_S = 90 * 24 * 3600
 
 
+def _resolve_evor_root(evor_root_arg: str | None) -> Path:
+    """THE evor root for init: arg > EVOR_ROOT env > ./.evor. One answer, used twice.
+
+    This function used to hold two. Run creation resolved `arg > EVOR_ROOT > .evor`
+    while the capability check resolved `arg > .evor`, skipping EVOR_ROOT — so with
+    the root set by environment (as the MCP server and the bench seeder both do),
+    the run was created under EVOR_ROOT and its probe was looked for under the
+    PROCESS CWD. The MCP server runs with cwd = the plugin repo, so the check read
+    the wrong directory and refused: "no capability profile", right after
+    evor_capability had written one. It worked in the field only because cwd
+    happened to be the project root.
+    """
+    return Path(evor_root_arg or os.environ.get("EVOR_ROOT", "") or ".evor").resolve()
+
+
 def _check_capability_probe(evor_root_arg: str | None) -> str | None:
     """Is there a fresh capability profile? Returns an error message, or None.
 
@@ -112,7 +127,7 @@ def _check_capability_probe(evor_root_arg: str | None) -> str | None:
     """
     from .capability import MalformedCapabilityProfile, read_capability
 
-    root = Path(evor_root_arg) if evor_root_arg else Path(".evor")
+    root = _resolve_evor_root(evor_root_arg)
     try:
         profile = read_capability(root)
     except MalformedCapabilityProfile as exc:
@@ -323,12 +338,8 @@ def run_init_run(
     # ── Resolve run_id (arg > auto-generated) ────────────────────────────────
     run_id: str = run_id_arg or f"{mission_id}-{_now_compact()}"
 
-    # ── Resolve evor_root (arg > EVOR_ROOT env > .evor) ──────────────────────
-    evor_root: Path = Path(
-        evor_root_arg
-        or os.environ.get("EVOR_ROOT", "")
-        or ".evor"
-    ).resolve()
+    # ── Resolve evor_root — the same resolver the probe check used ───────────
+    evor_root: Path = _resolve_evor_root(evor_root_arg)
 
     # ── Resolve run_dir (arg > <evor_root>/runs/<mission_id>/<run_id>) ────────
     run_dir: Path = (

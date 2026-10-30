@@ -209,8 +209,8 @@ def test_k06_circuit_breaker_below_max_iterations_is_accepted(tmp_path: Path) ->
     )
 
 
-def test_k06_circuit_breaker_longer_than_the_budget_is_flagged(tmp_path: Path) -> None:
-    """The hazard that remains: 11 consecutive failures cannot happen in 10 ticks."""
+def test_k06_circuit_breaker_longer_than_the_budget_does_not_block(tmp_path: Path) -> None:
+    """11 consecutive failures cannot happen in 10 ticks: inert, disclosed, not rejected."""
     contract = _contract_dict(
         budget={
             "max_iterations": 10,
@@ -220,9 +220,9 @@ def test_k06_circuit_breaker_longer_than_the_budget_is_flagged(tmp_path: Path) -
         }
     )
     report = validate_run(_write_run(tmp_path, contract=contract))
-    assert _has_failing_check(report, "circuit_breaker"), (
-        f"a breaker that can never trip validated. failing checks: {_failing(report)}"
-    )
+    assert not _has_failing_check(report, "circuit_breaker"), _failing(report)
+    detail = next(c.detail for c in report.checks if c.name == "circuit_breaker_consistent")
+    assert "cannot trip" in detail
 
 
 def test_k06_reachable_stop_condition_still_validates(tmp_path: Path) -> None:

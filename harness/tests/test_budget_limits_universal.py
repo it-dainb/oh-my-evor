@@ -195,11 +195,14 @@ def test_a_breaker_below_the_budget_is_the_normal_case(tmp_path: Path) -> None:
     assert checks["circuit_breaker_consistent"].ok is True
 
 
-def test_a_breaker_longer_than_the_budget_can_never_trip(tmp_path: Path) -> None:
-    checks = _validate_budget(tmp_path, max_iterations=10, plateau_window=5, circuit_breaker=11)
+def test_a_breaker_longer_than_the_budget_is_disclosed_not_rejected(tmp_path: Path) -> None:
+    """It cannot trip, which is worth saying — and harmless, so it must not block lock.
+    Rejecting it refused every short run with a default breaker, including the 1-tick
+    bench mission (breaker 5, max_iterations 1)."""
+    checks = _validate_budget(tmp_path, max_iterations=1, plateau_window=5, circuit_breaker=5)
     c = checks["circuit_breaker_consistent"]
-    assert c.ok is False
-    assert "never trip" in c.detail
+    assert c.ok is True
+    assert "cannot trip" in c.detail
 
 
 def test_an_absent_cost_ceiling_is_valid(tmp_path: Path) -> None:

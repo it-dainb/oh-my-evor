@@ -781,26 +781,25 @@ def _check_stop_reachable(run_dir: Path) -> list[CheckResult]:
     # budget to get past it.
     #
     # The breaker now counts consecutive FAILED ticks (tree.check_stop_condition),
-    # so a breaker below the budget is the normal case. The hazard that remains
-    # is the inverse: a breaker longer than the budget can never trip.
+    # so a breaker below the budget is the normal case and this no longer fails.
+    #
+    # A breaker LONGER than the budget can never trip, and is disclosed — not
+    # rejected. A first cut of this fix rejected it, and that would have refused
+    # every short run with a default breaker: a 1-tick bench mission (breaker 5,
+    # max_iterations 1) could no longer lock. Rejecting a harmless configuration
+    # is the same over-strictness that made every mission set breaker = budget.
     breaker = budget.get("circuit_breaker")
     max_iter = budget.get("max_iterations")
-    if isinstance(breaker, int) and isinstance(max_iter, int) and breaker > max_iter:
-        out.append(CheckResult(
-            name="circuit_breaker_consistent",
-            ok=False,
-            detail=(
-                f"circuit_breaker={breaker} needs {breaker} consecutive failed ticks, and "
-                f"max_iterations={max_iter} is fewer than that — the breaker can never trip. "
-                "It counts consecutive FAILED ticks, not ticks; a typical value is 3-8."
-            ),
-        ))
-    elif isinstance(breaker, int):
-        out.append(CheckResult(
-            name="circuit_breaker_consistent",
-            ok=True,
-            detail=f"stops after {breaker} consecutive failed ticks",
-        ))
+    if isinstance(breaker, int):
+        if isinstance(max_iter, int) and breaker > max_iter:
+            detail = (
+                f"circuit_breaker={breaker} cannot trip within max_iterations={max_iter} "
+                "(it counts consecutive FAILED ticks); the iteration cap ends the run first. "
+                "Harmless, but the breaker is inert for this run."
+            )
+        else:
+            detail = f"stops after {breaker} consecutive failed ticks"
+        out.append(CheckResult(name="circuit_breaker_consistent", ok=True, detail=detail))
 
     # ── K-07: a zero cost ceiling ───────────────────────────────────────────
     # The stop path reads 0 as "no spend permitted" (`total_cost >= 0` is true
