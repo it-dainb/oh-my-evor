@@ -26,6 +26,7 @@ import { registerGotchaTools } from "./tools/gotcha.js";
 import { registerProposalTools } from "./tools/proposals.js";
 import { registerAcquireTools } from "./tools/acquire.js";
 import { registerWaitTools } from "./tools/wait.js";
+import { acceptJsonStringArgs } from "./tolerant-args.js";
 
 /**
  * Server instructions — loaded upfront (<=2KB) even with MCP tool-search deferral,
@@ -54,6 +55,7 @@ async function main(): Promise<void> {
     { instructions: EVOR_INSTRUCTIONS }
   );
 
+  acceptJsonStringArgs(server);
   // Register all tools. WS-A/B/1.5 add artifact/lineage/compute modules.
   registerInitTools(server);      // evor_init_run
   registerRecordTools(server);    // evor_record_node, evor_record_eval

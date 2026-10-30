@@ -128,6 +128,25 @@ def _assign_proposal_ids(payload: Any) -> Any:
     return payload
 
 
+def _lift_selector_winner(payload: Any) -> Any:
+    """A verdict's ``winner`` is top-level; one written inside a review is lifted out.
+
+    Only when the top level has none, and only a single in-review winner: two
+    reviews naming different winners is a real conflict for the validator.
+    """
+    if not isinstance(payload, dict) or not isinstance(payload.get("reviews"), list):
+        return payload
+    named = [r["winner"] for r in payload["reviews"] if isinstance(r, dict) and "winner" in r]
+    if not named or payload.get("winner") not in (None, "") or len(set(named)) != 1:
+        return payload  # nothing to lift, or a conflict the validator reports as written
+    payload = copy.deepcopy(payload)
+    for r in payload["reviews"]:
+        if isinstance(r, dict):
+            r.pop("winner", None)
+    payload["winner"] = named[0]
+    return payload
+
+
 def _proposal_ids(payload: Any) -> list[dict[str, Any]]:
     """The ids as written, so the caller validates the same proposals Selector reads."""
     items = payload if isinstance(payload, list) else (
@@ -228,6 +247,8 @@ def write_artifact(
 
     if agent == "mutagen":
         payload = _assign_proposal_ids(payload)
+    elif agent == "selector":
+        payload = _lift_selector_winner(payload)
 
     err = _validate_payload(agent, payload)
     if err:
