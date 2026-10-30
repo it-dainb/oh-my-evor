@@ -2991,12 +2991,25 @@ describe("pre-tool-use hook — updatedInput run_id injection", () => {
       PRE_TOOL_USE,
       ACTIVE_ENV,
       JSON.stringify({
-        tool_name: "mcp__plugin_oh-my-evor_evor__capability",
+        tool_name: "mcp__plugin_oh-my-evor_evor__evor_capability",
         tool_input: {},
       }),
     );
     expect(result.status).toBe(0);
     expect(result.stdout.trim()).toBe("");
+  });
+
+  it("does NOT inject the active run_id into evor_init_run — the new run gets its own id", () => {
+    const result = runHookWithStdin(
+      PRE_TOOL_USE,
+      ACTIVE_ENV,
+      JSON.stringify({
+        tool_name: "mcp__plugin_oh-my-evor_evor__evor_init_run",
+        tool_input: { answers: { mission_id: "m-new" } },
+      }),
+    );
+    expect(result.status).toBe(0);
+    expect(result.stdout).not.toMatch(/updatedInput/);
   });
 
   it("does NOT inject when EVOR_ACTIVE_RUN_ID is unset", () => {
