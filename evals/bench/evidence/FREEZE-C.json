@@ -46,9 +46,9 @@
   },
   "agent_files": {
     "agents/evor-sage-junior.md": "3bd8126f455db6f247432d925f2f569995b81f7b9f201549e89fae14ba0a5799",
-    "agents/evor-tick.md": "16c4f75bd7f2e18ca65ced34fe233238407872872dc8a922f8f239bf84a07aa8",
-    "agents/evor-forge-analyst.md": "4456d819ee75b0de9160181c3a06d131e468504cf7ddcd09755d35aae0a2a2ef",
-    "agents/evor-probe.md": "46d3063c5277c49e60eafbb03d9ae2757d80c6a9c45712861ea63e79899d874e",
-    "skills/evor/SKILL.md": "5b860cea5177446576fc454678d03745ef0dabfb7c3024bc29bd03e85b551fbd"
+    "agents/evor-tick.md": "292a3ca818f313ca0b7067098df68664f7fa686cef909608c4f2b242c787be32",
+    "agents/evor-forge-analyst.md": "d4983fe6c273a4f2141c2276a8d33725c3de22c9a9897ad380ba6603eb5454c0",
+    "agents/evor-probe.md": "cb02e080d5fdc14063a89ba24d0128cd2fcd8fda4fc2fa68c7e11d20fcbca46f",
+    "skills/evor/SKILL.md": "37fd9d1c8a6d3721ad1bb41a6885d35cba32723ed7cd7a80f5117754bf956b0d"
   }
 }

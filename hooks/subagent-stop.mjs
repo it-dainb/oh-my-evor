@@ -34,6 +34,7 @@
  */
 
 import { existsSync, statSync, readFileSync, appendFileSync, renameSync, writeFileSync, mkdirSync } from 'fs';
+import { hasForgeReport } from './lib/forge-reports.mjs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { spawnSync } from 'child_process';
@@ -449,7 +450,10 @@ if (['sage', 'mutagen', 'probe', 'forge', 'selector', 'acquirer'].includes(agent
 const MIN_ARTIFACT_BYTES = 10;
 
 try {
-  if (!existsSync(artifactPath)) {
+  const artifactMissing = agentRole === 'forge'
+    ? !hasForgeReport(join(runDir, 'ticks', String(currentTick)))
+    : !existsSync(artifactPath);
+  if (artifactMissing) {
     process.stdout.write(
       `[EVOR SUBAGENT WARNING] ${agentRole} stopped but artifact not confirmed for this tick.\n` +
         `  Agent may not have externalized its work. Orchestrator should verify via evor_read_artifact.\n`

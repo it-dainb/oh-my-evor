@@ -93,7 +93,7 @@ The user presses Enter to accept the pre-filled value or types a replacement. Al
 
 ```
 Note on baseline: <metric>=<claimed_value> is a scraped claim with verified=false.
-It has NOT been measured on a controlled evaluation split. The official baseline_value
+It has NOT been verified on a controlled evaluation split. The official baseline_value
 used as the official baseline will be whatever EVOR measures on the frozen split during
 setup — not this scraped number. Both the claimed value and the EVOR-measured value are
 recorded; if they diverge by more than the tolerance threshold, EVOR will flag the
@@ -112,7 +112,7 @@ Display a progress indicator: "Question N/14" at the start of each question.
 
 **Q1 — Mission name and task description**
 "What are you trying to optimize? Describe the task in one or two sentences. This will become the mission ID."
-→ Derive `mission_id` as kebab-slug from the description + current date (e.g., "cifar10-improve-2026-07").
+→ Derive `mission_id` as kebab-slug from the description + current date (e.g., "cifar10-improve-<YYYY-MM>").
 → Set `task_description`.
 
 **Q2 — Dataset**
@@ -182,15 +182,12 @@ Metric options for your task:
 → Set `budget.plateau_window` (default 8).
 → Set `budget.circuit_breaker` (default 5). It counts CONSECUTIVE FAILED ticks — a tick whose
   outcome is `failed` — and is not a tick count. A breaker below `max_iterations` is the normal
-  case. (It used to be implemented as `tick >= circuit_breaker`, so a breaker of 8 stopped a
-  healthy run at tick 8, and the validator rejected anything below the budget. Both are fixed;
-  do not set it equal to `max_iterations` to get past a check — that disables it.)
+  case. Do not set it equal to `max_iterations` to get past a check — that disables it.
   `max_iterations` and `plateau_window` apply to EVERY mission, whatever its stop condition.
 → Ask: "Is this local-only or do you have cloud GPU available?" → for cloud, set
   `budget.max_cost_usd` to a positive ceiling. For local-only, OMIT the field — absent means no
   ceiling. Do NOT set 0: a ceiling of 0 permits no spend, so the run stops before its first
-  tick, and the validator rejects it. (This line used to say "0 = local-only", the schema made
-  the field required, and missions shipped a nominal $10000 to get through.)
+  tick, and the validator rejects it. Do not invent a nominal ceiling for a local-only run.
 → Optionally: set `budget.max_wall_clock_hours` and `budget.max_gpu_hours`.
 
 **Q7 — Framework**
@@ -291,8 +288,8 @@ Parse output to populate a ResourcePlan:
 - `vram_per_job_gb`: estimated from free GPU memory / concurrency.
 - Omit `budget.max_cost_usd` if local-only (no cloud configured) — absent means no ceiling.
 
-Then RECORD it — the tick reads this back, and until v1.2.9 there was nowhere to put it, so the
-"Estimated concurrency" printed below was computed and thrown away:
+Then RECORD it — the tick reads this back, and the "Estimated concurrency" printed below is
+lost unless it is written here:
 
 ```
 evor_state_write({ run_id, resource_plan: {
@@ -388,16 +385,16 @@ evor_init_eval_suite({
 
 This takes one domain per distinct value of the frozen split's `per_sample_domains`, creates an
 EvalSuite record, and initializes an EMPTY angle registry (angles are discovered during the run).
-If no split is frozen yet it falls back to a single `primary` domain. (This paragraph used to say
-domains were derived from `task_description` and that the registry got one entry per domain;
-neither was true. A 22-domain mission got a one-domain suite.)
+If no split is frozen yet it falls back to a single `primary` domain — so freeze the splits
+first, or a multi-domain mission gets a one-domain suite. Domains are not derived from
+`task_description`.
 
 ## Materialize and seal the canonical evaluator
 
 The integrity gate's eval-shift check compares each node's `evaluate.py` against the mission's sealed canonical evaluator anchor. That anchor must be sealed BEFORE the tick loop starts, or every node fails the integrity check and nothing is ever promoted.
 
-**First ask the contract which shape this mission needs.** There are two, and picking
-by hand is how a mission spent its setup discovering that neither path was reachable:
+**First ask the contract which shape this mission needs.** There are two; do not pick one by
+hand, because a hand-picked shape may be unreachable for this contract:
 
 - **generated** — `evor_scaffold_evaluator` emits the harness from the contract, the
   eval suite and the frozen index, and you write only `score(pred, gt)` in
@@ -425,9 +422,8 @@ evor_write_eval_script({
 ```
 
 The evaluator contract — argv, stdout, which files constitute the evaluator, and the
-environment it may rely on — is owned by `harness/evor/eval_contract.py`. Read it rather
-than inferring the interface; four sites once each held their own version of it and all
-four disagreed.
+environment it may rely on — is fixed by the plugin and enforced by `evor_write_eval_script`.
+Follow it as stated here rather than inferring the interface.
 
 An authored evaluator must:
 - Load the frozen test split. Its path comes from the run environment (`EVOR_RUN_DIR`,
@@ -453,9 +449,8 @@ evor_seal_eval_script({ run_id: "<run_id>", eval_version: "v1" })
 
 The seal writes **one anchor per file**: `eval_script_hash` = sha256 of `eval-suites/<v>.py`, and,
 when the evaluator has one, `eval_plugin_hash` = sha256 of `score_plugin.py` — the metric itself,
-which the generated harness imports. The integrity gate checks both. (v1.2.6 folded them into one
-set digest under `eval_script_hash`; every reader still compared a plain sha256, so every node
-failed `no_eval_shift` until v1.2.9 split them again.)
+which the generated harness imports. The integrity gate checks both, each as a plain sha256;
+never combine them into one digest, or every node fails `no_eval_shift`.
 
 Verify the call returns `ok`. If it reports the evaluator is missing, write eval-suites/<eval_version>.py first, then re-call evor_seal_eval_script. Do NOT proceed to lock if evor_seal_eval_script did not return ok.
 </EvalSuite_Initialization>
@@ -471,10 +466,9 @@ The preflight verifies:
 
 It does NOT verify that training works. `loss_decreasing` needs a candidate worktree for its
 micro-train, and none exists at setup, so it always comes back `null` and is listed under
-`unverified` in the result. Report it to the user as **not run**, never as passed. (This section
-used to promise a 5-step micro-train and a decreasing loss; at setup the micro-train cannot
-execute, and nothing later checks for a *decreasing* loss — integrity check 5 only rejects
-NaN, Inf or constant loss.)
+`unverified` in the result. Report it to the user as **not run**, never as passed. Do not
+promise the user a decreasing loss: nothing later checks for one — integrity check 5 only
+rejects NaN, Inf or constant loss.
 
 **On failure:** Use `AskUserQuestion`:
 "Preflight failed: <error>. Do you want to override and proceed anyway?

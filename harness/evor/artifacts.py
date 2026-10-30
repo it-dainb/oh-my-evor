@@ -73,6 +73,12 @@ def resolve_artifact_path(
     """
     if agent in _FIXED_PATHS:
         groupdir, stem = _FIXED_PATHS[agent]
+        # One forge family per candidate. A tick forges EVERY selected proposal, and
+        # the fixed path made the second Forge's report overwrite the first's
+        # (binarization mission, tick 4). With `kind` (the node name) each
+        # candidate gets forge/<kind>/; without it the path is unchanged.
+        if kind and groupdir == "forge":
+            groupdir = f"forge/{_slugify(kind)}"
     elif agent == "sage-junior":
         if not kind:
             raise ValueError("sage-junior requires 'kind' (used as slug in path)")

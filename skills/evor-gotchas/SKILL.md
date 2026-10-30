@@ -74,7 +74,7 @@ If capability_profile is present, show a summary table:
   Available libs:   flash-attn, xformers, triton
   CUDA version:  12.1
   CPU only:      False
-  Probed at:     2026-07-04T10:00:00Z
+  Probed at:     <ISO 8601 timestamp>
 
   [WARN] flash-attn v3 unavailable: requires sm_90, detected sm_80
 ```
@@ -88,13 +88,13 @@ If capability_profile is None, note that preflight has not been run.
 
 [hardware-constraint] flash-attn-v3-requires-sm90  confidence=1.00  occurrences=1
   Avoidance: flash-attn v3 (FA3) requires CUDA sm_90. Use flash-attn v2 instead.
-  Last seen: 2026-07-04T10:00:00Z
+  Last seen: <ISO 8601 timestamp>
 
 [runtime-failure] cuda-oom  confidence=0.84  occurrences=3
   Context: batch_size=256, node_id=node-abc
   Resolution: CUDA OOM: batch_size 256→128, gradient_accumulation_steps 1→2
   Avoidance: Avoid batch_size >= 256 on this task.
-  Last seen: 2026-07-04T12:30:00Z
+  Last seen: <ISO 8601 timestamp>
 
 (no approach-deadend gotchas yet)
 ```

@@ -370,7 +370,7 @@ export function registerGotchaTools(server: McpServer): void {
       "Store a file or text blob durably so it can be referenced across nodes and runs.",
       "Identical blobs are stored only once (dedup). Returns acquisition_id as the logical handle",
       "to pass to evor_record_node or store in tree artifacts.",
-      "If acquisition_id is provided, the blob is registered under the 'train' namespace (ADR-015 enforcement).",
+      "If acquisition_id is provided, the blob is registered under the 'train' namespace.",
     ].join(" "),
     {
       run_id: z.string().describe("Active run identifier"),

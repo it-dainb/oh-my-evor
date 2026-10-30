@@ -57,7 +57,7 @@
   "grounded_rule": {
     "file": "agents/evor-probe.md",
     "quote": "if the grad_norm series is missing or too short to compute, gradient_health is not \"healthy\"; that is what telemetry_sane and an \"inconclusive\" verdict are for.",
-    "sha256_at_authoring": "46d3063c5277c49e60eafbb03d9ae2757d80c6a9c45712861ea63e79899d874e"
+    "sha256_at_authoring": "b87081bd12e065557ca1a44f8389373ee97071456df473f677c0c1903d726d72"
   },
   "grounding": [
     "field-trace:M-09",

@@ -182,3 +182,22 @@ describe("agentOutcome — wait for a child with no artifact and read its result
   });
 });
 
+
+describe("forge family per candidate", () => {
+  it("matches the python layout: forge/<node>/ with a kind, legacy path without", async () => {
+    const { artifactPathFor } = await import("../src/tools/artifact.js");
+    expect(artifactPathFor("/R", 4, "forge")).toBe("/R/ticks/4/forge/forge-report.json");
+    expect(artifactPathFor("/R", 4, "forge", "t4-p1-Polarity")).toBe("/R/ticks/4/forge/t4-p1-polarity/forge-report.json");
+    expect(artifactPathFor("/R", 4, "forge-critic", "t4.p1")).toBe("/R/ticks/4/forge/t4-p1/critic.json");
+  });
+
+  it("hasForgeReport sees a per-candidate report", async () => {
+    const { hasForgeReport } = await import("../../hooks/lib/forge-reports.mjs");
+    const t = mkdtempSync(join(tmpdir(), "evor-fr-"));
+    expect(hasForgeReport(t)).toBe(false);
+    mkdirSync(join(t, "forge", "t4-p0"), { recursive: true });
+    writeFileSync(join(t, "forge", "t4-p0", "forge-report.json"), "{}");
+    expect(hasForgeReport(t)).toBe(true);
+    rmSync(t, { recursive: true, force: true });
+  });
+});

@@ -14,8 +14,8 @@ what is relevant to their own lens; the same signal is a brief to Mutagen, a gat
 Selector, a default to Forge-architect, and an escalation input to the orchestrator. The
 bus never decides routing — that is each consumer's job.
 
-Signals accumulate across ticks. A `cuda-oom` emitted in tick 3 is still visible in
-tick 7. Repeat occurrences of the same signal raise its `confidence` and `occurrences`
+Signals accumulate across ticks. A `cuda-oom` emitted in one tick is still visible
+several ticks later. Repeat occurrences of the same signal raise its `confidence` and `occurrences`
 count, making recurring patterns progressively harder to ignore.
 
 ---
@@ -172,7 +172,7 @@ the ceiling.
 
 `{X}` in kind strings is a placeholder for a variable (e.g. `family-arch-rejected`).
 
-### Existing kinds
+### Training, research, and acquisition kinds
 
 | kind | shapes | axes | severity | primary emitter | trigger |
 |---|---|---|---|---|---|
@@ -193,10 +193,11 @@ the ceiling.
 | `no-evidence-found` | opportunity | accuracy | medium | evor-sage | No prior art found for an angle after exhausting wiki + external search |
 | `leakage-blocked` | failure | data | medium (high if >20% collision rate) | evor-acquirer | Train/test collision items detected and removed during acquisition |
 
-### New kinds (§15D)
+### Diagnostic and run-state kinds
 
 | kind | shapes | axes | severity | primary emitter | trigger |
 |---|---|---|---|---|---|
+| `learning-stall` | trend | generalization (overfitting), accuracy (underfitting), stability (diverged) | medium | evor-forge | evor.watch stopped a run early: validation set no new best in N evaluations (stalled) or the loss diverged; evidence is the watcher's verdict, including `diagnosis` and `next_tick_hint` |
 | `gradient-explosion` | failure | stability | high | evor-probe | max(grad_norm) > 100 OR p95 > 10x mean |
 | `gradient-vanishing` | failure | stability | medium | evor-probe | mean(last 10 grad_norms) < 0.001 with param_norm present and non-zero |
 | `lr-schedule-misconfigured` | limit | stability | medium | evor-probe | LR constant for the entire run, or val metric degrades within 5 steps of any lr decrease > 50% |
@@ -209,9 +210,8 @@ the ceiling.
 | `diversity-collapse` | trend | accuracy, generalization | medium | orchestrator, strategy | Population converging on a single approach family; search space collapsing |
 | `sota-gap` | limit | accuracy, generalization | medium | evor-probe, evor-sage | Measurable gap remains between current best and the established SOTA bar on a tracked angle |
 
-**Note on `family-{X}-rejected` axis:** the correct axis is `generalization` (search-space
-diversity), not `accuracy`. Any agent code using `axes=["accuracy"]` for this kind should
-be updated to `axes=["generalization"]`.
+**Note on `family-{X}-rejected` axis:** the axis is `generalization` (search-space
+diversity), not `accuracy`.
 
 **Note on `overfit` severity:** emit at `medium` initially; raise to `high` if the gap
 between train loss trajectory and val metric persists for more than 30% of total steps.

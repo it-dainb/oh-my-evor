@@ -17,11 +17,11 @@ kept in step by hand with a fact stored elsewhere is an invariant with no writer
 | role | now | source of truth |
 |---|---|---|
 | `acquirer` | haiku | `agents/evor-acquirer.md` |
-| `forge` | opus | `agents/evor-forge.md` |
-| `forge-analyst` | opus | `agents/evor-forge-analyst.md` |
-| `forge-architect` | opus | `agents/evor-forge-architect.md` |
-| `forge-critic` | opus | `agents/evor-forge-critic.md` |
-| `forge-junior` | sonnet | `agents/evor-forge-junior.md` |
+| `forge` | sonnet | `agents/evor-forge.md` |
+| `forge-analyst` | sonnet | `agents/evor-forge-analyst.md` |
+| `forge-architect` | sonnet | `agents/evor-forge-architect.md` |
+| `forge-critic` | sonnet | `agents/evor-forge-critic.md` |
+| `forge-junior` | haiku | `agents/evor-forge-junior.md` |
 | `mutagen` | haiku | `agents/evor-mutagen.md` |
 | `probe` | haiku | `agents/evor-probe.md` |
 | `sage` | haiku | `agents/evor-sage.md` |

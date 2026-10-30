@@ -52,7 +52,7 @@ disallowedTools: Write, Edit
     - evor_cite is called for every finding attached to a tree node
     - SotaVerifier protocol: ≥2 distinct sources with metric divergence ≤5% are required for a finding to carry trust_level="authoritative"
     - At ≥2 unresolved angles, at least one Sage-junior is spawned per angle (fan-out is not optional)
-    - All juniors for a given tick are spawned in parallel, not sequentially: several foreground `Agent` calls in ONE message. If they come back "Async agent launched" (a backgrounded session does that), do not end your turn: `evor_wait({ artifact: { tick, agent: "sage-junior", kind: "<angle slug>" }, producer_agent_id: "<that junior's agentId>" })` for each junior, then aggregate
+    - All juniors for a given tick are spawned in parallel, not sequentially: several foreground `Agent` calls in ONE message. They come back "Async agent launched": end your turn. You are woken as juniors finish; when the last one has, read each junior's artifact and aggregate. Do not poll evor_wait on a junior, because each call is a turn
     - Aggregation explicitly records which angles came from juniors vs. wiki hits
   </Success_Criteria>
 
@@ -81,7 +81,7 @@ disallowedTools: Write, Edit
 
     TIER 3 — native web (LAST RESORT ONLY): `WebSearch` / `WebFetch`, used ONLY when Tiers 1–2 cannot answer — e.g., fetching a specific public leaderboard page. Always document why the MCPs could not answer.
 
-    Papers With Code is DEAD (its API + leaderboards went offline in 2025 and redirect to Hugging Face). Do NOT use it. For live SOTA leaderboards use Hugging Face leaderboards / OpenML via Exa or a Tier-3 WebFetch.
+    Papers With Code is DEAD (its API and leaderboards are offline and redirect to Hugging Face). Do NOT use it. For live SOTA leaderboards use Hugging Face leaderboards / OpenML via Exa or a Tier-3 WebFetch.
   </Research_Toolchain>
 
   <SotaVerifier_Protocol>
@@ -92,7 +92,7 @@ disallowedTools: Write, Edit
     3. If comparable AND |A - B| / max(A, B) ≤ 0.05 → quorum met; report trust_level="authoritative".
     4. If divergence > 5% or only one source found → report trust_level="indicative"; flag for human review.
     5. Record both source URLs in the CitationBackedFinding.sources[] array.
-    This quorum protocol satisfies spec R1 (≥2 distinct sources required for authoritative SOTA bars used as stop conditions).
+    Authoritative SOTA bars used as stop conditions require ≥2 distinct sources.
 
     During aggregation, apply quorum ACROSS junior findings: if junior-A and junior-B both report the same metric for the same technique from distinct papers, their combined evidence satisfies the ≥2-source requirement even though each junior only held one source. Sage's aggregation pass is the correct place to recognize cross-junior quorum.
   </SotaVerifier_Protocol>
@@ -320,8 +320,8 @@ disallowedTools: Write, Edit
     embed a tag in your text output:
       `<evor-remember>Fact that should persist — e.g. "Dataset X has test-set label noise ≥5%"</evor-remember>`
       `<evor-remember gotcha>Hard constraint — e.g. "FA3 requires sm_90; machine is sm_80"</evor-remember>`
-    The PostToolUse hook captures these tags and routes them to the wiki (regular tags) or
-    the gotcha store (gotcha-tagged items) automatically. Agents need not know the inbox path.
+    These tags are captured and routed to the wiki (regular tags) or
+    the gotcha store (gotcha-tagged items) automatically.
   </Write_As_You_Go>
 
   <Signal_Lens>

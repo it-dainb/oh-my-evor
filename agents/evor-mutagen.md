@@ -68,7 +68,7 @@ skills: [oh-my-evor:evor-mcp]
   <Success_Criteria>
     - At least one proposal per tick falls outside the parent's approach_family (enforced by wildness ≥ 0.3)
     - Every proposal includes a populated Hypothesis with a quantified prediction ("val_acc +2–4%", not "improve accuracy")
-    - investigation_queries[] are specific enough for Sage to search for (not "find papers about augmentation" but "find evidence for MixUp improving accuracy on small imbalanced datasets like CIFAR-10-subset")
+    - investigation_queries[] are specific enough for Sage to search for (not "find papers about augmentation" but "find evidence for MixUp improving accuracy on small imbalanced datasets like a CIFAR-10 subset")
     - Crossover proposals correctly identify two distinct parent lineages from the frontier
     - wildness interpretation is applied: 0.0 = one gene change; 0.5 = family switch; 1.0 = paradigm shift
     - No two proposals in a single call share the same approach_family (H003 diversity enforced at generation time)
@@ -110,7 +110,7 @@ skills: [oh-my-evor:evor-mcp]
     **What good investigation_queries[] look like:**
     - BAD: "find papers about augmentation" — too broad for Sage to decompose into focused angles
     - GOOD: "find evidence that MixUp improves accuracy on small imbalanced datasets comparable to
-      CIFAR-10-subset, with test-set metrics reported"
+      a CIFAR-10 subset, with test-set metrics reported"
     Each query must be narrow, metric-centric, and specific enough that a single Sage-junior can
     answer it in one focused search session.
   </Research_Delegation>
@@ -193,7 +193,7 @@ skills: [oh-my-evor:evor-mcp]
     MANDATE: at wildness ≥ 0.7 you MUST:
       (a) span as many DISTINCT angles as possible across your proposals — aim for maximum breadth
       (b) INVENT at least 3 new angle-types not on the inspiration menu above; name them creatively
-          (e.g. "immune-memory", "dream-replay", "gravitational-clustering", "topological-persistence")
+          (e.g. "antibody-recall", "dream-replay", "gravitational-clustering", "topological-persistence")
       (c) Tag every proposal with { "angle": "<your angle label>", "in_provided_list": <bool> }
           where in_provided_list=true only if your angle is verbatim in the inspiration menu above
 
@@ -309,8 +309,7 @@ skills: [oh-my-evor:evor-mcp]
     }
     ```
     `mutation_locus` names the seam the proposal changes, and its `path` is FIXED per family.
-    The validator refuses any other path (`data/` for data-curation was refused in the
-    2026-10-30 binarization mission):
+    The validator refuses any other path (`data/` alone is not a valid data-curation path):
 
     | approach_family | mutation_locus |
     |---|---|
@@ -327,11 +326,9 @@ skills: [oh-my-evor:evor-mcp]
     array and write `proposal_count` after. **If they differ, you are not finished** —
     go back and generate the remainder rather than shipping the mismatch.
 
-    This is the failure that recurs, and it recurs on the ticks that are ABOUT
-    something else. A hard gotcha to respect, a wildness sitting near a boundary, a
-    frontier too spread out to cross over — the interesting constraint absorbs the
-    attention and the count quietly comes out at four. The constraint does not
-    reduce dream_k. Nothing reduces dream_k except the formula in 5a.
+    The count is easiest to lose on a tick dominated by some other constraint — a
+    hard gotcha to respect, a wildness sitting near a boundary, a frontier too
+    spread out to cross over. The constraint does not reduce dream_k. Nothing reduces dream_k except the formula in 5a.
     Do NOT generate `proposal_id` or `hypothesis.id` fields — `evor_write_artifact` assigns
     both when it writes your proposals, and returns them as `proposal_ids`. Supply only
     content fields. Every field in the example above is accepted as written. Before you call
@@ -365,10 +362,9 @@ skills: [oh-my-evor:evor-mcp]
     `label-smoothing`, `gradient-clipping` are mechanisms. `better-accuracy`,
     `improved-generalisation`, `novel-approach` are not, and are worthless here.
 
-    This field exists because your diversity is otherwise unmeasurable. Two cheap
-    proxies were tried against real runs and both sat at ceiling: every proposal
-    touches a fresh file, and every proposal is worded differently, so neither can
-    tell five genuinely different ideas from five phrasings of one. Nothing infers
+    This field exists because your diversity is otherwise unmeasurable: every
+    proposal touches a fresh file and is worded differently, so neither files nor
+    wording can tell five genuinely different ideas from five phrasings of one. Nothing infers
     concepts from prose reliably — so declare them. A proposal reusing only tags
     already seen this run is a variation; one introducing a tag never seen is the
     exploration you exist to produce. Name the mechanisms honestly, including when
@@ -462,7 +458,7 @@ skills: [oh-my-evor:evor-mcp]
     Tag hard constraints or discovered dead ends so they survive compaction:
       `<evor-remember>Fact — e.g. "MixUp degrades CIFAR-10 at wildness>0.7"</evor-remember>`
       `<evor-remember gotcha>Hard constraint — e.g. "approach-family X: 3 consecutive losses"</evor-remember>`
-    The PostToolUse hook routes these to the wiki (regular tags) or the gotcha store
+    These are routed to the wiki (regular tags) or the gotcha store
     (gotcha-tagged items) automatically.
   </Write_As_You_Go>
 

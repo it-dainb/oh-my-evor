@@ -740,6 +740,12 @@
         "spec_sha256": "61b8a8ebf6747851",
         "repeats": 5
       },
+      "stale": {
+        "since": "2026-10-30",
+        "agent_sha256_now": "7203bda701c0a05c",
+        "reason": "The agent file changed after the 8.1 run during the 2026-10-30 binarization field fixes (waiting with evor_wait, per-candidate forge artifacts). The tier comparison in \u00a73 was measured against the previous text. Amended 2026-10-30c: the operator moved this role to a different model tier (Opus to Sonnet for the forge reviewers); the row now describes neither the text nor the tier that ships.",
+        "action": "re-measure this role before citing its \u00a73 row"
+      },
       "records": [
         {
           "tier": "opus-medium",
@@ -1471,6 +1477,12 @@
         "spec_sha256": "12be8abd109f7e58",
         "repeats": 5
       },
+      "stale": {
+        "since": "2026-10-30",
+        "agent_sha256_now": "e1cc403105a62e02",
+        "reason": "The agent file changed after the 8.1 run during the 2026-10-30 binarization field fixes (waiting with evor_wait, per-candidate forge artifacts). The tier comparison in \u00a73 was measured against the previous text. Amended 2026-10-30c: the operator moved this role to a different model tier (Opus to Sonnet for the forge reviewers); the row now describes neither the text nor the tier that ships.",
+        "action": "re-measure this role before citing its \u00a73 row"
+      },
       "records": [
         {
           "tier": "opus-medium",
@@ -2084,8 +2096,8 @@
       },
       "stale": {
         "since": "2026-10-30",
-        "agent_sha256_now": "5bc26351a55f117e",
-        "reason": "The agent file changed after the 8.1 run: the role now states that it reviews by reading and routes any execution evidence through Forge to forge-junior, after a critic tried to run a check script against the candidate. The tier comparison in \u00a73 was measured against the previous text.",
+        "agent_sha256_now": "9f3bc4806f2281d9",
+        "reason": "The agent file changed after the 8.1 run: the role now states that it reviews by reading and routes any execution evidence through Forge to forge-junior, after a critic tried to run a check script against the candidate. The tier comparison in \u00a73 was measured against the previous text. Amended 2026-10-30c: the operator moved this role to a different model tier (Opus to Sonnet for the forge reviewers); the row now describes neither the text nor the tier that ships.",
         "action": "re-measure this role before citing its \u00a73 row"
       },
       "records": [
@@ -3303,7 +3315,7 @@
       ],
       "stale": {
         "since": "2026-09-06",
-        "agent_sha256_now": "f451db9201680cc7",
+        "agent_sha256_now": "602a78d0c4c6e326",
         "reason": "The agent file changed after the 8.1 run: this role gained a capability-gap disclosure channel, closed-set kind vocabulary and severity-by-consequence guidance during the evor-eval-bench loop. The tier comparison in §3 was measured against the PREVIOUS text and no longer describes what ships. The numbers are not wrong about what they measured; they are no longer about this agent. Amended 2026-09-07: the role now also states that `evor_validate_proposals` is a call it makes rather than something that happens to its payload. The row stays stale; only the sha it went stale AT is re-recorded, so a later edit cannot hide inside this withdrawal. Amended 2026-09-11b: the role now states that `kind` is a REGISTRY rather than a closed set, matching agents/references/signal-protocol.md and the schema, which the four agent files had contradicted. Amended 2026-10-30b: changed again \u2014 the role is told that evor_write_artifact assigns proposal_id and hypothesis.id, which the validator previously required it to supply. The row was already stale; re-recording the sha keeps this edit from hiding inside the previous ones.",
         "action": "re-measure this role before citing its §3 row"
       }
@@ -3980,7 +3992,7 @@
       ],
       "stale": {
         "since": "2026-09-06",
-        "agent_sha256_now": "46d3063c5277c49e",
+        "agent_sha256_now": "b87081bd12e06555",
         "reason": "The agent file changed after the 8.1 run: this role gained a capability-gap disclosure channel, closed-set kind vocabulary and severity-by-consequence guidance during the evor-eval-bench loop. The tier comparison in §3 was measured against the PREVIOUS text and no longer describes what ships. The numbers are not wrong about what they measured; they are no longer about this agent.",
         "action": "re-measure this role before citing its §3 row"
       }
@@ -3995,7 +4007,7 @@
       },
       "stale": {
         "since": "2026-10-30",
-        "agent_sha256_now": "3bd8126f455db6f2",
+        "agent_sha256_now": "d418c268e48f0790",
         "reason": "The agent file changed after the 8.1 run: it now states that applicable_families is a closed set and where a loss function belongs, after the role repeatedly wrote an invented family the validator refuses. The tier comparison in \u00a73 was measured against the previous text and no longer describes what ships.",
         "action": "re-measure this role before citing its \u00a73 row"
       },
@@ -4672,7 +4684,7 @@
       },
       "stale": {
         "since": "2026-10-30",
-        "agent_sha256_now": "b05be757190cd12f",
+        "agent_sha256_now": "7a61fe84a7732a97",
         "reason": "The agent file changed after the 8.1 run: when its juniors' spawns come back asynchronous (a backgrounded session does that whatever is passed), the role now waits for each junior's artifact with evor_wait instead of ending its turn. The tier comparison in \u00a73 was measured against the previous text and no longer describes what ships.",
         "action": "re-measure this role before citing its \u00a73 row"
       },
@@ -5711,7 +5723,7 @@
       ],
       "stale": {
         "since": "2026-09-06",
-        "agent_sha256_now": "16c4f75bd7f2e18c",
+        "agent_sha256_now": "25a5648b5abb9cce",
         "reason": "The agent file changed after the 8.1 run: this role gained a capability-gap disclosure channel, closed-set kind vocabulary and severity-by-consequence guidance during the evor-eval-bench loop. The tier comparison in §3 was measured against the PREVIOUS text and no longer describes what ships. The numbers are not wrong about what they measured; they are no longer about this agent. Amended 2026-09-06: the file changed again — evor-tick's exploration section now says run state comes from the evor tools rather than from Glob/Grep/Read. The row was already stale; recording the new sha keeps this edit from hiding inside the previous one, which is what the gate is for. Amended 2026-09-11: the role now also states that a contradiction it acts on must be named in a signal carrying the disagreeing object, since declining to trust a stale record is invisible to a reader. The row stays stale; only the sha it went stale AT is re-recorded. Amended 2026-09-11b: the pointer rule and the failed-tick section contradicted each other; the failed-tick section now defers to the pointer rule, and the `kind` closed-set claim is corrected to a registry. Amended 2026-09-14: the file changed again — the role now Reads skills/evor/SKILL.md explicitly, because `skills: [oh-my-evor:evor]` in its frontmatter resolves to commands/evor.md (the command shadows the skill) and delivered a ~1.3KB `cat` stub to an agent that declares disallowedTools: Bash. The measured run never received the 9-step loop at all. A waiting section was added alongside it. The row was already stale; re-recording the sha keeps this edit from hiding inside the previous ones, which is what the gate is for. Amended 2026-09-14b: the file changed again — the role gained `yielding` as a return outcome and a duty to forge EVERY selected proposal, not only the winner. Its return contract previously had no word for waiting, so a tick blocked at step 5 reported outcome:\"failed\" three times and main re-spawned it. The row was already stale; re-recording the sha keeps this edit from hiding inside the previous ones. Amended 2026-10-30: changed again — the role now waits by spawning children in the FOREGROUND (a background spawn from a sub-agent is never resumed); TaskOutput guidance removed. Amended 2026-10-30b: changed again \u2014 the role now waits with evor_wait (job, pid or artifact) instead of ending its turn, never hands a child to main, and reports failure_kind on a failed tick. The row was already stale; re-recording the sha keeps this edit from hiding inside the previous ones.",
         "action": "re-measure this role before citing its §3 row"
       }

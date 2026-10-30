@@ -63,7 +63,7 @@
   "grounded_rule": {
     "file": "agents/evor-forge-analyst.md",
     "quote": "Do not speculate beyond the code evidence. State \"inconclusive — cannot estimate from code alone\" rather than asserting a single value when the model size is opaque.",
-    "sha256_at_authoring": "4456d819ee75b0de9160181c3a06d131e468504cf7ddcd09755d35aae0a2a2ef"
+    "sha256_at_authoring": "7203bda701c0a05c9f2d7af23ede9f22103586d9452e80fee33dc67b220bc4d8"
   },
   "grounding": [
     "field-trace:I-03",
@@ -157,7 +157,7 @@
   },
   "arms": [
     {
-      "model": "opus",
+      "model": "sonnet",
       "label": "shipped",
       "effort": "medium"
     }

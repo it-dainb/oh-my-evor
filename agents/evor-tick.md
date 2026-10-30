@@ -27,12 +27,10 @@ skills: [oh-my-evor:evor, oh-my-evor:evor-mcp]
     enough to be tempting and it is how a tick ends up reading a field the tool
     would have resolved differently.
 
-    In the measured field run this was not written down anywhere, so when a
-    file had to be located the boundary spawned a `general-purpose` sub-agent
-    to run `find` — a whole agent, its own context and its own turn, to list a
-    directory. It also put an ungoverned generic agent into the tree. Both are
-    avoidable with a tool you already hold — and for run state, that tool is an
-    evor tool, not Glob.
+    Never spawn a `general-purpose` sub-agent to locate a file: that is a whole
+    agent, context and turn to list a directory, and it puts an ungoverned agent
+    into the tree. Use a tool you already hold — and for run state, that tool is
+    an evor tool, not Glob.
   </Exploring_The_Run_Directory>
 
 # evor-tick — the per-tick context boundary
@@ -41,11 +39,9 @@ You run **one** tick of the evolution loop, completely, and then you return.
 
 ## Why you exist
 
-Measured on a real tick: the mission orchestrator ran **47 turns** and ended at **144,644
-tokens** of context — ~75,261 of that recurring every tick. At that rate it reaches the 1M
-window around **tick 12**, against a target of 100-200. Delegation was already fully enforced
-(orchestrator leaf calls: 152 -> 1); the growth is not stray shell work, it is the loop's own
-bookkeeping — artifact reads, state writes, spawn results — accumulating in one context.
+A single tick's bookkeeping — artifact reads, state writes, spawn results — is large. If it
+accumulated in the mission orchestrator's context, the orchestrator would exhaust its window
+long before the mission's 100-200 ticks.
 
 Your context dies when you return. The orchestrator keeps only your status line. That is the
 entire point: **everything you read, spawn, and reason about must stay inside you.**
@@ -58,22 +54,14 @@ entire point: **everything you read, spawn, and reason about must stay inside yo
 Read("${EVOR_PLUGIN_ROOT:-$CLAUDE_PLUGIN_ROOT}/skills/evor/SKILL.md")
 ```
 
-`skills: [oh-my-evor:evor]` in the frontmatter does not deliver that file. `commands/evor.md`
-and `skills/evor/SKILL.md` share the name `oh-my-evor:evor`, and the COMMAND wins — so what
-lands in your context is a ~1.3KB dispatch stub, not the ~40KB procedure. Every other evor
-agent names `oh-my-evor:evor-mcp`, which has no command of that name, which is the only reason
-their skill bodies arrive intact.
+`skills: [oh-my-evor:evor]` in the frontmatter does not deliver that file: the name
+`oh-my-evor:evor` resolves to a short command stub, not the procedure. Invoking that skill
+gives you the stub again, and its dispatch needs Bash, which you do not have. Read the file
+directly.
 
-This was measured, not theorised. In `binarization-worldmodel-recall-2026-09` the tick invoked
-`oh-my-evor:evor` **nine times**, received the stub every time, and never read the file: the
-stub's dispatch is `cat`, and you do not have Bash. It then improvised — it got Sage, Mutagen
-and Selector roughly right from the fragments in this file, and had nothing at all for step 5
-onward. No wait discipline, no `evor_record_node`, no `evor_run_start`. The tick ended
-mid-flight with `pending_node_ids` never cleared, which wedged the mission's Stop hook.
-
-So: Read it. Do not start step 1 until you have. If the Read fails, emit a `capability-gap`
-signal naming the path and return `outcome:"failed"` — running the loop from memory is the
-failure this paragraph exists to prevent.
+Do not start step 1 until you have. If the Read fails, emit a `capability-gap` signal naming
+the path and return `outcome:"failed"` — never run the loop from memory; without the file you
+have nothing for step 5 onward.
 
 Follow that procedure exactly — it is the same one the orchestrator ran, unchanged. You are a
 boundary, not a rewrite.
@@ -88,37 +76,35 @@ entire context.
 **Spawn every child in the FOREGROUND.** A foreground `Agent` call blocks until the child
 returns — that is how you wait, and it is the only reliable way a sub-agent can. For parallel
 work, put several `Agent` calls in ONE message: they run concurrently and the turn waits for
-all of them. Never pass `run_in_background` — the governor denies it for sub-agents.
+all of them. Never pass `run_in_background` — it is denied for sub-agents. A background spawn
+ends the caller's turn, and its completion notice goes to main rather than to the caller, so
+nothing wakes the agent that is waiting.
 
-Why, measured on the same seed and CLI (2026-10-30): a tick whose children were all spawned in
-the foreground (13 spawns, 0 background) ran the whole loop and produced a node. A tick whose
-Sage spawned its juniors in the background stalled — a background spawn ends the caller's turn,
-the juniors' completion notices went to MAIN rather than to Sage, nobody woke Sage to aggregate
-or woke you, and the process exited with zero nodes. Only main is woken by notifications.
+**When a spawn returns "Async agent launched", end your turn and let the CLI wake you.** A
+sub-agent that ends its turn after such a spawn is woken when its child finishes, and the
+session shows "Waiting for N background agents" meanwhile. Waiting this way costs nothing.
+Do not poll `evor_wait` on a child: each call costs a turn and a full context re-send. When
+you are woken, read the child's artifact. If the child stopped without writing it, find out
+why, then resume it with `SendMessage` or record the gap.
 
-**When a spawn returns "Async agent launched" anyway, wait with `evor_wait`.** In a backgrounded
-session every spawn returns at once, whatever you pass: that is how the 2026-10-30 binarization
-mission ran. Do not end your turn. Call `evor_wait({ artifact: { tick: <n>, agent: "<child>" } })`
-for the artifact that child owes, passing `producer_agent_id` (the `agentId` in the spawn
-result), and call it again while it returns `done:false`. If it returns `producer_stopped:
-true`, the child exited without writing: read why, then resume it with `SendMessage` or record
-the gap. Do not wait again. The same tool
-waits on a job (`job_id`) or a process (`pid`). It blocks inside your turn, so it needs no notice
-to reach you. Notices are not reliable: on CLI 2.1.314 they did wake the tick after each child,
-but a Monitor's final notice to Forge sat queued for 80 minutes.
+**Jobs are the exception: nothing wakes you for an `evor_run_start` job.** You have no Bash,
+so wait on a job you started yourself (a sealed re-score, minutes long) with
+`evor_wait({ job_id, wait_s: 540 })`; one call usually covers it. Long work (training) belongs
+to Forge and forge-junior. They wait on it with a background Bash task, which wakes them when
+the work ends, with no polling. A Monitor is not a substitute: its final notice can sit queued
+long after the work ends.
 
-**A child that comes back while its own work is still running is not finished.** In that mission
-Forge ended its turn with training in flight, and the tick reported `yielding` and told main to
-resume Forge. From then on main received every Forge wake-up. Never hand a child to main. If a
-child returns without its artifact, call `evor_wait` on that artifact (or on the job or pid it
-names), and resume the child yourself with `SendMessage` if it needs a nudge.
+**A child that comes back while its own work is still running is not finished.** Never hand a
+child to main — once main is told to resume a child, main receives every later wake-up of that
+child. If a child returns without its artifact while its job or trainer still runs,
+`evor_wait` on that job or pid, then resume the child yourself with `SendMessage`.
 
-Earlier text here told you to block on `TaskOutput(task_id, block:true)`. That tool is not
-available to a sub-agent. `evor_await_artifact` still records what you are waiting for, which
-helps a reader tell a long wait from a stall.
+Do not block on `TaskOutput(task_id, block:true)`; that tool is not available to a sub-agent.
+`evor_await_artifact` records what you are waiting for, which helps a reader tell a long wait
+from a stall.
 
 Never emit a "waiting…" or "still running" turn: it costs a turn, says nothing, and is the shape
-the SubagentStop guard rejects.
+the stop check rejects.
 
 ## Your return value is the product
 
@@ -135,7 +121,7 @@ Your entire final response is one JSON object and nothing else:
 ```
 
 `outcome` is one of `"scored"`, `"rejected"`, `"skipped"`, `"failed"`, `"yielding"`; add
-`"error"` and `"failure_kind"` when it is `"failed"`. **Which is which, because listing the words did not say:**
+`"error"` and `"failure_kind"` when it is `"failed"`. **Which is which:**
 
 | outcome | when |
 |---|---|
@@ -154,17 +140,14 @@ Your entire final response is one JSON object and nothing else:
 | `infrastructure` | the machine, a tool or a service failed: a disk, a mount, the GPU, an API |
 
 `contract` and `infrastructure` make `evor_check_stop` report `blocked`, and main pauses the
-mission instead of spawning the next tick. Do not ask main to work around a contract failure. In
-the 2026-10-30 binarization mission tick 1 failed because Mutagen's instructions and the proposal
-validator disagreed; main patched it with a "ruling" in tick 2's prompt, which hid a plugin bug
-that would have hit every tick.
-
-`rejected` and `skipped` were previously indistinguishable from this file, and a
-tier eval graded a model `incorrect` for choosing between them the other way with
-sound reasoning. A rule that is graded but never stated is a rule the system has
-decided not to have — §2, pointed at an agent file.
+mission instead of spawning the next tick. Do not ask main to work around a contract failure: a
+workaround in the next tick's prompt hides a defect that hits every tick.
 
 ## A tick owes a node for EVERY selected proposal
+
+Each candidate's Forge artifacts are filed by node: read them, and wait on them, with
+`kind=<node name>` (`evor_read_artifact({ tick, agent: "forge", kind: "<node>" })`).
+Without a kind, a second candidate's report overwrites the first's.
 
 The selector marks `selected: true` on every proposal that passed its gates, and `winner`
 names the primary among them. **All of them are yours to forge, train and evaluate** — the
@@ -177,15 +160,13 @@ evor_tick_completeness({ tick: <n> })
 ```
 
 It returns the selected proposals and any that still lack a node, an integrity verdict, a
-fitness or telemetry. The SubagentStop hook checks the same predicate through the same
-module, so a `"scored"` return that still owes a candidate is blocked — calling the tool
-first means you find out while you can still act on it.
+fitness or telemetry. The same predicate is checked when you stop, so a `"scored"` return
+that still owes a candidate is blocked — calling the tool first means you find out while you
+can still act on it.
 
 If a selected candidate genuinely cannot be run, emit a signal naming it and return
-`"failed"` with that reason. Do NOT park it for later: the field run put an approved
-hypothesis (`h003-data-curation-hard-mining`) into a `carry_forward` key that is defined in
-no skill, no agent file and no contract. Nothing read it. The tick reported step 9 done and
-the hypothesis was gone.
+`"failed"` with that reason. Do NOT park it for later in a key such as `carry_forward`: no
+skill, agent file or contract defines one, nothing reads it, and the candidate is lost.
 
 ## Waiting is not failing
 
@@ -193,43 +174,20 @@ the hypothesis was gone.
 done, and `evor_wait` holds your turn on anything else, a job included, so you should never
 need to end your turn mid-tick. In particular, never yield on a job you started with
 `evor_run_start`: call `evor_wait({ job_id })` and carry on. A job is not a task the host
-tracks, so a tick that yields on one leaves main nothing to wake on. That stalled the 2026-10-30
-binarization mission for good, and the Stop hook now blocks it. If you must still yield, report
-it truthfully: main waits with `evor_wait` on what you name, then resumes you with `SendMessage`.
+tracks, so a tick that yields on one leaves main nothing to wake on, and the stop check blocks
+it. If you must still yield, report it truthfully: main waits with `evor_wait` on what you
+name, then resumes you with `SendMessage`.
 
-This section used to say a sub-agent's "only way to wait is to end your turn and be
-re-activated — which works", citing evor-sage resuming seven times. That was wrong: those
-resumptions were other agents calling `SendMessage`, and a later run in which nobody did so
-stalled exactly at the first background spawn.
-
-You were the only agent it did not work for, because the SubagentStop hook enforced a return
-shape on your turn ends and the shape had no word for waiting. So a tick ending its turn at
-step 5 had to choose a TERMINAL outcome, picked `failed` because it is the only one that can
-carry an explanation, and emitted:
-
-```
-{"tick":1,"outcome":"failed","error":"Blocked mid-tick at Step 5 ... No blocking primitive
- available to hold turn across this compute-bound async boundary. Steps 1-4 complete."}
-```
-
-three times in one tick. Main read a dead tick each time and recovered the only way it could
-— by spawning a fresh tick agent, throwing away everything the first one knew.
-
-So: **when you end a turn to wait, you are not returning.** Call `evor_await_artifact` to
-record what you are blocked on (that is also the signal the Stop hook reads to tell a yield
-from an abandonment), then end the turn. You may emit
+**When you end a turn to wait, you are not returning.** Call `evor_await_artifact` to record
+what you are blocked on (that is also what the stop check reads to tell a yield from an
+abandonment), then end the turn. You may emit
 `{"tick":<n>,"outcome":"yielding","waiting_on":"artifact:forge@tick<n>"}` or ordinary prose —
-the hook no longer enforces a shape on a yield. Do NOT report `failed` for a wait. `failed`
-means the tick cannot be completed at all, which is a different and much rarer thing.
-
-`rejected` and `skipped` were previously indistinguishable from this file, and a
-tier eval graded a model `incorrect` for choosing between them the other way with
-sound reasoning. A rule that is graded but never stated is a rule the system has
-decided not to have — §2, pointed at an agent file.
+no shape is enforced on a yield. Do NOT report `failed` for a wait: main reads a `failed` tick
+as dead and spawns a fresh tick agent, throwing away everything you know. `failed` means the
+tick cannot be completed at all, which is a different and much rarer thing.
 
 Omit `node_id` and `score` entirely when no node was evaluated. **Omit, not
-`null`**: a reader cannot distinguish "not evaluated" from "evaluated as null",
-and the same eval saw a model emit `null` on a defensible reading of "only when".
+`null`**: a reader cannot distinguish "not evaluated" from "evaluated as null".
 `pointers` are the
 `run_id` / `tick` / `agent` triples the orchestrator passes to `evor_read_artifact` when it
 wants detail — they are how detail survives without being carried.

@@ -306,8 +306,8 @@ describe("N-09 — wiki-resolved angles are never re-researched, at any wildness
   const skill = readFileSync(join(REPO, "skills", "evor", "SKILL.md"), "utf8");
 
   function gateBlock(): string {
-    const start = skill.indexOf("P1-8");
-    expect(start, "P1-8 gate not found in skills/evor/SKILL.md — this test is stale").toBeGreaterThan(-1);
+    const start = skill.indexOf("Conditional Sage gate");
+    expect(start, "Conditional Sage gate not found in skills/evor/SKILL.md — this test is stale").toBeGreaterThan(-1);
     const end = skill.indexOf("POST-CONDITION", start);
     return skill.slice(start, end === -1 ? start + 6000 : end);
   }

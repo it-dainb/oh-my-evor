@@ -96,7 +96,7 @@ def validate(source: str, *, target: str) -> list[str]:
         problems.append(
             "polarity is not declared. The contract states label_semantics and the "
             "evaluator must read it rather than assume which pixel value means ink — "
-            "guessing is how a blank white page once scored F 92.32."
+            "a guessed polarity can score a blank page as a near-perfect result."
         )
     return problems
 

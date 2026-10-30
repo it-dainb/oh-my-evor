@@ -13,7 +13,7 @@
   "grounded_rule": {
     "file": "agents/evor-forge.md",
     "quote": "Store job_id for polling. Use only evor_run_status for all status queries.",
-    "sha256_at_authoring": "06e408becea1921eb7822dbd7389ed446659370c26c41a5438b8806352d3afbb"
+    "sha256_at_authoring": "8abd05829b3c7f48bb305bbd61063c6f327d41597175271ccce3a4f6bea732a2"
   },
   "grounding": [
     "field-trace:B-08",
@@ -22,9 +22,9 @@
   ],
   "arms": [
     {
-      "model": "opus",
+      "model": "sonnet",
       "label": "shipped",
-      "effort": "high"
+      "effort": "medium"
     }
   ],
   "repeats": 5,

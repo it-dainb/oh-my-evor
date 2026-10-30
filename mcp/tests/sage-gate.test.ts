@@ -30,8 +30,8 @@ const sage = readFileSync(join(REPO, "agents", "evor-sage.md"), "utf8");
 
 /** The P1-8 gate block, so assertions are scoped to the gate and not the file. */
 function gateBlock(): string {
-  const start = loop.indexOf("P1-8");
-  expect(start, "P1-8 gate not found — this test is stale").toBeGreaterThan(-1);
+  const start = loop.indexOf("Conditional Sage gate");
+  expect(start, "Conditional Sage gate not found — this test is stale").toBeGreaterThan(-1);
   const end = loop.indexOf("POST-CONDITION", start);
   return loop.slice(start, end === -1 ? start + 4000 : end);
 }

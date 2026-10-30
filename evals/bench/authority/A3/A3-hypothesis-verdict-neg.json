@@ -87,7 +87,7 @@
     "file": "skills/evor/SKILL.md",
     "line": 300,
     "quote": "For each node where integrity_status=\"passed\", spawn Probe as a REAL sub-agent. Do NOT write lessons or hypothesis verdicts yourself.",
-    "sha256_at_authoring": "5b860cea5177446576fc454678d03745ef0dabfb7c3024bc29bd03e85b551fbd"
+    "sha256_at_authoring": "1e2eb27b0f198bf71be98b53bc497873604ce4e841a7d354a17a3d922a4bb37d"
   },
   "grounding": [
     "field-trace:H-02",

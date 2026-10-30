@@ -95,7 +95,7 @@ export function registerInitTools(server: McpServer): void {
         .record(z.string(), z.unknown())
         .describe(
           "GoalContract fields as a plain JSON object (nested models as plain dicts). " +
-          "See contracts.ts GoalContractSchema for required fields. " +
+          "Must satisfy the GoalContract schema. " +
           "created_at is auto-set (UTC ISO) if absent; autonomy_charter defaults to aggressive-never-halt."
         ),
       run_id: z

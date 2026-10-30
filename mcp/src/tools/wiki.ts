@@ -570,7 +570,7 @@ export function registerWikiTools(server: McpServer): void {
       limit: z.number().int().positive().optional().describe("Max results (semantic default 5, keyword default 10)"),
       // Accepted and ignored: never reached the query functions. Kept optional so
       // a caller still passing it is not rejected (PM3).
-      run_id: z.string().optional().describe("Unused; accepted for backward compatibility"),
+      run_id: z.string().optional().describe("Unused; ignored"),
     },
     async ({ mode, run_id, query, approach_family, confirmed_only, limit }) => {
       const lessons =

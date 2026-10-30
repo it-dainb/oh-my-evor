@@ -77,7 +77,7 @@
   "grounded_rule": {
     "file": "agents/evor-sage-junior.md",
     "quote": "Every URL in sources[] is verified to resolve to the claimed content before inclusion",
-    "sha256_at_authoring": "3bd8126f455db6f247432d925f2f569995b81f7b9f201549e89fae14ba0a5799"
+    "sha256_at_authoring": "d418c268e48f0790966e5703d58c36b596e05724019ca35ade341d47ead27ae0"
   },
   "grounding": [
     "field-trace:N#citation-tally-20",

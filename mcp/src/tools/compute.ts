@@ -1027,8 +1027,8 @@ export function registerComputeTools(server: McpServer): void {
           `${String(receipt?.sealed_at ?? "an earlier time")} with hash ` +
           `${sealedMain.slice(0, 12)}…, and the file on disk now hashes to ${hash.slice(0, 12)}…. ` +
           `The evaluator changed after it was sealed. Re-sealing would make the changed file ` +
-          `the sealed one and retroactively validate every score recorded under the old anchor — ` +
-          `which is what happened at 23:49 in the field run. If replacing the evaluator is ` +
+          `the sealed one and retroactively validate every score recorded under the old anchor. ` +
+          `If replacing the evaluator is ` +
           `intended, seal it under a NEW eval_version so existing scores keep the evaluator ` +
           `they were measured with.`,
         );

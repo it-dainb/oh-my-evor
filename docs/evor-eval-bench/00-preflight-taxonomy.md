@@ -1522,3 +1522,18 @@ evaluate.py. It was copied from the locked reference during worktree setup." Wor
 moved to forge-junior, so that line became "Do NOT write or edit evaluate.py beyond that
 verbatim copy." The graded invariant (the junior never edits the evaluator) is unchanged, so
 the quote was re-pointed and the scenario was not withdrawn. Neither scenario had been scored.
+
+**2026-10-30 (1.2.17) — shipped arms re-pointed to an operator retier.** The operator moved
+`evor-forge`, `evor-forge-critic`, `evor-forge-architect` and `evor-forge-analyst` from Opus to
+Sonnet (medium effort) and `evor-forge-junior` from Sonnet to Haiku. The 52 scenarios whose first
+arm is labelled `shipped` for those roles now name the new tier. This was a text edit inside that arm
+only; the Haiku arms drop `effort`, which Haiku does not take. `bench-arms.test.ts` requires a
+shipped arm to be the tier that ships. No scenario's subject, expectation or detector changed, and
+none had been scored on the old tiers.
+
+**2026-10-30 (1.2.17) — agent-visible text cleaned of development history; product shas re-pointed.**
+Every agent file, skill and reference doc, and the strings hooks and tools emit to agents, were
+rewritten to remove incident history: dates, mission names, version numbers, finding ids and
+internal paths. Every instruction was kept. Every line the corpus quotes was kept verbatim (checked
+per file), so no quote moved. Product digests were re-pointed by exact path/digest pairing across
+all groups, with 0 mismatches after.

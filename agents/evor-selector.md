@@ -53,7 +53,7 @@ disallowedTools: Write, Edit
   </Constraints>
 
   <Fast_Path_Gate>
-    **P1-13 — Call `evor_validate_proposals` FIRST (before any gate logic).**
+    **Call `evor_validate_proposals` FIRST (before any gate logic).**
 
     Call `evor_validate_proposals({ run_id, tick })` before evaluating any gate. This
     deterministic MCP tool reads all proposals for the tick and classifies each as:
@@ -67,7 +67,7 @@ disallowedTools: Write, Edit
     Only `"needs_llm"` proposals enter the LLM gate loop. This eliminates full LLM evaluation
     cost for structurally clean, low-risk proposals — the most expensive step in the Selector loop.
 
-    **P1-7 — Deterministic pre-screen (run BEFORE full LLM evaluation).**
+    **Deterministic pre-screen (run BEFORE full LLM evaluation).**
 
     For `"needs_llm"` proposals (and as the reference logic `evor_validate_proposals` runs
     internally), Gates H001, H002, H003, H004, Schema, Instrumentation, and Gotcha Avoidance
@@ -130,7 +130,7 @@ disallowedTools: Write, Edit
     - If the set has 2+ proposals: at most ⌊N/2⌋ proposals may share the same parent_id (N = total proposals in tick).
     - Example: 3 proposals → at most 1 can share the same parent_id. 2 proposals → at most 1 shared parent.
     - Fail condition: more than ⌊N/2⌋ proposals have identical parent_id.
-    - Pass condition: parent diversity is maintained, OR the tick has only 1 proposal (trivially passes), OR all proposals have distinct parent_ids, OR the frontier has fewer than 2 nodes (read it with evor_tree_read). With one frontier node every proposal must share that parent, so the cap cannot be met. Failing H004 there rejects every tick, which is what tick 3 of the 2026-10-30 binarization mission did.
+    - Pass condition: parent diversity is maintained, OR the tick has only 1 proposal (trivially passes), OR all proposals have distinct parent_ids, OR the frontier has fewer than 2 nodes (read it with evor_tree_read). With one frontier node every proposal must share that parent, so the cap cannot be met, and failing H004 there would reject every tick.
     - Note: if a proposal's parent_id is null/absent (crossover or root node), treat it as a distinct parent for counting purposes.
 
     **Gate — Integrity Risk:**
@@ -202,7 +202,7 @@ disallowedTools: Write, Edit
 
   <Output_Format>
     The verdict.json artifact written via evor_write_artifact(agent="selector") has EXACTLY
-    this shape — this is the enforced contract (SelectorVerdict in harness/evor/contracts.py),
+    this shape — this is the enforced contract (SelectorVerdict),
     not a suggestion. A malformed verdict is rejected at write time with an error naming the
     offending field:
     ```json
@@ -238,18 +238,11 @@ disallowedTools: Write, Edit
     node; `winner` is the primary among them and orders lineage. It must be one
     of the selected.
 
-    "At most one selected" is what this file used to say, while
-    `skills/evor/SKILL.md` said "one Forge per approved proposal (up to
-    `ResourcePlan.concurrency`)" — two documents, two beliefs about how many
-    candidates a tick trains. In the field you approved h001 AND h003, marked
-    both selected (correctly, by the SKILL's rule; in violation of this file's),
-    and the write-time validator accepted it because nothing checked. Only h001
-    was forged. h003 was parked in a `carry_forward` key defined in no skill, no
-    agent file and no contract, and nothing ever read it.
-
+    The tick runs one Forge per selected proposal (up to `ResourcePlan.concurrency`).
     An approved proposal you do not select is an approved proposal that
-    disappears. So: select it, or reject it with a `rejection_reason` that says
-    why. `SelectorVerdict` now rejects the third option — approved, unselected,
+    disappears; no other key (such as `carry_forward`) is read. So: select it, or
+    reject it with a `rejection_reason` that says why. `SelectorVerdict` rejects
+    the third option — approved, unselected,
     unexplained — and rejects a winner who is not among the selected. Do NOT add a top-level `critic_approved` field
     to a review record and do NOT rename `reviews` (e.g. `per_proposal_reviews`)
     or hoist gate results out of `critic_review` to the top level of a review —

@@ -60,7 +60,7 @@ under the MCP prefix — the bare `evor_<name>` is not a name any tool has. See 
 | `evor_store_blob` | Store a file or text blob in the content-addressed store; returns `content_ref` |
 | `evor_telemetry_ingest` | Validate and append telemetry records for a node |
 
-### Candidate Telemetry (§19 — no evor import required)
+### Candidate Telemetry (no evor import required)
 
 The harness exports three env vars into every training subprocess before it starts:
 
@@ -140,7 +140,7 @@ For the full signal vocabulary (shapes, axes, severity, kind catalogue), read `a
 |---|---|
 | `evor_run_start` | **Evaluate an already-trained candidate** — runs the sealed `evaluate.py` as a detached job; returns `{job_id, status_path, log_path}` immediately. Does NOT train. |
 | `evor_run_status` | Read run progress and tail the log for a running or completed job |
-| `evor_wait` | **Block inside your turn** until a job finishes (`job_id`), a process exits (`pid`) or a tick artifact is written (`artifact: {tick, agent, kind?}`, plus `producer_agent_id` so a child that exits without writing returns `producer_stopped: true` at once), or a child agent finishes (`agent_id`: returns its final message as `result`; use it for children with no artifact slot, such as forge-junior). Up to 540 s per call (default 300); on `done:false` call it again. This is how every agent waits. |
+| `evor_wait` | **Block inside your turn** until a job finishes (`job_id`), a process exits (`pid`) or a tick artifact is written (`artifact: {tick, agent, kind?}`, plus `producer_agent_id` so a child that exits without writing returns `producer_stopped: true` at once), or a child agent finishes (`agent_id`: returns its final message as `result`; use it for children with no artifact slot, such as forge-junior). Up to 540 s per call (default 300); on `done:false` call it again. For an agent WITHOUT Bash waiting on a short job. With Bash, a background Bash task that exits with the work wakes you once at no cost; for a child agent, end your turn. |
 | `evor_schedule` | Submit a training job to the run scheduler; returns `{job_id, pid}` |
 | `evor_meta_evolve` | Update the search strategy from the current frontier (meta-evolution of the search policy) |
 | `evor_plot_report` | Render the evolution tree as PNG and/or HTML; writes to `report/` under the run directory |
@@ -201,7 +201,7 @@ For brownfield missions, call `evor_distill_scan` before `evor_init_run` to prod
 
 Use these platform tools directly — do not replicate their behavior in MCP.
 
-- **Waiting: `evor_wait`, never your turn ending.** To wait for a job, a trainer process or another agent's artifact, call `evor_wait` and call it again while it returns `done:false`. Do not end your turn to wait, and do not arm a `Monitor` and stop: both depend on a notice reaching you, and in the 2026-10-30 binarization mission one sat queued for 80 minutes while another wait (a job) had no notice at all. `evor_run_status` then reads the finished job's state, metrics and error signature. Do not tail log files by hand; the tool owns the run's internals.
+- **Waiting.** On a child agent: end your turn; the CLI wakes you when it finishes. On a trainer or an `evor_run_start` job, if you have Bash: start ONE background Bash task that exits when the work does (the trainer itself, or `until ! grep -q '"state": "running"' <run_dir>/jobs/<id>/status.json; do sleep 30; done`) and end your turn. You are woken once, with no calls in between, however long the work takes. Without Bash, wait on a short job with `evor_wait({ job_id, wait_s: 540 })`. Never arm a `Monitor` and stop: its final notice can sit queued long after the work ends. `evor_run_status` reads the finished job's state, metrics and error signature. Do not tail log files by hand; the tool owns the run's internals.
 - **`AskUserQuestion`** — Capture the mission goal, metric, budget, and autonomy level at setup; any human decision or consent gate. Do not use in the autonomous hot-loop.
 - **`PushNotification`** — Fire when a run finishes, crashes, hits an OOM, achieves a breakthrough (best-score jump), or reaches a human gate. Use for state changes the user would act on.
 - **`TaskCreate` / `TaskList` / `TaskUpdate` / `TaskStop`** — Track per-tick candidates and phase progress as a visible task list. Use `TaskStop` to abort a runaway sub-agent on a `severity=critical` signal.
@@ -239,12 +239,8 @@ is the MCP server namespace plus the tool's own name, so `evor_` appears twice. 
 matches the exact registered name, and the bare `evor_<name>` is not a name any tool has —
 so `select:evor_write_artifact` resolves nothing.
 
-It does so **silently**. It is not an error, just an empty result, which is why this cost a
-real mission: Mutagen needed `evor_write_artifact`, issued five `ToolSearch` calls for the
-bare name exactly as this file used to instruct, re-read the skill, tried the CLI, and
-finally delegated the write to another agent. A `general-purpose` helper in the same run
-asked for the prefixed name and had the tool on its first try. Mutagen never held the tool
-it was told to use — a discovery defect, not misuse.
+It does so **silently**: not an error, just an empty result. Repeating the bare-name search
+will never load the tool — always ask for the prefixed name.
 
 Load schemas before first use:
 

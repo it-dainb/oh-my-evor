@@ -2,6 +2,99 @@
 
 All notable changes to Evor. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.2.17] — 2026-10-30 — one forge report per candidate
+
+Found in tick 4 of the binarization mission, the first tick with two selected proposals.
+
+### Changed
+
+- **Forge-family model tiers (operator choice):** `evor-forge`, `evor-forge-critic`,
+  `evor-forge-architect` and `evor-forge-analyst` move from Opus to Sonnet (Forge's effort from high to medium), and `evor-forge-junior`
+  from Sonnet to Haiku. Haiku takes no `effort`, so the junior's `effort: low` is dropped. These
+  tiers have not been measured: `docs/v1-cost-and-verification.md` marks them as operator-set and
+  unmeasured, and the 8.1 rows for the three reviewers are re-recorded as stale.
+
+### Added
+
+- **`python -m evor.watch`: stop a training run that has stopped learning.** forge-junior runs it
+  as the one background task it waits on, with the trainer detached. It exits when the trainer
+  does, or early with a verdict:
+  - `stalled`: validation has set no new best in 5 evaluations. The `diagnosis` is `overfitting`
+    (train loss still falling, or the train-val gap widening) or `underfitting` (both flat).
+  - `diverged`: NaN/inf loss, or loss far above its best.
+  - `stuck`: the trainer is alive but writes no telemetry.
+
+  The junior stops the trainer, keeping its best checkpoint, and reports the verdict. Forge records
+  it as `early_stop` and emits a `learning-stall` signal with the verdict's `next_tick_hint`, so the
+  next proposal can act on it. The watcher never changes the learning rate or anything else
+  mid-run: that would change the experiment and make the result unattributable. Replayed on tick 4's
+  real telemetry, it flags `overfitting` at step ~28,000 of 60,000. That run's validation peaked at
+  12,000 while train loss kept falling, so roughly half of its compute was spent for no gain.
+
+### Changed
+
+- **Agent-visible text carries no development history.** The agent files, skills, commands and
+  reference docs had accumulated incident dates, mission names, tick anecdotes, plugin and CLI
+  version numbers, finding ids and paths into the plugin's own source. So had the strings the
+  hooks and tools emit to agents: deny reasons, nudges, stop blocks and tool descriptions. An agent
+  that knows how its governor is built studies it instead of doing its job: one Forge grepped the
+  governor to get past a denial. These surfaces now state each rule in the present tense, with at
+  most a one-clause domain reason. The history stays in this changelog and in code comments.
+  `agent-visible-no-leaks.test.ts` enforces it, for markdown and for emitted strings in the hooks
+  and MCP tools.
+
+### Fixed
+
+- **The completeness check reported every candidate as missing a node.** The server assigns
+  each proposal a hypothesis id distinct from its proposal id, and nodes are recorded with that
+  hypothesis id. Matching selected proposals by proposal id alone failed on both of tick 4's
+  candidates, although both were trained, evaluated and integrity-checked. A proposal now matches
+  by either id.
+- **Two candidates shared one forge report.** A tick forges every selected proposal, but the
+  forge-family slots (`forge`, `forge-critic`, `forge-architect`, `forge-analyst`) were one fixed
+  file per tick, so the second Forge's report overwrote the first's. With `kind=<node name>` each
+  candidate's artifacts now go under `ticks/<t>/forge/<node>/`, in both the Python and TypeScript
+  path maps; without a kind the path is unchanged. The agents are told to pass it, and the hooks
+  that check for a Forge report accept either layout.
+- **Agents polled `evor_wait` on their own children.** On CLI 2.1.314 a sub-agent that ends its
+  turn is woken when its child finishes; the field log shows it four times in a row. The CLI then
+  shows "Waiting for N background agents" and spends nothing while waiting. Polling cost a turn
+  and a context re-send per call: five calls in five minutes in tick 4. Agents now end their turn
+  to wait on a child. `evor_wait` is kept for jobs and processes, which wake nobody, with
+  `wait_s: 540`.
+- **Long jobs would have cost a poll every nine minutes.** At 540 s per `evor_wait` call, a
+  12-hour training run is about 80 calls. Agents with Bash now wait with ONE background Bash task
+  that exits when the work does: the trainer itself (forge-junior), or an `until` loop over the
+  job's `status.json` (Forge). They then end their turn and are woken once, with no calls in
+  between. This was verified on CLI 2.1.314: a sub-agent was woken 2 s after its background task
+  finished. `evor_wait` remains for the tick, which has no Bash, and its short re-scores. The
+  job-launch nudge says the same.
+- **forge-junior's trainer launch was refused.** The launch redirected the trainer's log and
+  later ran `head -1 $T` on the node's telemetry file. The guard read the whole command as one
+  unit, so the redirect made `$T`, which is under `.evor/runs`, a "write". Statements are now judged
+  separately; that whole-command pass existed only for `python -c` code, which is now lifted out
+  on its own. `NAME=/path` assignments are not targets. A real write through a variable is still
+  refused.
+- **A denied agent studied the governor to get past it.** After the wrongful trainer-launch
+  denial, Forge spent its turns grepping `pre-tool-use.mjs` and `write-targets.mjs` for a route
+  through. Every denial now says it is already recorded as a signal, and that a wrong one should
+  be reported or routed around, not reverse-engineered.
+- **The `[EVOR RESUME]` hint fired where no EVOR run exists**, and sent an unrelated session
+  looking for a run id.
+- **A never-halt mission could not ask a person who had just typed.** The user asked to drop a
+  "leaf" domain, there were two, and the clarifying question was denied. Asking is now allowed
+  when the current turn was started by a typed message; questions on autonomous turns are still
+  denied.
+- **Probe hit its 14-turn cap mid-analysis** and returned a partial result. The cap is now 24.
+- **Forge was truncated at its 45-turn cap**, with 83 turns used and no report written, while its waits were
+  still polled. Waits no longer cost turns, and the cap is now 60.
+- **The `evor_run_start` nudge told agents to end their turn and Monitor.** That is the pattern
+  that stalled the field run. It now says to wait with one background Bash task (with Bash) or
+  `evor_wait({ job_id, wait_s: 540 })` (without).
+- **"artifact not confirmed" fired on successful partial writes.** The check looked at the final
+  path; a `partial: true` write goes to `<stem>-partial.json`, and a kind-filed forge write goes to
+  `forge/<kind>/`.
+
 ## [1.2.16] — 2026-10-30 — resumes start clean; heredoc bodies are not shell
 
 Found resuming the binarization mission and in its tick 4.

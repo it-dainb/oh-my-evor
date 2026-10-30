@@ -21161,7 +21161,7 @@ var MutationLocusSchema = external_exports.discriminatedUnion("family", [
 var TreeNodeSchema = external_exports.object({
   id: external_exports.string().uuid(),
   name: external_exports.string().optional().describe(
-    "Human-readable node slug the agent coined (e.g. 'immune-memory-02'). Optional; when set, every node tool accepts it in place of the UUID (P2-1)."
+    "Human-readable node slug the agent coined (e.g. 'immune-memory-02'). Optional; when set, every node tool accepts it in place of the UUID."
   ),
   parent_ids: external_exports.array(external_exports.string()),
   approach_family: ApproachFamilySchema,
@@ -22335,7 +22335,7 @@ function registerRecordTools(server) {
               run_id,
               pending_remaining: pendingRemaining,
               telemetry_path: telemetryPath,
-              telemetry_note: "Export this EXACTLY as EVOR_TELEMETRY_PATH for the training subprocess. Do not rebuild it from the node name \u2014 that is what split one node across two directories and failed a node with 12,000 telemetry records."
+              telemetry_note: "Export this EXACTLY as EVOR_TELEMETRY_PATH for the training subprocess. Do not rebuild it from the node name \u2014 a rebuilt path can split one node's telemetry across two directories."
             })
           }
         ]
@@ -22992,7 +22992,7 @@ function registerWikiTools(server) {
       limit: external_exports.number().int().positive().optional().describe("Max results (semantic default 5, keyword default 10)"),
       // Accepted and ignored: never reached the query functions. Kept optional so
       // a caller still passing it is not rejected (PM3).
-      run_id: external_exports.string().optional().describe("Unused; accepted for backward compatibility")
+      run_id: external_exports.string().optional().describe("Unused; ignored")
     },
     async ({ mode, run_id, query, approach_family, confirmed_only, limit }) => {
       const lessons = mode === "keyword" ? wikiQuery(query, { family: approach_family, confirmedOnly: confirmed_only, limit }) : wikiGetRelevant(query, limit ?? 5);
@@ -23110,13 +23110,13 @@ var RunStatePatchSchema = external_exports.object({
     "Mission lifecycle state (draft, locked, running, paused, completed, failed). If set, patches the mission's status (gate: draft\u2192locked requires contract validation)."
   ),
   mission_status_reason: external_exports.string().optional().describe(
-    "Why a mission reached this status. Recorded with the transition. The field run's reason was typed into the artifact by hand 14h39m later, because the tool surface had no way to express it (I-11)."
+    "Why a mission reached this status. Recorded with the transition."
   ),
   superseded_by: external_exports.string().optional().describe(
-    "Mission id that supersedes this one. r1 -> r2 -> r3 were three attempts at one goal and there was no supported way to link them, so the link was hand-written into the state file after the fact."
+    "Mission id that supersedes this one. Use it to link successive attempts at one goal."
   ),
   reason: external_exports.string().optional().describe(
-    "Why this transition is being made. Recorded in transitions.jsonl at the moment of the write, never backfilled. K-08's supersession reason had to be reconstructed afterwards by a human editing JSON in vim, because nothing captured it when it happened."
+    "Why this transition is being made. Recorded in transitions.jsonl at the moment of the write, never backfilled."
   ),
   active_run: external_exports.object({
     mission_id: external_exports.string(),
@@ -23288,7 +23288,7 @@ function assertStateRootOutsidePlugin(runDir) {
   const pluginsAt = parts.lastIndexOf("plugins");
   if (pluginsAt >= 0 && ["cache", "marketplaces"].includes(parts[pluginsAt + 1] ?? "")) {
     throw new Error(
-      `refusing to write run state inside the plugin install (${parts.slice(0, pluginsAt + 2).join(import_path9.sep)}). A run recorded there is destroyed by the next plugin update and leaks into every project that installs the plugin \u2014 which is how the decoy .evor/ that Q-01's hooks read for 19 hours came to exist. Set EVOR_ROOT to a directory in the PROJECT, or run from the project directory.`
+      `refusing to write run state inside the plugin install (${parts.slice(0, pluginsAt + 2).join(import_path9.sep)}). A run recorded there is destroyed by the next plugin update and leaks into every project that installs the plugin. Set EVOR_ROOT to a directory in the PROJECT, or run from the project directory.`
     );
   }
   for (const root of [process.env.CLAUDE_PLUGIN_ROOT, process.env.EVOR_PLUGIN_ROOT].filter(Boolean)) {
@@ -23576,7 +23576,7 @@ function registerStateTools(server) {
   );
   server.tool(
     "evor_state_write",
-    "Merge-patch the run's RunState with the given fields. Optional side-effects: strategy\u2192strategy.json, mission_status\u2192mission-state.json, active_run\u2192active-run.json (include job_id to enable monitor lookup), tick_state\u2192tick-state.json (atomic; 10 read sites per tick).",
+    "Merge-patch the run's RunState with the given fields. Optional side-effects: strategy\u2192strategy.json, mission_status\u2192mission-state.json, active_run\u2192active-run.json (include job_id to enable monitor lookup), tick_state\u2192tick-state.json (atomic).",
     {
       run_id: external_exports.string().describe("Active run identifier"),
       patch: RunStatePatchSchema.describe("Fields to merge into the RunState")
@@ -23636,7 +23636,7 @@ function registerStateTools(server) {
   );
   server.tool(
     "evor_lock_mission",
-    "Validate the run's goal-contract, frozen splits, tree, and run-state via the harness, then atomically flip mission-state.json status to 'locked' on pass. Returns { ok, mission_status, validation_report } on success; { ok:false, error, validation_report } when validation fails (status stays draft). Replaces agent self-lock \u2014 always call this instead of writing mission_status='locked' directly.",
+    "Validate the run's goal-contract, frozen splits, tree, and run-state via the harness, then atomically flip mission-state.json status to 'locked' on pass. Returns { ok, mission_status, validation_report } on success; { ok:false, error, validation_report } when validation fails (status stays draft). Always call this instead of writing mission_status='locked' directly.",
     {
       run_id: external_exports.string().describe("Active run identifier"),
       mission_id: external_exports.string().optional().describe("Mission identifier (inferred when omitted)")
@@ -23656,7 +23656,7 @@ function registerStateTools(server) {
   );
   server.tool(
     "evor_check_stop",
-    "Evaluate all stop conditions for the run (beat-baseline, target, evolve-n, maximize-under-budget, evolve-until-plateau, evolve-until-regression, worst-angle-plateau, coverage-target) plus the circuit-breaker override. Returns { should_stop, reason, tick_count, best_score, frontier_count, budget_remaining }. Replaces inline stop predicates in the evor skill; call once per tick before proposing.",
+    "Evaluate all stop conditions for the run (beat-baseline, target, evolve-n, maximize-under-budget, evolve-until-plateau, evolve-until-regression, worst-angle-plateau, coverage-target) plus the circuit-breaker override. Returns { should_stop, reason, tick_count, best_score, frontier_count, budget_remaining }. Call once per tick before proposing.",
     {
       run_id: external_exports.string().describe("Active run identifier"),
       mission_id: external_exports.string().optional().describe("Mission identifier (inferred when omitted)")
@@ -24102,7 +24102,7 @@ function registerSignalTools(server) {
   );
   server.tool(
     "evor_signal_digest",
-    "Return a compact top-slice of the signal bus for spawn-prompt injection. Defaults to severity>=medium so low-noise signals never flood a digest. Equivalent to Python SignalBus.digest(). Drains inbox first.",
+    "Return a compact top-slice of the signal bus for spawn-prompt injection. Defaults to severity>=medium so low-noise signals never flood a digest. Drains inbox first.",
     {
       run_id: external_exports.string().describe("Active run identifier"),
       mission_id: external_exports.string().optional().describe("Mission identifier (resolved automatically when omitted)"),
@@ -24162,7 +24162,7 @@ function registerInitTools(server) {
     ].join(" "),
     {
       answers: external_exports.record(external_exports.string(), external_exports.unknown()).describe(
-        "GoalContract fields as a plain JSON object (nested models as plain dicts). See contracts.ts GoalContractSchema for required fields. created_at is auto-set (UTC ISO) if absent; autonomy_charter defaults to aggressive-never-halt."
+        "GoalContract fields as a plain JSON object (nested models as plain dicts). Must satisfy the GoalContract schema. created_at is auto-set (UTC ISO) if absent; autonomy_charter defaults to aggressive-never-halt."
       ),
       run_id: external_exports.string().optional().describe("Override the auto-generated run ID (default: <mission_id>-<UTC compact timestamp>)"),
       mission_id: external_exports.string().optional().describe("Override the mission_id from answers (takes precedence over answers.mission_id)"),
@@ -24298,6 +24298,8 @@ function readArtifact(runId, tick, agent, kind, partial2, missionId) {
 function artifactPathFor(runDir, tick, agent, kind) {
   const slug = (kind ?? "").replace(/[^a-zA-Z0-9._-]+/g, "-").replace(/^-+|-+$/g, "");
   const base = (0, import_path15.join)(runDir, "ticks", String(tick));
+  const forgeSlug = (kind ?? "").toLowerCase().replace(/[^\w-]/g, "-").replace(/^-+|-+$/g, "");
+  const forgeDir = forgeSlug && /^forge(-architect|-critic|-analyst)?$/.test(agent) ? (0, import_path15.join)("forge", forgeSlug) : "forge";
   switch (agent) {
     case "mutagen":
       return (0, import_path15.join)(base, "mutagen", "proposals.json");
@@ -24310,13 +24312,13 @@ function artifactPathFor(runDir, tick, agent, kind) {
     case "sage-junior":
       return (0, import_path15.join)(base, "sage", "juniors", `${slug || "findings"}.json`);
     case "forge":
-      return (0, import_path15.join)(base, "forge", "forge-report.json");
+      return (0, import_path15.join)(base, forgeDir, "forge-report.json");
     case "forge-architect":
-      return (0, import_path15.join)(base, "forge", "architect.json");
+      return (0, import_path15.join)(base, forgeDir, "architect.json");
     case "forge-critic":
-      return (0, import_path15.join)(base, "forge", "critic.json");
+      return (0, import_path15.join)(base, forgeDir, "critic.json");
     case "forge-analyst":
-      return (0, import_path15.join)(base, "forge", "analyst.json");
+      return (0, import_path15.join)(base, forgeDir, "analyst.json");
     case "acquirer":
       return (0, import_path15.join)(base, "acquirer", `${slug || "acquisition"}.json`);
     default:
@@ -24801,6 +24803,16 @@ function selectedProposals(runDir, tick) {
   const reviews = Array.isArray(verdict?.reviews) ? verdict.reviews : [];
   return reviews.filter((r) => r?.selected).map((r) => String(r?.proposal_id ?? "")).filter(Boolean);
 }
+function hypothesisIds(runDir, tick) {
+  const doc = readJson((0, import_path18.join)(runDir, "ticks", String(tick), "mutagen", "proposals.json"));
+  const items = Array.isArray(doc) ? doc : Array.isArray(doc?.proposals) ? doc.proposals : [];
+  const m = /* @__PURE__ */ new Map();
+  for (const p of items) {
+    const pid = p?.proposal_id, hid = p?.hypothesis?.id;
+    if (typeof pid === "string" && typeof hid === "string") m.set(pid, hid);
+  }
+  return m;
+}
 function treeNodes(runDir) {
   const tree = readJson((0, import_path18.join)(runDir, "tree.json"));
   const raw = tree?.nodes ?? {};
@@ -24810,9 +24822,11 @@ function owed(runDir, tick) {
   const selected = selectedProposals(runDir, tick);
   if (selected.length === 0) return [];
   const nodes = treeNodes(runDir);
+  const hyp = hypothesisIds(runDir, tick);
   const out = [];
   for (const proposalId of selected) {
-    const node = nodes.find((n) => n && String(n.hypothesis_id ?? "") === proposalId);
+    const ids = new Set([proposalId, hyp.get(proposalId)].filter(Boolean));
+    const node = nodes.find((n) => n && ids.has(String(n.hypothesis_id ?? "")));
     if (!node) {
       out.push({ proposal_id: proposalId, missing: ["node"] });
       continue;
@@ -25401,7 +25415,7 @@ function registerComputeTools(server) {
       }
       if (sealedMain && sealedMain !== hash) {
         return err2(
-          `refusing to re-seal ${eval_version}: this run sealed it at ${String(receipt?.sealed_at ?? "an earlier time")} with hash ${sealedMain.slice(0, 12)}\u2026, and the file on disk now hashes to ${hash.slice(0, 12)}\u2026. The evaluator changed after it was sealed. Re-sealing would make the changed file the sealed one and retroactively validate every score recorded under the old anchor \u2014 which is what happened at 23:49 in the field run. If replacing the evaluator is intended, seal it under a NEW eval_version so existing scores keep the evaluator they were measured with.`
+          `refusing to re-seal ${eval_version}: this run sealed it at ${String(receipt?.sealed_at ?? "an earlier time")} with hash ${sealedMain.slice(0, 12)}\u2026, and the file on disk now hashes to ${hash.slice(0, 12)}\u2026. The evaluator changed after it was sealed. Re-sealing would make the changed file the sealed one and retroactively validate every score recorded under the old anchor. If replacing the evaluator is intended, seal it under a NEW eval_version so existing scores keep the evaluator they were measured with.`
         );
       }
       try {
@@ -25952,7 +25966,7 @@ function registerGotchaTools(server) {
       "Store a file or text blob durably so it can be referenced across nodes and runs.",
       "Identical blobs are stored only once (dedup). Returns acquisition_id as the logical handle",
       "to pass to evor_record_node or store in tree artifacts.",
-      "If acquisition_id is provided, the blob is registered under the 'train' namespace (ADR-015 enforcement)."
+      "If acquisition_id is provided, the blob is registered under the 'train' namespace."
     ].join(" "),
     {
       run_id: external_exports.string().describe("Active run identifier"),

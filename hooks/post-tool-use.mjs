@@ -409,7 +409,13 @@ try {
       'forge-critic':    `ticks/${tick2}/forge/critic.json`,
       'forge-analyst':   `ticks/${tick2}/forge/analyst.json`,
     };
-    const relPath = SLOT_PATHS[agentSlot];
+    let relPath = SLOT_PATHS[agentSlot];
+    // A partial write lands at <stem>-partial.json, and a forge-family write with a
+    // kind lands under forge/<kind>/. Checking the final default path for those
+    // warned "not confirmed" on writes that had succeeded (binarization, tick 4).
+    if (relPath && toolInpR?.partial) relPath = relPath.replace(/\.json$/, '-partial.json');
+    const kindR = String(toolInpR?.kind ?? '').toLowerCase().replace(/[^\w-]/g, '-').replace(/^-+|-+$/g, '');
+    if (relPath && kindR && /^forge/.test(agentSlot)) relPath = relPath.replace(/\/forge\//, `/forge/${kindR}/`);
     if (relPath) {
       const artPath = pathJoin(runDir(runId2), relPath);
       if (!fsExists(artPath)) {
@@ -467,8 +473,10 @@ try {
     if (!isThrottled('run_start:launched')) {
       markThrottled('run_start:launched');
       const nudge =
-        `[EVOR REFLEX] Job launched — poll with evor_run_status (no arguments needed beyond the active run). ` +
-        `Do NOT block or tight-loop poll. Use the native Monitor tool to watch for progress and completion. ` +
+        `[EVOR REFLEX] Job launched. No host task tracks it, so nothing wakes you by itself. With Bash: ` +
+        `start ONE background Bash task, until ! grep -q '"state": "running"' <run_dir>/jobs/<job_id>/status.json; ` +
+        `do sleep 30; done, and end your turn; you are woken once when it exits. Without Bash: ` +
+        `evor_wait({ job_id, wait_s: 540 }). Never arm a Monitor and stop. ` +
         `When the run succeeds → call evor_record_eval; when it fails → call evor_signal_emit(kind="runtime-failure") + PushNotification.`;
       process.stdout.write(
         JSON.stringify({

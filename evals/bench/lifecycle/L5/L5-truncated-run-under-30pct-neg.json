@@ -82,7 +82,7 @@
   "grounded_rule": {
     "file": "agents/evor-probe.md",
     "quote": "Declaring `hypothesis_verdict=\"confirmed\"` when fewer than 30% of expected training steps completed: a truncated run cannot confirm a hypothesis; use \"inconclusive\" and note the step count in the evidence field.",
-    "sha256_at_authoring": "46d3063c5277c49e60eafbb03d9ae2757d80c6a9c45712861ea63e79899d874e"
+    "sha256_at_authoring": "b87081bd12e065557ca1a44f8389373ee97071456df473f677c0c1903d726d72"
   },
   "grounding": [
     "field-trace:M-06",
@@ -106,15 +106,15 @@
     "guarded_paths": [
       {
         "path": "agents/evor-probe.md",
-        "sha256": "46d3063c5277c49e60eafbb03d9ae2757d80c6a9c45712861ea63e79899d874e"
+        "sha256": "b87081bd12e065557ca1a44f8389373ee97071456df473f677c0c1903d726d72"
       },
       {
         "path": "skills/evor/SKILL.md",
-        "sha256": "5b860cea5177446576fc454678d03745ef0dabfb7c3024bc29bd03e85b551fbd"
+        "sha256": "1e2eb27b0f198bf71be98b53bc497873604ce4e841a7d354a17a3d922a4bb37d"
       },
       {
         "path": "hooks/stop.mjs",
-        "sha256": "df5506cd3411a175c2446660c138f550b2123f6f636170ce292bb8f18f65cea3"
+        "sha256": "d7667d65cf972c6e7a0bb7affb74130b503c6f8b5c4b221c41dd3326b549a686"
       }
     ],
     "follow_ups": []

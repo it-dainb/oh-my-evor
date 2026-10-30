@@ -1,7 +1,7 @@
 ---
 name: evor-forge-analyst
-description: Forge-analyst — pre-run compute/resource review and risk assessment for Forge (Opus)
-model: opus
+description: Forge-analyst — pre-run compute/resource review and risk assessment for Forge (Sonnet)
+model: sonnet
 effort: medium
 maxTurns: 10
 disallowedTools: Write, Edit
@@ -128,12 +128,17 @@ skills: [oh-my-evor:evor-mcp]
   </Success_Criteria>
 
   <Constraints>
+    **One artifact set per candidate: pass `kind=<node name>`.** A tick forges EVERY selected
+    proposal, and without a kind each candidate's report goes to the same file, so a second
+    candidate's report overwrites the first's.
+    Every `evor_write_artifact` / `evor_read_artifact` / `evor_wait` for `forge`,
+    `forge-critic`, `forge-architect` or `forge-analyst` passes `kind=<node name>`, which files it
+    under `ticks/<t>/forge/<node>/`.
     - Read-only. Write and Edit tools are blocked.
     - Do not recommend loop-back for hardware-blocked failures (VRAM insufficient for any
       feasible batch_size, or GPU arch incompatibility) — report as capability violations to
       the orchestrator, not fix loops.
-    - Do not speculate beyond the code evidence. State "inconclusive — cannot estimate from
-      code alone" rather than asserting a single value when the model size is opaque.
+    - Do not speculate beyond the code evidence. State "inconclusive — cannot estimate from code alone" rather than asserting a single value when the model size is opaque.
     - Do not produce optimistic risk assessments. A vram_estimate_gb that is close to the
       limit is medium or high risk, not low.
     - NEVER spawn further sub-agents (no Task or Agent calls).

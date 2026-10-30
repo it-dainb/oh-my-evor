@@ -118,7 +118,7 @@
   "grounded_rule": {
     "file": "agents/evor-tick.md",
     "quote": "Never\nreport a tick as successful because artifacts exist — a tick is successful when the evaluation\nrecorded a score, not when the files were written.",
-    "sha256_at_authoring": "16c4f75bd7f2e18ca65ced34fe233238407872872dc8a922f8f239bf84a07aa8"
+    "sha256_at_authoring": "25a5648b5abb9cce637bc735ec217b09bd24c388d564bb30e1701f0827955f16"
   },
   "grounding": [
     "field-trace:O-03",
@@ -142,15 +142,15 @@
     "guarded_paths": [
       {
         "path": "agents/evor-tick.md",
-        "sha256": "16c4f75bd7f2e18ca65ced34fe233238407872872dc8a922f8f239bf84a07aa8"
+        "sha256": "25a5648b5abb9cce637bc735ec217b09bd24c388d564bb30e1701f0827955f16"
       },
       {
         "path": "skills/evor/SKILL.md",
-        "sha256": "5b860cea5177446576fc454678d03745ef0dabfb7c3024bc29bd03e85b551fbd"
+        "sha256": "1e2eb27b0f198bf71be98b53bc497873604ce4e841a7d354a17a3d922a4bb37d"
       },
       {
         "path": "hooks/stop.mjs",
-        "sha256": "df5506cd3411a175c2446660c138f550b2123f6f636170ce292bb8f18f65cea3"
+        "sha256": "d7667d65cf972c6e7a0bb7affb74130b503c6f8b5c4b221c41dd3326b549a686"
       }
     ],
     "follow_ups": []

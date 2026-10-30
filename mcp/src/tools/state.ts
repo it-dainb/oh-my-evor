@@ -91,25 +91,21 @@ export const RunStatePatchSchema = z.object({
     .string()
     .optional()
     .describe(
-      "Why a mission reached this status. Recorded with the transition. The field " +
-      "run's reason was typed into the artifact by hand 14h39m later, because the " +
-      "tool surface had no way to express it (I-11).",
+      "Why a mission reached this status. Recorded with the transition.",
     ),
   superseded_by: z
     .string()
     .optional()
     .describe(
-      "Mission id that supersedes this one. r1 -> r2 -> r3 were three attempts at " +
-      "one goal and there was no supported way to link them, so the link was " +
-      "hand-written into the state file after the fact.",
+      "Mission id that supersedes this one. Use it to link successive attempts at " +
+      "one goal.",
     ),
   reason: z
     .string()
     .optional()
     .describe(
       "Why this transition is being made. Recorded in transitions.jsonl at the moment " +
-      "of the write, never backfilled. K-08's supersession reason had to be reconstructed " +
-      "afterwards by a human editing JSON in vim, because nothing captured it when it happened.",
+      "of the write, never backfilled.",
     ),
   active_run: z
     .object({
@@ -431,8 +427,7 @@ function assertStateRootOutsidePlugin(runDir: string): void {
     throw new Error(
       `refusing to write run state inside the plugin install (${parts.slice(0, pluginsAt + 2).join(sep)}). ` +
       `A run recorded there is destroyed by the next plugin update and leaks into ` +
-      `every project that installs the plugin — which is how the decoy .evor/ that ` +
-      `Q-01's hooks read for 19 hours came to exist. Set EVOR_ROOT to a directory in ` +
+      `every project that installs the plugin. Set EVOR_ROOT to a directory in ` +
       `the PROJECT, or run from the project directory.`,
     );
   }
@@ -918,7 +913,7 @@ export function registerStateTools(server: McpServer): void {
     "Merge-patch the run's RunState with the given fields. " +
     "Optional side-effects: strategy→strategy.json, mission_status→mission-state.json, " +
     "active_run→active-run.json (include job_id to enable monitor lookup), " +
-    "tick_state→tick-state.json (atomic; 10 read sites per tick).",
+    "tick_state→tick-state.json (atomic).",
     {
       run_id: z.string().describe("Active run identifier"),
       patch: RunStatePatchSchema.describe("Fields to merge into the RunState"),
@@ -995,7 +990,7 @@ export function registerStateTools(server: McpServer): void {
     "then atomically flip mission-state.json status to 'locked' on pass. " +
     "Returns { ok, mission_status, validation_report } on success; " +
     "{ ok:false, error, validation_report } when validation fails (status stays draft). " +
-    "Replaces agent self-lock — always call this instead of writing mission_status='locked' directly.",
+    "Always call this instead of writing mission_status='locked' directly.",
     {
       run_id: z.string().describe("Active run identifier"),
       mission_id: z.string().optional().describe("Mission identifier (inferred when omitted)"),
@@ -1021,7 +1016,7 @@ export function registerStateTools(server: McpServer): void {
     "maximize-under-budget, evolve-until-plateau, evolve-until-regression, " +
     "worst-angle-plateau, coverage-target) plus the circuit-breaker override. " +
     "Returns { should_stop, reason, tick_count, best_score, frontier_count, budget_remaining }. " +
-    "Replaces inline stop predicates in the evor skill; call once per tick before proposing.",
+    "Call once per tick before proposing.",
     {
       run_id: z.string().describe("Active run identifier"),
       mission_id: z.string().optional().describe("Mission identifier (inferred when omitted)"),

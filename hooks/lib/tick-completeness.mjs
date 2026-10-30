@@ -39,6 +39,18 @@ export function selectedProposals(runDir, tick) {
   return reviews.filter(r => r?.selected).map(r => String(r?.proposal_id ?? '')).filter(Boolean);
 }
 
+/** proposal_id -> hypothesis.id, from this tick's Mutagen proposals. */
+function hypothesisIds(runDir, tick) {
+  const doc = readJson(join(runDir, 'ticks', String(tick), 'mutagen', 'proposals.json'));
+  const items = Array.isArray(doc) ? doc : Array.isArray(doc?.proposals) ? doc.proposals : [];
+  const m = new Map();
+  for (const p of items) {
+    const pid = p?.proposal_id, hid = p?.hypothesis?.id;
+    if (typeof pid === 'string' && typeof hid === 'string') m.set(pid, hid);
+  }
+  return m;
+}
+
 /** Every node in the tree, as an array. */
 function treeNodes(runDir) {
   const tree = readJson(join(runDir, 'tree.json'));
@@ -58,9 +70,14 @@ export function owed(runDir, tick) {
   const selected = selectedProposals(runDir, tick);
   if (selected.length === 0) return [];
   const nodes = treeNodes(runDir);
+  const hyp = hypothesisIds(runDir, tick);
   const out = [];
   for (const proposalId of selected) {
-    const node = nodes.find(n => n && String(n.hypothesis_id ?? '') === proposalId);
+    // A node is recorded with the proposal's hypothesis id, which the server
+    // assigns as distinct from the proposal id. Matching only the proposal id
+    // reported every candidate as missing a node once ids were server-assigned.
+    const ids = new Set([proposalId, hyp.get(proposalId)].filter(Boolean));
+    const node = nodes.find(n => n && ids.has(String(n.hypothesis_id ?? '')));
     if (!node) {
       out.push({ proposal_id: proposalId, missing: ['node'] });
       continue;

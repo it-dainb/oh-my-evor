@@ -34,6 +34,7 @@
  */
 
 import { existsSync, readFileSync, writeFileSync, mkdirSync, statSync } from 'fs';
+import { hasForgeReport } from './lib/forge-reports.mjs';
 import { join } from 'path';
 import { randomBytes } from 'crypto';
 import { resolveActiveRun, resolveEvorRoot } from './lib/active-run.mjs';
@@ -463,8 +464,7 @@ try {
       // Forge produced a report (a candidate WAS implemented) but nothing reached the
       // tree. This is the "trained inline, recorded nothing" shortcut. (An all-rejected
       // tick has no forge-report and legitimately adds 0 nodes — not flagged.)
-      const forgeReport = join(tickDir, 'forge', 'forge-report.json');
-      if (existsSync(forgeReport) && nodeCount === 0) {
+      if (hasForgeReport(tickDir) && nodeCount === 0) {
         debtReasons.push(
           `[EVOR DRIFT GUARD] Tick ${curTick}: Forge produced output but no tree node recorded. Call evor_record_node and evor_record_eval.`
         );
