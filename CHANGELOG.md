@@ -2,6 +2,45 @@
 
 All notable changes to Evor. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.2.11] — 2026-10-30 — waits that do not depend on being woken
+
+Fixes from the log of the 2026-10-30 binarization mission. Its tick 1 failed on a plugin
+contradiction, tick 2 lost 80 minutes to a queued notice, and the run then stalled for good on a
+job nothing tracked.
+
+### Fixed
+
+- **Mutagen could not write the output its own instructions describe.** `agents/evor-mutagen.md`
+  told it to omit `hypothesis.id` ("the server assigns") and to emit `mutation_tier`, `angle`,
+  `technique_tags`, `investigation_queries` and three more fields. The proposal validator
+  required the id and rejected all of those fields, so tick 1 failed at step 2.
+  `evor_write_artifact` now assigns `proposal_id` and `hypothesis.id`, and the contract accepts
+  the documented fields. A test feeds the agent file's own example to the validator.
+- **A tick that yielded on a job stalled the mission.** No host task tracks an `evor_run_start`
+  job, so nothing could wake main, and main was denied `Monitor`. The new **`evor_wait`** tool
+  blocks inside the caller's turn until a job finishes, a process exits or an artifact is
+  written (up to 540 s per call; 330 s measured on CLI 2.1.314). Every wait in the agent docs now
+  uses it. The Stop hook blocks a stop that would leave a job wait with nobody to wake on it,
+  and says what to call.
+- **Main ended up driving Forge.** The tick handed Forge to main, and about 45 Forge wake-ups
+  ("Waiting.") became main turns. The governor now denies main a `SendMessage` to any evor agent
+  except the tick, and the tick doc says a child that returns mid-work is waited on, never
+  handed up.
+- **Forge slept 80 minutes after training ended.** It ended its turn with a `Monitor` armed, and
+  the trainer-exit notice stayed queued until main messaged it. Forge and forge-junior now hold
+  their turn with `evor_wait({ pid })`.
+- **A plugin contract failure was retried as if it were a bad experiment.** `tick_record` takes
+  `failure_kind` (`experiment` / `contract` / `infrastructure`) and `error`. A `contract` or
+  `infrastructure` failure makes `evor_check_stop` report `blocked`, and main pauses the mission
+  and reports it instead of spawning the next tick.
+
+### Changed
+
+- The docs no longer claim that nothing wakes a sub-agent, or that a foreground spawn always
+  blocks. On CLI 2.1.314 in a backgrounded session, every spawn returned at once and children's
+  notices did wake their parent, but not reliably. Agents now wait with `evor_wait` whichever
+  way the host behaves.
+
 ## [1.2.10] — 2026-10-30 — a paused mission no longer locks you out of setup
 
 ### Fixed

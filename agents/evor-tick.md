@@ -96,10 +96,23 @@ Sage spawned its juniors in the background stalled — a background spawn ends t
 the juniors' completion notices went to MAIN rather than to Sage, nobody woke Sage to aggregate
 or woke you, and the process exited with zero nodes. Only main is woken by notifications.
 
+**When a spawn returns "Async agent launched" anyway, wait with `evor_wait`.** In a backgrounded
+session every spawn returns at once, whatever you pass: that is how the 2026-10-30 binarization
+mission ran. Do not end your turn. Call `evor_wait({ artifact: { tick: <n>, agent: "<child>" } })`
+for the artifact that child owes, and call it again while it returns `done:false`. The same tool
+waits on a job (`job_id`) or a process (`pid`). It blocks inside your turn, so it needs no notice
+to reach you. Notices are not reliable: on CLI 2.1.314 they did wake the tick after each child,
+but a Monitor's final notice to Forge sat queued for 80 minutes.
+
+**A child that comes back while its own work is still running is not finished.** In that mission
+Forge ended its turn with training in flight, and the tick reported `yielding` and told main to
+resume Forge. From then on main received every Forge wake-up. Never hand a child to main. If a
+child returns without its artifact, call `evor_wait` on that artifact (or on the job or pid it
+names), and resume the child yourself with `SendMessage` if it needs a nudge.
+
 Earlier text here told you to block on `TaskOutput(task_id, block:true)`. That tool is not
-available to a sub-agent, which is what your own capability-gap signal reported — and it was
-never needed: the foreground call is the blocking primitive. `evor_await_artifact` still
-records what you are waiting for, which helps a reader tell a long wait from a stall.
+available to a sub-agent. `evor_await_artifact` still records what you are waiting for, which
+helps a reader tell a long wait from a stall.
 
 Never emit a "waiting…" or "still running" turn: it costs a turn, says nothing, and is the shape
 the SubagentStop guard rejects.
@@ -119,15 +132,29 @@ Your entire final response is one JSON object and nothing else:
 ```
 
 `outcome` is one of `"scored"`, `"rejected"`, `"skipped"`, `"failed"`, `"yielding"`; add
-`"error"` when it is `"failed"`. **Which is which, because listing the words did not say:**
+`"error"` and `"failure_kind"` when it is `"failed"`. **Which is which, because listing the words did not say:**
 
 | outcome | when |
 |---|---|
 | `scored` | a node was trained AND evaluated; `node_id` and `score` are present |
 | `rejected` | candidates existed and the selector approved none of them |
 | `skipped` | there was nothing to decide — no proposals reached the selector at all |
-| `failed` | the tick could not complete; add `error` with the reason |
+| `failed` | the tick could not complete; add `error` with the reason and `failure_kind` (below) |
 | `yielding` | you are WAITING, not finished. Add `waiting_on`. The tick is still yours. |
+
+`failure_kind` says whether a retry can succeed:
+
+| failure_kind | when |
+|---|---|
+| `experiment` | the candidate itself failed: it diverged, ran out of memory, or broke the integrity gate |
+| `contract` | two parts of the plugin disagree, so every retry fails the same way (an agent file and a validator, a tool and its schema) |
+| `infrastructure` | the machine, a tool or a service failed: a disk, a mount, the GPU, an API |
+
+`contract` and `infrastructure` make `evor_check_stop` report `blocked`, and main pauses the
+mission instead of spawning the next tick. Do not ask main to work around a contract failure. In
+the 2026-10-30 binarization mission tick 1 failed because Mutagen's instructions and the proposal
+validator disagreed; main patched it with a "ruling" in tick 2's prompt, which hid a plugin bug
+that would have hit every tick.
 
 `rejected` and `skipped` were previously indistinguishable from this file, and a
 tier eval graded a model `incorrect` for choosing between them the other way with
@@ -159,11 +186,13 @@ the hypothesis was gone.
 
 ## Waiting is not failing
 
-**`yielding` is a fallback, not the normal path.** With every child spawned in the foreground
-you never need to end your turn mid-tick, because each spawn returns when its work is done.
-`yielding` exists for the case you cannot avoid: you must end a turn before the tick is over.
-Report it truthfully then — but know that nothing wakes a sub-agent automatically. Main resumes
-you (with `SendMessage`) when what you are waiting for lands, which is slower and costs context.
+**`yielding` is a last resort, not the normal path.** Foreground spawns return when the child is
+done, and `evor_wait` holds your turn on anything else, a job included, so you should never
+need to end your turn mid-tick. In particular, never yield on a job you started with
+`evor_run_start`: call `evor_wait({ job_id })` and carry on. A job is not a task the host
+tracks, so a tick that yields on one leaves main nothing to wake on. That stalled the 2026-10-30
+binarization mission for good, and the Stop hook now blocks it. If you must still yield, report
+it truthfully: main waits with `evor_wait` on what you name, then resumes you with `SendMessage`.
 
 This section used to say a sub-agent's "only way to wait is to end your turn and be
 re-activated — which works", citing evor-sage resuming seven times. That was wrong: those

@@ -22,10 +22,12 @@ through as plain JSON objects.
 
 from __future__ import annotations
 
+import copy
 import json
 import os
 import re
 import tempfile
+import uuid
 from pathlib import Path
 from typing import Any
 
@@ -91,6 +93,45 @@ def resolve_artifact_path(
 
 
 # ─── Payload validation ───────────────────────────────────────────────────────
+
+def _assign_proposal_ids(payload: Any) -> Any:
+    """Fill ``proposal_id`` and ``hypothesis.id`` where Mutagen left them out.
+
+    ``agents/evor-mutagen.md`` tells Mutagen not to invent either id, because the
+    server owns them. The validator then required ``hypothesis.id``, so a Mutagen
+    that followed its instructions could never write its proposals. Assigning
+    here makes the written artifact carry the ids every later reader keys on.
+    The format matches ``evor_validate_proposals`` (``prop-<8 hex>-<index>``).
+    """
+    payload = copy.deepcopy(payload)  # never mutate the caller's object
+    items = payload if isinstance(payload, list) else (
+        payload.get("proposals") if isinstance(payload, dict) else None
+    )
+    if not isinstance(items, list):
+        return payload
+    for i, item in enumerate(items):
+        if not isinstance(item, dict):
+            continue
+        # Fill only what is absent or empty. A non-string id is left for the
+        # validator to reject rather than silently replaced.
+        if item.get("proposal_id") in (None, ""):
+            item["proposal_id"] = f"prop-{uuid.uuid4().hex[:8]}-{i}"
+        hyp = item.get("hypothesis")
+        if isinstance(hyp, dict) and hyp.get("id") in (None, ""):
+            hyp["id"] = f"h-{item['proposal_id']}"
+    return payload
+
+
+def _proposal_ids(payload: Any) -> list[dict[str, Any]]:
+    """The ids as written, so the caller validates the same proposals Selector reads."""
+    items = payload if isinstance(payload, list) else (
+        payload.get("proposals") if isinstance(payload, dict) else None
+    )
+    return [
+        {"proposal_id": it.get("proposal_id"), "hypothesis_id": (it.get("hypothesis") or {}).get("id")}
+        for it in (items or []) if isinstance(it, dict)
+    ]
+
 
 def _validate_payload(agent: str, payload: Any) -> str | None:
     """Validate payload against Pydantic contracts where one exists.
@@ -171,6 +212,9 @@ def write_artifact(
     except ValueError as exc:
         return {"error": str(exc)}
 
+    if agent == "mutagen":
+        payload = _assign_proposal_ids(payload)
+
     err = _validate_payload(agent, payload)
     if err:
         return {"error": f"payload validation failed for agent={agent!r}: {err}"}
@@ -191,6 +235,8 @@ def write_artifact(
     except Exception as exc:
         return {"error": f"write failed: {exc}"}
 
+    if agent == "mutagen":
+        return {"ok": True, "path": str(target), "proposal_ids": _proposal_ids(payload)}
     return {"ok": True, "path": str(target)}
 
 

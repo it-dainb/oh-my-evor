@@ -25,6 +25,7 @@ import { registerComputeTools } from "./tools/compute.js";
 import { registerGotchaTools } from "./tools/gotcha.js";
 import { registerProposalTools } from "./tools/proposals.js";
 import { registerAcquireTools } from "./tools/acquire.js";
+import { registerWaitTools } from "./tools/wait.js";
 
 /**
  * Server instructions — loaded upfront (<=2KB) even with MCP tool-search deferral,
@@ -70,6 +71,7 @@ async function main(): Promise<void> {
   registerGotchaTools(server);    // evor_gotcha_query, evor_gotcha_add, evor_store_blob
   registerProposalTools(server);  // evor_validate_proposals (P1-7 deterministic gate)
   registerAcquireTools(server);   // evor_check_leakage
+  registerWaitTools(server);      // evor_wait (blocking wait on job / pid / artifact)
 
   const transport = new StdioServerTransport();
   await server.connect(transport);

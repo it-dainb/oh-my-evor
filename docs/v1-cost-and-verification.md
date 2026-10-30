@@ -22,7 +22,7 @@ of the thing it names.
 
 | agent | main | release | status |
 |---|---|---|---|
-| evor-sage | opus | **haiku** | ships — **margin NOT SHOWN at 8.1**, and 92.3% is below the 95% floor |
+| evor-sage | opus | **haiku** | ships — **margin NOT SHOWN at 8.1**, and 92.3% is below the 95% floor — **row STALE, see below** |
 | evor-mutagen | opus | **haiku** | ships — margin **NOT SHOWN** at 8.1 (upper bound sits exactly on +10.0pp) — **row STALE, see below** |
 | evor-probe | opus | **haiku** | ships — **row STALE, see below** |
 | evor-acquirer | sonnet | **haiku** | ships |
@@ -43,6 +43,10 @@ channel, a closed-set `kind` vocabulary and severity-by-consequence guidance;
 probe additionally gained explicit "a file write is not a filed artifact / an
 appended line is not an emitted signal" rules, and tick gained the no-borrowed-
 artifact-slot and job-accounting sections.
+
+`evor-sage` joined them on 2026-10-30: its juniors' spawns can come back
+asynchronous, and it now waits for each junior's artifact with `evor_wait`, so its
+row is stale too.
 
 **The numbers above are not wrong about what they measured. They are no longer
 about these agents.** A tier comparison is a claim about a specific text, and

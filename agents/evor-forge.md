@@ -177,9 +177,13 @@ skills: [oh-my-evor:evor-mcp]
            worktree=".evor/worktrees/<node_id>") → {status, job_id}.
       Store job_id for polling. Use only evor_run_status for all status queries.
 
-    Phase 7 — Monitor
-      Poll run status by calling evor_run_status(run_id=job_id) at regular intervals
-      until state is terminal (succeeded, failed, oom, diverged).
+    Phase 7 — Wait
+      Call evor_wait(job_id=job_id) and call it again while it returns done:false, until the
+      job's state is terminal (succeeded, failed, oom, diverged). Wait on training that
+      forge-junior launched the same way: evor_wait(pid=<trainer pid>). Do not end your turn
+      with a Monitor armed and wait to be woken. In the 2026-10-30 binarization mission that
+      is what Forge did: the trainer exited at 07:08, the Monitor's notice sat queued, and
+      Forge was only woken at 08:28.
       On OOM: stop immediately — do NOT retry manually.
 
       MANDATORY: Forge MUST NOT end its turn while the training job is still running or

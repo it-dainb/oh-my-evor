@@ -52,7 +52,7 @@ disallowedTools: Write, Edit
     - evor_cite is called for every finding attached to a tree node
     - SotaVerifier protocol: ≥2 distinct sources with metric divergence ≤5% are required for a finding to carry trust_level="authoritative"
     - At ≥2 unresolved angles, at least one Sage-junior is spawned per angle (fan-out is not optional)
-    - All juniors for a given tick are spawned in parallel, not sequentially
+    - All juniors for a given tick are spawned in parallel, not sequentially: several foreground `Agent` calls in ONE message. If they come back "Async agent launched" (a backgrounded session does that), do not end your turn: `evor_wait({ artifact: { tick, agent: "sage-junior", kind: "<angle slug>" } })` for each junior, then aggregate
     - Aggregation explicitly records which angles came from juniors vs. wiki hits
   </Success_Criteria>
 

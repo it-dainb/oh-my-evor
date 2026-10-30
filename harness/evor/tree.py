@@ -828,6 +828,27 @@ def check_stop_condition(
         except Exception:  # noqa: BLE001 — an unreadable bus must not stop the run
             gaps = []
 
+    # A tick that failed because the plugin contradicts itself will fail the same
+    # way on every retry. Tick 1 of the 2026-10-30 binarization mission failed
+    # because Mutagen's instructions and the proposal validator disagreed; main
+    # recorded it and spawned tick 2 straight away. Such a failure blocks the run
+    # until someone fixes the plugin or the machine, as an open capability gap does.
+    last_records = [
+        r for r in (run_state.get("tick_records") or [])
+        if isinstance(r, dict) and isinstance(r.get("tick"), int)
+    ]
+    if last_records:
+        last = max(last_records, key=lambda r: r["tick"])
+        if last.get("outcome") == "failed" and last.get("failure_kind") in ("contract", "infrastructure"):
+            gaps.insert(0, {
+                "signature": f"tick{last['tick']}-{last['failure_kind']}-failure",
+                "severity": "high",
+                "evidence": str(last.get("error") or "no error text was recorded"),
+                "source": "tick_record",
+                "occurrences": 1,
+                "last_seen": None,
+            })
+
     # ── Budget remaining ──────────────────────────────────────────────────────
     budget_remaining: dict[str, Any] = {
         "iterations_left": max(0, budget.max_iterations - tick),
@@ -1066,6 +1087,7 @@ def check_stop_condition(
                 f"({top.get('occurrences', 1)} occurrence(s), source {top.get('source')!r}). "
                 "The tick cannot proceed until the missing capability is supplied or the "
                 "gap is resolved — this is a BLOCK, not a stop: the mission is still viable."
+                + (f" Evidence: {top['evidence']}" if top.get("source") == "tick_record" else "")
             ),
             capability_gaps=gaps,
         )

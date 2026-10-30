@@ -154,13 +154,17 @@ If `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` is set in the environment:
 - Evor manages the shared task-board via `evor_state_write` for inter-agent coordination.
 - **Do not wait on `job_complete` or `self_heal_event` — nothing emits them.** They are
   documented in `ARCHITECTURE.md` and have zero producers anywhere in the codebase, so an
-  agent told to idle on them can only poll or guess. **A sub-agent waits by spawning in the
-  FOREGROUND**: the `Agent` call blocks until the child returns, and several calls in one message
-  run in parallel and are all awaited. Never `run_in_background` from a sub-agent — the governor
-  denies it, because nothing wakes a sub-agent when a background child finishes (the notice goes
-  to main) and the work stops. `evor_await_artifact` records WHAT is awaited so a long wait is
-  distinguishable from a stall. (`TaskOutput(block:true)`, which this used to prescribe, is not
-  available to sub-agents.)
+  agent told to idle on them can only poll or guess. **A sub-agent waits inside its turn.**
+  Spawn children in the FOREGROUND: the `Agent` call blocks until the child returns, and several
+  calls in one message run in parallel and are all awaited. Never pass `run_in_background` from a
+  sub-agent; the governor denies it. **If a spawn comes back "Async agent launched" anyway**, which
+  happens in a backgrounded session whatever you pass, do not end your turn: call
+  `evor_wait({ artifact: { tick, agent } })` for the artifact that child owes, and call it again
+  while it returns `done:false`. Wait on a job with `evor_wait({ job_id })` and on a process with
+  `evor_wait({ pid })`. Every other wait depends on a notice reaching you, and in the 2026-10-30
+  binarization mission one sat queued for 80 minutes. `evor_await_artifact` still records WHAT is
+  awaited so a long wait is distinguishable from a stall. (`TaskOutput(block:true)`, which this
+  used to prescribe, is not available to sub-agents.)
 
 If the env var is unavailable, fall back to sequential candidate execution (concurrency=1): Forge agents run one at a time; Evor waits for each job by calling `evor_run_status` after blocking on the launching Task, not by waiting for a `job_complete` signal — nothing emits one.
 </Parallel_Execution>
@@ -176,12 +180,22 @@ run Steps 0-9 yourself. For each tick, spawn the boundary and await its status:
 
 `Task(subagent_type="oh-my-evor:evor-tick", description="Tick <n>", prompt="Run dir: <run_dir>. Tick: <n>. Execute exactly one tick end to end, then return a compact status.")`
 
-Then record the returned status, decide continue / stop / meta-evolve, and spawn the next tick.
+Then record the returned status, call `evor_check_stop({ run_id })`, decide continue / stop /
+meta-evolve, and only then spawn the next tick.
+
+**If `evor_check_stop` returns `blocked: true`, do not spawn the next tick.** Set the mission to
+paused with `evor_state_write({ run_id, mission_status: "paused", mission_status_reason:
+<blocked_reason> })` and tell the user what is blocking and what would unblock it. A tick that
+failed because the plugin contradicts itself (`failure_kind: "contract"`), or because the machine
+or a service failed (`"infrastructure"`), blocks the run: a retry can only fail the same way. Do
+not work around it with instructions in the next tick's prompt. In the 2026-10-30 binarization
+mission main did exactly that after Mutagen's contract and the validator disagreed: the
+workaround held only because main repeated it, and it hid a plugin bug.
 
 **Record every terminal outcome, once, as soon as the tick returns it:**
 
 ```
-evor_state_write({ run_id, tick_record: { tick: <n>, outcome: "<scored|rejected|skipped|failed>", score: <best fitness, if any node was evaluated> } })
+evor_state_write({ run_id, tick_record: { tick: <n>, outcome: "<scored|rejected|skipped|failed>", score: <best fitness, if any node was evaluated>, failure_kind: <the tick's, when failed>, error: <the tick's, when failed> } })
 ```
 
 This is not bookkeeping. The circuit breaker (consecutive FAILED ticks) and the plateau
@@ -192,11 +206,15 @@ implemented as a tick cap because there was nothing for it to count. The Stop ho
 finished tick with no record, so this cannot silently fall off.
 
 **`outcome: "yielding"` is NOT a finished tick.** It means the boundary had to end its turn
-while waiting on an agent or artifact. Do not record it as an outcome and do not advance the tick
-counter. **Resume that same tick agent with `SendMessage` once the artifact named in `waiting_on`
-exists** — `Monitor` the path, or act on the completion notice you receive. Nothing resumes it
-automatically: the platform wakes main on a child's completion, not a sub-agent. Prefer resuming
-over spawning a replacement, which throws away everything the tick already knows.
+while waiting on an agent, artifact or job. Do not record it as an outcome and do not advance the
+tick counter. **Wait with `evor_wait` on what `waiting_on` names** (`artifact:<agent>@tick<n>` →
+`evor_wait({ artifact: { tick: n, agent } })`, `job:<id>` → `evor_wait({ job_id })`), calling it
+again while it returns `done:false`, **then resume that same tick agent with `SendMessage`.** Do
+not use `Monitor`: the governor denies it to main. Do not end your turn instead: a job is not a
+task the host tracks, so nothing would wake you, and the Stop hook blocks that stop. Resume the
+TICK, never one of its children: the governor denies main messaging a tick's child, because that
+child's later notices then arrive in your context. Prefer resuming over spawning a replacement,
+which throws away everything the tick already knows.
 
 (This paragraph used to say the existing tick "will be re-activated when what it is waiting on
 reports" and to idle. On 2026-10-30 a bench tick did exactly that: it yielded on Mutagen, main
@@ -553,7 +571,7 @@ always exists; take it and continue.
 - `evor_telemetry_ingest` — validate and append telemetry records for a node
 - `evor_gotcha_add` — record a gotcha surfaced by inbox drain routing
 - `evor_plot_report` — render the evolution tree at milestones and stop
-- `Monitor` — watch an artifact PATH or a job's `status.json` during compute-bound phases; idle here, do not poll. (Not `job_complete`/`self_heal_event`: those events have no producers.)
+- `evor_wait` — hold your turn until a job finishes (`job_id`), a process exits (`pid`) or a tick artifact is written (`artifact`). Up to 540 s per call; call again on `done:false`. This is how every agent waits, main included. (Not `job_complete`/`self_heal_event`: those events have no producers.)
 - `TaskCreate` / `TaskList` / `TaskUpdate` — track per-tick candidates and phase progress as a visible task list
 - `SendUserFile` — deliver evolution-tree PNG and metrics plot at milestones and mission stop
 </Tool_Usage>
@@ -597,13 +615,12 @@ before acting — the restore block is a navigation aid, not the authoritative s
 </Compaction_Survival>
 
 <Execution_Policy>
-- Evor (orchestrator) idles via `Monitor` during compute-bound Forge phases — do not poll.
-  Main is the one agent that is woken by completion notices, so main may spawn the tick in the
-  background; every SUB-agent spawns in the foreground (the governor enforces this).
-- Main wakes on the background tick's completion notice, or by `Monitor`ing the job's
-  `status.json`. If a tick returns `outcome: "yielding"`, resume THAT agent with `SendMessage`
-  once the artifact it named exists — nothing resumes it automatically. There is no `job_complete` or
-  `self_heal_event` signal — those names appear in the docs and nothing emits them.
+- Main may spawn the tick in the background and wake on its completion notice; every SUB-agent
+  spawns in the foreground (the governor denies `run_in_background` from a sub-agent).
+- If a tick returns `outcome: "yielding"`, wait on what it named with `evor_wait`, then resume
+  THAT tick agent with `SendMessage`. Main is denied `Monitor`, and nothing resumes a yielded
+  tick by itself. There is no `job_complete` or `self_heal_event` signal; those names appear in
+  the docs and nothing emits them.
 - Do not run more Forge agents AT ONCE than `resource_plan.concurrency`; queue the rest.
 - Respect budget.max_wall_clock_hours and budget.max_gpu_hours if set.
 - Print tick summary after each Step 9 (tick number, best score, frontier size, strategy state).
@@ -614,7 +631,7 @@ Emit ONE concise status line per tick step, not a multi-paragraph essay. Format:
   `[T{tick} S{step}] {verb}: {object} → {outcome}` (e.g. `[T3 S2] Mutagen: 3 proposals → written`)
 
 Do NOT emit:
-- "Holding..." or "Waiting..." turns (idle silently via Monitor instead)
+- "Holding..." or "Waiting..." turns (hold the turn with `evor_wait` instead)
 - Intermediate reasoning paragraphs or "I will now..." preambles
 - Redundant recaps of what was already logged in the previous step
 - Full JSON payloads in orchestrator text output (those belong in artifacts, not narration)

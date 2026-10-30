@@ -219,3 +219,37 @@ def test_a_zero_ceiling_is_rejected_with_the_true_reason(tmp_path: Path) -> None
     assert c.ok is False
     assert "permits no spend" in c.detail
     assert "unlimited" not in c.detail
+
+
+# ── A contract failure blocks the run instead of being retried ───────────────
+#
+# Tick 1 of the 2026-10-30 binarization mission failed because Mutagen's
+# instructions and the proposal validator disagreed. Retrying could only fail
+# the same way, yet main recorded it and spawned tick 2 at once.
+
+def test_a_contract_failure_blocks_the_next_tick(tmp_path: Path) -> None:
+    records = [{"tick": 1, "outcome": "failed", "failure_kind": "contract",
+                "error": "Mutagen's contract and the validator disagree on hypothesis.id"}]
+    goal = _goal(circuit_breaker=6)
+    v = check_stop_condition(goal, _state(1, records), _make_engine(goal=goal, tmp_path=tmp_path))
+    assert v.should_stop is False
+    assert v.blocked is True
+    assert "tick1-contract-failure" in v.blocked_reason
+    assert "hypothesis.id" in v.blocked_reason
+
+
+def test_an_experiment_failure_does_not_block(tmp_path: Path) -> None:
+    records = [{"tick": 1, "outcome": "failed", "failure_kind": "experiment", "error": "diverged"}]
+    goal = _goal(circuit_breaker=6)
+    v = check_stop_condition(goal, _state(1, records), _make_engine(goal=goal, tmp_path=tmp_path))
+    assert v.blocked is False
+
+
+def test_a_later_success_clears_the_block(tmp_path: Path) -> None:
+    records = [
+        {"tick": 1, "outcome": "failed", "failure_kind": "contract", "error": "x"},
+        {"tick": 2, "outcome": "scored", "score": 0.2},
+    ]
+    goal = _goal(circuit_breaker=6)
+    v = check_stop_condition(goal, _state(2, records), _make_engine(goal=goal, tmp_path=tmp_path))
+    assert v.blocked is False

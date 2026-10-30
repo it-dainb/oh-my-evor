@@ -801,6 +801,33 @@ try {
       );
     }
 
+    // Resuming a tick's CHILD is the same leak through SendMessage. In the
+    // 2026-10-30 binarization mission the tick yielded and told main to resume
+    // Forge; main did, and from then on every one of Forge's ~45 wake-ups was a
+    // notice to MAIN ("Still training", "Waiting."), each a main turn. The tick is
+    // the one agent main talks to: resume IT, and it resumes its own children.
+    // The target's type comes from the session's subagents/<id>.meta.json; an
+    // address with no meta file (a named teammate, a missing file) is let through.
+    if (toolNameB === 'SendMessage') {
+      const to = String(input?.tool_input?.to ?? '').trim();
+      const tp = String(input?.transcript_path ?? '');
+      if (to && tp.endsWith('.jsonl')) {
+        const meta = _join(tp.slice(0, -'.jsonl'.length), 'subagents', `agent-${to}.meta.json`);
+        if (_exists(meta)) {
+          const targetType = String(JSON.parse(readFileSync(meta, 'utf8'))?.agentType ?? '')
+            .replace(/^oh-my-evor:/, '');
+          if (/^evor-/.test(targetType) && targetType !== 'evor-tick') {
+            deny(
+              `[EVOR GOVERNOR] ${targetType} belongs to the tick, so main does not resume it. ` +
+                `SendMessage the evor-tick agent that owns this tick instead; it resumes or ` +
+                `waits on its own children. Messaging a tick's child makes every later notice ` +
+                `from that child land in your context.`
+            );
+          }
+        }
+      }
+    }
+
     // Leads belong to the boundary too — main spawning them directly is the same
     // leak by another route (it pulls their results into main's context).
     const LEADS = new Set([

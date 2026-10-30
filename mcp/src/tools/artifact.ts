@@ -42,7 +42,7 @@ const CONTRACT_VALIDATED_AGENTS = new Set<string>([
   "acquirer",
 ]);
 
-const VALID_AGENTS = [
+export const VALID_AGENTS = [
   "mutagen",
   "selector",
   "probe",
@@ -65,7 +65,7 @@ export function writeArtifact(
   kind?: string,
   partial?: boolean,
   missionId?: string,
-): { ok: boolean; path?: string; error?: string } {
+): { ok: boolean; path?: string; error?: string; proposal_ids?: unknown } {
   const paths = resolveRunPaths(runId, missionId);
 
   // Write payload to a temp file so the bridge can read it without hitting
@@ -114,7 +114,11 @@ export function writeArtifact(
 
   const data = result.data as Record<string, unknown>;
   if (data?.ok === true) {
-    return { ok: true, path: String(data.path) };
+    return {
+      ok: true,
+      path: String(data.path),
+      ...(data.proposal_ids !== undefined ? { proposal_ids: data.proposal_ids } : {}),
+    };
   }
   return {
     ok: false,
@@ -177,7 +181,7 @@ export function readArtifact(
  * Python to answer "does a path exist" would make a cheap check expensive. If
  * the layout moves, both must move; the header comment is the shared statement.
  */
-function artifactPathFor(runDir: string, tick: number, agent: string, kind?: string): string {
+export function artifactPathFor(runDir: string, tick: number, agent: string, kind?: string): string {
   const slug = (kind ?? "").replace(/[^a-zA-Z0-9._-]+/g, "-").replace(/^-+|-+$/g, "");
   const base = join(runDir, "ticks", String(tick));
   switch (agent) {
@@ -331,6 +335,9 @@ export function registerArtifactTools(server: McpServer): void {
               run_id,
               tick,
               agent,
+              // Mutagen: the ids the server assigned. Validate THESE proposals,
+              // or Selector reads ids that are not in the artifact.
+              ...(result.proposal_ids !== undefined ? { proposal_ids: result.proposal_ids } : {}),
             }),
           },
         ],

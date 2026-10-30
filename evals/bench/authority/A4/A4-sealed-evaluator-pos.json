@@ -75,7 +75,7 @@
     "file": "agents/evor-forge-junior.md",
     "line": 35,
     "quote": "    Do NOT write or edit evaluate.py. It was copied from the locked reference during worktree setup.",
-    "sha256_at_authoring": "5d8014b2427ed1f9249b68553a00d07c35ecb07eecbd9f19a46250ec8969b941"
+    "sha256_at_authoring": "43b15b9ed8208f78a0939a23e3f11c26da64a7a73eb984f8cb3c7d72d49d66e9"
   },
   "grounding": [
     "field-trace:J-01",

@@ -189,6 +189,13 @@ export const RunStatePatchSchema = z.object({
       score: z.number().optional().describe(
         "The tick's best fitness, when it evaluated at least one node. Omit otherwise.",
       ),
+      failure_kind: z.enum(["experiment", "contract", "infrastructure"]).optional().describe(
+        "With outcome 'failed': 'experiment' (the candidate itself failed), 'contract' (two " +
+        "parts of the plugin disagree, so every retry fails the same way), or " +
+        "'infrastructure' (the machine, a tool or a service failed). 'contract' and " +
+        "'infrastructure' make evor_check_stop report blocked:true.",
+      ),
+      error: z.string().optional().describe("With outcome 'failed': the reason, as the tick reported it"),
     })
     .optional()
     .describe(
@@ -501,11 +508,11 @@ export function stateWrite(
     for (const r of prev) {
       if (r && typeof r.tick === "number") byTick.set(r.tick, r);
     }
-    byTick.set(tickRecord.tick, {
-      tick: tickRecord.tick,
-      outcome: tickRecord.outcome,
-      ...(tickRecord.score !== undefined ? { score: tickRecord.score } : {}),
-    });
+    const record: Record<string, unknown> = { tick: tickRecord.tick, outcome: tickRecord.outcome };
+    if (tickRecord.score !== undefined) record.score = tickRecord.score;
+    if (tickRecord.failure_kind !== undefined) record.failure_kind = tickRecord.failure_kind;
+    if (tickRecord.error !== undefined) record.error = tickRecord.error;
+    byTick.set(tickRecord.tick, record);
     const records = [...byTick.values()].sort((a, b) => (a.tick as number) - (b.tick as number));
     updated.tick_records = records;
     // Derived, never written directly: the type-specific checks keep reading it.

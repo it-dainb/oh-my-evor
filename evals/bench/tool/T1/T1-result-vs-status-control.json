@@ -13,7 +13,7 @@
   "grounded_rule": {
     "file": "skills/evor-mcp/SKILL.md",
     "quote": "Do not tail log files by hand; the tool owns the run's internals.",
-    "sha256_at_authoring": "b06e546fb4c498b0e844abeebf0ea0bd847a61585d7109df2a55bcba0bf98a0a"
+    "sha256_at_authoring": "90e0eeaf504d55b36ae05164293ffc38ce69c2f638f20c16627484c712df541d"
   },
   "grounding": [
     "field-trace:J-03",

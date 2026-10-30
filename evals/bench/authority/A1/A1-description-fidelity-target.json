@@ -111,7 +111,7 @@
     "file": "agents/evor-forge.md",
     "line": 372,
     "quote": "    - NEVER spawn forge-* sub-agents from within forge-* sub-agents — Forge is the sole spawner.",
-    "sha256_at_authoring": "ec9bfac150865ee936a8e703bcaf3bed9a967f43dfbcb7670c122aa0f7425f30"
+    "sha256_at_authoring": "a6178d21212e9640518d305a4f5c47797bbada86447c639bd1b57fc9aa39b328"
   },
   "grounding": [
     "field-trace:G-08",

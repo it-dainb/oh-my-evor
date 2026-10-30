@@ -110,11 +110,11 @@
       },
       {
         "path": "skills/evor/SKILL.md",
-        "sha256": "6da8b09e1ac379fe06aef05ae34436cb2c21b054f1c53c191195bf03ac602c16"
+        "sha256": "8bba6d3842fcc09fa6e47c4fd9f98f5ebede85f49fb0392a9b020f8aeeb95430"
       },
       {
         "path": "hooks/stop.mjs",
-        "sha256": "043defa94e2d84ba0e2435c8c4384645e83ecae3d4ce7ad50ad0e58af592f13a"
+        "sha256": "df5506cd3411a175c2446660c138f550b2123f6f636170ce292bb8f18f65cea3"
       }
     ],
     "follow_ups": []

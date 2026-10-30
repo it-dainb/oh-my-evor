@@ -774,6 +774,18 @@ class MutationProposal(BaseEvorModel):
     hypothesis: Hypothesis
     citations: list[str]
     wildness: float
+    # Fields `agents/evor-mutagen.md` tells Mutagen to emit. They were missing
+    # here while extra="forbid" was on, so the documented output could not be
+    # written: tick 1 of the 2026-10-30 binarization mission failed on exactly
+    # this. The agent file and this model are one contract; both are optional
+    # because only the agent file requires them.
+    mutation_tier: Optional[Literal["parametric", "structural"]] = None
+    mutation_locus: Optional[MutationLocus] = None
+    is_crossover: bool = False
+    angle: Optional[str] = None
+    in_provided_list: Optional[bool] = None
+    investigation_queries: list[str] = Field(default_factory=list)
+    technique_tags: list[str] = Field(default_factory=list)
     # `critic_approved` REMOVED (item 2b.2). The contract required the PROPOSER
     # to assert the REVIEWER's verdict — a self-report standing in for a review —
     # and nothing ever read it. `tree.py:410` hard-coded it to True on every
