@@ -544,10 +544,13 @@ def _cmd_preflight(args: argparse.Namespace) -> int:
 
     Checks:
       1. import_ok      — torch importable (raises NotImplementedError if absent)
-      2. loss_decreasing — loss at step 5 < loss at step 1 via micro-train
+      2. loss_decreasing — loss at step 5 < loss at step 1 via micro-train. Needs a
+                           candidate worktree, which this CLI never has, so it is
+                           always None here and reported under `unverified`.
       3. gpu_active     — GPU utilisation > 0% if GPU detected
 
-    Exit 0 if all checks pass; exit 5 with a report on failure.
+    Exit 0 if every check that RAN passed (unverified checks are listed, not
+    passed); exit 5 with a report on failure.
     Prints a JSON report to stdout.
     """
     from evor.scheduler import ResourceScheduler
@@ -617,8 +620,33 @@ def _cmd_preflight(args: argparse.Namespace) -> int:
         return 5
 
     report["passed"] = True
+    # A check that was not run is not a check that passed. At setup no candidate
+    # exists, so the micro-train behind `loss_decreasing` cannot run and the check
+    # comes back None. It was dropped from `required` (correct: it cannot gate an
+    # environment test) and the run was then reported "PASSED — environment
+    # ready", which a setup agent read as three verified checks out of three.
+    #
+    # The comment above calls this "deferred to the first real training run".
+    # Nothing collects it there: integrity check 5 fails a node only for a NaN,
+    # Inf or CONSTANT loss, so a diverging loss passes it. Say so, rather than let
+    # a deferral that nobody honours read as a verification.
+    unverified = [k for k, v in checks.items() if v is None]
+    if unverified:
+        report["unverified"] = unverified
+        report["unverified_reason"] = (
+            "not run: no candidate worktree exists at setup, so the micro-train cannot "
+            "execute. Nothing later verifies that loss DECREASES — integrity check 5 "
+            "only rejects NaN, Inf or constant loss."
+        )
     print(json.dumps(report, indent=2))
-    print("\n[evor preflight] PASSED — environment ready.", file=sys.stderr)
+    if unverified:
+        print(
+            f"\n[evor preflight] PASSED with UNVERIFIED checks: {unverified} — not run, "
+            "not passed. See report.unverified_reason.",
+            file=sys.stderr,
+        )
+    else:
+        print("\n[evor preflight] PASSED — environment ready.", file=sys.stderr)
     return 0
 
 

@@ -13,7 +13,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # The Claude Code CLI (isolated from your host session)
-RUN npm install -g @anthropic-ai/claude-code@2.1.220
+# Pinned for comparability between bench runs — but a pin is part of the
+# instrument. 2.1.220 does not wake a sub-agent when its background child
+# finishes, and the tick loop depends on exactly that since v1.2.7: on 2.1.220 a
+# tick yields at its first spawn and is never resumed, so every bench tick ended
+# with 0 nodes (2026-10-30, 191 s). The same seed on 2.1.312 ran the whole loop.
+# Numbers measured under 2.1.220 are not comparable with later ones.
+RUN npm install -g @anthropic-ai/claude-code@2.1.312
 
 # Runtime limits — declared, never inherited. The spawn-depth default has moved
 # twice in released Claude Code (on in 2.1.172, off in 2.1.217, back at 3 in

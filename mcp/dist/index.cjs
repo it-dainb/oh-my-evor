@@ -21109,8 +21109,11 @@ var GoalContractSchema = external_exports.object({
   budget: external_exports.object({
     max_iterations: external_exports.number().int().positive(),
     plateau_window: external_exports.number().int().positive(),
+    // Consecutive FAILED ticks before the run stops — not a tick count.
     circuit_breaker: external_exports.number().int().positive(),
-    max_cost_usd: external_exports.number().min(0),
+    // Optional: absent = no spend ceiling (local-only). 0 permits no spend and
+    // stops the run before tick 1, so the validator rejects it.
+    max_cost_usd: external_exports.number().min(0).optional(),
     max_wall_clock_hours: external_exports.number().optional(),
     max_gpu_hours: external_exports.number().optional()
   }),
@@ -21119,6 +21122,8 @@ var GoalContractSchema = external_exports.object({
   // Server-owned: harness computes at freeze — agent must never supply.
   locked_split_hash: external_exports.string().optional(),
   eval_script_hash: external_exports.string().optional(),
+  // sha256 of eval-suites/score_plugin.py, when the mission's evaluator has one.
+  eval_plugin_hash: external_exports.string().optional(),
   expansion_policy: ExpansionPolicySchema.optional(),
   allowed_licenses: external_exports.array(external_exports.string()),
   evolution_bounds: EvolutionBoundsSchema.optional().describe(
@@ -23123,6 +23128,46 @@ var RunStatePatchSchema = external_exports.object({
   total_cost_usd: external_exports.number().min(0).optional().describe(
     "Cumulative cost in USD for this run so far. Used by evor_check_stop to evaluate budget-based stop conditions."
   ),
+  // ── Resource plan: how many candidates a tick may run at once ────────────
+  //
+  // `skills/evor/SKILL.md` bounds Forge fan-out by `ResourcePlan.concurrency` in
+  // four places, and setup is told to compute it and prints "Estimated
+  // concurrency: N" — then had nowhere to put it. This schema is strict and had
+  // no such key, `scheduler.probe_throughput` (the only builder) is called by
+  // nothing, and so the value the tick reads did not exist at runtime: a tick
+  // forged its winner and parked the other selected proposal in an undefined
+  // `carry_forward` key. Setup records it here; the tick reads it back with
+  // evor_state_read.
+  resource_plan: external_exports.object({
+    concurrency: external_exports.number().int().min(1).describe(
+      "Candidates that may train AT ONCE on this hardware. 1 unless the free VRAM comfortably fits several jobs; it bounds simultaneity, not how many a tick forges."
+    ),
+    reason: external_exports.string().optional().describe("How the number was reached, e.g. free VRAM vs expected per-job VRAM"),
+    gpu_ids: external_exports.array(external_exports.number().int()).optional(),
+    vram_per_job_gb: external_exports.number().optional(),
+    cpu_fallback: external_exports.boolean().optional()
+  }).optional().describe("Written once at setup, after environment discovery. Read by every tick."),
+  // ── Per-tick record (the only writer of tick_records / tick_history_scores) ─
+  //
+  // `tick_history_scores` was READ by every history-based stop check — plateau,
+  // regression, worst-angle-plateau — and written by nothing. This schema is
+  // strict and did not accept the key, so an agent told to maintain it could not
+  // have. Every one of those stops was unreachable.
+  //
+  // One record per COMPLETED tick, upserted by tick number, so a repeated call
+  // for the same tick corrects rather than duplicates. The server derives
+  // `tick_history_scores` from these; neither key is writable directly.
+  tick_record: external_exports.object({
+    tick: external_exports.number().int().min(1),
+    // Terminal outcomes only. `yielding` is a tick that has not finished, so it
+    // has nothing to record — recording it would count a wait as a tick.
+    outcome: external_exports.enum(["scored", "rejected", "skipped", "failed"]),
+    score: external_exports.number().optional().describe(
+      "The tick's best fitness, when it evaluated at least one node. Omit otherwise."
+    )
+  }).optional().describe(
+    "Call once per tick, after it returns a terminal outcome. Feeds the circuit breaker (consecutive FAILED ticks) and the plateau window (ticks with no improvement), which read nothing else."
+  ),
   // ── Area 3: prediction bias sample (server-side rolling avg) ──────────────
   prediction_bias_sample: external_exports.object({
     predicted_gain: external_exports.number().describe("Predicted gain from the mutation proposal"),
@@ -23255,6 +23300,7 @@ function stateWrite(runId, patch, missionId) {
     active_run: activeRun,
     tick_state: tickState,
     prediction_bias_sample: biasSample,
+    tick_record: tickRecord,
     ...statePatch
   } = patch;
   const current = readRunState(paths.runStatePath, runId);
@@ -23275,6 +23321,21 @@ function stateWrite(runId, patch, missionId) {
     if (updated.prediction_bias_history === prevHistory || updated.prediction_bias_history === void 0) {
       updated.prediction_bias_history = newHistory;
     }
+  }
+  if (tickRecord !== void 0) {
+    const prev = Array.isArray(current.tick_records) ? current.tick_records : [];
+    const byTick = /* @__PURE__ */ new Map();
+    for (const r of prev) {
+      if (r && typeof r.tick === "number") byTick.set(r.tick, r);
+    }
+    byTick.set(tickRecord.tick, {
+      tick: tickRecord.tick,
+      outcome: tickRecord.outcome,
+      ...tickRecord.score !== void 0 ? { score: tickRecord.score } : {}
+    });
+    const records = [...byTick.values()].sort((a, b) => a.tick - b.tick);
+    updated.tick_records = records;
+    updated.tick_history_scores = records.map((r) => r.score).filter((v) => typeof v === "number");
   }
   writeRunState(paths.runStatePath, updated);
   if (strategyDelta && Object.keys(strategyDelta).length > 0) {
@@ -24903,18 +24964,24 @@ function lockEvaluate(runId, nodeRef, missionId) {
     };
   }
   let contractHash = "";
+  let legacySetAnchorOk = false;
   try {
     const { runDir } = resolveRunPaths(runId, missionId);
     const contractPath = (0, import_path19.join)(runDir, "goal-contract.json");
     if ((0, import_fs18.existsSync)(contractPath)) {
       const contract = JSON.parse((0, import_fs18.readFileSync)(contractPath, "utf8"));
       contractHash = typeof contract.eval_script_hash === "string" ? contract.eval_script_hash : "";
+      const version2 = typeof contract.eval_version === "string" ? contract.eval_version : "";
+      const canonical = (0, import_path19.join)(runDir, "eval-suites", `${version2}.py`);
+      if (version2 && (0, import_fs18.existsSync)(canonical) && contractHash === digestEvaluator(runDir, version2).hash) {
+        legacySetAnchorOk = (0, import_crypto4.createHash)("sha256").update((0, import_fs18.readFileSync)(canonical)).digest("hex") === (0, import_crypto4.createHash)("sha256").update((0, import_fs18.readFileSync)(evalPath)).digest("hex");
+      }
     }
   } catch {
   }
   try {
     const hash = (0, import_crypto4.createHash)("sha256").update((0, import_fs18.readFileSync)(evalPath)).digest("hex");
-    if (contractHash && contractHash !== hash) {
+    if (contractHash && contractHash !== hash && !legacySetAnchorOk) {
       return {
         ok: false,
         node_name: nodeRef,
@@ -25148,7 +25215,7 @@ function registerComputeTools(server) {
   );
   server.tool(
     "evor_preflight",
-    "Smoke-test the run environment before committing GPU time. Two modes: mode='full' (default) runs the 5-step micro-train + import/GPU checks \u2014 checks: import_ok, loss_decreasing, gpu_active; returns {run_id, checks, passed}. mode='env_only' checks imports + env variables only \u2014 fast, no GPU required, safe to call on CPU-only nodes or before evor_capability. Pass no_gpu_check=true to skip GPU utilisation even in full mode.",
+    "Smoke-test the run environment before committing GPU time. Two modes: mode='full' (default) checks import_ok and gpu_active, and reports loss_decreasing \u2014 which is ALWAYS null at setup: the micro-train needs a candidate worktree and none exists yet. A null check is listed in `unverified`; it was not run and must not be read as passed. Returns {run_id, checks, passed, unverified?}. mode='env_only' checks imports + env variables only \u2014 fast, no GPU required, safe to call on CPU-only nodes or before evor_capability. Pass no_gpu_check=true to skip GPU utilisation even in full mode.",
     {
       run_id: external_exports.string().describe("Active run identifier"),
       run_dir: external_exports.string().optional().describe("Explicit run_dir override"),
@@ -25234,7 +25301,7 @@ function registerComputeTools(server) {
   );
   server.tool(
     "evor_init_eval_suite",
-    "Create the initial evaluation suite for a new mission. Returns {eval_version, mission_id, domains, created_at}.",
+    "Create the initial evaluation suite for a new mission. Call AFTER evor_freeze_splits: its domains are read from the frozen test split (one per distinct per-sample domain), and before a freeze it can only produce a single placeholder 'primary' domain. Returns {eval_version, mission_id, domains, created_at}.",
     {
       mission_id: external_exports.string().describe("Mission identifier"),
       eval_version: external_exports.string().describe("Eval version string (e.g. v1)"),
@@ -25256,7 +25323,7 @@ function registerComputeTools(server) {
   );
   server.tool(
     "evor_seal_eval_script",
-    "Hash the canonical evaluator \u2014 EVERY file it comprises, per the evaluator contract, which for the generated shape is the harness AND the mission's score_plugin.py \u2014 and lock the digest into goal-contract.json so the integrity gate's no_eval_shift check verifies against a real value. Call once after the canonical evaluator is written.",
+    "Seal the canonical evaluator into goal-contract.json: eval_script_hash = sha256 of eval-suites/<eval_version>.py, and \u2014 when the mission has one \u2014 eval_plugin_hash = sha256 of score_plugin.py, the metric itself. The integrity gate's no_eval_shift check verifies both. Call once after the canonical evaluator is written.",
     {
       run_id: external_exports.string().describe("Active run identifier"),
       eval_version: external_exports.string().describe("Eval version string (e.g. v1)"),
@@ -25272,7 +25339,11 @@ function registerComputeTools(server) {
         );
       }
       const content = (0, import_fs18.readFileSync)(evalScriptPath);
-      const { hash, files } = digestEvaluator(runDir, eval_version);
+      const fileSha = (path) => (0, import_crypto4.createHash)("sha256").update((0, import_fs18.readFileSync)(path)).digest("hex");
+      const hash = fileSha(evalScriptPath);
+      const pluginPath = `${runDir}/eval-suites/score_plugin.py`;
+      const pluginHash = (0, import_fs18.existsSync)(pluginPath) ? fileSha(pluginPath) : void 0;
+      const { files } = digestEvaluator(runDir, eval_version);
       const receiptPath = `${runDir}/eval-suites/${eval_version}.sealed.json`;
       let receipt = null;
       try {
@@ -25280,9 +25351,16 @@ function registerComputeTools(server) {
       } catch {
         receipt = null;
       }
-      if (receipt?.hash && receipt.hash !== hash) {
+      const sealedMain = receipt?.files?.[`${eval_version}.py`] ?? receipt?.hash;
+      const sealedPlugin = receipt?.files?.["score_plugin.py"] ?? receipt?.plugin_hash;
+      if (sealedPlugin && pluginHash && sealedPlugin !== pluginHash) {
         return err2(
-          `refusing to re-seal ${eval_version}: this run sealed it at ${String(receipt.sealed_at ?? "an earlier time")} with hash ${receipt.hash.slice(0, 12)}\u2026, and the file on disk now hashes to ${hash.slice(0, 12)}\u2026. The evaluator changed after it was sealed. Re-sealing would make the changed file the sealed one and retroactively validate every score recorded under the old anchor \u2014 which is what happened at 23:49 in the field run. If replacing the evaluator is intended, seal it under a NEW eval_version so existing scores keep the evaluator they were measured with.`
+          `refusing to re-seal ${eval_version}: score_plugin.py changed after it was sealed (${sealedPlugin.slice(0, 12)}\u2026 \u2192 ${pluginHash.slice(0, 12)}\u2026). The plugin is the metric; replacing it under the same anchor would revalidate every score already recorded. Seal the new metric under a NEW eval_version.`
+        );
+      }
+      if (sealedMain && sealedMain !== hash) {
+        return err2(
+          `refusing to re-seal ${eval_version}: this run sealed it at ${String(receipt?.sealed_at ?? "an earlier time")} with hash ${sealedMain.slice(0, 12)}\u2026, and the file on disk now hashes to ${hash.slice(0, 12)}\u2026. The evaluator changed after it was sealed. Re-sealing would make the changed file the sealed one and retroactively validate every score recorded under the old anchor \u2014 which is what happened at 23:49 in the field run. If replacing the evaluator is intended, seal it under a NEW eval_version so existing scores keep the evaluator they were measured with.`
         );
       }
       try {
@@ -25296,12 +25374,21 @@ function registerComputeTools(server) {
           `could not take custody of ${eval_version}: ${String(e)}. The evaluator is hardlinked outside the run, so sealing it would anchor a file another path can still rewrite.`
         );
       }
-      patchGoalContract(runDir, { eval_script_hash: hash });
+      patchGoalContract(runDir, {
+        eval_script_hash: hash,
+        ...pluginHash !== void 0 ? { eval_plugin_hash: pluginHash } : {}
+      });
       try {
         (0, import_fs18.writeFileSync)(
           receiptPath,
           JSON.stringify(
-            { eval_version, hash, files, sealed_at: (/* @__PURE__ */ new Date()).toISOString() },
+            {
+              eval_version,
+              hash,
+              ...pluginHash !== void 0 ? { plugin_hash: pluginHash } : {},
+              files,
+              sealed_at: (/* @__PURE__ */ new Date()).toISOString()
+            },
             null,
             2
           ),
@@ -25309,7 +25396,13 @@ function registerComputeTools(server) {
         );
       } catch {
       }
-      return ok2({ ok: true, eval_version, hash, files });
+      return ok2({
+        ok: true,
+        eval_version,
+        hash,
+        ...pluginHash !== void 0 ? { plugin_hash: pluginHash } : {},
+        files
+      });
     }
   );
   server.tool(

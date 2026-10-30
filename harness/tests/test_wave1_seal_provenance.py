@@ -45,6 +45,7 @@ def _make_frozen_split(
     samples: dict[str, bytes],
     eval_version: str = "v1",
     mission_id: str = "test-mission",
+    groups: dict[str, str] | None = None,
 ) -> FrozenSplit:
     per_sample_hashes = {k: _sha256(v) for k, v in samples.items()}
     split_hash = _compute_split_hash(per_sample_hashes)
@@ -66,6 +67,9 @@ def _make_frozen_split(
         frozen_at="2026-08-23T00:00:00Z",
         storage_path=str(run_dir / "frozen-splits" / f"{eval_version}-test.json"),
         eval_version=eval_version,
+        # Declared lineage: test item -> source page. The source-page leakage
+        # check can only answer from this; without it it reports "not evaluated".
+        per_sample_groups=groups or {},
     )
     (run_dir / "frozen-splits" / f"{eval_version}-test.json").write_text(
         split.model_dump_json(indent=2)
@@ -250,7 +254,14 @@ def _office_corpus(run_dir: Path) -> tuple[FrozenSplit, Path]:
         "office_scan_p17_b": b"PAGE17-degraded-SCAN",
         "office_print_p42_b": b"PAGE42-degraded-PRINT",
     }
-    frozen_test = _make_frozen_split(run_dir, test_samples)
+    # The lineage the gate needs: each test item's SOURCE PAGE. Without it the
+    # source-page leakage check cannot answer and returns None (not evaluated),
+    # which is how these cases came to fail after the check was implemented —
+    # the fixture still described a corpus that declares no lineage.
+    frozen_test = _make_frozen_split(run_dir, test_samples, groups={
+        "office_scan_p17_b": "page-17",
+        "office_print_p42_b": "page-42",
+    })
 
     # The train-side half, recorded through the provenance channel the gate reads.
     prov_path = run_dir / "nodes" / "node-test-001" / "data-provenance.jsonl"
@@ -332,12 +343,10 @@ class TestM03SourcePageLeakage:
         """M-03 — the office_scan/office_print shape, 100% leaked.
 
         Invariant: two degradations of one source page, split across train and
-        test, must fail the gate (no_label_contamination / no_test_leakage).
-        Current behaviour: ``_check_no_label_contamination`` returns True
-        unconditionally, ``_check_no_test_leakage`` only looks for duplicate
-        hashes *within* the frozen test split, and check 9 compares
-        ``source_sample_id`` against test *indices* only — so a shared source
-        page is invisible on every one of the three surfaces. The gate passes.
+        test, must fail the gate. Caught by ``no_source_page_leakage``, which
+        compares the test items' declared source pages (``per_sample_groups``)
+        against the train side's ``source_sample_id``. (Written RED, before that
+        check existed, when a shared source page was invisible on every surface.)
         """
         run_dir = tmp_path / "run"
         run_dir.mkdir()
@@ -345,17 +354,14 @@ class TestM03SourcePageLeakage:
 
         report = _run_gate(run_dir, frozen_test, prov_path)
 
-        leakage_seen = (
-            not report.checks.no_test_leakage
-            or not report.checks.no_label_contamination
-            or not report.checks.data_provenance_valid
-        )
-        assert leakage_seen, (
+        # The check the M-03 fix added. The previous form OR'd three surfaces
+        # together, and `not report.checks.no_label_contamination` was True for a
+        # None — a check nothing computes any more — so that assertion passed
+        # vacuously while the verdict assertion below failed.
+        assert report.checks.no_source_page_leakage is False, (
             "train and test both contain a degradation of page-17 and page-42 "
             "(identical GT mask, different image bytes) and the gate reported "
-            f"no leakage: no_test_leakage={report.checks.no_test_leakage}, "
-            f"no_label_contamination={report.checks.no_label_contamination}, "
-            f"data_provenance_valid={report.checks.data_provenance_valid}"
+            f"no_source_page_leakage={report.checks.no_source_page_leakage}"
         )
         assert report.verdict == "failed", report.failure_reason
 
@@ -375,6 +381,10 @@ class TestM03SourcePageLeakage:
         frozen_test = _make_frozen_split(run_dir, {
             "nabuco_p3": b"NABUCO-page-3-scan",
             "monk_cuper_p8": b"MONK-page-8-scan",
+        }, groups={
+            # Source pages that appear nowhere in train.
+            "nabuco_p3": "nabuco-page-3",
+            "monk_cuper_p8": "monk-cuper-page-8",
         })
 
         prov_path = run_dir / "nodes" / "node-test-001" / "data-provenance.jsonl"
@@ -402,7 +412,11 @@ class TestM03SourcePageLeakage:
         report = _run_gate(run_dir, frozen_test, prov_path)
 
         assert report.checks.no_test_leakage is True
-        assert report.checks.no_label_contamination is True
+        # The benign arm's real subject: a shared GT mask from DIFFERENT source
+        # pages is not leakage. This asserted `no_label_contamination`, which no
+        # longer computes and comes back None — so the arm could not tell a fix
+        # that flags every mask collision from one that does not.
+        assert report.checks.no_source_page_leakage is True
         assert report.checks.data_provenance_valid is True
         assert report.verdict == "passed", report.failure_reason
 

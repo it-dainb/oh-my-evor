@@ -32,7 +32,13 @@ function runStop(tickState: unknown, payload: Record<string, unknown> = {}) {
   const runDir = join(root, ".evor", "runs", "m1", "r1");
   mkdirSync(runDir, { recursive: true });
   writeFileSync(join(root, ".evor", "active-run.json"), JSON.stringify({ run_id: "r1", mission_id: "m1" }));
-  writeFileSync(join(runDir, "run-state.json"), JSON.stringify({ run_id: "r1", tick: 1, pending_node_ids: [] }));
+  // tick_records for the tick under test, so the separate "finished tick with no
+  // tick_record" debt (stop.mjs guard f) does not mask the guard these cases are about.
+  const recTick = (tickState as { tick?: number } | undefined)?.tick ?? 1;
+  writeFileSync(join(runDir, "run-state.json"), JSON.stringify({
+    run_id: "r1", tick: 1, pending_node_ids: [],
+    tick_records: [{ tick: recTick, outcome: "scored", score: 0.5 }],
+  }));
   writeFileSync(join(runDir, "mission-state.json"), JSON.stringify({ status: "running", tick: 1 }));
   if (tickState !== undefined) writeFileSync(join(runDir, "tick-state.json"), JSON.stringify(tickState));
 

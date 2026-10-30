@@ -53,28 +53,17 @@ const MISSION = "binarization-worldmodel-min98-2026-08";
 const sha256 = (s: string): string => createHash("sha256").update(s, "utf8").digest("hex");
 
 /**
- * The anchor the seal now records: a digest over EVERY file the evaluator
- * comprises, per `harness/evor/eval_contract.py`.
+ * The anchor the seal records: sha256 of `eval-suites/<v>.py`, byte for byte.
  *
- * These cases compared `eval_script_hash` to `sha256(<v>.py)`, which was the
- * seal's whole extent — and that extent is the defect: the generated harness
- * does `from score_plugin import score`, so the function deciding every score
- * sat outside the anchor meant to pin it. The invariants each case asserts are
- * unchanged; only what "the evaluator's hash" means is.
+ * v1.2.6 changed this to a digest over the evaluator's whole file set, and these
+ * cases were rewritten to expect that. Every READER of the anchor still compared
+ * a plain sha256, so every node failed no_eval_shift until v1.2.9 split the
+ * plugin into its own anchor (`eval_plugin_hash`) and restored this one. The
+ * invariants these cases assert never changed — only what the anchor means did,
+ * twice. `seal-to-readers.test.ts` now runs the seal against every reader.
  */
-const evaluatorAnchor = (runDir: string, evalVersion = "v1"): string => {
-  const base = join(runDir, "eval-suites");
-  const acc = createHash("sha256");
-  for (const name of [`${evalVersion}.py`, "score_plugin.py"]) {
-    const path = join(base, name);
-    if (!existsSync(path)) continue;
-    acc.update(name);
-    acc.update(Buffer.from([0]));
-    acc.update(createHash("sha256").update(readFileSync(path)).digest("hex"));
-    acc.update("\n");
-  }
-  return acc.digest("hex");
-};
+const evaluatorAnchor = (runDir: string, evalVersion = "v1"): string =>
+  createHash("sha256").update(readFileSync(join(runDir, "eval-suites", `${evalVersion}.py`))).digest("hex");
 
 let tmpRoot: string;
 let savedEvorRoot: string | undefined;

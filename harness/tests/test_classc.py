@@ -430,15 +430,35 @@ def test_stop_coverage_not_yet(tmp_path: Path) -> None:
 
 
 def test_stop_circuit_breaker_overrides(tmp_path: Path) -> None:
-    """circuit-breaker: tick >= circuit_breaker always stops, even if no other condition fires."""
-    budget = _make_budget(max_iterations=50, circuit_breaker=10, max_cost_usd=1000.0)
+    """circuit-breaker: N consecutive FAILED ticks always stop, even if no other condition fires.
+
+    This case used to assert `tick >= circuit_breaker` — a tick cap — which is
+    what the stop path implemented and NOT what the setup interview asks for
+    ("Do you want a circuit breaker (max consecutive failures)?"). Under the tick
+    reading, tick 10 with breaker 10 stopped a run that had never failed once.
+    """
+    budget = _make_budget(max_iterations=50, circuit_breaker=3, max_cost_usd=1000.0)
     goal = _make_goal(stop_type="target", baseline=0.70, target=0.99, budget=budget)
     engine = _make_engine(goal=goal, tmp_path=tmp_path)
-    # best_score=0.50 would not trigger target; but circuit_breaker=10, tick=10
+    # best_score=0.50 would not trigger target; three failed ticks in a row should.
     state = _run_state(tick=10, best_score=0.50)
+    state["tick_records"] = (
+        [{"tick": i, "outcome": "scored", "score": 0.5} for i in range(1, 8)]
+        + [{"tick": i, "outcome": "failed"} for i in range(8, 11)]
+    )
     verdict = check_stop_condition(goal, state, engine)
     assert verdict.should_stop is True
     assert "circuit_breaker" in verdict.reason
+
+
+def test_stop_circuit_breaker_is_not_a_tick_cap(tmp_path: Path) -> None:
+    """The old semantics, pinned as the defect: tick == breaker with no failures does NOT stop."""
+    budget = _make_budget(max_iterations=50, plateau_window=50, circuit_breaker=10, max_cost_usd=1000.0)
+    goal = _make_goal(stop_type="target", baseline=0.70, target=0.99, budget=budget)
+    engine = _make_engine(goal=goal, tmp_path=tmp_path)
+    state = _run_state(tick=10, best_score=0.50)
+    verdict = check_stop_condition(goal, state, engine)
+    assert verdict.should_stop is False, verdict.reason
 
 
 def test_stop_no_condition_triggered(tmp_path: Path) -> None:

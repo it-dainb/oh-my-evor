@@ -13,7 +13,7 @@
   "grounded_rule": {
     "file": "skills/evor/SKILL.md",
     "quote": "confirms completion exclusively via `evor_read_artifact` \u2014 do not read artifact files directly.",
-    "sha256_at_authoring": "8e71327f2a7f7640c7342786f527cbffb0b5658b0d51eb3acab458e56c807483"
+    "sha256_at_authoring": "6da8b09e1ac379fe06aef05ae34436cb2c21b054f1c53c191195bf03ac602c16"
   },
   "grounding": [
     "field-trace:J-03",

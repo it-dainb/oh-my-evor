@@ -359,12 +359,24 @@ export function lockEvaluate(
   // Verify against the mission's locked canonical evaluator hash before locking.
   // Done outside the fs try/catch so resolveRunPaths errors don't mask hash errors.
   let contractHash = "";
+  let legacySetAnchorOk = false;
   try {
     const { runDir } = resolveRunPaths(runId, missionId);
     const contractPath = join(runDir, "goal-contract.json");
     if (existsSync(contractPath)) {
       const contract = JSON.parse(readFileSync(contractPath, "utf8")) as Record<string, unknown>;
       contractHash = typeof contract.eval_script_hash === "string" ? contract.eval_script_hash : "";
+      // v1.2.6–v1.2.9 sealed a digest over the evaluator's file SET into this
+      // field, and this check compares one file's sha256 — so no node could be
+      // locked under such a contract. The set digest commits to the same bytes,
+      // so it is honoured when the node's copy equals the sealed canonical file.
+      const version = typeof contract.eval_version === "string" ? contract.eval_version : "";
+      const canonical = join(runDir, "eval-suites", `${version}.py`);
+      if (version && existsSync(canonical) && contractHash === digestEvaluator(runDir, version).hash) {
+        legacySetAnchorOk =
+          createHash("sha256").update(readFileSync(canonical)).digest("hex")
+          === createHash("sha256").update(readFileSync(evalPath)).digest("hex");
+      }
     }
   } catch {
     // Fail-open: if we can't read the contract (run dir missing, parse error, etc.), proceed.
@@ -373,7 +385,7 @@ export function lockEvaluate(
   try {
     const hash = createHash("sha256").update(readFileSync(evalPath)).digest("hex");
 
-    if (contractHash && contractHash !== hash) {
+    if (contractHash && contractHash !== hash && !legacySetAnchorOk) {
       return {
         ok: false,
         node_name: nodeRef,
@@ -737,8 +749,10 @@ export function registerComputeTools(server: McpServer): void {
   server.tool(
     "evor_preflight",
     "Smoke-test the run environment before committing GPU time. "
-    + "Two modes: mode='full' (default) runs the 5-step micro-train + import/GPU checks — "
-    + "checks: import_ok, loss_decreasing, gpu_active; returns {run_id, checks, passed}. "
+    + "Two modes: mode='full' (default) checks import_ok and gpu_active, and reports "
+    + "loss_decreasing — which is ALWAYS null at setup: the micro-train needs a candidate "
+    + "worktree and none exists yet. A null check is listed in `unverified`; it was not "
+    + "run and must not be read as passed. Returns {run_id, checks, passed, unverified?}. "
     + "mode='env_only' checks imports + env variables only — fast, no GPU required, "
     + "safe to call on CPU-only nodes or before evor_capability. "
     + "Pass no_gpu_check=true to skip GPU utilisation even in full mode.",
@@ -881,7 +895,9 @@ export function registerComputeTools(server: McpServer): void {
   // ── evor_init_eval_suite ────────────────────────────────────────────────────
   server.tool(
     "evor_init_eval_suite",
-    "Create the initial evaluation suite for a new mission. "
+    "Create the initial evaluation suite for a new mission. Call AFTER evor_freeze_splits: "
+    + "its domains are read from the frozen test split (one per distinct per-sample domain), "
+    + "and before a freeze it can only produce a single placeholder 'primary' domain. "
     + "Returns {eval_version, mission_id, domains, created_at}.",
     {
       mission_id: z.string().describe("Mission identifier"),
@@ -914,11 +930,10 @@ export function registerComputeTools(server: McpServer): void {
   // ── evor_seal_eval_script ───────────────────────────────────────────────────
   server.tool(
     "evor_seal_eval_script",
-    "Hash the canonical evaluator — EVERY file it comprises, per the evaluator "
-    + "contract, which for the generated shape is the harness AND the mission's "
-    + "score_plugin.py — and lock the digest into goal-contract.json so the integrity "
-    + "gate's no_eval_shift check verifies against a real value. Call once after the "
-    + "canonical evaluator is written.",
+    "Seal the canonical evaluator into goal-contract.json: eval_script_hash = sha256 of "
+    + "eval-suites/<eval_version>.py, and — when the mission has one — eval_plugin_hash = "
+    + "sha256 of score_plugin.py, the metric itself. The integrity gate's no_eval_shift "
+    + "check verifies both. Call once after the canonical evaluator is written.",
     {
       run_id: z.string().describe("Active run identifier"),
       eval_version: z.string().describe("Eval version string (e.g. v1)"),
@@ -935,21 +950,28 @@ export function registerComputeTools(server: McpServer): void {
       }
       const content = readFileSync(evalScriptPath);
 
-      // ── The evaluator is a SET of files ───────────────────────────────────
+      // ── Two anchors, one per file — never one digest over both ───────────
       //
-      // This hashed `eval-suites/<v>.py` alone. The generated harness does
-      // `from score_plugin import score`, so the function that decides every
-      // score sat OUTSIDE the anchor whose stated purpose is that nobody can
-      // shift the metric — a rewrite of the plugin left custody reporting
-      // intact.
+      // `eval_script_hash` is sha256(<v>.py), byte for byte. Three readers
+      // compute exactly that and compare: integrity check 4 (no_eval_shift),
+      // ForgeStructureGate.eval_locked, and the evaluator install check above.
       //
-      // `harness/evor/eval_contract.py` OWNS the rule; this mirrors it, and
-      // `mcp/tests/eval-contract-parity.test.ts` runs both over one fixture and
-      // fails if the hashes diverge. A mirror plus a parity test, rather than a
-      // subprocess on the seal's hot path — and rather than a second
-      // independent opinion, which is the shape of defect this whole change
-      // exists to remove.
-      const { hash, files } = digestEvaluator(runDir, eval_version);
+      // v1.2.6 replaced it with a digest over the evaluator's whole FILE SET, to
+      // bring score_plugin.py — the actual metric — under custody. The goal was
+      // right and the move was wrong: it changed what the anchor MEANS and none of
+      // the three readers moved with it, so every node failed no_eval_shift from
+      // v1.2.6 on and nothing could ever be promoted. A parity test pinned the seal
+      // to evor.eval_contract and nothing pinned it to the gate that reads it. The
+      // first live tick on a current CLI found it.
+      //
+      // So the plugin gets its OWN anchor, `eval_plugin_hash`, and the anchor every
+      // reader already understands keeps its meaning. The per-file manifest still
+      // goes in the receipt.
+      const fileSha = (path: string) => createHash("sha256").update(readFileSync(path)).digest("hex");
+      const hash = fileSha(evalScriptPath);
+      const pluginPath = `${runDir}/eval-suites/score_plugin.py`;
+      const pluginHash = existsSync(pluginPath) ? fileSha(pluginPath) : undefined;
+      const { files } = digestEvaluator(runDir, eval_version);
 
       // ── J-01: re-sealing must not launder an out-of-band rewrite ─────────
       //
@@ -974,14 +996,31 @@ export function registerComputeTools(server: McpServer): void {
       // distinguish "we sealed this" from "someone wrote a hash here". The
       // receipt is written by the seal and by nothing else.
       const receiptPath = `${runDir}/eval-suites/${eval_version}.sealed.json`;
-      let receipt: { hash?: string; sealed_at?: string } | null = null;
+      let receipt: {
+        hash?: string; plugin_hash?: string; files?: Record<string, string>; sealed_at?: string;
+      } | null = null;
       try { receipt = JSON.parse(readFileSync(receiptPath, "utf8")); } catch { receipt = null; }
 
-      if (receipt?.hash && receipt.hash !== hash) {
+      // Compare CONTENT, file by file. A receipt from v1.2.6–v1.2.9 carries a
+      // set digest in `hash` and the per-file shas in `files`; reading `files`
+      // first is what lets such a run re-seal in place and get a correct anchor,
+      // instead of being refused as a tamper over bytes that never changed.
+      const sealedMain = receipt?.files?.[`${eval_version}.py`] ?? receipt?.hash;
+      const sealedPlugin = receipt?.files?.["score_plugin.py"] ?? receipt?.plugin_hash;
+      if (sealedPlugin && pluginHash && sealedPlugin !== pluginHash) {
+        return err(
+          `refusing to re-seal ${eval_version}: score_plugin.py changed after it was sealed ` +
+          `(${sealedPlugin.slice(0, 12)}… → ${pluginHash.slice(0, 12)}…). The plugin is the ` +
+          `metric; replacing it under the same anchor would revalidate every score already ` +
+          `recorded. Seal the new metric under a NEW eval_version.`,
+        );
+      }
+
+      if (sealedMain && sealedMain !== hash) {
         return err(
           `refusing to re-seal ${eval_version}: this run sealed it at ` +
-          `${String(receipt.sealed_at ?? "an earlier time")} with hash ` +
-          `${receipt.hash.slice(0, 12)}…, and the file on disk now hashes to ${hash.slice(0, 12)}…. ` +
+          `${String(receipt?.sealed_at ?? "an earlier time")} with hash ` +
+          `${sealedMain.slice(0, 12)}…, and the file on disk now hashes to ${hash.slice(0, 12)}…. ` +
           `The evaluator changed after it was sealed. Re-sealing would make the changed file ` +
           `the sealed one and retroactively validate every score recorded under the old anchor — ` +
           `which is what happened at 23:49 in the field run. If replacing the evaluator is ` +
@@ -1016,7 +1055,10 @@ export function registerComputeTools(server: McpServer): void {
         );
       }
 
-      patchGoalContract(runDir, { eval_script_hash: hash });
+      patchGoalContract(runDir, {
+        eval_script_hash: hash,
+        ...(pluginHash !== undefined ? { eval_plugin_hash: pluginHash } : {}),
+      });
 
       // The receipt is what makes the NEXT call able to tell a tamper from a
       // first seal. Written after custody, so it attests the file this run owns.
@@ -1024,7 +1066,11 @@ export function registerComputeTools(server: McpServer): void {
         writeFileSync(
           receiptPath,
           JSON.stringify(
-            { eval_version, hash, files, sealed_at: new Date().toISOString() },
+            {
+              eval_version, hash,
+              ...(pluginHash !== undefined ? { plugin_hash: pluginHash } : {}),
+              files, sealed_at: new Date().toISOString(),
+            },
             null,
             2,
           ),
@@ -1032,7 +1078,11 @@ export function registerComputeTools(server: McpServer): void {
         );
       } catch { /* unwritable run dir — the contract anchor still stands */ }
 
-      return ok({ ok: true, eval_version, hash, files });
+      return ok({
+        ok: true, eval_version, hash,
+        ...(pluginHash !== undefined ? { plugin_hash: pluginHash } : {}),
+        files,
+      });
     },
   );
 

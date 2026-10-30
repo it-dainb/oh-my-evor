@@ -109,7 +109,7 @@
     "file": "skills/evor-setup/SKILL.md",
     "line": 332,
     "quote": "evor_freeze_splits seals the split integrity anchors server-side. Never attempt to compute or write anchor values yourself — if evor_freeze_splits returns an error, surface it and stop; there is no agent-side fallback.",
-    "sha256_at_authoring": "068ac943aea7bbc6fc75c02dc2306b15d6879b77455d990b36e80b90aba2439b"
+    "sha256_at_authoring": "9370dd51c3eaad923aef0b143a74492463c6a761851285f67199b6455882b4db"
   },
   "grounding": [
     "field-trace:H-06",

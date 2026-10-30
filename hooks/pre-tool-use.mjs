@@ -239,6 +239,33 @@ try {
   // ── Spawn-hierarchy gate — child agents may be spawned ONLY by their parent ──
   const spawnType = String(ti?.subagent_type ?? '').replace(/^oh-my-evor:/, '');
 
+  // ── A sub-agent spawns in the FOREGROUND ───────────────────────────────────
+  //
+  // A foreground Agent/Task call blocks until the child returns — that IS the
+  // wait primitive, and several in one message run in parallel and are all
+  // awaited. A BACKGROUND spawn returns at once, the caller's turn ends, and
+  // nothing wakes a sub-agent when its child finishes: the completion notice goes
+  // to MAIN. Only main is re-activated by notifications.
+  //
+  // Measured, same seed, same CLI (2.1.312), 2026-10-30:
+  //   13 foreground spawns, 0 background  → the tick ran the whole loop, 1 node
+  //    3 foreground, 4 background (Sage's juniors) → Sage was never woken to
+  //      aggregate, the tick was never woken, main had nothing to act on, and the
+  //      process exited 4 s after the last junior. 0 nodes.
+  // The tick's own "no blocking primitive (TaskOutput unregistered)" signal, and
+  // the v1.2.7 yield design built on it, missed that the primitive was the
+  // foreground call it already had. Main may background: it is woken.
+  if ((tool === 'Task' || tool === 'Agent') && !isMain && ti?.run_in_background === true) {
+    deny(
+      `[EVOR GOVERNOR] ${agentType} may not spawn a sub-agent in the background. Nothing ` +
+        `wakes a sub-agent when its background child finishes — the notice goes to main — so ` +
+        `your turn would end and the work would stop. Spawn it in the FOREGROUND (omit ` +
+        `run_in_background): the call blocks until the child returns. For parallel fan-out, ` +
+        `put several Agent calls in ONE message; they run concurrently and are all awaited.`,
+      { tool, target: spawnType || String(ti?.subagent_type ?? '') }
+    );
+  }
+
   // ── §0.3: an evor spawn must never carry `name` ─────────────────────────────
   // Passing `name` turns the spawn into an in-process teammate. The teammate then
   // presents under that name rather than its subagent_type, so every matcher in

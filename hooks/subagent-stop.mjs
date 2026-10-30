@@ -314,7 +314,7 @@ const runDir = missionId
 // the whole cost landed on the orchestrator — which could only re-spawn or nudge.
 //
 // `SKILL.md` already tells the tick how to wait (`evor_await_artifact`, then
-// `TaskOutput(task_id, block:true)` or `Monitor` the artifact). Prose was not
+// a FOREGROUND spawn, which blocks until the child returns). Prose was not
 // enough; this is the same instruction delivered where the agent cannot skip it.
 //
 // Bounded by the shared retry counter — at most MAX_RETRIES nudges per agent_id,
@@ -345,9 +345,10 @@ try {
           `Yielding to wait IS allowed and is not this: if you had spawned an agent that is ` +
           `still running, or called evor_await_artifact to record what you are blocked on, ` +
           `this would not have fired.\n` +
-          `If you spawned an agent, WAIT for it: call evor_await_artifact to record WHAT you ` +
-          `are waiting for, then TaskOutput(task_id, block:true) on that agent, or Monitor the ` +
-          `artifact path it owes. Do not poll, and do not emit a "waiting..." turn.\n` +
+          `To wait for a child, spawn it in the FOREGROUND: the Agent call blocks until it ` +
+          `returns, and several Agent calls in one message run in parallel and are all ` +
+          `awaited. A background spawn ends your turn and nothing wakes you. (TaskOutput is ` +
+          `not available to a sub-agent.) Do not poll, and do not emit a "waiting..." turn.\n` +
           `Return only once the tick reaches step 9 with a recorded outcome — or, if it truly ` +
           `cannot, with outcome:"failed" and an "error" that says what blocked it.`,
       }) + '\n');

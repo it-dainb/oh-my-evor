@@ -277,19 +277,18 @@ print(len(X))
   };
 
   try {
+    // The machine is measured BEFORE the run: since 624a92d (2026-09-02) init_run
+    // refuses to start without .evor/capability.json, because a run sizes its
+    // candidates against it. This seeder was never updated, so every bench tick
+    // since then failed here — "no capability profile" — before any model ran,
+    // and no live tick was measured for two months. Setup's own order is the same.
+    await step('capability', () => mcp.call('evor_capability', {}));
+
     const init = await step('init_run', () =>
       mcp.call('evor_init_run', { answers: goalContract, mission_id: MISSION_ID }));
     const runId = init.run_id ?? init.runId ?? init.data?.run_id;
     if (!runId) throw new Error(`no run_id in init_run response: ${JSON.stringify(init).slice(0, 300)}`);
     console.log(`    run_id = ${runId}`);
-
-    await step('init_eval_suite', () =>
-      mcp.call('evor_init_eval_suite', {
-        mission_id: MISSION_ID,
-        eval_version: EVAL_VERSION,
-        task_description: goalContract.task_description,
-        run_id: runId,
-      }));
 
     await step('freeze_splits', () =>
       mcp.call('evor_freeze_splits', {
@@ -297,6 +296,16 @@ print(len(X))
         eval_version: EVAL_VERSION,
         run_id: runId,
         mission_id: MISSION_ID,
+      }));
+
+    // AFTER the freeze: the suite's domains are read from the frozen test split
+    // (v1.2.9). Before a freeze it can only produce a placeholder 'primary' domain.
+    await step('init_eval_suite', () =>
+      mcp.call('evor_init_eval_suite', {
+        mission_id: MISSION_ID,
+        eval_version: EVAL_VERSION,
+        task_description: goalContract.task_description,
+        run_id: runId,
       }));
 
     // A from-scratch mission has no evaluator until the run authors one, so

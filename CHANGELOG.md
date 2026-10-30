@@ -2,6 +2,160 @@
 
 All notable changes to Evor. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.2.9] — 2026-10-30 — the budget meant what the interview said, and the first live tick in two months
+
+### ⚠ Every node failed integrity from v1.2.6 to v1.2.8
+
+`eval_script_hash` has one writer, the seal, and three readers — integrity check 4
+(`no_eval_shift`), `ForgeStructureGate.eval_locked`, and `lockEvaluate` — all of which compare
+**sha256 of one file**. v1.2.6 made the seal write a digest over the evaluator's whole file set,
+to bring `score_plugin.py` under custody, and moved none of the readers. From v1.2.6 every node
+failed `no_eval_shift` and no node could be locked, so nothing could ever be promoted. It shipped
+to `main` as 1.2.8. The parity test pinned the seal to `evor.eval_contract`; nothing pinned it to
+the gate that reads it.
+
+- One anchor per file: `eval_script_hash` = sha256(`<v>.py`) again, new `eval_plugin_hash` =
+  sha256(`score_plugin.py`). The gate checks both; a rewritten metric under an intact harness
+  still fails.
+- Contracts sealed by 1.2.6–1.2.8 carry a set digest. It commits to the same bytes, so it is
+  accepted — translated in one place per runtime (`eval_contract.per_file_anchor`,
+  `lockEvaluate`) — and re-sealing such a run rewrites the anchor to the per-file form. The
+  tamper guard compares content file by file, so the re-seal is not mistaken for a tamper.
+- `mcp/tests/seal-to-readers.test.ts` runs the real seal against every reader in both runtimes.
+  It fails on the 1.2.8 seal.
+
+Verified live: a bench tick's node — `feature-cross-lr-01`, fitness 0.874 — passed integrity
+with `no_eval_shift: true`. The previous tick's node failed on exactly this check.
+
+### A sub-agent spawns in the foreground
+
+v1.2.7 assumed the platform re-activates a sub-agent when its background child finishes. It
+does not: completion notices go to MAIN. The "resumptions" that seemed to prove it were agents
+calling `SendMessage` on each other. The wait primitive a sub-agent has is a FOREGROUND `Agent`
+call, which blocks until the child returns — several in one message run in parallel and are all
+awaited. Same seed, same CLI: 13 foreground / 0 background spawns ran the whole tick; 3 / 4 (Sage
+backgrounding its juniors) stalled and exited with 0 nodes.
+
+- The governor denies `run_in_background` from any sub-agent. Main may still background.
+- `skills/evor/SKILL.md`, `agents/evor-tick.md` and the SubagentStop message no longer prescribe
+  `TaskOutput(block:true)`, which a sub-agent never had. On a `yielding` return main resumes that
+  tick with `SendMessage` instead of idling for a wake-up that does not come.
+
+### The live-tick runner could not run
+
+`ci/bench-tick.sh` failed in seeding from 2026-09-02 to now — `init_run` refused "no capability
+profile" — so no live tick was measured for two months, across every release.
+
+- The seeder never probed the machine; it does now, and freezes before the eval suite.
+- `init_run` resolved the evor root twice: run creation honoured `EVOR_ROOT`, the probe check
+  used the process cwd. With the root set by environment it looked in the wrong `.evor`. One
+  resolver; the new test fails on the old code with the field error.
+- The images pinned CLI 2.1.220, which never resumes a yielding sub-agent; ticks died at the
+  first spawn. Both pinned to 2.1.312. Measurements under 2.1.220 are not comparable. The ML
+  image's `claude-agent-sdk@0.3.220` pin was paired with the old CLI and is left as it was.
+
+### A correction to this release
+
+K-06 was first made to reject a breaker longer than the budget. That is inert, not harmful, and
+rejecting it refused every short run with a default breaker — including the 1-tick bench mission.
+It is disclosed and passes.
+
+### Still open
+
+`tick-state.json`'s step counter is maintained by agent prose: in the verified live tick it stayed
+at step 2 while the tick completed and was recorded `scored`. Nothing blocked on it this time; the
+continuation guard reads it.
+
+
+The September setup transcript reported two "inverted validator predicates" and three
+smaller setup defects. The validator was not inverted. Underneath it was a stop path that
+honoured the three budget numbers selectively, and a per-tick history nothing wrote.
+
+### The budget limits were per stop type
+
+The setup interview asks three questions as if about every mission
+(`skills/evor-setup/SKILL.md:173`): *how many iterations at most*, *the plateau window (ticks
+with no improvement before stopping)*, and *a circuit breaker (max consecutive failures)*.
+`tree.check_stop_condition` answered a different set:
+
+| limit | was enforced for | and meant |
+|---|---|---|
+| `max_iterations` | `maximize-under-budget` only | a tick cap |
+| `plateau_window` | `worst-angle-plateau` only | a spread over `tick_history_scores` |
+| `circuit_breaker` | every type | **`tick >= circuit_breaker`** — a second tick cap, counting nothing |
+
+`tick_history_scores` — read by every history-based stop — was written by nothing, and
+`evor_state_write` is `.strict()` and did not accept the key. So for a `target` mission,
+neither `max_iterations` nor the plateau was ever checked, and the breaker was the only
+working stop. The validator's K-06 rejected any breaker below the budget, which is correct
+under a tick-cap reading, so every mission set breaker = budget — which by accident made it
+the run's only iteration limit. A breaker of 0, or above the budget, would have run forever.
+The setup summary in the field told the operator "plateau_window = 20 is the real early
+stop"; it could not have fired.
+
+- **The breaker counts consecutive FAILED ticks.** `rejected` and `skipped` are not
+  failures — a search that comes up empty is the plateau's job, not the breaker's.
+- **`max_iterations` and `plateau_window` apply to every mission**, checked after the stop
+  type's own goal so a target reached on the last permitted tick is reported as the target.
+  A tick with no score improves nothing.
+- **`evor_state_write({tick_record: {tick, outcome, score?}})`** is the one writer of
+  `run_state.tick_records`; `tick_history_scores` is derived from it and not writable
+  directly. `yielding` is rejected — a wait is not a tick.
+- **The Stop hook flags a finished tick with no record** — debt main can pay in one call.
+  Counted from the first recorded tick, or for a run that predates records, the latest tick
+  only: a run in flight cannot honestly reconstruct outcomes it never stored.
+- **K-06 now checks the hazard that remains**: a breaker longer than the budget can never
+  trip. **K-07's message was false** ("0 is read as unlimited") — the stop path reads 0 as
+  no spend, so a zero ceiling stops the run before tick 1. And it advised omitting a field
+  the schema made required. **`max_cost_usd` is optional**; absent means no ceiling, which is
+  what a local-only run means. Missions had been shipping a nominal $10000.
+
+### Setup took no domains from the data
+
+`create_initial_suite` built one hardcoded `primary` domain, whatever the frozen split held. A
+22-domain mission got a one-domain suite; every open-ended angle and coverage figure described
+that. Domains now come from the frozen split's `per_sample_domains` — derived by `freeze.py`
+from the samples, never the caller — with `primary` only before a freeze. The setup skill now
+orders `evor_init_eval_suite` after `evor_freeze_splits`.
+
+### A preflight check that was not run was reported as passed
+
+`loss_decreasing` needs a candidate worktree, which never exists at setup, so it was always
+`null`, dropped from `required`, and the run printed "PASSED — environment ready". The
+"deferral to the first real training run" is collected by nothing: integrity check 5 rejects
+only NaN, Inf or CONSTANT loss, so a diverging loss passes it. It is now listed under
+`unverified`, the tool description and setup skill stop promising a micro-train, and the
+skill tells the agent to report it as not run.
+
+### Concurrency had nowhere to live
+
+Setup computed and printed "Estimated concurrency: N" and had no field to write it to; the
+only builder of a ResourcePlan is called by nothing. `evor_state_write` now takes a
+`resource_plan`, setup records it, and the tick reads it. It bounds how many candidates train
+AT ONCE — never how many a tick owes.
+
+### The test suite depended on the directory it ran from
+
+Seven `mcp/tests` files resolved repo paths from `process.cwd()`, true only under `npm test`.
+From the repo root every hook spawn in `hooks.test.ts` died with "Cannot find module", ~189
+tests failed for that reason alone, and 26 tests elsewhere skipped silently. Among the
+failures were **16 real ones introduced in v1.2.3**, when the Stop hook moved to the JSON
+block protocol: they asserted `exit 2`, and were invisible because `hooks.test.ts` was already
+red and releases compared failing FILES against a baseline. All seven files now anchor to the
+test file; `no-cwd-relative-paths.test.ts` forbids the pattern; counts are identical from both
+directories. `TestM03SourcePageLeakage` — written RED before its fix existed — now declares
+the lineage the fix reads, and is mutation-checked: with the check stubbed to "clean" the leak
+arm fails.
+
+### Also
+
+`test_r03_run_records_interpreter_and_package_set` failed on the calendar: its capability
+fixture hardcoded `probed_at: 2026-07-06`, which passed init's 2160h staleness limit in
+September and not in late October. It is relative to now.
+
+**Not verified by:** a bench re-measure — skipped by the operator. The agent and skill files
+changed again; evor-tick's 8.1 evidence row stays stale.
+
 ## [1.2.8] — 2026-09-14 — O-01 closed at the write side
 
 `node_identity.py` made every READER tolerant of a node's two identities. That was the

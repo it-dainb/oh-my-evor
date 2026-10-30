@@ -27,12 +27,19 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { spawnSync } from "child_process";
 import { mkdtempSync, rmSync, writeFileSync, mkdirSync, readdirSync, readFileSync, existsSync, utimesSync } from "fs";
-import { join, resolve } from "path";
+import { join, resolve, dirname } from "path";
+import { fileURLToPath } from "url";
 import { tmpdir } from "os";
 
 // Hooks live at ../../hooks/ relative to this file's directory in the repo.
-// process.cwd() is the mcp/ workspace when vitest runs; __dirname is the same.
-const HOOKS_DIR = resolve(process.cwd(), "../hooks");
+// Anchored to THIS FILE, not to process.cwd(). The old form,
+// `resolve(process.cwd(), "../hooks")`, assumed vitest runs from `mcp/` — true
+// under `npm test --workspace=mcp`, false under `npx vitest run mcp/tests/...` from
+// the repo root, where it resolved one directory too high. Every hook spawn then
+// died with "Cannot find module .../research/hooks/stop.mjs", ~189 tests failed
+// for that reason alone, and the file reported nothing about the hooks it exists
+// to check — including 16 real failures hiding among them.
+const HOOKS_DIR = resolve(dirname(fileURLToPath(import.meta.url)), "../../hooks");
 const SESSION_START = join(HOOKS_DIR, "session-start.mjs");
 const POST_TOOL_USE = join(HOOKS_DIR, "post-tool-use.mjs");
 const STOP = join(HOOKS_DIR, "stop.mjs");
@@ -69,6 +76,25 @@ function runHookWithStdin(
     encoding: "utf8",
     timeout: 5000,
   });
+}
+
+/**
+ * The Stop hook's block reason, or "" when it did not block.
+ *
+ * A block is the JSON protocol — `{"decision":"block","reason":...}` on stdout
+ * with exit 0 — not exit 2. Exit 2 makes Claude Code read the reason from STDERR,
+ * and stop.mjs wrote it to stdout, so every block reached the model as "Stop
+ * hook error: … No stderr output" and one run blocked 497 times with an empty
+ * message. These cases asserted `status === 2`, which passed throughout: an exit
+ * code cannot tell a readable block from an unreadable one.
+ */
+function blockOf(result: { stdout?: string | null }): string {
+  try {
+    const parsed = JSON.parse((result.stdout ?? "").trim());
+    return parsed?.decision === "block" ? String(parsed.reason ?? "") : "";
+  } catch {
+    return "";
+  }
 }
 
 /** Build CLAUDE_HOOK_INPUT JSON as the hook expects it. */
@@ -204,7 +230,12 @@ describe("stop hook (continuation guard)", () => {
     mkdirSync(runDir, { recursive: true });
     writeFileSync(
       join(runDir, "run-state.json"),
-      JSON.stringify({ tick_count: 3, pending_node_ids: [], status: "running" })
+      // tick_records present: the subject here is pending_node_ids, and three
+      // completed ticks with no records are a separate debt the hook now flags.
+      JSON.stringify({
+        tick_count: 3, pending_node_ids: [], status: "running",
+        tick_records: [1, 2, 3].map((tick) => ({ tick, outcome: "scored", score: 0.5 })),
+      })
     );
     const result = runHook(STOP, {
       EVOR_ACTIVE_RUN_ID: "run-001",
@@ -214,7 +245,7 @@ describe("stop hook (continuation guard)", () => {
     expect(result.stdout).toBe("");
   });
 
-  it("exits 2 and outputs continuation guard when pending_node_ids is non-empty", () => {
+  it("blocks and outputs continuation guard when pending_node_ids is non-empty", () => {
     const runDir = join(tmpDir, "runs", "run-001");
     mkdirSync(runDir, { recursive: true });
     // Write tree.json with named nodes so the hook can resolve names
@@ -230,7 +261,8 @@ describe("stop hook (continuation guard)", () => {
       EVOR_ACTIVE_RUN_ID: "run-001",
       EVOR_ROOT: tmpDir,
     });
-    expect(result.status).toBe(2);
+    expect(result.status).toBe(0);
+    expect(blockOf(result), `expected a block; stdout=${result.stdout} stderr=${result.stderr}`).not.toBe("");
     expect(result.stdout).toMatch(/EVOR CONTINUATION GUARD/);
     // Hook resolves names from tree.json — expect readable names not raw ids
     expect(result.stdout).toMatch(/node-alpha/);
@@ -254,7 +286,8 @@ describe("stop hook (continuation guard)", () => {
       EVOR_ACTIVE_RUN_ID: "run-001",
       EVOR_ROOT: tmpDir,
     });
-    expect(result.status).toBe(2);
+    expect(result.status).toBe(0);
+    expect(blockOf(result), `expected a block; stdout=${result.stdout} stderr=${result.stderr}`).not.toBe("");
     expect(result.stdout).toMatch(/Tick 7/);
     // Hook uses name from tree.json
     expect(result.stdout).toMatch(/my-candidate/);
@@ -277,7 +310,8 @@ describe("stop hook (continuation guard)", () => {
       EVOR_MISSION_ID: "mission-001",
       EVOR_ROOT: tmpDir,
     });
-    expect(result.status).toBe(2);
+    expect(result.status).toBe(0);
+    expect(blockOf(result), `expected a block; stdout=${result.stdout} stderr=${result.stderr}`).not.toBe("");
     expect(result.stdout).toMatch(/node-gamma/);
   });
 
@@ -510,7 +544,8 @@ describe("kill switches — DISABLE_EVOR", () => {
       EVOR_ROOT: tmpDir,
     });
     // stop is not in the skip list — continuation guard should fire
-    expect(result.status).toBe(2);
+    expect(result.status).toBe(0);
+    expect(blockOf(result), `expected a block; stdout=${result.stdout} stderr=${result.stderr}`).not.toBe("");
   });
 
   it("session-start: DISABLE_EVOR=1 exits 0 silently", () => {
@@ -576,7 +611,7 @@ describe("stop hook — drift-guard (Phase 2)", () => {
     rmSync(tmpDir, { recursive: true, force: true });
   });
 
-  it("exits 2 when a done node has no evaluations/<id>.json (unrecorded integrity)", () => {
+  it("blocks when a done node has no evaluations/<id>.json (unrecorded integrity)", () => {
     const runId = "run-drift-001";
     const nodeId = "node-drift-aaaa";
     const runDir = join(tmpDir, "runs", runId);
@@ -603,14 +638,15 @@ describe("stop hook — drift-guard (Phase 2)", () => {
       EVOR_ACTIVE_RUN_ID: runId,
       EVOR_ROOT: tmpDir,
     });
-    expect(result.status).toBe(2);
+    expect(result.status).toBe(0);
+    expect(blockOf(result), `expected a block; stdout=${result.stdout} stderr=${result.stderr}`).not.toBe("");
     expect(result.stdout).toMatch(/EVOR DRIFT GUARD/);
     // Hook uses node.name — expect readable name, not raw nodeId
     expect(result.stdout).toMatch(/drift-candidate-a/);
     expect(result.stdout).toMatch(/integrity/i);
   });
 
-  it("exits 2 when evaluated node has missing telemetry.jsonl", () => {
+  it("blocks when evaluated node has missing telemetry.jsonl", () => {
     const runId = "run-drift-002";
     const nodeId = "node-drift-bbbb";
     const runDir = join(tmpDir, "runs", runId);
@@ -639,12 +675,13 @@ describe("stop hook — drift-guard (Phase 2)", () => {
       EVOR_ACTIVE_RUN_ID: runId,
       EVOR_ROOT: tmpDir,
     });
-    expect(result.status).toBe(2);
+    expect(result.status).toBe(0);
+    expect(blockOf(result), `expected a block; stdout=${result.stdout} stderr=${result.stderr}`).not.toBe("");
     expect(result.stdout).toMatch(/EVOR DRIFT GUARD/);
     expect(result.stdout).toMatch(/telemetry/i);
   });
 
-  it("exits 2 when telemetry.jsonl exists but is empty (0 bytes)", () => {
+  it("blocks when telemetry.jsonl exists but is empty (0 bytes)", () => {
     const runId = "run-drift-003";
     const nodeId = "node-drift-cccc";
     const runDir = join(tmpDir, "runs", runId);
@@ -666,12 +703,13 @@ describe("stop hook — drift-guard (Phase 2)", () => {
       EVOR_ACTIVE_RUN_ID: runId,
       EVOR_ROOT: tmpDir,
     });
-    expect(result.status).toBe(2);
+    expect(result.status).toBe(0);
+    expect(blockOf(result), `expected a block; stdout=${result.stdout} stderr=${result.stderr}`).not.toBe("");
     expect(result.stdout).toMatch(/EVOR DRIFT GUARD/);
     expect(result.stdout).toMatch(/telemetry/i);
   });
 
-  it("exits 2 when tick-state current_step < 9 and run-state status is running (M-2 fix)", () => {
+  it("blocks when tick-state current_step < 9 and run-state status is running (M-2 fix)", () => {
     // M-2 fix: check (c) reads runState.status (run-state.json) NOT mission-state.json.
     // Proof: mission-state.json is seeded with status="locked" (not "running").
     // The guard must still fire because run-state.json has status="running".
@@ -704,7 +742,8 @@ describe("stop hook — drift-guard (Phase 2)", () => {
       EVOR_ACTIVE_RUN_ID: runId,
       EVOR_ROOT: tmpDir,
     });
-    expect(result.status).toBe(2);
+    expect(result.status).toBe(0);
+    expect(blockOf(result), `expected a block; stdout=${result.stdout} stderr=${result.stderr}`).not.toBe("");
     expect(result.stdout).toMatch(/EVOR DRIFT GUARD/);
     // 1.2/1.9c: the "mid-flight" wording belonged to drift-guard check (c), which
     // is REMOVED. It reported the same condition as Guard 3's continuation check —
@@ -719,7 +758,7 @@ describe("stop hook — drift-guard (Phase 2)", () => {
     expect(result.stdout).toMatch(/behavioral debt|mid-flight|current_step/i);
   });
 
-  it("exits 2 (check c) even without mission-state.json when run-state is running", () => {
+  it("blocks (check c) even without mission-state.json when run-state is running", () => {
     // M-2 fix: check (c) only needs tick-state.json + run-state.json (already loaded).
     // mission-state.json need not exist for the guard to fire.
     const runId = "run-drift-004b";
@@ -744,7 +783,8 @@ describe("stop hook — drift-guard (Phase 2)", () => {
       EVOR_ACTIVE_RUN_ID: runId,
       EVOR_ROOT: tmpDir,
     });
-    expect(result.status).toBe(2);
+    expect(result.status).toBe(0);
+    expect(blockOf(result), `expected a block; stdout=${result.stdout} stderr=${result.stderr}`).not.toBe("");
     expect(result.stdout).toMatch(/EVOR DRIFT GUARD/);
   });
 
@@ -3002,7 +3042,8 @@ describe("stop hook — stop_hook_active escalation (§17D)", () => {
       { EVOR_ACTIVE_RUN_ID: "run-esc-001", EVOR_ROOT: tmpDir },
       JSON.stringify({ stop_hook_active: false }),
     );
-    expect(result.status).toBe(2);
+    expect(result.status).toBe(0);
+    expect(blockOf(result), `expected a block; stdout=${result.stdout} stderr=${result.stderr}`).not.toBe("");
     expect(result.stdout).toContain("[Attempt");
     expect(result.stdout).toMatch(/EVOR_SKIP_HOOKS=stop/);
   });
@@ -3098,7 +3139,8 @@ describe("stop hook — stop_hook_active escalation (§17D)", () => {
       { EVOR_ACTIVE_RUN_ID: "run-esc-005", EVOR_ROOT: tmpDir },
       JSON.stringify({ stop_hook_active: false }),
     );
-    expect(result.status).toBe(2);
+    expect(result.status).toBe(0);
+    expect(blockOf(result), `expected a block; stdout=${result.stdout} stderr=${result.stderr}`).not.toBe("");
     expect(result.stdout).toMatch(/EVOR CONTINUATION GUARD/);
   });
 
@@ -3504,7 +3546,8 @@ describe("stop hook — P0-9 never-halt blockCount escalation", () => {
       { EVOR_ACTIVE_RUN_ID: runId, EVOR_ROOT: tmpDir },
       JSON.stringify({ stop_hook_active: true }),
     );
-    expect(result.status).toBe(2);
+    expect(result.status).toBe(0);
+    expect(blockOf(result), `expected a block; stdout=${result.stdout} stderr=${result.stderr}`).not.toBe("");
     expect(result.stdout).toMatch(/EVOR DRIFT GUARD/);
   });
 
@@ -3548,7 +3591,8 @@ describe("stop hook — P0-9 never-halt blockCount escalation", () => {
       { EVOR_ACTIVE_RUN_ID: runId, EVOR_ROOT: tmpDir },
       JSON.stringify({ stop_hook_active: true }),
     );
-    expect(result.status).toBe(2);
+    expect(result.status).toBe(0);
+    expect(blockOf(result), `expected a block; stdout=${result.stdout} stderr=${result.stderr}`).not.toBe("");
     expect(result.stdout).toMatch(/EVOR CONTINUATION GUARD/);
   });
 
@@ -3572,7 +3616,8 @@ describe("stop hook — P0-9 never-halt blockCount escalation", () => {
       { EVOR_ACTIVE_RUN_ID: runId, EVOR_ROOT: tmpDir },
       JSON.stringify({ stop_hook_active: true }),
     );
-    expect(result.status).toBe(2);
+    expect(result.status).toBe(0);
+    expect(blockOf(result), `expected a block; stdout=${result.stdout} stderr=${result.stderr}`).not.toBe("");
     expect(result.stdout).toMatch(/EVOR CONTINUATION GUARD/);
   });
 });
@@ -3624,7 +3669,8 @@ describe("stop hook — P0-4 pending_subagent_ids guard", () => {
       EVOR_ACTIVE_RUN_ID: runId,
       EVOR_ROOT: tmpDir,
     });
-    expect(result.status).toBe(2);
+    expect(result.status).toBe(0);
+    expect(blockOf(result), `expected a block; stdout=${result.stdout} stderr=${result.stderr}`).not.toBe("");
     expect(result.stdout).toMatch(/EVOR DRIFT GUARD/);
     expect(result.stdout).toMatch(/sub-agent/i);
     expect(result.stdout).toMatch(/abc-forge/);
@@ -3679,7 +3725,8 @@ describe("stop hook — P0-4 pending_subagent_ids guard", () => {
       EVOR_ACTIVE_RUN_ID: runId,
       EVOR_ROOT: tmpDir,
     });
-    expect(result.status).toBe(2);
+    expect(result.status).toBe(0);
+    expect(blockOf(result), `expected a block; stdout=${result.stdout} stderr=${result.stderr}`).not.toBe("");
     expect(result.stdout).toMatch(/4/);
     expect(result.stdout).toMatch(/id-a/);
     expect(result.stdout).toMatch(/id-b/);
