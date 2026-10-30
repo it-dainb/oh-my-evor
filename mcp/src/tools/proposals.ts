@@ -317,7 +317,23 @@ export function registerProposalTools(server: McpServer): void {
       let proposals = given as z.infer<typeof ProposalInputSchema>[] | undefined;
       const needsLookup = !given || given.some((p) => !("approach_family" in p));
       if (needsLookup) {
-        const art = run_id && tick ? readArtifact(run_id, tick, "mutagen", undefined, false, process.env.EVOR_MISSION_ID) : null;
+        // The tick in progress, when the caller did not name one.
+        let atTick = tick;
+        if (atTick === undefined && run_id) {
+          try {
+            const ts = join(resolveRunPaths(run_id, process.env.EVOR_MISSION_ID).runDir, "tick-state.json");
+            const t = existsSync(ts) ? JSON.parse(readFileSync(ts, "utf8"))?.tick : undefined;
+            if (typeof t === "number" && t > 0) atTick = t;
+          } catch { /* no tick to default to */ }
+        }
+        if (!run_id || atTick === undefined) {
+          return { content: [{ type: "text" as const, text: JSON.stringify({
+            ok: false,
+            error: "proposals given by id need run_id (and tick, when no tick is in progress); or pass each proposal in full.",
+          }) }] };
+        }
+        const tick_ = atTick;
+        const art = readArtifact(run_id, tick_, "mutagen", undefined, false, process.env.EVOR_MISSION_ID);
         const all = ((art?.ok ? (art.payload as { proposals?: unknown[] })?.proposals : undefined) ?? []) as
           z.infer<typeof ProposalInputSchema>[];
         if (!all.length) {
@@ -332,7 +348,7 @@ export function registerProposalTools(server: McpServer): void {
         if (missing.length) {
           return { content: [{ type: "text" as const, text: JSON.stringify({
             ok: false,
-            error: `no Mutagen proposal for tick ${tick} has proposal_id ${missing.map((p) => p.proposal_id).join(", ")}`,
+            error: `no Mutagen proposal for tick ${tick_} has proposal_id ${missing.map((p) => p.proposal_id).join(", ")}`,
           }) }] };
         }
         proposals = given

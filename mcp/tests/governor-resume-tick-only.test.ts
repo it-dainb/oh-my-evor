@@ -151,3 +151,15 @@ describe("sed -i edits the files after its script", () => {
     expect(guarded.permissionDecision).toBe("deny");
   });
 });
+
+describe("a redirect writes only where it points", () => {
+  const bash = (command: string) => ({ tool_name: "Bash", tool_input: { command } });
+  it("diffing two worktrees into a scratch patch reads both and writes the patch", () => {
+    const d = decide({ agent_type: "oh-my-evor:evor-forge", ...bash(
+      "cd .evor/worktrees; diff -u a-01/train/trainer.py b-01/train/trainer.py > /tmp/p1.patch") });
+    expect(d.permissionDecision).not.toBe("deny");
+  });
+  it("a redirect into run state is still a write to it", () => {
+    expect(decide(bash("cd .evor/runs/m1/r1 && echo x > mission-state.json"), "draft").permissionDecision).toBe("deny");
+  });
+});

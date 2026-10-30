@@ -2,6 +2,34 @@
 
 All notable changes to Evor. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.2.27] — 2026-10-30 — the tick in progress is the default
+
+### Fixed
+
+- **`evor_validate_proposals` by id needed a tick the caller did not give.** The tick passed
+  proposal ids without `tick`, and the tool answered that Mutagen's proposals were not written,
+  which they were. The tick now defaults to the one in progress, and a call missing what the
+  lookup needs says what is missing.
+- **A Selector verdict with its winner inside a review was rejected.** `winner` is a top-level
+  field; one written inside a single review is now lifted to the top level. Reviews naming
+  different winners are still rejected.
+- **A redirect made every path in its statement a write target.** `diff -u a.py b.py > p.patch`
+  counted as writing both files it compares, so Forge was refused building a patch from two
+  worktrees. A statement whose only write is a redirect now writes only where the redirect
+  points; that includes a bare file name after a `cd`, which was previously missed.
+- **The loop skill told main to poll a yielded tick.** Its execution policy said sub-agents
+  spawn in the foreground and that main should `evor_wait` on what a yielded tick named. Sub-agent
+  spawns are asynchronous, and the agent being waited on wakes main when it finishes. The policy
+  now says to end the turn, to pass a completion notice from inside a tick to that tick with
+  SendMessage, and to resume the tick only when nothing is running.
+- **Nested arguments sent as JSON strings were rejected by every tool.** The tick's
+  `evor_record_eval` failed with its whole `result` JSON-encoded, after the same slip in
+  `evor_signal_emit` and `evor_validate_proposals`. The server now parses any object, array or
+  record parameter sent as a string before validation, for every tool; string parameters are
+  untouched and the advertised schemas are unchanged.
+- **Forge-junior slept to wait.** Its protocol now says the watcher wakes it and `sleep` is
+  refused.
+
 ## [1.2.26] — 2026-10-30 — waiting on an agent is ending the turn
 
 ### Fixed

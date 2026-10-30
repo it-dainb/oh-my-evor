@@ -601,11 +601,13 @@ before acting — the restore block is a navigation aid, not the authoritative s
 </Compaction_Survival>
 
 <Execution_Policy>
-- Main may spawn the tick in the background and wake on its completion notice; every SUB-agent
-  spawns in the foreground (`run_in_background` is denied from a sub-agent).
-- If a tick returns `outcome: "yielding"`, wait on what it named with `evor_wait`, then resume
-  THAT tick agent with `SendMessage`. Main is denied `Monitor`, and nothing resumes a yielded
-  tick by itself. There is no `job_complete` or `self_heal_event` signal; nothing emits them.
+- Main spawns the tick and wakes on its completion notice.
+- If a tick returns `outcome: "yielding"`, end your turn while the agent it waits on runs; that
+  agent's completion wakes you. A completion notice from an agent inside the tick (Forge, a
+  junior, a reviewer) can reach you instead of its parent: pass it to THAT tick agent with
+  `SendMessage`, verbatim. If nothing is running and the tick's wait is unmet, resume the tick
+  with `SendMessage`. Main is denied `Monitor`. There is no `job_complete` or
+  `self_heal_event` signal; nothing emits them.
 - Do not run more Forge agents AT ONCE than `resource_plan.concurrency`; queue the rest.
 - Respect budget.max_wall_clock_hours and budget.max_gpu_hours if set.
 - Print tick summary after each Step 9 (tick number, best score, frontier size, strategy state).

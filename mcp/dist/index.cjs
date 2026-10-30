@@ -26191,7 +26191,23 @@ function registerProposalTools(server) {
       let proposals = given;
       const needsLookup = !given || given.some((p) => !("approach_family" in p));
       if (needsLookup) {
-        const art = run_id && tick ? readArtifact(run_id, tick, "mutagen", void 0, false, process.env.EVOR_MISSION_ID) : null;
+        let atTick = tick;
+        if (atTick === void 0 && run_id) {
+          try {
+            const ts = (0, import_path21.join)(resolveRunPaths(run_id, process.env.EVOR_MISSION_ID).runDir, "tick-state.json");
+            const t = (0, import_fs20.existsSync)(ts) ? JSON.parse((0, import_fs20.readFileSync)(ts, "utf8"))?.tick : void 0;
+            if (typeof t === "number" && t > 0) atTick = t;
+          } catch {
+          }
+        }
+        if (!run_id || atTick === void 0) {
+          return { content: [{ type: "text", text: JSON.stringify({
+            ok: false,
+            error: "proposals given by id need run_id (and tick, when no tick is in progress); or pass each proposal in full."
+          }) }] };
+        }
+        const tick_ = atTick;
+        const art = readArtifact(run_id, tick_, "mutagen", void 0, false, process.env.EVOR_MISSION_ID);
         const all = (art?.ok ? art.payload?.proposals : void 0) ?? [];
         if (!all.length) {
           return { content: [{ type: "text", text: JSON.stringify({
@@ -26204,7 +26220,7 @@ function registerProposalTools(server) {
         if (missing.length) {
           return { content: [{ type: "text", text: JSON.stringify({
             ok: false,
-            error: `no Mutagen proposal for tick ${tick} has proposal_id ${missing.map((p) => p.proposal_id).join(", ")}`
+            error: `no Mutagen proposal for tick ${tick_} has proposal_id ${missing.map((p) => p.proposal_id).join(", ")}`
           }) }] };
         }
         proposals = given ? given.map((p) => "approach_family" in p ? p : byId.get(p.proposal_id)) : all;
@@ -26497,6 +26513,40 @@ function registerWaitTools(server) {
   );
 }
 
+// src/tolerant-args.ts
+function baseType(t) {
+  let cur = t;
+  for (; ; ) {
+    const def = cur._def;
+    if (def?.innerType) cur = def.innerType;
+    else if (def?.typeName === "ZodEffects" && def.schema) cur = def.schema;
+    else return cur;
+  }
+}
+function tolerant(t) {
+  const b = baseType(t);
+  if (!(b instanceof external_exports.ZodObject || b instanceof external_exports.ZodArray || b instanceof external_exports.ZodRecord)) return t;
+  return external_exports.preprocess((v) => {
+    if (typeof v !== "string") return v;
+    try {
+      return JSON.parse(v);
+    } catch {
+      return v;
+    }
+  }, t);
+}
+function acceptJsonStringArgs(server) {
+  const original = server.tool.bind(server);
+  server.tool = (...args) => {
+    const i = args.findIndex((a, k) => k > 0 && a && typeof a === "object" && !Array.isArray(a) && typeof a !== "function" && Object.values(a).every((v) => v instanceof external_exports.ZodType));
+    if (i > 0) {
+      const shape = args[i];
+      args[i] = Object.fromEntries(Object.entries(shape).map(([k, v]) => [k, tolerant(v)]));
+    }
+    return original(...args);
+  };
+}
+
 // src/index.ts
 var EVOR_INSTRUCTIONS = "Evor runs an autonomous ML-research evolution: it evolves a model+dataset by mutation tree search under integrity gates. USE these evor_* tools whenever a mission is being set up, run, resumed, or inspected \u2014 any time you change or read .evor state, record a node/eval, launch or check a training run, write or read a tick artifact, cite a paper, emit/query a signal, or manage the run. These evor_* tools are the only sanctioned way to operate a run; do not author .evor state files by hand. Search for them whenever an evor run is active. Core loop: evor_init_run -> evor_record_node -> evor_run_start (async; watch with the native Monitor tool) -> evor_run_status -> evor_record_eval -> evor_integrity_check -> evor_wiki_add. Read upstream tick artifacts with evor_read_artifact before acting. Full catalog, lifecycle recipes, and artifact schemas: invoke the `oh-my-evor:evor-mcp` skill.";
 async function main() {
@@ -26507,6 +26557,7 @@ async function main() {
     },
     { instructions: EVOR_INSTRUCTIONS }
   );
+  acceptJsonStringArgs(server);
   registerInitTools(server);
   registerRecordTools(server);
   registerTreeTools(server);

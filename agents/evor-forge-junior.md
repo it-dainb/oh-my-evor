@@ -221,7 +221,8 @@ skills: [oh-my-evor:evor-mcp]
       change the experiment. The verdict's `next_tick_hint` is for the next proposal. When woken,
       read the log and report to Forge. Do not poll evor_wait(pid): on a 12-hour run that is about
       80 calls, each re-sending your context. Do not arm a Monitor and stop: its final notice can
-      sit queued long after the trainer exits. Report to Forge only once training
+      sit queued long after the trainer exits. Never `sleep` to wait; the shell refuses it, and
+      the watcher already wakes you. Report to Forge only once training
       has ended; a report sent mid-training reads as "finished".
     - **A change to a check is recorded in the run's decision log.** When you repair a faulty
       check — a false negative, a resolution bug, a stub reinstated — append what you

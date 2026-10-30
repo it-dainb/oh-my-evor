@@ -131,6 +131,19 @@ function segments(command, cwd, vars) {
 }
 
 /**
+ * The destinations of a statement whose only write is a redirect, or null.
+ * `diff -u a.py b.py > out.patch` writes out.patch; the files it reads are not
+ * targets. Any other write in the statement (a write verb, tee, sed -i, python
+ * file I/O) leaves the general rule in force.
+ */
+function redirectOnlyTargets(text) {
+  if (/\btee\b/.test(text) || WRITE_VERBS.test(text) || PY_WRITE_CALL.test(text)) return null;
+  const out = [];
+  for (const m of text.replace(/2>&1|>&\d/g, '').matchAll(/(?:^|[^<>&])(?:\d|&)?>>?\s*([^\s|&;<>]+)/g)) out.push(m[1].replace(/^['"]|['"]$/g, ''));
+  return out.length ? out : null;
+}
+
+/**
  * The files `sed -i` edits, or null when the statement is not an in-place sed.
  * Its script is not a path: `'72s/a (b)/c in data\/x.py/'` named three bogus
  * targets and missed the file it edits. Operands are what follows the script
@@ -300,7 +313,8 @@ export function resolveWriteTargets({ tool, toolInput = {}, cwd = process.cwd() 
     if (!(unit.pythonOnly ? hasPythonWriteIntent(text) : hasWriteIntent(text))) continue;
     writes = true;
     const sed = !unit.pythonOnly && sedInPlaceFiles(text);
-    for (const raw of sed || pathTokens(text)) {
+    const redirected = !unit.pythonOnly && !sed && redirectOnlyTargets(text);
+    for (const raw of sed || redirected || pathTokens(text)) {
       const t = raw.trim();
       if (!t || t === '-' || /^[a-z]+:\/\//i.test(t)) continue;
       targets.add(isAbsolute(t) ? t : resolve(unit.cwd, t));

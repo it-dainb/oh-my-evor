@@ -72,3 +72,17 @@ describe("evor_validate_proposals resolves proposals from Mutagen's artifact", (
     expect(r.ok).toBe(true);
   });
 });
+
+describe("the tick defaults to the one in progress", () => {
+  it("ids resolve against tick-state's tick when tick is omitted", async () => {
+    writeFileSync(join(root, "runs", "m1", "r1", "tick-state.json"), JSON.stringify({ tick: 1, current_step: 3 }));
+    const r = await call({ run_id: "r1", proposals: [{ proposal_id: "prop-a-0" }] });
+    expect(r.ok).toBe(true);
+  });
+
+  it("without run_id says what is missing, not that proposals are unwritten", async () => {
+    const r = await call({ proposals: [{ proposal_id: "prop-a-0" }] });
+    expect(r.ok).toBe(false);
+    expect(r.error).toMatch(/run_id/);
+  });
+});
