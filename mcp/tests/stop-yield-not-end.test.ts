@@ -90,11 +90,12 @@ function runStop({ tickState, subagents = [], pendingNodeIds = [] }: Opts) {
 const MID_TICK = { tick: 1, current_step: 2, step_status: "running" };
 
 describe("a yield is allowed", () => {
-  it("allows the stop when the tick recorded what it is blocked on", () => {
-    // Verbatim shape from the field run: evor_await_artifact wrote this and the
-    // tick parked exactly as the skill instructs.
+  it("allows the stop when the tick recorded what it is blocked on and its producer runs", () => {
+    // evor_await_artifact wrote this and the tick parked exactly as the skill
+    // instructs, with the agent that owes the artifact still running.
     const r = runStop({
       tickState: { ...MID_TICK, blocked: { on: "artifact:sage@tick1", since: "2026-09-14T07:15:07Z" } },
+      subagents: [LIVE],
       pendingNodeIds: ["n1"],
     });
     expect(r.blocked, r.reason).toBe(false);

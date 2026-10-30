@@ -14,20 +14,17 @@
  * recorded and never evaluated, a tick it abandoned. They are not for the
  * absence of an artifact somebody else still owes.
  *
- * Two signals, either one sufficient, both fail-open:
+ * The signal is a live agent under the session's `subagents/` directory.
+ * `tick-state.json`'s `blocked` field (written by `evor_await_artifact`) says
+ * WHAT is awaited, not that anything will deliver it: an agent that ended its
+ * turn is marked finished and is not woken again by itself, so a recorded wait
+ * with nothing live is a stall.
  *
- *   1. `tick-state.json`'s `blocked` field — written by `evor_await_artifact`,
- *      which the skill already tells agents to call before they block. This is
- *      first-party and in-band: the agent SAID what it is waiting for. It is the
- *      authoritative signal and it survives the reactivation race in (2).
- *
- *   2. A live agent under the session's `subagents/` directory. Covers agents
- *      that yield without recording a wait (evor-sage fanning out to five
- *      juniors, for one). An agent is live unless its transcript ends with an
- *      assistant message that stopped for a terminal reason — and a PARKED agent
- *      looks terminal by that test, which is why a recent write also counts: the
- *      window between a child finishing and its parent waking is real, and
- *      treating it as a dead chain is the false positive this avoids.
+ * An agent is live unless the CLI marked it finished or its last message
+ * stopped for a terminal reason — and a PARKED agent
+ * looks terminal by that test, which is why a recent write also counts: the
+ * window between a child finishing and its parent waking is real, and
+ * treating it as a dead chain is the false positive this avoids.
  */
 
 import { existsSync, readFileSync, readdirSync, statSync, openSync, readSync, closeSync, fstatSync } from 'fs';
@@ -52,8 +49,23 @@ export function recordedWait(tickState) {
   return typeof on === 'string' && on.trim() ? tickState.blocked : null;
 }
 
-/** Last JSON record of a .jsonl file, reading only its tail. null on any failure. */
-function lastRecord(path) {
+/**
+ * Has this agent's transcript finished? The CLI's own `finished` flag in the
+ * agent's meta file is authoritative when present. Otherwise the last assistant
+ * message decides: hook and system attachments are written AFTER the final
+ * message, so the last record alone made a stopped agent look live forever.
+ */
+function agentFinished(transcriptPath) {
+  try {
+    const meta = JSON.parse(readFileSync(transcriptPath.replace(/\.jsonl$/, '.meta.json'), 'utf8'));
+    if (meta?.finished === true) return true;
+  } catch { /* no meta: read the transcript */ }
+  const rec = lastMessageRecord(transcriptPath);
+  return rec?.type === 'assistant' && TERMINAL.has(rec?.message?.stop_reason);
+}
+
+/** Last user/assistant record of a .jsonl file, skipping attachments; null on failure. */
+function lastMessageRecord(path) {
   let fd;
   try {
     fd = openSync(path, 'r');
@@ -63,7 +75,9 @@ function lastRecord(path) {
     readSync(fd, buf, 0, len, size - len);
     const lines = buf.toString('utf8').split('\n').filter(l => l.trim());
     for (let i = lines.length - 1; i >= 0; i--) {
-      try { return JSON.parse(lines[i]); } catch { /* partial first line, or noise */ }
+      let rec;
+      try { rec = JSON.parse(lines[i]); } catch { continue; }
+      if (rec?.type === 'assistant' || rec?.type === 'user') return rec;
     }
     return null;
   } catch {
@@ -113,9 +127,7 @@ export function liveSubagents(sessionId, transcriptPath, now = Date.now()) {
     let mtime = 0;
     try { mtime = statSync(path).mtimeMs; } catch { continue; }
 
-    const rec = lastRecord(path);
-    const msg = rec?.message;
-    const finished = rec?.type === 'assistant' && TERMINAL.has(msg?.stop_reason);
+    const finished = agentFinished(path);
     // A parked agent reads as finished. If its transcript moved recently, the
     // chain is still turning over and the parent has not been woken yet.
     const recent = now - mtime < RECENT_MS;
@@ -150,9 +162,7 @@ export function liveChildren(agentTranscriptPath, now = Date.now()) {
     const path = join(dir, `agent-${id}.jsonl`);
     let mtime = 0;
     try { mtime = statSync(path).mtimeMs; } catch { live.push(id); continue; }  // launched, not written yet
-    const rec = lastRecord(path);
-    const finished = rec?.type === 'assistant' && TERMINAL.has(rec?.message?.stop_reason);
-    if (!finished || now - mtime < RECENT_MS) live.push(id);
+    if (!agentFinished(path) || now - mtime < RECENT_MS) live.push(id);
   }
   return live;
 }
@@ -162,6 +172,8 @@ export function liveChildren(agentTranscriptPath, now = Date.now()) {
  * Callers must treat true as "allow the stop", unconditionally.
  */
 export function isYieldingStop(payload, tickState) {
-  if (recordedWait(tickState)) return true;
+  // A recorded wait is a yield only while something is running that will
+  // report: an agent that ended its turn is not woken again on its own, so a
+  // wait on its artifact with nothing live is a stall, not a yield.
   return liveSubagents(payload?.session_id, payload?.transcript_path).length > 0;
 }

@@ -2,6 +2,20 @@
 
 All notable changes to Evor. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.2.22] — 2026-10-30 — a wait nothing will deliver is a stall
+
+### Fixed
+
+- **The mission parked on a wait that could not end.** Forge ended its turn while its junior
+  trained. The CLI marks an agent finished when it ends its turn, so the junior's completion
+  went to main, and neither Forge nor the tick was woken. Main's stop was still read as a yield
+  for two reasons: a recorded wait counted as a yield on its own, and an agent counted as live
+  when its transcript ended in a hook attachment written after its last message. Liveness now
+  uses the CLI's own `finished` flag, and otherwise the last message rather than the last
+  record. A recorded wait is a yield only while something is running. When it is not, main is
+  told to resume the tick with SendMessage so the tick can resume the agent that owes the
+  artifact.
+
 ## [1.2.21] — 2026-10-30 — a fan-out is a yield
 
 ### Fixed
