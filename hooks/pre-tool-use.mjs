@@ -285,15 +285,22 @@ try {
   // that talks about training is not training.
   const cmdUnquoted = cmd.replace(/'[^']*'|"[^"]*"/g, ' ');
   const INSPECTION_MODULES = /^-m\s+(py_compile|pytest|unittest|pip|venv|json\.tool|site|http\.server)\b/;
-  const pyInvocation = cmdUnquoted.match(/\bpython[0-9.]*\s+(.*)$/);
-  const runsTraining =
-    !!pyInvocation &&
-    !INSPECTION_MODULES.test(pyInvocation[1].trim()) &&
-    // `-m evor…` is deliberately NOT here: `python -m evor run` is a CLI
-    // invocation, not training, and it is owned by the EVOR GUARD rule below,
-    // which names the right replacement tool (evor_run_start + Monitor). Claiming
-    // it here would make this rule fire first and report the wrong cause.
-    /(\S+\.py\b|-m\s+\S*train\S*)/.test(pyInvocation[1]);
+  // Judge each python invocation by what it runs — the script or module right
+  // after the interpreter's flags — not by any `.py` path later in the command
+  // line: `python3 -c "…"; grep -n x eval.py` reads a file, it runs nothing.
+  const pyArgs = cmdUnquoted
+    .split(/;|&&|\|\|?|\n/)
+    .map((seg) => seg.match(/\bpython[0-9.]*\s+(.*)$/)?.[1].trim().replace(/^(?:-(?![mc]\b)[A-Za-z]+\s+)+/, ''))
+    .filter((a) => a !== undefined);
+  const runsTraining = pyArgs.some(
+    (a) =>
+      !INSPECTION_MODULES.test(a) &&
+      // `-m evor…` is deliberately NOT here: `python -m evor run` is a CLI
+      // invocation, not training, and it is owned by the EVOR GUARD rule below,
+      // which names the right replacement tool (evor_run_start + Monitor). Claiming
+      // it here would make this rule fire first and report the wrong cause.
+      /^(\S+\.py\b|-m\s+\S*train\S*)/.test(a),
+  );
 
   // ── Spawn-hierarchy gate — child agents may be spawned ONLY by their parent ──
   const spawnType = String(ti?.subagent_type ?? '').replace(/^oh-my-evor:/, '');
@@ -590,7 +597,9 @@ try {
     // The broad orchestrator-only rule runs AFTER the .evor write-guard below —
     // see §1.3 there. Denying here would shadow the more specific guard and
     // report the wrong rule as the cause.
-  } else if (agentType !== 'evor-forge-junior') {
+  } else if (!isMain && agentType !== 'evor-forge-junior') {
+    // Main outside a live mission (setup, a paused or finished run) is not a
+    // sub-agent role; the orchestrator rules above are the only ones meant for it.
     // Only evor-forge-junior authors/runs candidate CODE. Everyone else — including the
     // Forge LEAD (an orchestrator of its dev team) and the architect/critic/analyst —
     // emits JSON artifacts and delegates code to the junior. The lead launches evaluation

@@ -2,6 +2,23 @@
 
 All notable changes to Evor. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.2.19] — 2026-10-30 — reading is not training
+
+### Fixed
+
+- **A read-only command was denied as running training.** The check looked for any `.py`
+  path anywhere after `python` on the command line, so `python3 -c "…"; grep -n x eval.py`
+  counted as running `eval.py`. It now judges each python invocation by the script or module
+  that follows the interpreter's flags.
+- **Main got a sub-agent's role rules outside a live mission.** With the mission paused or
+  not yet created, main fell through to the branch meant for non-junior sub-agents and was
+  denied with an empty role name. That branch now applies to sub-agents only.
+- **Running a script counted as writing it.** In `python3 $RUN/eval-suites/v1.py > out.json`
+  the redirect made every path in the statement a write target, the evaluator included, so
+  measuring a baseline with the sealed evaluator was refused as a hand edit of the run. The
+  script an interpreter runs is now read, unless another statement writes it or the run
+  redirects into it.
+
 ## [1.2.18] — 2026-10-30 — setup can ask again
 
 ### Fixed

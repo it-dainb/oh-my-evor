@@ -291,5 +291,19 @@ export function resolveWriteTargets({ tool, toolInput = {}, cwd = process.cwd() 
   const { sources, written } = copySources(segments(shellText, cwd, vars), vars, cwd);
   for (const src of sources) if (!written.has(src)) targets.delete(src);
 
+  // The script an interpreter runs is read too: `python3 $RUN/eval-suites/v1.py >
+  // out.json` writes out.json, not the evaluator it executes.
+  // Only a script no other statement writes, and the run does not redirect into.
+  const segs = segments(shellText, cwd, vars).map((s) => ({ ...s, text: foldConcat(expandVars(s.text, vars)) }));
+  segs.forEach((seg, i) => {
+    const m = seg.text.match(/(?:^|\s)python[0-9.]*\s+(?:-(?![mc]\b)[A-Za-z]+\s+)*([^\s<>|;&]+\.py)\b/);
+    if (!m) return;
+    const script = isAbsolute(m[1]) ? m[1] : resolve(seg.cwd, m[1]);
+    const named = (s) => pathTokens(s.text).some((t) => (isAbsolute(t) ? t : resolve(s.cwd, t)) === script);
+    const rest = { ...seg, text: seg.text.slice((m.index ?? 0) + m[0].length).replace(/^[^>]*/, '') };
+    const writtenElsewhere = segs.some((s, j) => j !== i && hasWriteIntent(s.text) && named(s)) || named(rest);
+    if (!writtenElsewhere) targets.delete(script);
+  });
+
   return { targets: [...targets], writes };
 }
