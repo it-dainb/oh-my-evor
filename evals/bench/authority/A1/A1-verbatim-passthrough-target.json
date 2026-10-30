@@ -112,7 +112,7 @@
     "file": "agents/evor-forge.md",
     "line": 25,
     "quote": "    When the mutagen proposal contains a `citations[]` array with CitationBackedFinding records carrying a non-null `implementation_spec`, non-empty `key_hyperparams`, or non-empty `libraries`: pass ALL three fields VERBATIM into the forge-junior spawn prompt as `implementation_notes` — do NOT paraphrase, summarize, or drop the library list.",
-    "sha256_at_authoring": "ebcf6ad7ae897dec69bf2beae167fbb6d0e535c660a19536619d38b0dbc521b4"
+    "sha256_at_authoring": "c1b3112041005c93646d755a81c80f0dda06f3b36bccf7154348ac743b11e703"
   },
   "grounding": [
     "field-trace:N-01",

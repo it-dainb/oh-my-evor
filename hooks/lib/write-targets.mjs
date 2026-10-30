@@ -28,8 +28,13 @@
 
 import { isAbsolute, resolve } from 'path';
 
-/** Commands whose presence means the line intends to modify something. */
-const WRITE_VERBS = /\b(cp|mv|ln|install|dd|truncate|shred|rsync|touch|mkdir|rm|chmod|chown)\b/;
+/**
+ * Commands whose presence means the line intends to modify something — as a
+ * COMMAND: at the start of a statement or pipeline stage, or after sudo, xargs,
+ * env, nohup, time or find's -exec. As a bare word it matched flags and data:
+ * `grep -ln "sha256" …` read as `ln`.
+ */
+const WRITE_VERBS = /(?:^|[|&;(`]\s*|\$\(\s*|\b(?:sudo|xargs|env|nohup|time|command)\s+(?:-\S+\s+)*|-exec(?:dir)?\s+)(cp|mv|ln|install|dd|truncate|shred|rsync|touch|mkdir|rm|chmod|chown)(?=\s|$)/;
 
 /** Python-level write shapes, including the ones used to evade a text matcher. */
 const PY_WRITE_CALL =
