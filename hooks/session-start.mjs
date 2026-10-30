@@ -469,8 +469,8 @@ const LAW_PRIMER =
   `decide continue/stop. The tick's detail — artifacts, tree, run state — lives inside the ` +
   `boundary and returns to you as a status line plus pointers.\n` +
   `[WAIT] A tick is not done when you have spawned it — it is done when it reports an ` +
-  `outcome. If you resume or spawn anything in the background, block on TaskOutput or ` +
-  `Monitor until it returns. Ending your turn while a tick is in flight ends the mission.\n` +
+  `outcome. While it runs, end your turn: its completion notice wakes you. Do not poll it ` +
+  `or emit "still waiting" turns.\n` +
   `[TOOLS] Hot-path: evor-tick spawn, evor_check_stop, evor_check_plateau, evor_write_handoff.`;
 output.message += `\n\n${LAW_PRIMER}`;
 

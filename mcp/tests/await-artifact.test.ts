@@ -102,9 +102,10 @@ describe("§2b.3 — evor_await_artifact", () => {
     expect(tickState().blocked).toBeNull();
   });
 
-  it("tells the caller how to actually block, since the old instruction named nothing real", async () => {
+  it("tells the caller how a sub-agent actually waits: by ending its turn", async () => {
     const res = await call({ run_id: RUN, tick: 1, agent: "forge", mission_id: MISSION });
-    expect(res.next).toMatch(/TaskOutput|Monitor/);
+    expect(res.next).toMatch(/end your turn/i);
+    expect(res.next, "a sub-agent has neither tool").not.toMatch(/TaskOutput|Monitor/);
     expect(res.next, "polling is what agents did when told to wait on a non-existent event").toMatch(/do not poll/i);
   });
 });

@@ -86,7 +86,7 @@
     "file": "agents/evor-sage-junior.md",
     "line": 65,
     "quote": "        - NOT comparable, or not stated → the quorum check does not apply. Set quorum_met=false, trust_level=\"indicative\", confidence=\"low\", and state the specific incomparability in the evidence field (e.g. \"94.2% is under the original preprocessing; 90.0% is under matched preprocessing in a fair-comparison study; the two are not the same measurement\"). Do NOT report \"authoritative\" merely because the numbers happen to land close together.",
-    "sha256_at_authoring": "d418c268e48f0790966e5703d58c36b596e05724019ca35ade341d47ead27ae0"
+    "sha256_at_authoring": "f0331f61e383cf90f0b54657f1d1da7b4831bc076757d425e09189de5b3a3ee2"
   },
   "grounding": [
     "field-trace:N-04",

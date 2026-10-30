@@ -2,6 +2,41 @@
 
 All notable changes to Evor. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.2.21] — 2026-10-30 — a fan-out is a yield
+
+### Fixed
+
+- **Sage was warned for waiting on its juniors.** The SubagentStop hook warned "artifact not
+  confirmed" whenever a research or review agent ended a turn without its artifact. Sage ends its
+  turn after spawning its juniors and writes the artifact once they report, so every fan-out
+  drew the warning, and the tick was told to go and verify an artifact that was still owed. The
+  warning now fires only when the agent has no live children of its own, read from the async
+  launches in its transcript.
+- **Optional research connectors were named as if always present.** Sage and Sage-junior listed
+  Consensus and Exa as Tier 2 tools, and a junior called one that this account does not have.
+  Both are now marked optional: load them with ToolSearch first, and skip them if absent.
+- **Mutagen read the current tick's Sage findings.** Its protocol now asks for the previous
+  tick's, and says "not found" is expected on the first tick.
+- **`evor_validate_proposals` rejected proposals given by id.** The tick passes the proposal
+  ids it knows; the schema required every field, so the call failed and the Selector was
+  spawned without the classification. Entries may now be `{proposal_id}` alone, or the list
+  omitted, and the tool reads the rest from that tick's Mutagen proposals.
+- **The wait hint named tools a sub-agent does not have.** `evor_await_artifact` told the tick
+  to block with TaskOutput or Monitor. It now says to end the turn and be woken when the agent
+  that owes the artifact finishes. Main's session-start note said ending the turn while a tick
+  runs ends the mission; it now says the completion notice wakes it.
+- **The node's telemetry directory did not exist.** `evor_record_node` returned a
+  `telemetry_path` under the node's directory without creating it, and `.evor/` is closed to
+  hand writes, so Forge could not prepare it and filed a capability gap. The tool now creates
+  the directory before returning the path.
+- **`evor_store_patch` wrote under the node's name.** It built `nodes/<node_id>/` from whatever
+  it was given, so a node passed by name got a second directory beside the one keyed by its id.
+  It now resolves the name to the node's id first.
+- **Stringified arguments to `evor_signal_emit` were rejected.** `shapes`, `axes` and `evidence`
+  sent as JSON strings, or `tick` as a string, are now parsed.
+- **A severity sent JSON-quoted twice was rejected.** The signal tools now accept `"\"medium\""`
+  as `medium`.
+
 ## [1.2.20] — 2026-10-30 — a new run gets its own id
 
 ### Fixed

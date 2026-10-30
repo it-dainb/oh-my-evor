@@ -40,7 +40,7 @@ import { tmpdir } from 'os';
 import { spawnSync } from 'child_process';
 import { resolveActiveRun, resolveEvorRoot } from './lib/active-run.mjs';
 import { isTickFinished } from './lib/run-status.mjs';
-import { isYieldingStop } from './lib/waiting.mjs';
+import { isYieldingStop, liveChildren } from './lib/waiting.mjs';
 import { owed, describeOwed } from './lib/tick-completeness.mjs';
 
 // ── Kill switches ─────────────────────────────────────────────────────────────
@@ -453,6 +453,8 @@ try {
   const artifactMissing = agentRole === 'forge'
     ? !hasForgeReport(join(runDir, 'ticks', String(currentTick)))
     : !existsSync(artifactPath);
+  // An agent waiting on its own children has yielded; its artifact comes after they report.
+  if (artifactMissing && liveChildren(payload.agent_transcript_path).length) process.exit(0);
   if (artifactMissing) {
     process.stdout.write(
       `[EVOR SUBAGENT WARNING] ${agentRole} stopped but artifact not confirmed for this tick.\n` +

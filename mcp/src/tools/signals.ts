@@ -356,6 +356,20 @@ export function digestSignals(
 
 // ── Tool registrations ───────────────────────────────────────────────────────
 
+/** An array or object argument, tolerating one sent as a JSON string. */
+function jsonArg<T extends z.ZodTypeAny>(schema: T) {
+  return z.preprocess((v) => {
+    if (typeof v !== "string") return v;
+    try { return JSON.parse(v); } catch { return v; }
+  }, schema);
+}
+
+/** A severity, tolerating a value sent JSON-quoted twice (`"\"medium\""`). */
+const SeverityArg = z.preprocess(
+  (v) => (typeof v === "string" ? v.replace(/^["']+|["']+$/g, "").trim() : v),
+  SignalSeveritySchema,
+);
+
 export function registerSignalTools(server: McpServer): void {
   // ── evor_signal_emit ────────────────────────────────────────────────────────
   server.tool(
@@ -372,17 +386,17 @@ export function registerSignalTools(server: McpServer): void {
       mission_id: z.string().optional().describe("Mission identifier (resolved automatically when omitted)"),
       kind: z.string().describe("Free-text signal type (e.g. 'cuda-oom', 'training-too-slow')"),
       signature: z.string().describe("Dedup key — identical signatures aggregate"),
-      shapes: z
+      shapes: jsonArg(z
         .array(SignalShapeSchema)
-        .min(1)
+        .min(1))
         .describe("Closed facet set: limit | opportunity | failure | trend"),
-      axes: z
-        .array(SignalAxisSchema)
+      axes: jsonArg(z
+        .array(SignalAxisSchema))
         .describe("Closed facet set: memory | compute | accuracy | stability | data | generalization | cost"),
-      severity: SignalSeveritySchema.describe("low | medium | high | critical"),
-      evidence: z.record(z.string(), z.unknown()).describe("Structured evidence dict"),
+      severity: SeverityArg.describe("low | medium | high | critical"),
+      evidence: jsonArg(z.record(z.string(), z.unknown())).describe("Structured evidence dict"),
       source: z.string().describe("Emitting role (e.g. 'evor-forge-analyst')"),
-      tick: z.number().int().optional().describe("Optional evolution tick"),
+      tick: z.coerce.number().int().optional().describe("Optional evolution tick"),
       node_id: z.string().optional().describe("Optional associated node id"),
       confidence: z
         .number()
@@ -429,7 +443,7 @@ export function registerSignalTools(server: McpServer): void {
         .optional()
         .describe("ANY-overlap axis filter; omit to match all axes"),
       kind: z.string().optional().describe("Exact kind filter; omit for all kinds"),
-      min_severity: SignalSeveritySchema.default("low").describe("Severity floor (inclusive). Default: low"),
+      min_severity: SeverityArg.default("low").describe("Severity floor (inclusive). Default: low"),
       since_tick: z.number().int().optional().describe("Only include signals with tick >= this value"),
       limit: z.number().int().min(1).max(500).optional().describe(
         "Cap on returned signals sorted by (severity, confidence, recency) desc. Default 100. "
@@ -466,7 +480,7 @@ export function registerSignalTools(server: McpServer): void {
         .array(SignalAxisSchema)
         .optional()
         .describe("ANY-overlap axis filter; omit to match all axes"),
-      min_severity: SignalSeveritySchema.default("medium").describe(
+      min_severity: SeverityArg.default("medium").describe(
         "Severity floor (inclusive). Default: medium (low kept out of digests by default)",
       ),
       max_items: z

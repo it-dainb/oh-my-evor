@@ -121,7 +121,7 @@
     "file": "agents/evor-mutagen.md",
     "line": 398,
     "quote": "- Searching for citations yourself: emit investigation_queries[] for Sage. Research tools are blocked.",
-    "sha256_at_authoring": "602a78d0c4c6e3267f064be3d132d52efd79ab0bab64be0c1697afc1f494eb23"
+    "sha256_at_authoring": "737656286f598e933a52f8676f7fbb3cdba0c5e2db697aabef4d2213c429d30e"
   },
   "grounding": [
     "field-trace:J-05",

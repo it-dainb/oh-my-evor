@@ -209,7 +209,8 @@ export function registerArtifactTools(server: McpServer): void {
   server.tool(
     "evor_await_artifact",
     "Record that this tick is WAITING for an artifact, and report whether it has arrived. " +
-    "Does not block — use Monitor or TaskOutput(block:true) for that. This makes the wait " +
+    "Does not block: to wait, end your turn, and you are woken when the agent you spawned " +
+    "finishes. This makes the wait " +
     "visible in tick-state so a waiting tick is distinguishable from a stalled one.",
     {
       run_id: z.string().describe("Active run identifier"),
@@ -272,12 +273,11 @@ export function registerArtifactTools(server: McpServer): void {
         arrived,
         waiting_on: blocked?.on ?? null,
         waiting_since: blocked?.since ?? null,
-        // Told plainly, because the previous instruction was to wait on an event
-        // that does not exist.
+        // A sub-agent has no TaskOutput or Monitor; ending the turn is how it waits.
         next: arrived
           ? "the artifact is present — read it with evor_read_artifact"
-          : "not yet written. Block with TaskOutput(task_id, block:true) on the agent that owes it, " +
-            "or Monitor the artifact path. Do NOT poll this tool in a loop.",
+          : "not yet written. If the agent that owes it is running in the background, end your " +
+            "turn: you are woken when it finishes. Do not poll this tool in a loop.",
       });
     },
   );

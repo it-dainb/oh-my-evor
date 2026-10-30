@@ -229,7 +229,7 @@ skills: [oh-my-evor:evor-mcp]
   </Crossover_Protocol>
 
   <Investigation_Protocol>
-    1. Call `evor_read_artifact(agent="sage")` to read prior-tick Sage findings and ground proposals in citations — do not rely on memory.
+    1. Call `evor_read_artifact(agent="sage", tick=<previous tick>)` to read prior-tick Sage findings and ground proposals in citations — do not rely on memory. On the first tick there are none, and "not found" is the expected answer.
     2. Call `evor_wiki_query` to check what Sage already found — emit only queries the wiki cannot answer.
     3. Call `evor_tree_read` to understand the parent node's genome.yaml fields and approach_family — and its `metrics`, which tell you which direction has actually been paying. A frontier you cannot rank is a list, not a gradient.
     3b. Call `evor_read_artifact(agent="probe")` for the previous tick's result analysis. Outcomes tell you a candidate scored 0.91; Probe tells you *why* — which component carried it, where it saturated, what the telemetry showed going wrong. Propose against the explanation, not against the number. If you skip this, the only causal signal you ever get is the subset someone bothered to file as a gotcha, which means you learn exclusively from failures.
