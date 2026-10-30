@@ -308,6 +308,20 @@ skills: [oh-my-evor:evor-mcp]
       "crossover_triggered": false
     }
     ```
+    `mutation_locus` names the seam the proposal changes, and its `path` is FIXED per family.
+    The validator refuses any other path (`data/` for data-curation was refused in the
+    2026-10-30 binarization mission):
+
+    | approach_family | mutation_locus |
+    |---|---|
+    | arch | `{ "family": "arch", "path": "model/" }` |
+    | training | `{ "family": "training", "path": "train/" }` |
+    | data-curation | `{ "family": "data-curation", "path": "data/builder" }` |
+    | data-augmentation | `{ "family": "data-augmentation", "path": "data/aug" }` |
+    | data-acquisition | `{ "family": "data-acquisition", "path": "data/acquisition", "acquisition_type": "external" }` (or `"synthetic"`) |
+    | algo | `{ "family": "algo", "path": "<the file or directory you change>", "genome_extension": "<the genome.yaml key your change adds>" }` |
+    | other | omit `mutation_locus` |
+
     `dream_k` is the number step 5a computed, and `proposal_count` is how many entries
     `proposals` actually holds. Write `dream_k` down BEFORE generating, then COUNT the
     array and write `proposal_count` after. **If they differ, you are not finished** —

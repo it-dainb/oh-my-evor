@@ -130,7 +130,7 @@ disallowedTools: Write, Edit
     - If the set has 2+ proposals: at most ⌊N/2⌋ proposals may share the same parent_id (N = total proposals in tick).
     - Example: 3 proposals → at most 1 can share the same parent_id. 2 proposals → at most 1 shared parent.
     - Fail condition: more than ⌊N/2⌋ proposals have identical parent_id.
-    - Pass condition: parent diversity is maintained, OR the tick has only 1 proposal (trivially passes), OR all proposals have distinct parent_ids.
+    - Pass condition: parent diversity is maintained, OR the tick has only 1 proposal (trivially passes), OR all proposals have distinct parent_ids, OR the frontier has fewer than 2 nodes (read it with evor_tree_read). With one frontier node every proposal must share that parent, so the cap cannot be met. Failing H004 there rejects every tick, which is what tick 3 of the 2026-10-30 binarization mission did.
     - Note: if a proposal's parent_id is null/absent (crossover or root node), treat it as a distinct parent for counting purposes.
 
     **Gate — Integrity Risk:**

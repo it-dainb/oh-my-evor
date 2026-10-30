@@ -409,3 +409,19 @@ describe("critic_review — server-populated (Class 7)", () => {
     expect(r.reason).toMatch(/h001/);
   });
 });
+
+describe("gateH004 — needs two parents to be diverse over", () => {
+  // Tick 3 of the 2026-10-30 binarization mission: one frontier node, so every
+  // proposal shared it, H004 failed them all, and the tick trained nothing.
+  const counts = new Map([["only-parent", 3]]);
+  it("passes with fewer than two frontier nodes", () => {
+    expect(gateH004("only-parent", counts, 3, 1)).toBe("pass");
+    expect(gateH004("only-parent", counts, 3, 0)).toBe("pass");
+  });
+  it("still caps the share once there is a choice", () => {
+    expect(gateH004("only-parent", counts, 3, 2)).toBe("fail");
+  });
+  it("keeps the plain cap when the frontier size is unknown", () => {
+    expect(gateH004("only-parent", counts, 3)).toBe("fail");
+  });
+});

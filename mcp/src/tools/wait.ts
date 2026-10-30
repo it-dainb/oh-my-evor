@@ -15,7 +15,9 @@
  * runs and returns a definite answer. On a timeout the caller calls it again.
  */
 
-import { existsSync } from "fs";
+import { existsSync, readdirSync, statSync, readFileSync } from "fs";
+import { join } from "path";
+import { homedir } from "os";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { resolveRunPaths } from "../run-store.js";
@@ -28,6 +30,39 @@ import { artifactPathFor, VALID_AGENTS } from "./artifact.js";
 export const MAX_WAIT_S = 540;
 const DEFAULT_WAIT_S = 300;
 const POLL_MS = 5_000;
+
+/** How long a finished transcript must stay quiet before its agent counts as stopped. */
+const STOPPED_QUIET_MS = 15_000;
+
+/**
+ * Has the agent with this id stopped? Finds subagents/agent-<id>.jsonl under any
+ * session of ~/.claude/projects and reads its last record. True only for a final
+ * assistant message that is not a tool call, in a transcript quiet for
+ * STOPPED_QUIET_MS. Anything unreadable counts as running, so the wait goes on.
+ */
+export function agentStopped(agentId: string, projectsDir = join(homedir(), ".claude", "projects"), now = Date.now()): boolean {
+  if (!/^[A-Za-z0-9_-]+$/.test(agentId)) return false;
+  let projects: string[];
+  try { projects = readdirSync(projectsDir); } catch { return false; }
+  for (const proj of projects) {
+    let sessions: string[];
+    try { sessions = readdirSync(join(projectsDir, proj)); } catch { continue; }
+    for (const sess of sessions) {
+      const path = join(projectsDir, proj, sess, "subagents", `agent-${agentId}.jsonl`);
+      if (!existsSync(path)) continue;
+      try {
+        if (now - statSync(path).mtimeMs < STOPPED_QUIET_MS) return false;
+        const lines = readFileSync(path, "utf8").trimEnd().split("\n");
+        const last = JSON.parse(lines[lines.length - 1]);
+        const reason = last?.message?.stop_reason;
+        return last?.type === "assistant" && typeof reason === "string" && reason !== "tool_use";
+      } catch {
+        return false;
+      }
+    }
+  }
+  return false;
+}
 
 type Probe = () => { done: boolean; detail?: Record<string, unknown>; error?: string };
 
@@ -75,11 +110,16 @@ export function registerWaitTools(server: McpServer): void {
         })
         .optional()
         .describe("Wait for this tick artifact to be written"),
+      producer_agent_id: z.string().optional().describe(
+        "With artifact: the agentId of the child that owes it (from the spawn result). If that " +
+          "child stops without writing it, the wait returns at once with producer_stopped:true " +
+          "instead of running out the clock.",
+      ),
       wait_s: z.number().int().min(0).max(MAX_WAIT_S).optional()
         .describe(`Seconds to wait at most (default ${DEFAULT_WAIT_S}, max ${MAX_WAIT_S})`),
       mission_id: z.string().optional().describe("Mission id; resolved from the active run when omitted"),
     },
-    async ({ run_id, job_id, pid, artifact, wait_s, mission_id }) => {
+    async ({ run_id, job_id, pid, artifact, wait_s, mission_id, producer_agent_id }) => {
       const given = [job_id, pid, artifact].filter((v) => v !== undefined).length;
       if (given !== 1) return err("give exactly one of job_id, pid, artifact");
       const waitS = wait_s ?? DEFAULT_WAIT_S;
@@ -127,7 +167,26 @@ export function registerWaitTools(server: McpServer): void {
       }
       artifact!.agent = agent;
       const path = artifactPathFor(runDir, artifact!.tick, agent, artifact!.kind);
-      const r = await waitFor(() => ({ done: existsSync(path) }), waitS);
+      let producerStopped = false;
+      const r = await waitFor(() => {
+        if (existsSync(path)) return { done: true };
+        // In the binarization mission's tick 3, Sage exited without its artifact
+        // and the tick sat in a 540 s wait for a file nobody would write.
+        if (producer_agent_id && agentStopped(producer_agent_id)) {
+          producerStopped = existsSync(path) ? false : true;
+          return { done: existsSync(path), error: producerStopped ? "__stopped__" : undefined };
+        }
+        return { done: false };
+      }, waitS);
+      if (producerStopped) {
+        return ok({
+          done: false,
+          producer_stopped: true,
+          waited_s: r.waited_s,
+          condition: `artifact:${artifact!.agent}${artifact!.kind ? `/${artifact!.kind}` : ""}@tick${artifact!.tick}`,
+          next: "the producing agent stopped without writing this artifact — read its result, then resume it with SendMessage or record the gap; do not wait again",
+        });
+      }
       return ok({
         ...r,
         condition: `artifact:${artifact!.agent}${artifact!.kind ? `/${artifact!.kind}` : ""}@tick${artifact!.tick}`,

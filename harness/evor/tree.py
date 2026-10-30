@@ -789,6 +789,16 @@ class StopVerdict:
     capability_gaps: list[dict[str, Any]] = field(default_factory=list)
 
 
+def _plugin_version() -> str | None:
+    """The version in this plugin's .claude-plugin/plugin.json, or None."""
+    try:
+        p = Path(__file__).resolve().parents[2] / ".claude-plugin" / "plugin.json"
+        v = json.loads(p.read_text()).get("version")
+        return v if isinstance(v, str) and v else None
+    except Exception:  # noqa: BLE001 — unknown version: no record counts as same-code
+        return None
+
+
 def _gap_outlived(gap: Any, run_state: dict[str, Any]) -> bool:
     """True once a LATER tick finished without failing: the run got past the gap.
 
@@ -881,7 +891,15 @@ def check_stop_condition(
     ]
     if last_records:
         last = max(last_records, key=lambda r: r["tick"])
-        if last.get("outcome") == "failed" and last.get("failure_kind") in ("contract", "infrastructure"):
+        recorded_by = last.get("plugin_version")
+        # A failure recorded by an EARLIER plugin version is a question the new
+        # code has not been asked yet: let one tick run. If the cause persists the
+        # tick fails again, and that record (this version) blocks. Without this the
+        # block could never clear: it lifts only after a later tick succeeds, and
+        # no tick runs while it holds (binarization mission, tick 3).
+        same_code = recorded_by is not None and recorded_by == _plugin_version()
+        if (last.get("outcome") == "failed" and last.get("failure_kind") in ("contract", "infrastructure")
+                and same_code):
             gaps.insert(0, {
                 "signature": f"tick{last['tick']}-{last['failure_kind']}-failure",
                 "severity": "high",

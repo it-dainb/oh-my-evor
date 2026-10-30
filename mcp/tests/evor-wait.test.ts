@@ -10,7 +10,8 @@ import { spawn } from "child_process";
 import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from "fs";
 import { join, dirname } from "path";
 import { tmpdir } from "os";
-import { registerWaitTools, waitFor, pidAlive, MAX_WAIT_S } from "../src/tools/wait.js";
+import { registerWaitTools, waitFor, pidAlive, MAX_WAIT_S, agentStopped } from "../src/tools/wait.js";
+import { utimesSync } from "fs";
 import { ensureRunDirs, resolveRunPaths } from "../src/run-store.js";
 
 const RUN = "run-wait-01";
@@ -122,3 +123,39 @@ describe("evor_wait", () => {
     expect(r).toMatchObject({ done: false, condition: "artifact:forge@tick1" });
   });
 });
+
+describe("agentStopped", () => {
+  // Tick 3 of the binarization mission waited 540 s on Sage's artifact after
+  // Sage had already exited without writing it.
+  function transcript(last: Record<string, unknown>, ageMs: number) {
+    const projects = mkdtempSync(join(tmpdir(), "evor-proj-"));
+    const dir = join(projects, "p", "s", "subagents");
+    mkdirSync(dir, { recursive: true });
+    const f = join(dir, "agent-abc123.jsonl");
+    writeFileSync(f, JSON.stringify({ type: "user" }) + "\n" + JSON.stringify(last) + "\n");
+    const t = (Date.now() - ageMs) / 1000;
+    utimesSync(f, t, t);
+    return projects;
+  }
+
+  it("is true for a quiet transcript ending in a final assistant message", () => {
+    const p = transcript({ type: "assistant", message: { stop_reason: "end_turn" } }, 60_000);
+    expect(agentStopped("abc123", p)).toBe(true);
+    rmSync(p, { recursive: true, force: true });
+  });
+
+  it("is false while the agent is mid tool call, or wrote recently", () => {
+    const a = transcript({ type: "assistant", message: { stop_reason: "tool_use" } }, 60_000);
+    expect(agentStopped("abc123", a)).toBe(false);
+    const b = transcript({ type: "assistant", message: { stop_reason: "end_turn" } }, 1_000);
+    expect(agentStopped("abc123", b)).toBe(false);
+    rmSync(a, { recursive: true, force: true });
+    rmSync(b, { recursive: true, force: true });
+  });
+
+  it("is false for an unknown or malformed id", () => {
+    expect(agentStopped("nope", mkdtempSync(join(tmpdir(), "evor-proj-")))).toBe(false);
+    expect(agentStopped("../etc")).toBe(false);
+  });
+});
+

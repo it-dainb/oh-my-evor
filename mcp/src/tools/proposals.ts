@@ -15,6 +15,9 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { randomUUID } from "crypto";
 import { z } from "zod";
+import { existsSync, readFileSync } from "fs";
+import { join } from "path";
+import { resolveRunPaths } from "../run-store.js";
 
 // ── Input schemas ─────────────────────────────────────────────────────────────
 
@@ -55,6 +58,12 @@ const StrategyContextSchema = z
       .describe(
         "Ordered list of approach families that won recent ticks; last 3 used for H002 streak check",
       ),
+    frontier_size: z
+      .number()
+      .int()
+      .min(0)
+      .optional()
+      .describe("Nodes on the frontier. H004 applies only when there are 2 or more to choose from."),
   })
   .passthrough();
 
@@ -131,7 +140,12 @@ export function gateH004(
   primaryParentId: string,
   parentShareCounts: Map<string, number>,
   N: number,
+  frontierSize?: number,
 ): GateResult {
+  // Parent diversity needs parents to be diverse over. With fewer than two nodes
+  // on the frontier every proposal shares the one parent, the cap cannot be met,
+  // and every tick is rejected: tick 3 of the 2026-10-30 binarization mission.
+  if (frontierSize !== undefined && frontierSize < 2) return "pass";
   const share = parentShareCounts.get(primaryParentId) ?? 0;
   return share <= Math.floor(N / 2) ? "pass" : "fail";
 }
@@ -208,7 +222,7 @@ export function validateProposals(
     const h002 = gateH002(proposal.approach_family, winningFamilies);
     const h003 = gateH003(proposal.approach_family, familiesSeen);
     const primaryParent = proposal.parent_node_ids[0] ?? "";
-    const h004 = gateH004(primaryParent, parentShareCounts, N);
+    const h004 = gateH004(primaryParent, parentShareCounts, N, strategy.frontier_size);
 
     // Register family for H003 on subsequent proposals in this batch.
     familiesSeen.add(proposal.approach_family);
@@ -287,9 +301,22 @@ export function registerProposalTools(server: McpServer): void {
       strategy: StrategyContextSchema.describe(
         "Current strategy context; winning_families used for H002 streak check",
       ),
+      run_id: z.string().optional().describe(
+        "Active run; when given, frontier_size is read from run-state for H004",
+      ),
     },
-    async ({ proposals, strategy }) => {
-      const summary = validateProposals(proposals, strategy);
+    async ({ proposals, strategy, run_id }) => {
+      let frontierSize = strategy.frontier_size;
+      if (frontierSize === undefined && run_id) {
+        try {
+          const rs = join(resolveRunPaths(run_id, process.env.EVOR_MISSION_ID).runDir, "run-state.json");
+          if (existsSync(rs)) {
+            const ids = JSON.parse(readFileSync(rs, "utf8"))?.frontier_ids;
+            if (Array.isArray(ids)) frontierSize = ids.length;
+          }
+        } catch { /* unknown frontier: H004 keeps its plain cap */ }
+      }
+      const summary = validateProposals(proposals, { ...strategy, frontier_size: frontierSize });
       // Server-owned: populate critic_review from gate results so the agent
       // never has to parrot internal gate codes back.
       const resultsWithReview = summary.results.map(r => ({

@@ -76,7 +76,7 @@
   "grounded_rule": {
     "file": "agents/evor-sage-junior.md",
     "quote": "Abstract-only citation: citing an arXiv abstract when the full paper body contradicts or retracts the abstract's claim.",
-    "sha256_at_authoring": "3df9f95d1a1a13d694b627d98ff5cd1e299cd41da2be8f5662767a03e36486c0"
+    "sha256_at_authoring": "3bd8126f455db6f247432d925f2f569995b81f7b9f201549e89fae14ba0a5799"
   },
   "grounding": [
     "field-trace:N-02",

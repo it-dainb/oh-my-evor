@@ -225,3 +225,41 @@ def latest_tick_handoff(run_dir: Path) -> tuple[int, str] | None:
         return (best[0], best[1].read_text())
     except Exception:
         return None
+
+
+def tick_json_handoffs(run_dir: Path, tick: int | None = None, to_agent: str | None = None) -> list[dict[str, Any]]:
+    """Entries written by ``evor_write_handoff`` (``handoffs/<tick>-<seq>.json``), oldest first.
+
+    The writer and the readers named different files: the writer produced
+    ``<tick>-<seq>.json`` and every reader looked for ``tick-<n>.md`` or
+    ``<from>_to_<to>.json``. So a handoff was written and could never be read.
+    In the 2026-10-30 binarization mission, tick 3 routed Mutagen's
+    investigation queries to Sage this way. Sage read "not found" three times
+    and exited with nothing to research.
+
+    ``tick`` None means the latest tick that has entries. ``to_agent`` keeps the
+    entries addressed to that agent (``data.to``).
+    """
+    d = _handoffs_dir(run_dir)
+    if not d.is_dir():
+        return []
+    found: dict[int, list[tuple[int, Path]]] = {}
+    for f in d.glob("*-*.json"):
+        head, _, seq = f.stem.partition("-")
+        if head.isdigit() and seq.isdigit():
+            found.setdefault(int(head), []).append((int(seq), f))
+    if not found:
+        return []
+    t = max(found) if tick is None else tick
+    out: list[dict[str, Any]] = []
+    for _, f in sorted(found.get(t, [])):
+        try:
+            entry = json.loads(f.read_text())
+        except Exception:  # noqa: BLE001 — one unreadable entry must not hide the rest
+            continue
+        if not isinstance(entry, dict):
+            continue
+        if to_agent is not None and str(entry.get("to", "")).replace("evor-", "") != to_agent.replace("evor-", ""):
+            continue
+        out.append({**entry, "_tick": t})
+    return out

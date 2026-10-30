@@ -1012,6 +1012,14 @@ try {
     // distils it into a gotcha, which means only FAILURES survive the trip and the
     // dreamer is fed exclusively on what not to do.
     READ_EXTRA_GRANTS['evor-mutagen'] = new Set([...(READ_EXTRA_GRANTS['evor-mutagen'] ?? []), 'probe']);
+
+    // RESEARCH EDGE. Within a tick, Mutagen runs BEFORE Sage: Sage answers the
+    // investigation_queries Mutagen wrote, and since 1.2.11 those queries live in
+    // Mutagen's own artifact. PIPELINE above puts sage upstream of mutagen, so
+    // Sage was denied the one artifact it researches. When the tick skipped the
+    // mutagen-to-sage handoff (binarization mission, tick 3), Sage found nothing
+    // to research and exited.
+    READ_EXTRA_GRANTS['evor-sage'] = new Set([...(READ_EXTRA_GRANTS['evor-sage'] ?? []), 'mutagen']);
     // evor-tick is deliberately absent from AGENT_ROLE_MAP, so this guard skips it
     // entirely: the tick boundary reads every stage's artifact by design — that is
     // the context the orchestrator is denied and evor-tick absorbs on its behalf.

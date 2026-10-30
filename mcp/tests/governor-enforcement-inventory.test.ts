@@ -415,9 +415,13 @@ describe("S2 rev2 — the grant map follows the pipeline, not a list of exceptio
   });
 
   it("grants do not run backwards down the pipeline", () => {
-    // sage is the first stage; nothing downstream of a role is readable by it.
+    // Nothing downstream of a role is readable by it. Sage reading MUTAGEN is
+    // not on this list: within a tick Mutagen runs first and Sage answers its
+    // investigation_queries (the research edge, governance-affordance.test.ts).
+    // Asserting the opposite here is what left Sage unable to read the queries
+    // in tick 3 of the 2026-10-30 binarization mission.
     for (const [role, slot] of [
-      ["evor-sage", "mutagen"],
+      ["evor-sage", "selector"],
       ["evor-mutagen", "selector"],
       ["evor-selector", "forge"],
     ]) {

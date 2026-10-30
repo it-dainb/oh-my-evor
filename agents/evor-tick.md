@@ -99,7 +99,10 @@ or woke you, and the process exited with zero nodes. Only main is woken by notif
 **When a spawn returns "Async agent launched" anyway, wait with `evor_wait`.** In a backgrounded
 session every spawn returns at once, whatever you pass: that is how the 2026-10-30 binarization
 mission ran. Do not end your turn. Call `evor_wait({ artifact: { tick: <n>, agent: "<child>" } })`
-for the artifact that child owes, and call it again while it returns `done:false`. The same tool
+for the artifact that child owes, passing `producer_agent_id` (the `agentId` in the spawn
+result), and call it again while it returns `done:false`. If it returns `producer_stopped:
+true`, the child exited without writing: read why, then resume it with `SendMessage` or record
+the gap. Do not wait again. The same tool
 waits on a job (`job_id`) or a process (`pid`). It blocks inside your turn, so it needs no notice
 to reach you. Notices are not reliable: on CLI 2.1.314 they did wake the tick after each child,
 but a Monitor's final notice to Forge sat queued for 80 minutes.

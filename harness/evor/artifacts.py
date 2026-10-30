@@ -159,8 +159,16 @@ def _validate_payload(agent: str, payload: Any) -> str | None:
 
         elif agent == "sage-junior":
             from evor.contracts import CitationBackedFinding
-            # sage-junior may write a single finding or a list
-            items = payload if isinstance(payload, list) else [payload]
+            # A list of findings, a single finding, or the wrapper
+            # agents/evor-sage-junior.md documents ({angle_slug, findings: [...], ...}).
+            # The wrapper used to be validated AS a finding and failed on every
+            # required field (binarization mission, tick 3).
+            if isinstance(payload, list):
+                items = payload
+            elif isinstance(payload, dict) and isinstance(payload.get("findings"), list):
+                items = payload["findings"]
+            else:
+                items = [payload]
             for item in items:
                 CitationBackedFinding.model_validate(item)
 

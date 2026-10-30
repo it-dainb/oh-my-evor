@@ -1677,6 +1677,10 @@ class CitationBackedFinding(BaseEvorModel):
     libraries: list[str] = Field(default_factory=list)
     """Exact libraries / tools the paper uses that Forge can inherit or reuse directly,
     e.g. ["augraphy", "timm", "kornia", "albumentations"].  Empty if none noted."""
+    self_directed: bool = False
+    """True for a finding from the one angle Sage chose itself rather than one Mutagen
+    asked about. agents/evor-sage.md (Step 1b) requires the flag and calls it "the whole
+    measurement". The model forbade it, so Sage's write failed (binarization, tick 3)."""
 
 
 # ────────────────────────────────────────────────────────────────────────────
