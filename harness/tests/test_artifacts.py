@@ -636,3 +636,52 @@ class TestMutagenDocumentedOutput:
         payload = _documented_mutagen_output()
         payload["proposals"][0]["hypothesis"]["id"] = 7
         assert "error" in write_artifact(tmp_path, 1, "mutagen", payload)
+
+    def test_every_documented_mutation_locus_is_accepted(self) -> None:
+        """Mutagen's locus table is the contract it writes to; every row must validate."""
+        import re
+        from pydantic import TypeAdapter
+        from evor.contracts import MutationLocus
+        rows = re.findall(r"\| [\w-]+ \| `(\{[^`]*\})`", _MUTAGEN_MD.read_text())
+        assert len(rows) >= 6, rows
+        for row in rows:
+            locus = json.loads(row.replace("<the file or directory you change>", "algo/x.py").replace("<the genome.yaml key your change adds>", "algo.x"))
+            TypeAdapter(MutationLocus).validate_python(locus)
+
+
+# ─── Sage-junior's documented output is writable ─────────────────────────────
+
+_JUNIOR_MD = Path(__file__).resolve().parents[2] / "agents" / "evor-sage-junior.md"
+
+
+def _documented_junior_output() -> dict:
+    block = _JUNIOR_MD.read_text().split("<Output_Format>", 1)[1].split("```json", 1)[1].split("```", 1)[0]
+    lines = []
+    for line in block.splitlines():
+        if '"' in line and " | " in line:
+            key, _, value = line.partition(":")
+            first = value.strip().strip(",").strip('"').split(" | ")[0]
+            line = f'{key}: "{first}"' + ("," if value.rstrip().endswith(",") else "")
+        lines.append(line)
+    return json.loads("\n".join(lines))
+
+
+class TestSageJuniorDocumentedOutput:
+    def test_the_agent_files_example_is_written_as_is(self, tmp_path: Path) -> None:
+        result = write_artifact(tmp_path, 3, "sage-junior", _documented_junior_output(), kind="angle-a")
+        assert result.get("ok"), result
+
+    def test_an_empty_findings_list_is_accepted(self, tmp_path: Path) -> None:
+        payload = {**_documented_junior_output(), "findings": []}
+        assert write_artifact(tmp_path, 3, "sage-junior", payload, kind="angle-b").get("ok")
+
+    def test_a_bad_finding_inside_the_wrapper_is_refused(self, tmp_path: Path) -> None:
+        payload = _documented_junior_output()
+        del payload["findings"][0]["source_url"]
+        assert "error" in write_artifact(tmp_path, 3, "sage-junior", payload, kind="angle-c")
+
+
+def test_sage_may_flag_a_self_directed_finding(tmp_path: Path) -> None:
+    """agents/evor-sage.md Step 1b requires `self_directed` on its own angle's findings."""
+    finding = {**_documented_junior_output()["findings"][0], "self_directed": True}
+    assert write_artifact(tmp_path, 3, "sage", {"findings": [finding]}).get("ok")

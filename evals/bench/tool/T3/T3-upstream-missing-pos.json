@@ -13,7 +13,7 @@
   "grounded_rule": {
     "file": "skills/evor-mcp/SKILL.md",
     "quote": "If `evor_read_artifact` returns an error object, the upstream step has not produced output. Stop and surface the gap \u2014 do not proceed.",
-    "sha256_at_authoring": "90e0eeaf504d55b36ae05164293ffc38ce69c2f638f20c16627484c712df541d"
+    "sha256_at_authoring": "d2a045f4452db24a9a5ac5ba577e8715b1aedff3635018208e7671e9f9de86f3"
   },
   "grounding": [
     "field-trace:B-04",

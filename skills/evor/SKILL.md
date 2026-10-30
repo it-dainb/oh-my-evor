@@ -159,8 +159,9 @@ If `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` is set in the environment:
   calls in one message run in parallel and are all awaited. Never pass `run_in_background` from a
   sub-agent; the governor denies it. **If a spawn comes back "Async agent launched" anyway**, which
   happens in a backgrounded session whatever you pass, do not end your turn: call
-  `evor_wait({ artifact: { tick, agent } })` for the artifact that child owes, and call it again
-  while it returns `done:false`. Wait on a job with `evor_wait({ job_id })` and on a process with
+  `evor_wait({ artifact: { tick, agent }, producer_agent_id: <agentId from the spawn result> })`
+  for the artifact that child owes, and call it again while it returns `done:false`. On
+  `producer_stopped: true` the child exited without writing it: resume it or record the gap. Wait on a job with `evor_wait({ job_id })` and on a process with
   `evor_wait({ pid })`. Every other wait depends on a notice reaching you, and in the 2026-10-30
   binarization mission one sat queued for 80 minutes. `evor_await_artifact` still records WHAT is
   awaited so a long wait is distinguishable from a stall. (`TaskOutput(block:true)`, which this
@@ -329,7 +330,7 @@ For each proposal returned by Mutagen:
 ## Step 4 — Critique
 
 **P1-7/P1-13 — Deterministic pre-screen before spawning Selector:**
-Call `evor_validate_proposals({ run_id, tick })` to run deterministic checks (field presence, numeric types, schema, H001/H002/H003/H004 fast-path) on all proposals BEFORE spawning Selector. The result classifies each proposal as `"fast_pass"`, `"fast_reject"`, or `"needs_llm"`. Pass the classification result in Selector's spawn prompt. Selector skips full LLM gate evaluation for `fast_pass` proposals (write approved verdict immediately) and only runs the complete 7-gate loop for `needs_llm` ones. `fast_reject` proposals are dropped before Selector is invoked. This eliminates full LLM evaluation cost for structurally clean, low-risk proposals.
+Call `evor_validate_proposals({ run_id, proposals: <Mutagen's proposals>, strategy: { winning_families } })` (it reads the frontier size for H004 from `run_id`) to run deterministic checks (field presence, numeric types, schema, H001/H002/H003/H004 fast-path) on all proposals BEFORE spawning Selector. The result classifies each proposal as `"fast_pass"`, `"fast_reject"`, or `"needs_llm"`. Pass the classification result in Selector's spawn prompt. Selector skips full LLM gate evaluation for `fast_pass` proposals (write approved verdict immediately) and only runs the complete 7-gate loop for `needs_llm` ones. `fast_reject` proposals are dropped before Selector is invoked. This eliminates full LLM evaluation cost for structurally clean, low-risk proposals.
 
 Spawn Selector as a REAL sub-agent in a SEPARATE context. Do NOT approve/reject proposals yourself —
 the whole point is an independent critic that did not generate the proposals it gates.

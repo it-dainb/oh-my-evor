@@ -23346,6 +23346,8 @@ function stateWrite(runId, patch, missionId) {
     if (tickRecord.score !== void 0) record2.score = tickRecord.score;
     if (tickRecord.failure_kind !== void 0) record2.failure_kind = tickRecord.failure_kind;
     if (tickRecord.error !== void 0) record2.error = tickRecord.error;
+    const version2 = tickRecord.outcome === "failed" ? pluginVersion() : void 0;
+    if (version2) record2.plugin_version = version2;
     byTick.set(tickRecord.tick, record2);
     const records = [...byTick.values()].sort((a, b) => a.tick - b.tick);
     updated.tick_records = records;
@@ -23672,6 +23674,23 @@ function registerStateTools(server) {
       };
     }
   );
+}
+function pluginVersion() {
+  const roots = [];
+  if (process.env.CLAUDE_PLUGIN_ROOT) roots.push(process.env.CLAUDE_PLUGIN_ROOT);
+  let dir = process.argv[1] ? (0, import_path9.dirname)(process.argv[1]) : "";
+  for (let i = 0; dir && i < 6; i++, dir = (0, import_path9.dirname)(dir)) roots.push(dir);
+  for (const root of roots) {
+    try {
+      const p = (0, import_path9.join)(root, ".claude-plugin", "plugin.json");
+      if ((0, import_fs8.existsSync)(p)) {
+        const v = JSON.parse((0, import_fs8.readFileSync)(p, "utf8"))?.version;
+        if (typeof v === "string" && v) return v;
+      }
+    } catch {
+    }
+  }
+  return void 0;
 }
 
 // src/tools/cite.ts
@@ -25983,6 +26002,8 @@ function registerGotchaTools(server) {
 
 // src/tools/proposals.ts
 var import_crypto5 = require("crypto");
+var import_fs20 = require("fs");
+var import_path21 = require("path");
 var ProposalInputSchema = external_exports.object({
   // Server-owned: generated server-side if absent (crypto.randomUUID / prop-<short> slug).
   proposal_id: external_exports.string().optional().describe("Unique ID for this proposal (correlates results); generated server-side if omitted"),
@@ -25997,7 +26018,8 @@ var ProposalInputSchema = external_exports.object({
 var StrategyContextSchema = external_exports.object({
   winning_families: external_exports.array(external_exports.string()).optional().describe(
     "Ordered list of approach families that won recent ticks; last 3 used for H002 streak check"
-  )
+  ),
+  frontier_size: external_exports.number().int().min(0).optional().describe("Nodes on the frontier. H004 applies only when there are 2 or more to choose from.")
 }).passthrough();
 function gateH001(prediction) {
   if (!prediction?.trim()) return "fail";
@@ -26018,7 +26040,8 @@ function gateH002(family, winningFamilies) {
 function gateH003(family, familiesSeenSoFar) {
   return familiesSeenSoFar.has(family) ? "fail" : "pass";
 }
-function gateH004(primaryParentId, parentShareCounts, N) {
+function gateH004(primaryParentId, parentShareCounts, N, frontierSize) {
+  if (frontierSize !== void 0 && frontierSize < 2) return "pass";
   const share = parentShareCounts.get(primaryParentId) ?? 0;
   return share <= Math.floor(N / 2) ? "pass" : "fail";
 }
@@ -26061,7 +26084,7 @@ function validateProposals(proposals, strategy) {
     const h002 = gateH002(proposal.approach_family, winningFamilies);
     const h003 = gateH003(proposal.approach_family, familiesSeen);
     const primaryParent = proposal.parent_node_ids[0] ?? "";
-    const h004 = gateH004(primaryParent, parentShareCounts, N);
+    const h004 = gateH004(primaryParent, parentShareCounts, N, strategy.frontier_size);
     familiesSeen.add(proposal.approach_family);
     const isAcquisition = proposal.is_acquisition === true;
     const hardFail = h001 === "fail";
@@ -26114,10 +26137,24 @@ function registerProposalTools(server) {
       proposals: external_exports.array(ProposalInputSchema).min(1).describe("Proposals to validate; results are returned in the same order"),
       strategy: StrategyContextSchema.describe(
         "Current strategy context; winning_families used for H002 streak check"
+      ),
+      run_id: external_exports.string().optional().describe(
+        "Active run; when given, frontier_size is read from run-state for H004"
       )
     },
-    async ({ proposals, strategy }) => {
-      const summary = validateProposals(proposals, strategy);
+    async ({ proposals, strategy, run_id }) => {
+      let frontierSize = strategy.frontier_size;
+      if (frontierSize === void 0 && run_id) {
+        try {
+          const rs = (0, import_path21.join)(resolveRunPaths(run_id, process.env.EVOR_MISSION_ID).runDir, "run-state.json");
+          if ((0, import_fs20.existsSync)(rs)) {
+            const ids = JSON.parse((0, import_fs20.readFileSync)(rs, "utf8"))?.frontier_ids;
+            if (Array.isArray(ids)) frontierSize = ids.length;
+          }
+        } catch {
+        }
+      }
+      const summary = validateProposals(proposals, { ...strategy, frontier_size: frontierSize });
       const resultsWithReview = summary.results.map((r) => ({
         ...r,
         critic_review: {
@@ -26222,10 +26259,44 @@ function registerAcquireTools(server) {
 }
 
 // src/tools/wait.ts
-var import_fs20 = require("fs");
+var import_fs21 = require("fs");
+var import_path22 = require("path");
+var import_os5 = require("os");
 var MAX_WAIT_S = 540;
 var DEFAULT_WAIT_S = 300;
 var POLL_MS = 5e3;
+var STOPPED_QUIET_MS = 15e3;
+function agentStopped(agentId, projectsDir = (0, import_path22.join)((0, import_os5.homedir)(), ".claude", "projects"), now = Date.now()) {
+  if (!/^[A-Za-z0-9_-]+$/.test(agentId)) return false;
+  let projects;
+  try {
+    projects = (0, import_fs21.readdirSync)(projectsDir);
+  } catch {
+    return false;
+  }
+  for (const proj of projects) {
+    let sessions;
+    try {
+      sessions = (0, import_fs21.readdirSync)((0, import_path22.join)(projectsDir, proj));
+    } catch {
+      continue;
+    }
+    for (const sess of sessions) {
+      const path = (0, import_path22.join)(projectsDir, proj, sess, "subagents", `agent-${agentId}.jsonl`);
+      if (!(0, import_fs21.existsSync)(path)) continue;
+      try {
+        if (now - (0, import_fs21.statSync)(path).mtimeMs < STOPPED_QUIET_MS) return false;
+        const lines = (0, import_fs21.readFileSync)(path, "utf8").trimEnd().split("\n");
+        const last = JSON.parse(lines[lines.length - 1]);
+        const reason = last?.message?.stop_reason;
+        return last?.type === "assistant" && typeof reason === "string" && reason !== "tool_use";
+      } catch {
+        return false;
+      }
+    }
+  }
+  return false;
+}
 function pidAlive(pid) {
   try {
     process.kill(pid, 0);
@@ -26259,10 +26330,13 @@ function registerWaitTools(server) {
         agent: external_exports.string(),
         kind: external_exports.string().optional()
       }).optional().describe("Wait for this tick artifact to be written"),
+      producer_agent_id: external_exports.string().optional().describe(
+        "With artifact: the agentId of the child that owes it (from the spawn result). If that child stops without writing it, the wait returns at once with producer_stopped:true instead of running out the clock."
+      ),
       wait_s: external_exports.number().int().min(0).max(MAX_WAIT_S).optional().describe(`Seconds to wait at most (default ${DEFAULT_WAIT_S}, max ${MAX_WAIT_S})`),
       mission_id: external_exports.string().optional().describe("Mission id; resolved from the active run when omitted")
     },
-    async ({ run_id, job_id, pid, artifact, wait_s, mission_id }) => {
+    async ({ run_id, job_id, pid, artifact, wait_s, mission_id, producer_agent_id }) => {
       const given = [job_id, pid, artifact].filter((v) => v !== void 0).length;
       if (given !== 1) return err("give exactly one of job_id, pid, artifact");
       const waitS = wait_s ?? DEFAULT_WAIT_S;
@@ -26301,7 +26375,24 @@ function registerWaitTools(server) {
       }
       artifact.agent = agent;
       const path = artifactPathFor(runDir, artifact.tick, agent, artifact.kind);
-      const r = await waitFor(() => ({ done: (0, import_fs20.existsSync)(path) }), waitS);
+      let producerStopped = false;
+      const r = await waitFor(() => {
+        if ((0, import_fs21.existsSync)(path)) return { done: true };
+        if (producer_agent_id && agentStopped(producer_agent_id)) {
+          producerStopped = (0, import_fs21.existsSync)(path) ? false : true;
+          return { done: (0, import_fs21.existsSync)(path), error: producerStopped ? "__stopped__" : void 0 };
+        }
+        return { done: false };
+      }, waitS);
+      if (producerStopped) {
+        return ok({
+          done: false,
+          producer_stopped: true,
+          waited_s: r.waited_s,
+          condition: `artifact:${artifact.agent}${artifact.kind ? `/${artifact.kind}` : ""}@tick${artifact.tick}`,
+          next: "the producing agent stopped without writing this artifact \u2014 read its result, then resume it with SendMessage or record the gap; do not wait again"
+        });
+      }
       return ok({
         ...r,
         condition: `artifact:${artifact.agent}${artifact.kind ? `/${artifact.kind}` : ""}@tick${artifact.tick}`,

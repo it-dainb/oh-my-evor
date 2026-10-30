@@ -113,7 +113,7 @@
   "grounded_rule": {
     "file": "agents/evor-tick.md",
     "quote": "A tick that fails is a normal outcome, not an error to hide. Return the same compact shape with\nthe outcome set to the failure and a pointer to whatever artifact or signal explains it.",
-    "sha256_at_authoring": "5779da5259b3b1f3c24c7b1714ceebc78d8286a79cbca1689fe722e72112c2cb"
+    "sha256_at_authoring": "16c4f75bd7f2e18ca65ced34fe233238407872872dc8a922f8f239bf84a07aa8"
   },
   "grounding": [
     "field-trace:C-02",
@@ -138,11 +138,11 @@
     "guarded_paths": [
       {
         "path": "agents/evor-tick.md",
-        "sha256": "5779da5259b3b1f3c24c7b1714ceebc78d8286a79cbca1689fe722e72112c2cb"
+        "sha256": "16c4f75bd7f2e18ca65ced34fe233238407872872dc8a922f8f239bf84a07aa8"
       },
       {
         "path": "skills/evor/SKILL.md",
-        "sha256": "8bba6d3842fcc09fa6e47c4fd9f98f5ebede85f49fb0392a9b020f8aeeb95430"
+        "sha256": "761f1d72e128f65c7a1472c630ff8be9c57c3d99797430065d8ccd1715a6f18e"
       },
       {
         "path": "hooks/stop.mjs",

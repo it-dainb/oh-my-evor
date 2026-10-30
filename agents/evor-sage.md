@@ -52,7 +52,7 @@ disallowedTools: Write, Edit
     - evor_cite is called for every finding attached to a tree node
     - SotaVerifier protocol: ≥2 distinct sources with metric divergence ≤5% are required for a finding to carry trust_level="authoritative"
     - At ≥2 unresolved angles, at least one Sage-junior is spawned per angle (fan-out is not optional)
-    - All juniors for a given tick are spawned in parallel, not sequentially: several foreground `Agent` calls in ONE message. If they come back "Async agent launched" (a backgrounded session does that), do not end your turn: `evor_wait({ artifact: { tick, agent: "sage-junior", kind: "<angle slug>" } })` for each junior, then aggregate
+    - All juniors for a given tick are spawned in parallel, not sequentially: several foreground `Agent` calls in ONE message. If they come back "Async agent launched" (a backgrounded session does that), do not end your turn: `evor_wait({ artifact: { tick, agent: "sage-junior", kind: "<angle slug>" }, producer_agent_id: "<that junior's agentId>" })` for each junior, then aggregate
     - Aggregation explicitly records which angles came from juniors vs. wiki hits
   </Success_Criteria>
 
@@ -216,7 +216,7 @@ disallowedTools: Write, Edit
   </Fan_Out_Protocol>
 
   <Investigation_Protocol>
-    1. Call evor_read_handoff(from_agent="mutagen", to_agent="sage") for investigation_queries[] (or read a direct query from the orchestrator).
+    1. Call evor_read_handoff(from_agent="mutagen", to_agent="sage") for investigation_queries[] (or read a direct query from the orchestrator). If there is no handoff, read them where Mutagen wrote them: evor_read_artifact(tick=<n>, agent="mutagen") → proposals[*].investigation_queries. Exit with "nothing to research" only when both are empty.
     2. Decompose the queries into distinct research angles (see Fan_Out_Protocol Step 1).
     3. For each angle, call `evor_wiki_query` — wiki hits are immediately recorded as resolved findings; no junior needed.
     4. For each unresolved angle, spawn a Sage-junior via the Task tool (see Fan_Out_Protocol Step 3). Spawn all in parallel.

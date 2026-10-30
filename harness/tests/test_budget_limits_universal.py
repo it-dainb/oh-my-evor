@@ -228,7 +228,8 @@ def test_a_zero_ceiling_is_rejected_with_the_true_reason(tmp_path: Path) -> None
 # the same way, yet main recorded it and spawned tick 2 at once.
 
 def test_a_contract_failure_blocks_the_next_tick(tmp_path: Path) -> None:
-    records = [{"tick": 1, "outcome": "failed", "failure_kind": "contract",
+    from evor.tree import _plugin_version
+    records = [{"tick": 1, "outcome": "failed", "failure_kind": "contract", "plugin_version": _plugin_version(),
                 "error": "Mutagen's contract and the validator disagree on hypothesis.id"}]
     goal = _goal(circuit_breaker=6)
     v = check_stop_condition(goal, _state(1, records), _make_engine(goal=goal, tmp_path=tmp_path))
@@ -267,3 +268,20 @@ def test_a_gap_is_outlived_by_a_later_successful_tick() -> None:
                                                     {"tick": 2, "outcome": "failed"}]})
     assert not _gap_outlived(SimpleNamespace(tick=2), {"tick_records": [{"tick": 2, "outcome": "scored"}]})
     assert not _gap_outlived(SimpleNamespace(tick=None), {"tick_records": [{"tick": 5, "outcome": "scored"}]})
+
+
+def test_a_contract_failure_from_an_older_plugin_does_not_block(tmp_path: Path) -> None:
+    """The block lifts only after a later tick succeeds, and no tick runs while it
+    holds. A failure recorded by different code must let one tick try the new code."""
+    records = [{"tick": 3, "outcome": "failed", "failure_kind": "contract", "plugin_version": "0.0.1",
+                "error": "H004 cannot pass with one frontier node"}]
+    goal = _goal(circuit_breaker=6)
+    v = check_stop_condition(goal, _state(3, records), _make_engine(goal=goal, tmp_path=tmp_path))
+    assert v.blocked is False
+
+
+def test_a_contract_failure_without_a_version_does_not_block(tmp_path: Path) -> None:
+    records = [{"tick": 3, "outcome": "failed", "failure_kind": "contract", "error": "x"}]
+    goal = _goal(circuit_breaker=6)
+    v = check_stop_condition(goal, _state(3, records), _make_engine(goal=goal, tmp_path=tmp_path))
+    assert v.blocked is False

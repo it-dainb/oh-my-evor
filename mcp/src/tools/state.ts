@@ -512,6 +512,10 @@ export function stateWrite(
     if (tickRecord.score !== undefined) record.score = tickRecord.score;
     if (tickRecord.failure_kind !== undefined) record.failure_kind = tickRecord.failure_kind;
     if (tickRecord.error !== undefined) record.error = tickRecord.error;
+    // Server-stamped, so a contract failure blocks only the plugin version that
+    // produced it (see harness/evor/tree.py check_stop_condition).
+    const version = tickRecord.outcome === "failed" ? pluginVersion() : undefined;
+    if (version) record.plugin_version = version;
     byTick.set(tickRecord.tick, record);
     const records = [...byTick.values()].sort((a, b) => (a.tick as number) - (b.tick as number));
     updated.tick_records = records;
@@ -1035,4 +1039,26 @@ export function registerStateTools(server: McpServer): void {
       };
     }
   );
+}
+
+/**
+ * The installed plugin's version, from .claude-plugin/plugin.json. Looked up from
+ * CLAUDE_PLUGIN_ROOT, then upward from the running script. Undefined when neither
+ * finds it.
+ */
+export function pluginVersion(): string | undefined {
+  const roots: string[] = [];
+  if (process.env.CLAUDE_PLUGIN_ROOT) roots.push(process.env.CLAUDE_PLUGIN_ROOT);
+  let dir = process.argv[1] ? dirname(process.argv[1]) : "";
+  for (let i = 0; dir && i < 6; i++, dir = dirname(dir)) roots.push(dir);
+  for (const root of roots) {
+    try {
+      const p = join(root, ".claude-plugin", "plugin.json");
+      if (existsSync(p)) {
+        const v = JSON.parse(readFileSync(p, "utf8"))?.version;
+        if (typeof v === "string" && v) return v;
+      }
+    } catch { /* try the next candidate */ }
+  }
+  return undefined;
 }

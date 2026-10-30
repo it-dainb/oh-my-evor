@@ -42,7 +42,10 @@ describe("tick_record", () => {
     rec(2, "failed");
     rec(3, "scored", 0.6);
     const state = stateRead(RUN, MISSION) as Record<string, unknown>;
-    expect(state.tick_records).toEqual([
+    // A failed record also carries the server-stamped plugin_version when the
+    // plugin root is resolvable; the order and the rest are what is asserted.
+    const recs = (state.tick_records as Array<Record<string, unknown>>).map(({ plugin_version: _v, ...r }) => r);
+    expect(recs).toEqual([
       { tick: 1, outcome: "scored", score: 0.4 },
       { tick: 2, outcome: "failed" },
       { tick: 3, outcome: "scored", score: 0.6 },
@@ -91,7 +94,9 @@ describe("resource_plan", () => {
   it("keeps failure_kind and error, which evor_check_stop reads to block a contract failure", () => {
     stateWrite(RUN, { tick_record: { tick: 1, outcome: "failed", failure_kind: "contract", error: "ids disagree" } }, MISSION);
     const state = stateRead(RUN, MISSION) as Record<string, unknown>;
-    expect(state.tick_records).toEqual([{ tick: 1, outcome: "failed", failure_kind: "contract", error: "ids disagree" }]);
+    const recs = state.tick_records as Array<Record<string, unknown>>;
+    expect(recs).toHaveLength(1);
+    expect(recs[0]).toMatchObject({ tick: 1, outcome: "failed", failure_kind: "contract", error: "ids disagree" });
   });
 
   it("refuses a failure_kind outside the three", () => {

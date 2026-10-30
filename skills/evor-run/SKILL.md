@@ -80,7 +80,9 @@ do not resume a run the plugin itself says cannot proceed.
   Frontier size: <len(frontier_ids)>
   Last eval version: <current_eval_version>
   ```
-  Ask: "Resume from tick <tick_count + 1>? (yes/no)"
+  Under an `aggressive-never-halt` autonomy charter, resume without asking: the user's
+  `/evor-run` is the instruction, and the governor denies `AskUserQuestion` to main on such a
+  mission. Otherwise ask: "Resume from tick <tick_count + 1>? (yes/no)"
   → "no": allow the user to specify a different run or abort.
 - If **mission-state** `status` is terminal (`completed`, `failed` or `superseded`): print "This run is already complete. Use /evor-report to view results or /evor-setup to start a new mission." and stop. **Read mission-state, not run-state** — `run-state.status` was retired in v1.2.1 (item 1.9b), so this branch would never fire again if keyed on it.
 

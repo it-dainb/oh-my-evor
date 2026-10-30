@@ -45,10 +45,10 @@
     "E4/E4-telemetry-path-false-negative-pos.json": "c7446924e74c905df9c62f4fdd7777bf34f3200201930ccb55e2809df4315db5"
   },
   "agent_files": {
-    "agents/evor-sage-junior.md": "3df9f95d1a1a13d694b627d98ff5cd1e299cd41da2be8f5662767a03e36486c0",
-    "agents/evor-tick.md": "5779da5259b3b1f3c24c7b1714ceebc78d8286a79cbca1689fe722e72112c2cb",
+    "agents/evor-sage-junior.md": "3bd8126f455db6f247432d925f2f569995b81f7b9f201549e89fae14ba0a5799",
+    "agents/evor-tick.md": "16c4f75bd7f2e18ca65ced34fe233238407872872dc8a922f8f239bf84a07aa8",
     "agents/evor-forge-analyst.md": "4456d819ee75b0de9160181c3a06d131e468504cf7ddcd09755d35aae0a2a2ef",
     "agents/evor-probe.md": "46d3063c5277c49e60eafbb03d9ae2757d80c6a9c45712861ea63e79899d874e",
-    "skills/evor/SKILL.md": "8bba6d3842fcc09fa6e47c4fd9f98f5ebede85f49fb0392a9b020f8aeeb95430"
+    "skills/evor/SKILL.md": "761f1d72e128f65c7a1472c630ff8be9c57c3d99797430065d8ccd1715a6f18e"
   }
 }

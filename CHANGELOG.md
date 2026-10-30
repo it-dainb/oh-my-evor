@@ -2,6 +2,46 @@
 
 All notable changes to Evor. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.2.14] — 2026-10-30 — Sage had nothing to research, and waits outlived the agent they waited on
+
+Found in tick 3 of the binarization mission on 1.2.13.
+
+### Fixed
+
+- **Gate H004 rejected every proposal while the frontier had one node.** "No parent supplies more
+  than ⌊N/2⌋ proposals" cannot hold when only one parent exists, so tick 3 trained nothing and
+  every later tick would have too. H004 now applies only with two or more frontier nodes, in the
+  deterministic gate and in Selector's instructions. `evor_validate_proposals` takes `run_id` and
+  reads the frontier size itself. The skill had documented a `run_id` the tool did not accept.
+- **A contract-failure block could never lift.** It cleared only after a later tick succeeded,
+  and no tick runs while it holds. Failed tick records are now stamped with the plugin version,
+  and they block only while that same version runs. After a plugin fix, one tick tries the new
+  code; if the cause persists, it fails again and blocks again.
+- **A handoff could be written and never read.** `evor_write_handoff` writes
+  `handoffs/<tick>-<seq>.json`, and `evor_read_handoff` only looked for `tick-<n>.md` or
+  `<from>_to_<to>.json`. The tick routed Mutagen's investigation queries to Sage this way, and
+  Sage read "not found" three times and exited without researching. Every read route now also
+  returns these entries; a `from→to` read falls back to the newest entry addressed to the reader.
+- **Sage was denied the artifact it researches.** The read guard ordered the pipeline
+  `sage → mutagen`, but within a tick Mutagen runs first and Sage answers its queries. Sage may
+  now read Mutagen's artifact, and its instructions fall back to it when no handoff exists.
+- **`evor_wait` outlived the agent it waited on.** Waiting on an artifact whose producer had
+  already exited ran out the full 540 s. Pass `producer_agent_id` (from the spawn result): a
+  producer that stops without writing makes the wait return at once with `producer_stopped`.
+- **Mutagen guessed `mutation_locus` paths.** Its instructions showed one example. The
+  validator accepts one fixed path per family and refused `data/` for data-curation. The full
+  table is now in the agent file, and a test validates every row.
+- **Sage-junior could not write its documented output.** Its instructions wrap findings in
+  `{angle_slug, findings: [...], ...}`, and the validator checked that wrapper as if it were a
+  single finding, failing every required field. It now validates each entry in `findings`. A test
+  feeds the agent file's example to the validator.
+- **Sage could not write a finding flagged `self_directed`.** Its instructions (Step 1b)
+  require the flag on findings from the one angle it chooses itself, and the contract forbade it.
+- **Sage-junior invented approach families** (`loss`), which the validator refuses. Its
+  instructions now state the closed set and where a loss function belongs.
+- **`evor-run` still asked "Resume from tick N?"** on a never-halt mission; the governor denied
+  it, at the cost of one call. It now resumes without asking under that charter.
+
 ## [1.2.13] — 2026-10-30 — open-ended missions overwrote their fitness with an undefined coverage
 
 1.2.12's fix was right but not reached: in an `open_ended` mission the evaluator then replaced

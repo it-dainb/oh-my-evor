@@ -238,3 +238,22 @@ describe("§4.3 — a generic spawn inherits its spawner's constraints", () => {
     expect(hook.updatedInput).toBeUndefined();
   });
 });
+
+describe("research edge — Sage reads the queries Mutagen wrote", () => {
+  // Mutagen runs before Sage within a tick, and its artifact carries the
+  // investigation_queries Sage answers. The guard's PIPELINE put sage upstream of
+  // mutagen, so Sage was denied that artifact and exited with nothing to research.
+  const read = (agent_type: string, agent: string) => call({
+    hook_event_name: "PreToolUse", agent_type,
+    tool_name: "mcp__plugin_oh-my-evor_evor__evor_read_artifact",
+    tool_input: { run_id: "r1", tick: 3, agent },
+  }).hook;
+
+  it("lets evor-sage read mutagen's artifact", () => {
+    expect(read("oh-my-evor:evor-sage", "mutagen").permissionDecision).not.toBe("deny");
+  });
+
+  it("still keeps evor-sage out of a downstream slot", () => {
+    expect(read("oh-my-evor:evor-sage", "forge").permissionDecision).toBe("deny");
+  });
+});

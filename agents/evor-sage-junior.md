@@ -181,6 +181,11 @@ disallowedTools: Write, Edit
       "urls_verified": true
     }
     ```
+    `applicable_families` is a CLOSED set: each entry is exactly one of `arch`, `training`,
+    `data-curation`, `data-augmentation`, `data-acquisition`, `algo`, `other`. A loss function
+    is `training`, and anything else that does not fit is `other`. The validator refuses any
+    other word (`loss` was refused repeatedly in the 2026-10-30 binarization mission).
+
     If no evidence was found after exhausting both primary and fallback search paths, return `findings: []`
     with `fallback_used` set to the path attempted and a brief note on what was searched.
   </Output_Format>

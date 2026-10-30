@@ -219,3 +219,51 @@ def test_tick_handoff_path_uses_tick_number(tmp_path: Path) -> None:
 
     path = write_tick_handoff(run_dir, 42, {})
     assert "tick-42" in path.name
+
+
+# ─── evor_write_handoff entries are readable ─────────────────────────────────
+#
+# The writer produced handoffs/<tick>-<seq>.json; every reader looked for
+# tick-<n>.md or <from>_to_<to>.json. Tick 3 of the 2026-10-30 binarization
+# mission routed Mutagen's queries to Sage this way and Sage read "not found".
+
+import subprocess
+import sys as _sys
+
+_BRIDGE = Path(__file__).resolve().parents[2] / "mcp" / "bridge" / "read_handoff_bridge.py"
+
+
+def _bridge(run_dir: Path, *args: str) -> dict:
+    env = {"PYTHONPATH": str(Path(__file__).resolve().parents[1])}
+    out = subprocess.run([_sys.executable, str(_BRIDGE), "--run-dir", str(run_dir), *args],
+                         capture_output=True, text=True, env=env, check=True)
+    return json.loads(out.stdout)
+
+
+def _write_entry(run_dir: Path, tick: int, seq: int, data: dict) -> None:
+    d = run_dir / "handoffs"
+    d.mkdir(parents=True, exist_ok=True)
+    (d / f"{tick}-{seq}.json").write_text(json.dumps(data))
+
+
+def test_tick_json_entries_are_returned_for_the_tick(tmp_path: Path) -> None:
+    from evor.handoff import tick_json_handoffs
+    _write_entry(tmp_path, 3, 0, {"to": "sage", "investigation_queries": ["q1"]})
+    _write_entry(tmp_path, 3, 1, {"to": "selector", "note": "x"})
+    _write_entry(tmp_path, 2, 0, {"to": "sage", "investigation_queries": ["old"]})
+    assert [e["to"] for e in tick_json_handoffs(tmp_path, tick=3)] == ["sage", "selector"]
+    assert tick_json_handoffs(tmp_path, to_agent="evor-sage")[0]["investigation_queries"] == ["q1"]
+
+
+def test_every_read_route_finds_what_the_writer_wrote(tmp_path: Path) -> None:
+    _write_entry(tmp_path, 3, 0, {"to": "sage", "investigation_queries": ["q1"]})
+    pair = _bridge(tmp_path, "--from-agent", "mutagen", "--to-agent", "sage")
+    assert pair["ok"] and pair["handoff"]["investigation_queries"] == ["q1"]
+    by_tick = _bridge(tmp_path, "--tick", "3")
+    assert by_tick["ok"] and by_tick["entries"][0]["to"] == "sage"
+    latest = _bridge(tmp_path)
+    assert latest["ok"] and latest["tick"] == 3
+
+
+def test_a_missing_handoff_is_still_not_found(tmp_path: Path) -> None:
+    assert _bridge(tmp_path, "--tick", "3") == {"error": "not found"}

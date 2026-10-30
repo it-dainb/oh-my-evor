@@ -13,7 +13,7 @@
   "grounded_rule": {
     "file": "agents/evor-sage.md",
     "quote": "Read-only for code. You may call MCP tools (evor_wiki_query, evor_cite, and the research MCPs \u2014 see Research_Toolchain) but never Write or Edit files.",
-    "sha256_at_authoring": "4b870ba89c2027df95c21efbf5699ee3e788db6b76a2d4484165b0add8a39e84"
+    "sha256_at_authoring": "b05be757190cd12f570db4cf2fc27fb36a1180f4292c0ef4616eee3b087dc00f"
   },
   "grounding": [
     "field-trace:N-03",
