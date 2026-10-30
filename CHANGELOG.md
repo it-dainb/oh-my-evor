@@ -2,6 +2,17 @@
 
 All notable changes to Evor. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.2.24] — 2026-10-30 — sed edits its operands
+
+### Fixed
+
+- **`sed -i` was judged by its script.** The write resolver read every quoted word with a
+  slash as a path, so `sed -i '72s/a (b)/c in data\/x.py/' genome.yaml` named three bogus
+  targets inside the worktree and Forge was refused an edit to its own genome. It also missed
+  the file actually edited when that file was a bare name after a `cd`, so an in-place edit of
+  a run's state file inside `.evor/runs/` went unguarded. In-place sed now resolves to the
+  operands that follow its script.
+
 ## [1.2.23] — 2026-10-30 — a job watcher is a live child
 
 ### Fixed
