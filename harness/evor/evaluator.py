@@ -520,14 +520,21 @@ class EvaluatorAdapter:
                 for angle_id, avs in per_angle_dict.items()
             }
 
-            return EvaluationResult(
-                **{
-                    **result.model_dump(),
-                    "worst_angle_coverage": coverage,
-                    "per_angle_vs_sota": {k: v.model_dump() for k, v in per_angle_inline.items()},
-                    # For open_ended: fitness is worst_angle_coverage
-                    "fitness_value": coverage,
-                }
-            )
+            # No angle matched a reported domain: coverage is undefined, and an
+            # undefined value must not stand in for a measured one.
+            if not per_angle_inline:
+                return result
+            update: dict[str, Any] = {
+                "worst_angle_coverage": coverage,
+                "per_angle_vs_sota": {k: v.model_dump() for k, v in per_angle_inline.items()},
+            }
+            # Coverage is the fitness only when the contract declares no primary
+            # fitness of its own. A declared one wins: the contract's baseline_value
+            # and every best_score are in ITS units. In the 2026-10-30 binarization
+            # mission coverage (a 0-1 share of domains above a bar of 98) replaced
+            # a fitness of 2.52 with 0.0, against a baseline of 0.000153.
+            if not any(m.role == "primary_fitness" for m in goal.metric_specs):
+                update["fitness_value"] = coverage
+            return EvaluationResult(**{**result.model_dump(), **update})
         except Exception:
             return result

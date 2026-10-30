@@ -226,7 +226,12 @@ class AngleRegistryManager:
         above_sota_count = 0
 
         for angle in registry.angles:
+            # Domain angles are registered as "domain:<name>" while evaluators key
+            # per_domain by "<name>". Matching only the full id left every angle of
+            # the 2026-10-30 binarization mission unscored.
             domain_scores = result.per_domain.get(angle.angle_id)
+            if domain_scores is None and ":" in angle.angle_id:
+                domain_scores = result.per_domain.get(angle.angle_id.split(":", 1)[1])
             if domain_scores is None:
                 # Unscored — absent from result; excluded from coverage denominator
                 continue

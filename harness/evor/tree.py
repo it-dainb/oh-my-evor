@@ -523,8 +523,10 @@ class TreeEngine:
             None,
         )
 
-        # Open-ended override (evaluated before constraints/formula)
-        if goal.mission_type == "open_ended" and result.worst_angle_coverage is not None:
+        # Open-ended: coverage is the fitness only when the contract declares no
+        # primary fitness; a declared one wins, since baseline_value is in its units.
+        if (goal.mission_type == "open_ended" and result.worst_angle_coverage is not None
+                and primary_spec is None):
             return result.worst_angle_coverage
 
         # Hard constraint guards — any violation → penalized fitness 0.0
@@ -787,6 +789,25 @@ class StopVerdict:
     capability_gaps: list[dict[str, Any]] = field(default_factory=list)
 
 
+def _gap_outlived(gap: Any, run_state: dict[str, Any]) -> bool:
+    """True once a LATER tick finished without failing: the run got past the gap.
+
+    No tool can close a capability gap, so every gap ever raised stayed "open" and
+    blocked the run for good. In the 2026-10-30 binarization mission, tick 1's
+    Mutagen gap (fixed in the plugin) still blocked after tick 2 scored. A gap that
+    recurs is raised again, and the bus moves its `tick` forward, so it blocks
+    again. A gap with no tick stays blocking, because there is nothing to compare.
+    """
+    gap_tick = getattr(gap, "tick", None)
+    if not isinstance(gap_tick, int):
+        return False
+    return any(
+        isinstance(r, dict) and isinstance(r.get("tick"), int) and r["tick"] > gap_tick
+        and r.get("outcome") in ("scored", "rejected", "skipped")
+        for r in (run_state.get("tick_records") or [])
+    )
+
+
 def check_stop_condition(
     goal: GoalContract,
     run_state: dict[str, Any],
@@ -844,6 +865,7 @@ def check_stop_condition(
                     "last_seen": g.last_seen,
                 }
                 for g in open_capability_gaps(Path(run_dir))
+                if not _gap_outlived(g, run_state)
             ]
         except Exception:  # noqa: BLE001 — an unreadable bus must not stop the run
             gaps = []

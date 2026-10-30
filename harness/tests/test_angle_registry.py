@@ -336,3 +336,18 @@ def test_flag_sota_regression_missing_angle_raises(
     mgr._ensure_registry(run_dir)
     with pytest.raises(KeyError):
         mgr.flag_sota_regression("nonexistent", 0.5, "src", "cite", run_dir)
+
+
+def test_score_angles_matches_a_domain_angle_to_its_bare_domain_key(
+    mgr: AngleRegistryManager, run_dir: Path
+) -> None:
+    """Domain angles are registered as "domain:<name>"; evaluators key per_domain by
+    "<name>". Matching only the full id left all 24 angles of the 2026-10-30
+    binarization mission unscored, and that undefined coverage became fitness 0.0."""
+    mgr.add_angle("domain:palmleaf_khmer", 0.90, [_source("s1"), _source("s2")], None, run_dir)
+    reg = _load_registry(run_dir)
+    result = _make_eval_result({"palmleaf_khmer": {"accuracy": 0.95}})
+
+    per_angle, coverage = mgr.score_angles(result, reg, "v1")
+    assert per_angle["domain:palmleaf_khmer"].above_sota is True
+    assert coverage == pytest.approx(1.0)

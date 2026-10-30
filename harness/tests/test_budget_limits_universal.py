@@ -253,3 +253,17 @@ def test_a_later_success_clears_the_block(tmp_path: Path) -> None:
     goal = _goal(circuit_breaker=6)
     v = check_stop_condition(goal, _state(2, records), _make_engine(goal=goal, tmp_path=tmp_path))
     assert v.blocked is False
+
+
+# ── A capability gap stops blocking once a later tick gets past it ───────────
+
+def test_a_gap_is_outlived_by_a_later_successful_tick() -> None:
+    from types import SimpleNamespace
+    from evor.tree import _gap_outlived
+    gap = SimpleNamespace(tick=1)
+    assert _gap_outlived(gap, {"tick_records": [{"tick": 1, "outcome": "failed"},
+                                                {"tick": 2, "outcome": "scored"}]})
+    assert not _gap_outlived(gap, {"tick_records": [{"tick": 1, "outcome": "failed"},
+                                                    {"tick": 2, "outcome": "failed"}]})
+    assert not _gap_outlived(SimpleNamespace(tick=2), {"tick_records": [{"tick": 2, "outcome": "scored"}]})
+    assert not _gap_outlived(SimpleNamespace(tick=None), {"tick_records": [{"tick": 5, "outcome": "scored"}]})

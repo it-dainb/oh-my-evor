@@ -520,13 +520,27 @@ def test_fitness_weighted(tmp_path: Path) -> None:
     assert fitness == pytest.approx(0.70)  # (0.80 + 0.60) / 2
 
 
-def test_fitness_open_ended_uses_coverage(tmp_path: Path) -> None:
-    """open_ended + worst_angle_coverage set → fitness = worst_angle_coverage."""
+def test_fitness_open_ended_uses_coverage_without_a_declared_primary(tmp_path: Path) -> None:
+    """open_ended, no primary_fitness spec, coverage set → fitness = worst_angle_coverage."""
+    goal = _make_goal(mission_type="open_ended", target=None)
+    goal = goal.model_copy(update={"metric_specs": [
+        m.model_copy(update={"role": "secondary_reported"}) for m in goal.metric_specs
+    ]})
+    result = _make_eval_result(score=0.85, worst_angle_coverage=0.6)
+    engine = TreeEngine(nodes=[], goal=goal, strategy=_make_strategy(), run_dir=tmp_path)
+    assert engine.compute_fitness(result, goal) == pytest.approx(0.6)
+
+
+def test_fitness_open_ended_keeps_a_declared_primary(tmp_path: Path) -> None:
+    """A declared primary fitness wins over coverage: baseline_value is in its units.
+
+    2026-10-30 binarization: coverage (a 0-1 share of domains above 98) replaced a
+    fitness of 2.52 with 0.0, against a contract baseline of 0.000153.
+    """
     goal = _make_goal(mission_type="open_ended", target=None)
     result = _make_eval_result(score=0.85, worst_angle_coverage=0.6)
     engine = TreeEngine(nodes=[], goal=goal, strategy=_make_strategy(), run_dir=tmp_path)
-    fitness = engine.compute_fitness(result, goal)
-    assert fitness == pytest.approx(0.6)
+    assert engine.compute_fitness(result, goal) == pytest.approx(0.85)
 
 
 def test_fitness_open_ended_fallback(tmp_path: Path) -> None:
