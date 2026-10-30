@@ -62,8 +62,8 @@ describe("a stop on a job wait is a dead end, not a yield", () => {
     expect(r.reason).toMatch(/resume the evor-tick agent/);
   });
 
-  it("still treats an artifact wait as a yield", () => {
-    const r = stop({ ...mid, blocked: { on: "artifact:forge@tick2", since: "x" } });
+  it("still treats an artifact wait as a yield while an agent is running", () => {
+    const r = stop({ ...mid, blocked: { on: "artifact:forge@tick2", since: "x" } }, "running", true);
     expect(r.decision).toBeUndefined();
     expect(r.stderr).toMatch(/yielding, not ending/);
   });

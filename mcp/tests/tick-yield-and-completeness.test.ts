@@ -123,9 +123,19 @@ describe("a yield is not a return", () => {
     // re-activates it instead of main receiving a value.
     const r = run("Forge is still training h001. Waiting.", {
       tickState: { ...MID, blocked: { on: "artifact:forge@tick1" } },
+      subagents: [LIVE],
     });
     expect(r.blocked, r.reason).toBe(false);
     expect(r.code).toBe(0);
+  });
+
+  it("a recorded wait with nothing running is a stall, not a yield", () => {
+    // The agent that owes the artifact ended its turn; nothing will wake the tick.
+    const r = run("Forge is still training h001. Waiting.", {
+      tickState: { ...MID, blocked: { on: "artifact:forge@tick1" } },
+      subagents: [FINISHED],
+    });
+    expect(r.blocked).toBe(true);
   });
 
   it("lets a yielding tick end its turn with live children and no recorded wait", () => {
@@ -196,6 +206,7 @@ describe("a terminal return may not owe a selected candidate", () => {
       tickState: { tick: 1, current_step: 5, step_status: "running", blocked: { on: "artifact:forge@tick1" } },
       selected: [["h001", true], ["h003", true]],
       nodes: [],
+      subagents: [LIVE],
     });
     expect(r.blocked, r.reason).toBe(false);
   });

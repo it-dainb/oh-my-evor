@@ -582,7 +582,16 @@ try {
     // why the two absences are read in opposite directions.
     const finished = isTickFinished(ts);
 
-    if (started && !finished) {
+    const stalledOn = recordedWait(ts)?.on;
+    if (started && !finished && stalledOn && !/^job:/.test(stalledOn)) {
+      blockStop(
+        `[EVOR CONTINUATION] Tick ${ts.tick} is waiting on ${stalledOn}, and no agent is running ` +
+          `that will deliver it: the agent that owes it ended its turn and is not woken again by ` +
+          `itself. Resume the evor-tick agent for this tick with SendMessage and tell it what it ` +
+          `is waiting on; it resumes the agent that owes the artifact. If no tick agent can be ` +
+          `resumed, spawn Task(subagent_type="oh-my-evor:evor-tick") again for this tick.\n`
+      );
+    } else if (started && !finished) {
       blockStop(
         `[EVOR CONTINUATION] Tick ${ts.tick} is at step ${step} (${ts?.step_status ?? 'unknown'}) — not complete.\n` +
           `Ending your turn now ends the mission with this tick unfinished.\n\n` +
