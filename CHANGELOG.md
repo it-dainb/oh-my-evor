@@ -2,6 +2,33 @@
 
 All notable changes to Evor. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.2.15] — 2026-10-30 — Forge could not wait for forge-junior, or set up a worktree
+
+Found in tick 4 of the binarization mission on 1.2.14.
+
+### Fixed
+
+- **No way to wait for a child that has no artifact.** On CLI 2.1.314 every sub-agent spawn
+  returns at once. forge-junior reports only through its final message, so Forge could neither
+  wait for it nor read its result. `evor_wait({ agent_id })` now waits for that child to finish
+  and returns its final message as `result`, which a foreground spawn used to provide. Waiting on
+  a `forge-junior` artifact is refused, with a pointer to `agent_id`.
+- **A copy's sources counted as writes.** The guard treated every path in a writing command as
+  a target, so Forge's `cp -r $P/data … $N/` "wrote" the parent node's code and the sealed
+  evaluator it copied from. Source operands of `cp`, `ln`, `install` and `rsync` are now reads.
+  `mv`, which removes its source, is unchanged, and so is a path that is also written.
+- **Forge's instructions had it set up the worktree; the governor forbids that.** Copying seams
+  and the evaluator writes `.py` files, which only forge-junior may do. The setup is now
+  forge-junior's first step, and Forge locks the evaluator afterwards.
+- **A reviewer's scratchpad counted as candidate code.** The critic wrote a check script to its
+  session scratchpad and was refused "author-code", with the target `<worktree>/EOF`: the quoted
+  heredoc delimiter was read as a path. Scratchpad paths are no longer write targets for the role
+  checks, and heredoc delimiters are not paths. Running candidate code is still forge-junior's
+  alone, and the critic's instructions now say how to ask for execution evidence instead.
+- **`evor_lock_evaluate` refused every node in setup order.** It required the node to be
+  registered, but the evaluator is placed and locked before `evor_record_node`. It now locks a
+  worktree named for the node, and still refuses a name with neither a node nor a worktree.
+
 ## [1.2.14] — 2026-10-30 — Sage had nothing to research, and waits outlived the agent they waited on
 
 Found in tick 3 of the binarization mission on 1.2.13.

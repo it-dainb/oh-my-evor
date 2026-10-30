@@ -672,6 +672,26 @@ describe("lockEvaluate — worktree written under either node identity", () => {
     expect(existsSync(join(wt, "evaluate.py.lock"))).toBe(true);
   });
 
+  it("locks a node that is not registered yet, by its worktree name", () => {
+    // Setup places and locks the evaluator before evor_record_node registers the
+    // node; requiring registration refused that order four times in tick 4 of the
+    // 2026-10-30 binarization mission.
+    registerNode();
+    const wt = makeWorktree("t4-p0-unregistered");
+
+    const result = lockEvaluate(RUN, "t4-p0-unregistered", MISSION);
+
+    expect(result.ok).toBe(true);
+    expect(existsSync(join(wt, "evaluate.py.lock"))).toBe(true);
+  });
+
+  it("refuses a name that is neither registered nor a worktree", () => {
+    registerNode();
+    const result = lockEvaluate(RUN, "no-such-node", MISSION);
+    expect(result.ok).toBe(false);
+    expect(result.error).toMatch(/no worktree/);
+  });
+
   it("still fails when the worktree exists under NEITHER identity", () => {
     // The safety property: resolution rescues a misfiled worktree, it never
     // manufactures one. A genuinely un-materialized node fails as before.

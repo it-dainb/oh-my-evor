@@ -140,7 +140,7 @@ For the full signal vocabulary (shapes, axes, severity, kind catalogue), read `a
 |---|---|
 | `evor_run_start` | **Evaluate an already-trained candidate** — runs the sealed `evaluate.py` as a detached job; returns `{job_id, status_path, log_path}` immediately. Does NOT train. |
 | `evor_run_status` | Read run progress and tail the log for a running or completed job |
-| `evor_wait` | **Block inside your turn** until a job finishes (`job_id`), a process exits (`pid`) or a tick artifact is written (`artifact: {tick, agent, kind?}`, plus `producer_agent_id` so a child that exits without writing returns `producer_stopped: true` at once). Up to 540 s per call (default 300); on `done:false` call it again. This is how every agent waits. |
+| `evor_wait` | **Block inside your turn** until a job finishes (`job_id`), a process exits (`pid`) or a tick artifact is written (`artifact: {tick, agent, kind?}`, plus `producer_agent_id` so a child that exits without writing returns `producer_stopped: true` at once), or a child agent finishes (`agent_id`: returns its final message as `result`; use it for children with no artifact slot, such as forge-junior). Up to 540 s per call (default 300); on `done:false` call it again. This is how every agent waits. |
 | `evor_schedule` | Submit a training job to the run scheduler; returns `{job_id, pid}` |
 | `evor_meta_evolve` | Update the search strategy from the current frontier (meta-evolution of the search policy) |
 | `evor_plot_report` | Render the evolution tree as PNG and/or HTML; writes to `report/` under the run directory |

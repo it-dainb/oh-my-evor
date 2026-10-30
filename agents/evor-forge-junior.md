@@ -32,7 +32,11 @@ skills: [oh-my-evor:evor-mcp]
     is reflected exactly in the file.
 
     **Step 2 — Lock evaluate.py**
-    Do NOT write or edit evaluate.py. It was copied from the locked reference during worktree setup.
+    Worktree setup is YOUR first step when Forge's prompt says the worktree does not exist yet.
+    Create it, copy the parent node's seams (data/, model/, train/) and genome.yaml into it, and
+    copy the run's sealed evaluator in VERBATIM as evaluate.py (`cp`, never an edit). Forge
+    then locks it with evor_lock_evaluate.
+    Do NOT write or edit evaluate.py beyond that verbatim copy.
     Verify and lock it immediately:
     ```
     evor_lock_evaluate(node=node_name)

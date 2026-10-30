@@ -88,7 +88,12 @@ function pathTokens(text) {
   const out = [];
   const quoted = /(['"])((?:\\.|(?!\1)[^\\])*)\1/g;
   let m;
-  while ((m = quoted.exec(text))) out.push(m[2]);
+  while ((m = quoted.exec(text))) {
+    // A quoted heredoc delimiter (`<<'EOF'`) is not a path; reading it as one
+    // made a critic's check script "write" <worktree>/EOF.
+    if (/<<-?\s*$/.test(text.slice(0, m.index))) continue;
+    out.push(m[2]);
+  }
   for (const t of text.split(/[\s;|&()<>]+/)) {
     if (/[/]/.test(t) && !/^-/.test(t)) out.push(t.replace(/^['"]|['"]$/g, ''));
   }
@@ -157,6 +162,40 @@ function hasWriteIntent(text) {
   return false;
 }
 
+/** Read-only source operands of cp / ln / install / rsync segments, and their destinations. */
+function copySources(segs, vars, baseCwd) {
+  const sources = new Set();
+  const written = new Set();
+  for (const { text, cwd } of segs) {
+    const t = foldConcat(expandVars(text, vars)).trim();
+    const m = t.match(/^(cp|ln|install|rsync)\s+(.*)$/);
+    if (!m) continue;
+    // Anything shell-ish beyond plain operands (redirects, pipes, substitutions)
+    // is left to the general rules.
+    if (/[<>|`$(]/.test(m[2])) continue;
+    const args = m[2].split(/\s+/).filter(Boolean);
+    let dest = null;
+    const operands = [];
+    for (let i = 0; i < args.length; i++) {
+      const a = args[i];
+      if (a === '-t' || a === '--target-directory') { dest = args[++i] ?? null; continue; }
+      if (a.startsWith('--target-directory=')) { dest = a.slice('--target-directory='.length); continue; }
+      if (a.startsWith('-')) continue;
+      operands.push(a.replace(/^['"]|['"]$/g, ''));
+    }
+    if (dest === null) dest = operands.pop() ?? null;
+    if (!dest || !operands.length) continue;
+    const abs = (p, dir) => (isAbsolute(p) ? p : resolve(dir, p));
+    // The whole-command pass resolves relative paths against the STARTING cwd,
+    // not the segment's, so drop the source under both resolutions.
+    for (const dir of [cwd, baseCwd]) {
+      written.add(abs(dest, dir));
+      for (const o of operands) sources.add(abs(o, dir));
+    }
+  }
+  return { sources, written };
+}
+
 /**
  * Resolve the effective write targets of a tool call to absolute paths.
  *
@@ -206,6 +245,14 @@ export function resolveWriteTargets({ tool, toolInput = {}, cwd = process.cwd() 
       targets.add(isAbsolute(t) ? t : resolve(unit.cwd, t));
     }
   }
+
+  // A copy READS its sources. Counting them as targets made Forge's documented
+  // worktree setup (`cp -r $P/data $P/model $N/`) "write" the PARENT node's code
+  // and the sealed evaluator it copied from (binarization mission, tick 4).
+  // Only sources that are not also written elsewhere in the command are dropped;
+  // `mv` is excluded because it removes its source.
+  const { sources, written } = copySources(segments(command, cwd, vars), vars, cwd);
+  for (const src of sources) if (!written.has(src)) targets.delete(src);
 
   return { targets: [...targets], writes };
 }

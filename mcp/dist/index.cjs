@@ -24987,11 +24987,12 @@ function worktreeDir(evorRoot, ...refs) {
 }
 function lockEvaluate(runId, nodeRef, missionId) {
   const nodeId = tryResolveNodeRef(runId, nodeRef, missionId);
-  if (nodeId === null) {
+  const namedWorktree = /^[A-Za-z0-9._-]+$/.test(nodeRef) && (0, import_fs18.existsSync)((0, import_path19.join)(getEvorRoot(), "worktrees", nodeRef));
+  if (nodeId === null && !namedWorktree) {
     return {
       ok: false,
       node_name: nodeRef,
-      error: `node '${nodeRef}' is not in this run's tree \u2014 check the name with evor_tree_read.`
+      error: `node '${nodeRef}' is not in this run's tree and has no worktree \u2014 check the name with evor_tree_read.`
     };
   }
   const worktree = worktreeDir(getEvorRoot(), nodeId, nodeRef);
@@ -26267,12 +26268,15 @@ var DEFAULT_WAIT_S = 300;
 var POLL_MS = 5e3;
 var STOPPED_QUIET_MS = 15e3;
 function agentStopped(agentId, projectsDir = (0, import_path22.join)((0, import_os5.homedir)(), ".claude", "projects"), now = Date.now()) {
-  if (!/^[A-Za-z0-9_-]+$/.test(agentId)) return false;
+  return agentOutcome(agentId, projectsDir, now).stopped;
+}
+function agentOutcome(agentId, projectsDir = (0, import_path22.join)((0, import_os5.homedir)(), ".claude", "projects"), now = Date.now()) {
+  if (!/^[A-Za-z0-9_-]+$/.test(agentId)) return { stopped: false, found: false };
   let projects;
   try {
     projects = (0, import_fs21.readdirSync)(projectsDir);
   } catch {
-    return false;
+    return { stopped: false, found: false };
   }
   for (const proj of projects) {
     let sessions;
@@ -26285,17 +26289,21 @@ function agentStopped(agentId, projectsDir = (0, import_path22.join)((0, import_
       const path = (0, import_path22.join)(projectsDir, proj, sess, "subagents", `agent-${agentId}.jsonl`);
       if (!(0, import_fs21.existsSync)(path)) continue;
       try {
-        if (now - (0, import_fs21.statSync)(path).mtimeMs < STOPPED_QUIET_MS) return false;
+        if (now - (0, import_fs21.statSync)(path).mtimeMs < STOPPED_QUIET_MS) return { stopped: false, found: true };
         const lines = (0, import_fs21.readFileSync)(path, "utf8").trimEnd().split("\n");
         const last = JSON.parse(lines[lines.length - 1]);
         const reason = last?.message?.stop_reason;
-        return last?.type === "assistant" && typeof reason === "string" && reason !== "tool_use";
+        const stopped = last?.type === "assistant" && typeof reason === "string" && reason !== "tool_use";
+        if (!stopped) return { stopped: false, found: true };
+        const content = last?.message?.content;
+        const text = Array.isArray(content) ? content.filter((c) => c?.type === "text").map((c) => c.text ?? "").join("\n") : typeof content === "string" ? content : "";
+        return { stopped: true, found: true, text };
       } catch {
-        return false;
+        return { stopped: false, found: true };
       }
     }
   }
-  return false;
+  return { stopped: false, found: false };
 }
 function pidAlive(pid) {
   try {
@@ -26330,16 +26338,32 @@ function registerWaitTools(server) {
         agent: external_exports.string(),
         kind: external_exports.string().optional()
       }).optional().describe("Wait for this tick artifact to be written"),
+      agent_id: external_exports.string().optional().describe(
+        "Wait for this child agent (the agentId in its spawn result) to finish, and return its final message as `result`. For children with no artifact slot, e.g. forge-junior."
+      ),
       producer_agent_id: external_exports.string().optional().describe(
         "With artifact: the agentId of the child that owes it (from the spawn result). If that child stops without writing it, the wait returns at once with producer_stopped:true instead of running out the clock."
       ),
       wait_s: external_exports.number().int().min(0).max(MAX_WAIT_S).optional().describe(`Seconds to wait at most (default ${DEFAULT_WAIT_S}, max ${MAX_WAIT_S})`),
       mission_id: external_exports.string().optional().describe("Mission id; resolved from the active run when omitted")
     },
-    async ({ run_id, job_id, pid, artifact, wait_s, mission_id, producer_agent_id }) => {
-      const given = [job_id, pid, artifact].filter((v) => v !== void 0).length;
-      if (given !== 1) return err("give exactly one of job_id, pid, artifact");
+    async ({ run_id, job_id, pid, artifact, wait_s, mission_id, producer_agent_id, agent_id }) => {
+      const given = [job_id, pid, artifact, agent_id].filter((v) => v !== void 0).length;
+      if (given !== 1) return err("give exactly one of job_id, pid, artifact, agent_id");
       const waitS = wait_s ?? DEFAULT_WAIT_S;
+      if (agent_id !== void 0) {
+        let outcome = agentOutcome(agent_id);
+        const r2 = await waitFor(() => {
+          outcome = agentOutcome(agent_id);
+          return { done: outcome.stopped };
+        }, waitS);
+        if (!outcome.found) return err(`no transcript found for agent ${agent_id}; pass the agentId from its spawn result`);
+        return ok({
+          ...r2,
+          condition: `agent:${agent_id}`,
+          ...r2.done ? { result: outcome.text ?? "" } : { next: "still working \u2014 call evor_wait again" }
+        });
+      }
       if (pid !== void 0) {
         const r2 = await waitFor(() => ({ done: !pidAlive(pid) }), waitS);
         return ok({ ...r2, condition: `pid:${pid}`, ...r2.done ? {} : { next: "still running \u2014 call evor_wait again" } });
@@ -26369,6 +26393,9 @@ function registerWaitTools(server) {
       const agent = artifact.agent.replace(/^(oh-my-evor:)?evor-/, "");
       if (!VALID_AGENTS.includes(agent)) {
         return err(`unknown artifact agent ${JSON.stringify(artifact.agent)}; one of ${VALID_AGENTS.join(", ")}`);
+      }
+      if (agent === "forge-junior") {
+        return err("forge-junior has no artifact slot: it reports through its final message. Wait with evor_wait({ agent_id: <its agentId> }), which returns that message as `result`.");
       }
       if ((agent === "sage-junior" || agent === "acquirer") && !artifact.kind) {
         return err(`${agent} artifacts are per kind: pass artifact.kind (the junior's angle slug or the acquirer's source slug)`);

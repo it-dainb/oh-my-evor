@@ -2082,6 +2082,12 @@
         "spec_sha256": "c7cd642aa049a354",
         "repeats": 5
       },
+      "stale": {
+        "since": "2026-10-30",
+        "agent_sha256_now": "5bc26351a55f117e",
+        "reason": "The agent file changed after the 8.1 run: the role now states that it reviews by reading and routes any execution evidence through Forge to forge-junior, after a critic tried to run a check script against the candidate. The tier comparison in \u00a73 was measured against the previous text.",
+        "action": "re-measure this role before citing its \u00a73 row"
+      },
       "records": [
         {
           "tier": "opus-medium",
