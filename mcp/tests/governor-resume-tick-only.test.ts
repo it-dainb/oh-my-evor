@@ -101,3 +101,42 @@ describe("main resumes only the tick", () => {
     expect(decide(ask, "paused", "aggressive-never-halt", big).permissionDecision).not.toBe("deny");
   });
 });
+
+describe("what counts as running training code", () => {
+  const bash = (command: string, agent_type?: string) =>
+    ({ tool_name: "Bash", tool_input: { command }, ...(agent_type ? { agent_type } : {}) });
+
+  it("a python -c read followed by a grep over a .py file runs nothing", () => {
+    const d = decide(bash(`python3 -c "import json; print(1)"; grep -n v10 eval-suites/v1.py`, "oh-my-evor:evor-forge"));
+    expect(d.permissionDecision).not.toBe("deny");
+  });
+
+  it("a script after interpreter flags or inside a pipeline still runs training", () => {
+    expect(decide(bash("python3 -u train.py", "oh-my-evor:evor-forge")).permissionDecision).toBe("deny");
+    expect(decide(bash("cd x && python train.py | tee log", "oh-my-evor:evor-forge")).permissionDecision).toBe("deny");
+  });
+
+  it("main outside a live mission is not held to a sub-agent's role rules", () => {
+    const d = decide(bash("python3 baseline_eval.py --weights w.pt"), "paused");
+    expect(d.permissionDecision).not.toBe("deny");
+  });
+
+  it("main during a live mission still delegates training", () => {
+    expect(decide(bash("python3 baseline_eval.py --weights w.pt")).permissionDecision).toBe("deny");
+  });
+});
+
+describe("the script an interpreter runs is read, not written", () => {
+  const bash = (command: string) => ({ tool_name: "Bash", tool_input: { command } });
+  const EV = ".evor/runs/m1/r1/eval-suites/v1.py";
+
+  it("running the run's evaluator with its output redirected elsewhere writes only the output", () => {
+    const d = decide(bash(`mkdir -p reports/s && python3 ${EV} > reports/s/b.json 2> reports/s/b.err`), "draft");
+    expect(d.permissionDecision).not.toBe("deny");
+  });
+
+  it("a statement that writes the script is still a write to it", () => {
+    expect(decide(bash(`echo x > ${EV}; python3 ${EV} > reports/b.json`), "draft").permissionDecision).toBe("deny");
+    expect(decide(bash(`python3 ${EV} > ${EV}`), "draft").permissionDecision).toBe("deny");
+  });
+});
