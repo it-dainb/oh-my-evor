@@ -8,34 +8,16 @@ This command resumes a paused or interrupted Evor mission by restoring run state
 
 ## Dispatch
 
-1. Read the bundled skill instructions with one deterministic read — use the **Read
-   tool**, not a shell command:
-   ```
-   Read("${EVOR_PLUGIN_ROOT:-$CLAUDE_PLUGIN_ROOT}/skills/evor-run/SKILL.md")
-   ```
-   This dispatch is also what an agent gets when it names this skill in its
-   `skills:` frontmatter, because the command and the skill share a name and the
-   command wins. `evor-tick` declares `disallowedTools: Bash` and was handed a
-   `cat` — so for nine invocations across one mission it received this stub, could
-   not execute it, and ran the tick without ever seeing the 9-step loop. Read is
-   available to every agent; `cat` is not. If you do hold Bash, `cat` on the same
-   path is equivalent.
-   `EVOR_PLUGIN_ROOT` is exported by this plugin’s SessionStart hook and `CLAUDE_PLUGIN_ROOT` by Claude Code — either points at the plugin’s install directory, so this resolves regardless of your current working directory.
-2. Follow that SKILL.md exactly with the resume flag active, treating the user's arguments as:
+Invoke the `oh-my-evor:evor-run` skill with the **Skill tool**, passing the user's arguments:
 
 ```text
 $ARGUMENTS
 ```
 
-The `evor-run` skill handles resume detection automatically: if the run has completed ticks and is not yet finished, it enters resume mode.
-
-If `$CLAUDE_PLUGIN_ROOT` happens to be unset, fall back to a **bounded** lookup only:
-
-```bash
-find "$HOME/.claude/plugins" -path "*oh-my-evor*/skills/evor-run/SKILL.md" 2>/dev/null | head -1
-```
-
-**Never run `find /` or scan the whole filesystem.** The skill lives inside this plugin's own directory; a full-disk search is unnecessary and will hang the session.
+The skill loads with its own base directory and runs the resume flow: if the run has completed
+ticks and is not finished, it resumes. This stub used to `Read` a path written as
+`${EVOR_PLUGIN_ROOT:-$CLAUDE_PLUGIN_ROOT}/…`. The Read tool cannot expand shell variables, so
+every resume began with a denied Bash call.
 
 ## Quick Reference
 
