@@ -444,10 +444,11 @@ Then seal the anchor into the contract:
 evor_seal_eval_script({ run_id: "<run_id>", eval_version: "v1" })
 ```
 
-The seal covers **every file the evaluator comprises** — for the generated shape that is
-the harness and `score_plugin.py` together, because the harness imports the metric from
-it and an anchor over the harness alone leaves the function that decides every score
-outside custody.
+The seal writes **one anchor per file**: `eval_script_hash` = sha256 of `eval-suites/<v>.py`, and,
+when the evaluator has one, `eval_plugin_hash` = sha256 of `score_plugin.py` — the metric itself,
+which the generated harness imports. The integrity gate checks both. (v1.2.6 folded them into one
+set digest under `eval_script_hash`; every reader still compared a plain sha256, so every node
+failed `no_eval_shift` until v1.2.9 split them again.)
 
 Verify the call returns `ok`. If it reports the evaluator is missing, write eval-suites/<eval_version>.py first, then re-call evor_seal_eval_script. Do NOT proceed to lock if evor_seal_eval_script did not return ok.
 </EvalSuite_Initialization>

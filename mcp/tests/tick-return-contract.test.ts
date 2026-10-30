@@ -260,7 +260,9 @@ describe("evor-tick may not return mid-flight", () => {
     // passes, so only the mid-flight guard can be what blocked it.
     expect(r.json?.decision).toBe("block");
     expect(r.json?.reason).toMatch(/mid-flight/);
-    expect(r.json?.reason).toMatch(/TaskOutput|Monitor/);
+    // The wait instruction for a SUB-agent is a foreground spawn; TaskOutput is
+    // not available to it, and an earlier version of this message prescribed it.
+    expect(r.json?.reason).toMatch(/FOREGROUND/);
   });
 
   it("releases after the retry cap, so a tick that truly cannot finish gets through", () => {

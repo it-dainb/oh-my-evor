@@ -85,23 +85,24 @@ because ending your turn *feels* like waiting. It is not. When you end your turn
 orchestrator's only remaining move is to re-spawn or nudge you, and re-spawning re-primes your
 entire context.
 
-When you have spawned an agent and need its result:
+**Spawn every child in the FOREGROUND.** A foreground `Agent` call blocks until the child
+returns — that is how you wait, and it is the only reliable way a sub-agent can. For parallel
+work, put several `Agent` calls in ONE message: they run concurrently and the turn waits for
+all of them. Never pass `run_in_background` — the governor denies it for sub-agents.
 
-1. `evor_await_artifact` — records WHAT you are waiting for, so a waiting tick is
-   distinguishable from a stalled one.
-2. Then **block**: `TaskOutput(task_id, block:true)` on the agent that owes it, or `Monitor`
-   on the artifact path.
+Why, measured on the same seed and CLI (2026-10-30): a tick whose children were all spawned in
+the foreground (13 spawns, 0 background) ran the whole loop and produced a node. A tick whose
+Sage spawned its juniors in the background stalled — a background spawn ends the caller's turn,
+the juniors' completion notices went to MAIN rather than to Sage, nobody woke Sage to aggregate
+or woke you, and the process exited with zero nodes. Only main is woken by notifications.
 
-`TaskOutput` and `Monitor` are deferred tools — their schemas are not loaded until you ask for
-them. Load them before you need them:
+Earlier text here told you to block on `TaskOutput(task_id, block:true)`. That tool is not
+available to a sub-agent, which is what your own capability-gap signal reported — and it was
+never needed: the foreground call is the blocking primitive. `evor_await_artifact` still
+records what you are waiting for, which helps a reader tell a long wait from a stall.
 
-```
-ToolSearch("select:TaskOutput,Monitor")
-```
-
-In the measured run neither tool was ever loaded, and the string `TaskOutput` never once
-appeared in the tick's context. Never emit a "waiting…" or "still running" turn: it costs a
-turn, says nothing, and is the shape the SubagentStop guard will now reject.
+Never emit a "waiting…" or "still running" turn: it costs a turn, says nothing, and is the shape
+the SubagentStop guard rejects.
 
 ## Your return value is the product
 
@@ -158,11 +159,16 @@ the hypothesis was gone.
 
 ## Waiting is not failing
 
-**`yielding` is the one you will need most, and it did not exist.** A tick spans hours and
-around ten async agent boundaries. You have no blocking primitive across them: `TaskOutput`
-is not registered for a sub-agent, so your only way to wait is to end your turn and be
-re-activated — which works. In the field `evor-sage` did exactly that SEVEN times while five
-juniors ran, and resumed every time.
+**`yielding` is a fallback, not the normal path.** With every child spawned in the foreground
+you never need to end your turn mid-tick, because each spawn returns when its work is done.
+`yielding` exists for the case you cannot avoid: you must end a turn before the tick is over.
+Report it truthfully then — but know that nothing wakes a sub-agent automatically. Main resumes
+you (with `SendMessage`) when what you are waiting for lands, which is slower and costs context.
+
+This section used to say a sub-agent's "only way to wait is to end your turn and be
+re-activated — which works", citing evor-sage resuming seven times. That was wrong: those
+resumptions were other agents calling `SendMessage`, and a later run in which nobody did so
+stalled exactly at the first background spawn.
 
 You were the only agent it did not work for, because the SubagentStop hook enforced a return
 shape on your turn ends and the shape had no word for waiting. So a tick ending its turn at

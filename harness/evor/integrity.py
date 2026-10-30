@@ -207,16 +207,24 @@ class IntegrityGate:
             no_label_contamination = False
 
         # ── Check 4: no_eval_shift ────────────────────────────────────────
-        no_eval_shift = True
-        if eval_script_path.exists():
-            actual_hash = _sha256_file(eval_script_path)
-            no_eval_shift = actual_hash == goal.eval_script_hash
-        else:
-            # Missing eval script is a shift by definition
-            no_eval_shift = False
+        #
+        # Both anchors, through the contract module that owns their meaning. A
+        # missing eval script is a shift by definition. The plugin anchor is
+        # checked only when the contract carries one — it is the metric, and a
+        # rewrite of it under an intact harness is the shift this check exists for.
+        from .eval_contract import eval_script_anchor_matches, plugin_anchor_matches
+
+        no_eval_shift = eval_script_anchor_matches(goal.eval_script_hash, eval_script_path)
         if not no_eval_shift:
             failures.append(
                 "no_eval_shift: eval_script sha256 does not match GoalContract.eval_script_hash"
+            )
+        plugin_ok = plugin_anchor_matches(getattr(goal, "eval_plugin_hash", None), eval_script_path)
+        if plugin_ok is False:
+            no_eval_shift = False
+            failures.append(
+                "no_eval_shift: score_plugin.py does not match GoalContract.eval_plugin_hash — "
+                "the metric changed after it was sealed"
             )
 
         # ── Check 3b: source-page leakage (items 2.3 / 9.1, finding M-03) ───
@@ -385,7 +393,13 @@ class IntegrityGate:
         if candidate_dir is not None:
             try:
                 from evor.quality_gate import ForgeStructureGate  # lazy import
-                sg = ForgeStructureGate(locked_eval_hash=goal.eval_script_hash)
+                from .eval_contract import per_file_anchor
+
+                # The gate compares one file's sha256; a v1.2.6–v1.2.9 set-digest
+                # anchor is translated first, or every node fails eval_locked.
+                sg = ForgeStructureGate(
+                    locked_eval_hash=per_file_anchor(goal.eval_script_hash, eval_script_path)
+                )
                 sg_report = sg.check(candidate_dir)
                 structure_ok = sg_report.passed
                 if not structure_ok:

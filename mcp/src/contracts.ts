@@ -175,6 +175,8 @@ export const GoalContractSchema = z.object({
   // Server-owned: harness computes at freeze — agent must never supply.
   locked_split_hash: z.string().optional(),
   eval_script_hash: z.string().optional(),
+  // sha256 of eval-suites/score_plugin.py, when the mission's evaluator has one.
+  eval_plugin_hash: z.string().optional(),
   expansion_policy: ExpansionPolicySchema.optional(),
   allowed_licenses: z.array(z.string()),
   evolution_bounds: EvolutionBoundsSchema.optional().describe(

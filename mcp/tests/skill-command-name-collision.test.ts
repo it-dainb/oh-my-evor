@@ -61,12 +61,14 @@ describe("evor-tick knows its procedure does not arrive via frontmatter", () => 
     expect(src).not.toMatch(/skill, loaded above/);
   });
 
-  it("names the wait tools AND that they must be ToolSearch'd first", () => {
-    // The measured tick never loaded either one; the string "TaskOutput" did not
-    // appear anywhere in its context, because the wait discipline lives in the
-    // SKILL.md that never arrived.
-    expect(src).toMatch(/TaskOutput/);
-    expect(src).toMatch(/Monitor/);
-    expect(src).toMatch(/ToolSearch\("select:TaskOutput/);
+  it("tells the tick to wait by spawning in the FOREGROUND, not by TaskOutput", () => {
+    // This case used to require the agent file to prescribe
+    // `ToolSearch("select:TaskOutput,Monitor")` and a TaskOutput block. That
+    // tool is not available to a sub-agent; the wait primitive is a foreground
+    // Agent call, which blocks until the child returns. A tick told otherwise
+    // backgrounded its children and was never resumed (2026-10-30, 0 nodes).
+    expect(src).toMatch(/FOREGROUND/);
+    expect(src).toMatch(/several `Agent` calls in ONE message/);
+    expect(src).not.toMatch(/ToolSearch\("select:TaskOutput/);
   });
 });

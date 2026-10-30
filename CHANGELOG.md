@@ -2,7 +2,70 @@
 
 All notable changes to Evor. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
-## [1.2.9] — 2026-10-29 — the budget meant what the interview said
+## [1.2.9] — 2026-10-30 — the budget meant what the interview said, and the first live tick in two months
+
+### ⚠ Every node failed integrity from v1.2.6 to v1.2.8
+
+`eval_script_hash` has one writer, the seal, and three readers — integrity check 4
+(`no_eval_shift`), `ForgeStructureGate.eval_locked`, and `lockEvaluate` — all of which compare
+**sha256 of one file**. v1.2.6 made the seal write a digest over the evaluator's whole file set,
+to bring `score_plugin.py` under custody, and moved none of the readers. From v1.2.6 every node
+failed `no_eval_shift` and no node could be locked, so nothing could ever be promoted. It shipped
+to `main` as 1.2.8. The parity test pinned the seal to `evor.eval_contract`; nothing pinned it to
+the gate that reads it.
+
+- One anchor per file: `eval_script_hash` = sha256(`<v>.py`) again, new `eval_plugin_hash` =
+  sha256(`score_plugin.py`). The gate checks both; a rewritten metric under an intact harness
+  still fails.
+- Contracts sealed by 1.2.6–1.2.8 carry a set digest. It commits to the same bytes, so it is
+  accepted — translated in one place per runtime (`eval_contract.per_file_anchor`,
+  `lockEvaluate`) — and re-sealing such a run rewrites the anchor to the per-file form. The
+  tamper guard compares content file by file, so the re-seal is not mistaken for a tamper.
+- `mcp/tests/seal-to-readers.test.ts` runs the real seal against every reader in both runtimes.
+  It fails on the 1.2.8 seal.
+
+Verified live: a bench tick's node — `feature-cross-lr-01`, fitness 0.874 — passed integrity
+with `no_eval_shift: true`. The previous tick's node failed on exactly this check.
+
+### A sub-agent spawns in the foreground
+
+v1.2.7 assumed the platform re-activates a sub-agent when its background child finishes. It
+does not: completion notices go to MAIN. The "resumptions" that seemed to prove it were agents
+calling `SendMessage` on each other. The wait primitive a sub-agent has is a FOREGROUND `Agent`
+call, which blocks until the child returns — several in one message run in parallel and are all
+awaited. Same seed, same CLI: 13 foreground / 0 background spawns ran the whole tick; 3 / 4 (Sage
+backgrounding its juniors) stalled and exited with 0 nodes.
+
+- The governor denies `run_in_background` from any sub-agent. Main may still background.
+- `skills/evor/SKILL.md`, `agents/evor-tick.md` and the SubagentStop message no longer prescribe
+  `TaskOutput(block:true)`, which a sub-agent never had. On a `yielding` return main resumes that
+  tick with `SendMessage` instead of idling for a wake-up that does not come.
+
+### The live-tick runner could not run
+
+`ci/bench-tick.sh` failed in seeding from 2026-09-02 to now — `init_run` refused "no capability
+profile" — so no live tick was measured for two months, across every release.
+
+- The seeder never probed the machine; it does now, and freezes before the eval suite.
+- `init_run` resolved the evor root twice: run creation honoured `EVOR_ROOT`, the probe check
+  used the process cwd. With the root set by environment it looked in the wrong `.evor`. One
+  resolver; the new test fails on the old code with the field error.
+- The images pinned CLI 2.1.220, which never resumes a yielding sub-agent; ticks died at the
+  first spawn. Both pinned to 2.1.312. Measurements under 2.1.220 are not comparable. The ML
+  image's `claude-agent-sdk@0.3.220` pin was paired with the old CLI and is left as it was.
+
+### A correction to this release
+
+K-06 was first made to reject a breaker longer than the budget. That is inert, not harmful, and
+rejecting it refused every short run with a default breaker — including the 1-tick bench mission.
+It is disclosed and passes.
+
+### Still open
+
+`tick-state.json`'s step counter is maintained by agent prose: in the verified live tick it stayed
+at step 2 while the tick completed and was recorded `scored`. Nothing blocked on it this time; the
+continuation guard reads it.
+
 
 The September setup transcript reported two "inverted validator predicates" and three
 smaller setup defects. The validator was not inverted. Underneath it was a stop path that

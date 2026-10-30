@@ -40,6 +40,12 @@ THE CONTRACT.
                the harness alone leaves the function that decides every score
                outside custody. `evaluator_files` is that set.
 
+  Anchors      ONE PER FILE: `eval_script_hash` = sha256(<v>.py), the value every
+               reader computes; `eval_plugin_hash` = sha256(score_plugin.py) when
+               present. v1.2.6 folded both into one set digest under
+               `eval_script_hash`; no reader moved with it and every node failed
+               no_eval_shift until v1.2.9 split them again.
+
   Shapes       `generated` scores prediction files and cannot load a model.
                `authored` loads the candidate's model and can measure inference.
                A contract that gates on latency or VRAM REQUIRES `authored`;
@@ -141,6 +147,59 @@ def evaluator_digest(run_dir: str | Path, eval_version: str) -> dict[str, Any]:
         acc.update(digest.encode())
         acc.update(b"\n")
     return {"ok": True, "hash": acc.hexdigest(), "files": manifest}
+
+
+# ── Anchors: what the seal writes and what the integrity gate checks ────────
+
+def file_sha256(path: str | Path) -> str:
+    return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+
+
+def eval_script_anchor_matches(anchor: str | None, eval_script: str | Path) -> bool:
+    """Does `anchor` (GoalContract.eval_script_hash) seal THIS evaluator file?
+
+    The anchor is sha256 of `<run_dir>/eval-suites/<v>.py`. Contracts sealed by
+    v1.2.6–v1.2.9 hold instead a digest over the evaluator's whole file set — a
+    change that left every reader comparing a plain sha256 against it, so every
+    node failed `no_eval_shift`. That digest commits to the same bytes (it is
+    built from each file's sha256), so it is accepted here; nothing is weakened.
+    Re-sealing such a run rewrites the anchor to the per-file form.
+    """
+    if not anchor:
+        return False
+    path = Path(eval_script)
+    if not path.exists():
+        return False
+    if file_sha256(path) == anchor:
+        return True
+    run_dir, version = path.resolve().parent.parent, path.stem
+    return evaluator_digest(run_dir, version).get("hash") == anchor
+
+
+def per_file_anchor(anchor: str | None, eval_script: str | Path) -> str | None:
+    """`anchor` in its per-file form, for readers that compare one file's sha256.
+
+    A v1.2.6–v1.2.9 set-digest anchor that seals this evaluator is translated to
+    sha256(<v>.py); anything else is returned unchanged, so a genuine mismatch
+    still fails wherever it is compared. One translation point, so no reader
+    grows its own understanding of the legacy form.
+    """
+    if anchor and eval_script_anchor_matches(anchor, eval_script):
+        return file_sha256(eval_script)
+    return anchor
+
+
+def plugin_anchor_matches(plugin_anchor: str | None, eval_script: str | Path) -> bool | None:
+    """Does `eval_plugin_hash` seal the score_plugin.py beside this evaluator?
+
+    None when the contract carries no plugin anchor — nothing to check, which is
+    the authored shape. False when an anchor exists and the plugin is missing or
+    changed: the metric moved.
+    """
+    if not plugin_anchor:
+        return None
+    plugin = Path(eval_script).parent / SCORE_PLUGIN_FILENAME
+    return plugin.exists() and file_sha256(plugin) == plugin_anchor
 
 
 # ── Shapes and capabilities ──────────────────────────────────────────────────

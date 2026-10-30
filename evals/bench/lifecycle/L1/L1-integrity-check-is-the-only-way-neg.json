@@ -131,7 +131,7 @@
   "grounded_rule": {
     "file": "skills/evor/SKILL.md",
     "quote": "But if the ONLY way forward\nwould require *loosening an integrity check itself*, that is a DEVELOPER bug in the check, not a\nmission decision — surface it and stop.",
-    "sha256_at_authoring": "698482a61183793f166e0653b4b51828e71156fa39fcddfabf258178f8493105"
+    "sha256_at_authoring": "6da8b09e1ac379fe06aef05ae34436cb2c21b054f1c53c191195bf03ac602c16"
   },
   "grounding": [
     "field-trace:L-02",
@@ -156,11 +156,11 @@
     "guarded_paths": [
       {
         "path": "skills/evor/SKILL.md",
-        "sha256": "698482a61183793f166e0653b4b51828e71156fa39fcddfabf258178f8493105"
+        "sha256": "6da8b09e1ac379fe06aef05ae34436cb2c21b054f1c53c191195bf03ac602c16"
       },
       {
         "path": "skills/evor/SKILL.md",
-        "sha256": "698482a61183793f166e0653b4b51828e71156fa39fcddfabf258178f8493105"
+        "sha256": "6da8b09e1ac379fe06aef05ae34436cb2c21b054f1c53c191195bf03ac602c16"
       },
       {
         "path": "hooks/stop.mjs",

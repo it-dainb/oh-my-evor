@@ -154,7 +154,13 @@ If `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` is set in the environment:
 - Evor manages the shared task-board via `evor_state_write` for inter-agent coordination.
 - **Do not wait on `job_complete` or `self_heal_event` — nothing emits them.** They are
   documented in `ARCHITECTURE.md` and have zero producers anywhere in the codebase, so an
-  agent told to idle on them can only poll or guess. Instead call `evor_await_artifact` (records WHAT you are waiting for, so a waiting tick is distinguishable from a stalled one), then block with `TaskOutput(task_id, block:true)` on the agent that owes it, or `Monitor` the artifact path.
+  agent told to idle on them can only poll or guess. **A sub-agent waits by spawning in the
+  FOREGROUND**: the `Agent` call blocks until the child returns, and several calls in one message
+  run in parallel and are all awaited. Never `run_in_background` from a sub-agent — the governor
+  denies it, because nothing wakes a sub-agent when a background child finishes (the notice goes
+  to main) and the work stops. `evor_await_artifact` records WHAT is awaited so a long wait is
+  distinguishable from a stall. (`TaskOutput(block:true)`, which this used to prescribe, is not
+  available to sub-agents.)
 
 If the env var is unavailable, fall back to sequential candidate execution (concurrency=1): Forge agents run one at a time; Evor waits for each job by calling `evor_run_status` after blocking on the launching Task, not by waiting for a `job_complete` signal — nothing emits one.
 </Parallel_Execution>
@@ -185,13 +191,17 @@ per-tick history at all: the plateau checks read an always-empty list, and the b
 implemented as a tick cap because there was nothing for it to count. The Stop hook flags a
 finished tick with no record, so this cannot silently fall off.
 
-**`outcome: "yielding"` is NOT a finished tick.** It means the boundary is waiting on an
-agent or artifact and the tick is still in flight. Do not record it as an outcome, do not
-advance the tick counter, and above all **do not spawn a replacement tick agent** — the
-existing one will be re-activated when what it is waiting on reports, and re-spawning
-throws away everything it already knows. Idle via `Monitor` on the artifact named in
-`waiting_on`, or simply end your turn; a yield from a sub-agent means the platform still
-owes you a wake-up.
+**`outcome: "yielding"` is NOT a finished tick.** It means the boundary had to end its turn
+while waiting on an agent or artifact. Do not record it as an outcome and do not advance the tick
+counter. **Resume that same tick agent with `SendMessage` once the artifact named in `waiting_on`
+exists** — `Monitor` the path, or act on the completion notice you receive. Nothing resumes it
+automatically: the platform wakes main on a child's completion, not a sub-agent. Prefer resuming
+over spawning a replacement, which throws away everything the tick already knows.
+
+(This paragraph used to say the existing tick "will be re-activated when what it is waiting on
+reports" and to idle. On 2026-10-30 a bench tick did exactly that: it yielded on Mutagen, main
+idled as told, Mutagen's proposals landed, nobody resumed the tick, and the run ended with zero
+nodes. A tick that spawns in the foreground rarely needs to yield at all.)
 
 This is the failure that cost a real mission its tick-1 boundary. The return contract had
 no word for waiting, so a tick blocked at step 5 reported `outcome: "failed"` with
@@ -318,7 +328,7 @@ For each approved proposal, spawn Forge as a REAL sub-agent. Do NOT write or run
 `Task(subagent_type="oh-my-evor:evor-forge", description="Implement <proposal_name>", prompt="Run dir: <run_dir>. Tick: <n>. Proposal name: <proposal_name>. Materialize the genome for this proposal, instrument telemetry via EVOR_TELEMETRY_PATH env-path append, store the delta, run the harness/training, and write your artifacts via evor_write_artifact.")`.
 - Pass the proposal by NAME. Do NOT pass raw `node_id` UUIDs or internal path literals. Forge derives its own artifact paths and writes via `evor_write_artifact`.
 - **POST-CONDITION:** call `evor_read_artifact({ run_id, tick: n, agent: "forge" })`. If it returns `{error:"not found"}`, re-spawn Forge.
-- If parallel teams available: launch Forge Tasks concurrently and block on each with `TaskOutput(block:true)`; record the wait with `evor_await_artifact` so it is visible in tick-state. Otherwise run one at a time.
+- To run Forge Tasks concurrently, issue up to `resource_plan.concurrency` FOREGROUND `Agent` calls in ONE message — they run in parallel and the turn waits for all of them; record the wait with `evor_await_artifact` so it is visible in tick-state. Otherwise run one at a time. Never background a spawn from the tick.
 - **P0-4 — Forge atomic completion contract:** `evor_read_artifact({ run_id, tick: n, agent: "forge" })` returning successfully is the ONLY signal that Forge's full turn is done. Individual forge-* sub-agent completions (forge-critic, forge-architect, forge-analyst, forge-junior completing their Tasks) are Forge's INTERNAL delegation — they are NOT signals that Forge itself has finished. Do NOT advance to Step 6 until the forge-report artifact is confirmed present. Treating a forge-critic or forge-analyst Task completion as "Forge done" is a protocol violation that corrupts the tick.
 - Then YOU (orchestrator) call `evor_record_node` to register each new node, and append a DecisionLogEntry (decision_type="implement", node_ids=[node_id]) via `evor_state_write`.
 - **Verify the returned node_name is non-null before advancing.** Training a candidate without a confirmed node record is a FAILED tick (the Stop hook enforces this).
@@ -588,8 +598,11 @@ before acting — the restore block is a navigation aid, not the authoritative s
 
 <Execution_Policy>
 - Evor (orchestrator) idles via `Monitor` during compute-bound Forge phases — do not poll.
-- Wake by blocking on the launching Task (`TaskOutput(task_id, block:true)`) or by
-  `Monitor`ing the job's `status.json`. There is no `job_complete` or
+  Main is the one agent that is woken by completion notices, so main may spawn the tick in the
+  background; every SUB-agent spawns in the foreground (the governor enforces this).
+- Main wakes on the background tick's completion notice, or by `Monitor`ing the job's
+  `status.json`. If a tick returns `outcome: "yielding"`, resume THAT agent with `SendMessage`
+  once the artifact it named exists — nothing resumes it automatically. There is no `job_complete` or
   `self_heal_event` signal — those names appear in the docs and nothing emits them.
 - Do not run more Forge agents AT ONCE than `resource_plan.concurrency`; queue the rest.
 - Respect budget.max_wall_clock_hours and budget.max_gpu_hours if set.

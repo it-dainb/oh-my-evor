@@ -21122,6 +21122,8 @@ var GoalContractSchema = external_exports.object({
   // Server-owned: harness computes at freeze — agent must never supply.
   locked_split_hash: external_exports.string().optional(),
   eval_script_hash: external_exports.string().optional(),
+  // sha256 of eval-suites/score_plugin.py, when the mission's evaluator has one.
+  eval_plugin_hash: external_exports.string().optional(),
   expansion_policy: ExpansionPolicySchema.optional(),
   allowed_licenses: external_exports.array(external_exports.string()),
   evolution_bounds: EvolutionBoundsSchema.optional().describe(
@@ -24962,18 +24964,24 @@ function lockEvaluate(runId, nodeRef, missionId) {
     };
   }
   let contractHash = "";
+  let legacySetAnchorOk = false;
   try {
     const { runDir } = resolveRunPaths(runId, missionId);
     const contractPath = (0, import_path19.join)(runDir, "goal-contract.json");
     if ((0, import_fs18.existsSync)(contractPath)) {
       const contract = JSON.parse((0, import_fs18.readFileSync)(contractPath, "utf8"));
       contractHash = typeof contract.eval_script_hash === "string" ? contract.eval_script_hash : "";
+      const version2 = typeof contract.eval_version === "string" ? contract.eval_version : "";
+      const canonical = (0, import_path19.join)(runDir, "eval-suites", `${version2}.py`);
+      if (version2 && (0, import_fs18.existsSync)(canonical) && contractHash === digestEvaluator(runDir, version2).hash) {
+        legacySetAnchorOk = (0, import_crypto4.createHash)("sha256").update((0, import_fs18.readFileSync)(canonical)).digest("hex") === (0, import_crypto4.createHash)("sha256").update((0, import_fs18.readFileSync)(evalPath)).digest("hex");
+      }
     }
   } catch {
   }
   try {
     const hash = (0, import_crypto4.createHash)("sha256").update((0, import_fs18.readFileSync)(evalPath)).digest("hex");
-    if (contractHash && contractHash !== hash) {
+    if (contractHash && contractHash !== hash && !legacySetAnchorOk) {
       return {
         ok: false,
         node_name: nodeRef,
@@ -25315,7 +25323,7 @@ function registerComputeTools(server) {
   );
   server.tool(
     "evor_seal_eval_script",
-    "Hash the canonical evaluator \u2014 EVERY file it comprises, per the evaluator contract, which for the generated shape is the harness AND the mission's score_plugin.py \u2014 and lock the digest into goal-contract.json so the integrity gate's no_eval_shift check verifies against a real value. Call once after the canonical evaluator is written.",
+    "Seal the canonical evaluator into goal-contract.json: eval_script_hash = sha256 of eval-suites/<eval_version>.py, and \u2014 when the mission has one \u2014 eval_plugin_hash = sha256 of score_plugin.py, the metric itself. The integrity gate's no_eval_shift check verifies both. Call once after the canonical evaluator is written.",
     {
       run_id: external_exports.string().describe("Active run identifier"),
       eval_version: external_exports.string().describe("Eval version string (e.g. v1)"),
@@ -25331,7 +25339,11 @@ function registerComputeTools(server) {
         );
       }
       const content = (0, import_fs18.readFileSync)(evalScriptPath);
-      const { hash, files } = digestEvaluator(runDir, eval_version);
+      const fileSha = (path) => (0, import_crypto4.createHash)("sha256").update((0, import_fs18.readFileSync)(path)).digest("hex");
+      const hash = fileSha(evalScriptPath);
+      const pluginPath = `${runDir}/eval-suites/score_plugin.py`;
+      const pluginHash = (0, import_fs18.existsSync)(pluginPath) ? fileSha(pluginPath) : void 0;
+      const { files } = digestEvaluator(runDir, eval_version);
       const receiptPath = `${runDir}/eval-suites/${eval_version}.sealed.json`;
       let receipt = null;
       try {
@@ -25339,9 +25351,16 @@ function registerComputeTools(server) {
       } catch {
         receipt = null;
       }
-      if (receipt?.hash && receipt.hash !== hash) {
+      const sealedMain = receipt?.files?.[`${eval_version}.py`] ?? receipt?.hash;
+      const sealedPlugin = receipt?.files?.["score_plugin.py"] ?? receipt?.plugin_hash;
+      if (sealedPlugin && pluginHash && sealedPlugin !== pluginHash) {
         return err2(
-          `refusing to re-seal ${eval_version}: this run sealed it at ${String(receipt.sealed_at ?? "an earlier time")} with hash ${receipt.hash.slice(0, 12)}\u2026, and the file on disk now hashes to ${hash.slice(0, 12)}\u2026. The evaluator changed after it was sealed. Re-sealing would make the changed file the sealed one and retroactively validate every score recorded under the old anchor \u2014 which is what happened at 23:49 in the field run. If replacing the evaluator is intended, seal it under a NEW eval_version so existing scores keep the evaluator they were measured with.`
+          `refusing to re-seal ${eval_version}: score_plugin.py changed after it was sealed (${sealedPlugin.slice(0, 12)}\u2026 \u2192 ${pluginHash.slice(0, 12)}\u2026). The plugin is the metric; replacing it under the same anchor would revalidate every score already recorded. Seal the new metric under a NEW eval_version.`
+        );
+      }
+      if (sealedMain && sealedMain !== hash) {
+        return err2(
+          `refusing to re-seal ${eval_version}: this run sealed it at ${String(receipt?.sealed_at ?? "an earlier time")} with hash ${sealedMain.slice(0, 12)}\u2026, and the file on disk now hashes to ${hash.slice(0, 12)}\u2026. The evaluator changed after it was sealed. Re-sealing would make the changed file the sealed one and retroactively validate every score recorded under the old anchor \u2014 which is what happened at 23:49 in the field run. If replacing the evaluator is intended, seal it under a NEW eval_version so existing scores keep the evaluator they were measured with.`
         );
       }
       try {
@@ -25355,12 +25374,21 @@ function registerComputeTools(server) {
           `could not take custody of ${eval_version}: ${String(e)}. The evaluator is hardlinked outside the run, so sealing it would anchor a file another path can still rewrite.`
         );
       }
-      patchGoalContract(runDir, { eval_script_hash: hash });
+      patchGoalContract(runDir, {
+        eval_script_hash: hash,
+        ...pluginHash !== void 0 ? { eval_plugin_hash: pluginHash } : {}
+      });
       try {
         (0, import_fs18.writeFileSync)(
           receiptPath,
           JSON.stringify(
-            { eval_version, hash, files, sealed_at: (/* @__PURE__ */ new Date()).toISOString() },
+            {
+              eval_version,
+              hash,
+              ...pluginHash !== void 0 ? { plugin_hash: pluginHash } : {},
+              files,
+              sealed_at: (/* @__PURE__ */ new Date()).toISOString()
+            },
             null,
             2
           ),
@@ -25368,7 +25396,13 @@ function registerComputeTools(server) {
         );
       } catch {
       }
-      return ok2({ ok: true, eval_version, hash, files });
+      return ok2({
+        ok: true,
+        eval_version,
+        hash,
+        ...pluginHash !== void 0 ? { plugin_hash: pluginHash } : {},
+        files
+      });
     }
   );
   server.tool(

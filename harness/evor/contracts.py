@@ -395,6 +395,9 @@ class GoalContract(BaseEvorModel):
     # Required in stored contract; optional at agent-facing input layer.
     locked_split_hash: Optional[str] = None
     eval_script_hash: Optional[str] = None
+    # sha256 of eval-suites/score_plugin.py, when the evaluator has one — the
+    # metric's own anchor, separate from the harness's (see eval_contract).
+    eval_plugin_hash: Optional[str] = None
     expansion_policy: Optional[ExpansionPolicy] = None
     allowed_licenses: list[str]
     """allowlist for data-acquisition provenance (R-3)"""
