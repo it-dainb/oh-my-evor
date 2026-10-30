@@ -2,6 +2,24 @@
 
 All notable changes to Evor. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.2.10] — 2026-10-30 — a paused mission no longer locks you out of setup
+
+### Fixed
+
+- **The governor treated an active-run pointer as a running mission.** `/evor-setup` in a
+  workspace whose `.evor/active-run.json` pointed at a *paused* mission was denied Bash,
+  `evor_state_read`, an `evor-probe` spawn and a memory write, and then stopped. Main's
+  orchestration rules (no leaf work, spawn only the tick, no state reads at the tick boundary)
+  exist to keep a running mission's ticks inside `evor-tick`, so they now apply only while
+  `isMissionLive` says the mission is running. A pointer with no state files yet keeps them on,
+  and so does an unreadable state, which is now logged. The state guards (`.evor` writes,
+  protected paths) are unchanged, and main may always write its own memory.
+- **evor-setup Case C asks and then acts instead of stopping.** It offers start new, resume or
+  cancel and carries out the choice in the same turn. Starting new needs no manual close:
+  `init_run` already supersedes every non-terminal prior mission.
+- Harness tests that import sibling test modules failed at collection from the repo root. They
+  now resolve from both working directories.
+
 ## [1.2.9] — 2026-10-30 — the budget meant what the interview said, and the first live tick in two months
 
 ### ⚠ Every node failed integrity from v1.2.6 to v1.2.8
