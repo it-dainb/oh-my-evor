@@ -130,6 +130,29 @@ function segments(command, cwd, vars) {
   return out.length ? out : [{ text: command, cwd: dir }];
 }
 
+/**
+ * The files `sed -i` edits, or null when the statement is not an in-place sed.
+ * Its script is not a path: `'72s/a (b)/c in data\/x.py/'` named three bogus
+ * targets and missed the file it edits. Operands are what follows the script
+ * (or every non-option word when the script came through -e / -f).
+ */
+function sedInPlaceFiles(text) {
+  const m = text.match(/^\s*sed\s+(.*)$/s);
+  if (!m || !/(^|\s)(-i\S*|--in-place\S*)(\s|$)/.test(m[1])) return null;
+  const words = [...m[1].matchAll(/'([^']*)'|"((?:\\.|[^"\\])*)"|(\S+)/g)].map((w) => w[1] ?? w[2] ?? w[3]);
+  const files = [];
+  let scriptSeen = false;
+  for (let i = 0; i < words.length; i++) {
+    const w = words[i];
+    if (/^(-e|--expression|-f|--file)$/.test(w)) { scriptSeen = true; i++; continue; }
+    if (/^-/.test(w)) continue;
+    if (/^[|<>&;]/.test(w)) break;
+    if (!scriptSeen) { scriptSeen = true; continue; }
+    files.push(w);
+  }
+  return files;
+}
+
 /** Extract heredoc bodies with the cwd in force where each one opened. */
 function heredocs(command, cwd, vars) {
   const out = [];
@@ -276,7 +299,8 @@ export function resolveWriteTargets({ tool, toolInput = {}, cwd = process.cwd() 
     const text = foldConcat(expandVars(unit.text, vars));
     if (!(unit.pythonOnly ? hasPythonWriteIntent(text) : hasWriteIntent(text))) continue;
     writes = true;
-    for (const raw of pathTokens(text)) {
+    const sed = !unit.pythonOnly && sedInPlaceFiles(text);
+    for (const raw of sed || pathTokens(text)) {
       const t = raw.trim();
       if (!t || t === '-' || /^[a-z]+:\/\//i.test(t)) continue;
       targets.add(isAbsolute(t) ? t : resolve(unit.cwd, t));

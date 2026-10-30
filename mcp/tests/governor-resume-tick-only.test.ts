@@ -140,3 +140,14 @@ describe("the script an interpreter runs is read, not written", () => {
     expect(decide(bash(`python3 ${EV} > ${EV}`), "draft").permissionDecision).toBe("deny");
   });
 });
+
+describe("sed -i edits the files after its script", () => {
+  const bash = (command: string) => ({ tool_name: "Bash", tool_input: { command } });
+  it("a sed script with slashes is not a path, and the file it edits is the target", () => {
+    const ok = decide({ agent_type: "oh-my-evor:evor-forge", ...bash(
+      `cd .evor/worktrees/c1; sed -i '72s/# a (b)/# c in data\\/builder.py/' genome.yaml`) });
+    expect(ok.permissionDecision).not.toBe("deny");
+    const guarded = decide(bash(`cd .evor/runs/m1/r1; sed -i 's/running/done/' mission-state.json`));
+    expect(guarded.permissionDecision).toBe("deny");
+  });
+});
