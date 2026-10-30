@@ -2,6 +2,18 @@
 
 All notable changes to Evor. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.2.26] — 2026-10-30 — waiting on an agent is ending the turn
+
+### Fixed
+
+- **`evor_wait` asked to be called again on agents that report by themselves.** Its description
+  said nothing would wake the caller, and a timed-out wait on an artifact or an agent said
+  "call evor_wait again", so main held 9-minute waits on a Forge that was still running. It
+  now says the wait is for jobs and processes; an agent or a background task wakes its caller
+  when it finishes, so the caller ends its turn. Job and pid waits still say to call again.
+- **Forge slept to wait.** Its protocol covered spawned agents only. It now says a background
+  shell task wakes it when it exits, and that `sleep` is refused.
+
 ## [1.2.25] — 2026-10-30 — a notice is not a prompt
 
 ### Fixed

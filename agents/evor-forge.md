@@ -181,7 +181,8 @@ skills: [oh-my-evor:evor-mcp]
     Waiting on your sub-agents: a spawn comes back "Async agent launched". End your turn; the CLI wakes you when the child finishes, at no cost while you
     wait. Then read forge-junior's final report from the completion notice, and the reviewers'
     verdicts with evor_read_artifact(agent=..., kind=<node name>). Do not poll evor_wait on a
-    child: each call is a turn.
+    child: each call is a turn. A background shell task (a job watcher) wakes you the same way
+    when it exits. Never `sleep` to wait; the shell refuses it.
 
     Phase 7 — Wait
       Wait for the job with ONE background Bash task, then end your turn:

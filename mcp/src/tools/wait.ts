@@ -116,9 +116,10 @@ export function registerWaitTools(server: McpServer): void {
     "evor_wait",
     "BLOCK until a condition holds, holding your turn: an evor job finishes (job_id), a " +
       "process exits (pid), or a tick artifact is written (artifact). Returns {done:true,...} " +
-      "as soon as it holds, or {done:false} after wait_s (default 300, max 540). On done:false, " +
-      "call evor_wait again — do NOT end your turn to wait, because nothing is guaranteed to " +
-      "wake you. Give exactly one of job_id, pid, artifact.",
+      "as soon as it holds, or {done:false} after wait_s (default 300, max 540). Use it only for " +
+      "what nothing will report: a job or a process. An agent you spawned, and a background " +
+      "task you started, wake you when they finish — end your turn instead. Give exactly one " +
+      "of job_id, pid, artifact.",
     {
       run_id: z.string().optional().describe("Active run identifier; resolved from the active run when omitted"),
       job_id: z.string().optional().describe("Wait for this evor_run_start job to leave state 'running'"),
@@ -159,7 +160,7 @@ export function registerWaitTools(server: McpServer): void {
         return ok({
           ...r,
           condition: `agent:${agent_id}`,
-          ...(r.done ? { result: outcome.text ?? "" } : { next: "still working — call evor_wait again" }),
+          ...(r.done ? { result: outcome.text ?? "" } : { next: "still working — end your turn; its completion notice wakes you" }),
         });
       }
 
@@ -234,7 +235,7 @@ export function registerWaitTools(server: McpServer): void {
         condition: `artifact:${artifact!.agent}${artifact!.kind ? `/${artifact!.kind}` : ""}@tick${artifact!.tick}`,
         ...(r.done
           ? { next: "written — read it with evor_read_artifact" }
-          : { next: "not written yet — call evor_wait again" }),
+          : { next: "not written yet — if the agent that owes it is running, end your turn: its completion notice wakes you" }),
       });
     },
   );

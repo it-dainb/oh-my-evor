@@ -26396,7 +26396,7 @@ async function waitFor(probe, waitS, pollMs = POLL_MS) {
 function registerWaitTools(server) {
   server.tool(
     "evor_wait",
-    "BLOCK until a condition holds, holding your turn: an evor job finishes (job_id), a process exits (pid), or a tick artifact is written (artifact). Returns {done:true,...} as soon as it holds, or {done:false} after wait_s (default 300, max 540). On done:false, call evor_wait again \u2014 do NOT end your turn to wait, because nothing is guaranteed to wake you. Give exactly one of job_id, pid, artifact.",
+    "BLOCK until a condition holds, holding your turn: an evor job finishes (job_id), a process exits (pid), or a tick artifact is written (artifact). Returns {done:true,...} as soon as it holds, or {done:false} after wait_s (default 300, max 540). Use it only for what nothing will report: a job or a process. An agent you spawned, and a background task you started, wake you when they finish \u2014 end your turn instead. Give exactly one of job_id, pid, artifact.",
     {
       run_id: external_exports.string().optional().describe("Active run identifier; resolved from the active run when omitted"),
       job_id: external_exports.string().optional().describe("Wait for this evor_run_start job to leave state 'running'"),
@@ -26429,7 +26429,7 @@ function registerWaitTools(server) {
         return ok({
           ...r2,
           condition: `agent:${agent_id}`,
-          ...r2.done ? { result: outcome.text ?? "" } : { next: "still working \u2014 call evor_wait again" }
+          ...r2.done ? { result: outcome.text ?? "" } : { next: "still working \u2014 end your turn; its completion notice wakes you" }
         });
       }
       if (pid !== void 0) {
@@ -26491,7 +26491,7 @@ function registerWaitTools(server) {
       return ok({
         ...r,
         condition: `artifact:${artifact.agent}${artifact.kind ? `/${artifact.kind}` : ""}@tick${artifact.tick}`,
-        ...r.done ? { next: "written \u2014 read it with evor_read_artifact" } : { next: "not written yet \u2014 call evor_wait again" }
+        ...r.done ? { next: "written \u2014 read it with evor_read_artifact" } : { next: "not written yet \u2014 if the agent that owes it is running, end your turn: its completion notice wakes you" }
       });
     }
   );
