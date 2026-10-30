@@ -1503,3 +1503,14 @@ instead of stopping. Text-level replacement of the two old digests in A2 (2), A4
 and T4 (8). No quotes moved (lint clean); `bench-freeze --group authority`, then
 `--check`: 1099 files match. No scenario's subject, expectation or detector changed;
 none had been scored.
+
+**2026-10-30 (second) — scenarios re-pointed after the 1.2.11 product changes (not re-frozen corpus).**
+Product files changed: `agents/evor-{tick,forge,forge-junior,mutagen,sage}.md`,
+`skills/evor/SKILL.md`, `skills/evor-mcp/SKILL.md`, `hooks/pre-tool-use.mjs`, `hooks/stop.mjs`.
+They implement the fixes from the binarization field log: Mutagen's documented output and the
+proposal validator agree; `evor_wait` is the wait primitive; main resumes only the tick; a stop on
+a job wait is blocked; and a contract failure blocks the run. The old digests were replaced as
+text in the authority, evidence, lifecycle and tool scenarios and in the `agent_files` maps of
+`evidence/FREEZE-C.json` and `lifecycle/FREEZE.json`. Authority lint is clean (no quote moved).
+`bench-freeze --group` was run for all four groups, then `--check`: 1099 files match. No
+scenario's subject, expectation or detector changed, and none had been scored.

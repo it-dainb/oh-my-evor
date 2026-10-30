@@ -281,6 +281,16 @@ export const MutationProposalSchema = z.object({
   hypothesis: HypothesisSchema,
   citations: z.array(z.string()),
   wildness: z.number().min(0).max(1),
+  // The fields agents/evor-mutagen.md tells Mutagen to emit; mirrors
+  // harness/evor/contracts.py. Missing from the Python model, they made the
+  // documented output unwritable (binarization mission, 2026-10-30, tick 1).
+  mutation_tier: z.enum(["parametric", "structural"]).optional(),
+  mutation_locus: MutationLocusSchema.optional(),
+  is_crossover: z.boolean().optional(),
+  angle: z.string().optional(),
+  in_provided_list: z.boolean().optional(),
+  investigation_queries: z.array(z.string()).optional(),
+  technique_tags: z.array(z.string()).optional(),
   // `critic_approved` REMOVED (item 2b.2): the contract required the PROPOSER to
   // assert the REVIEWER's verdict, and nothing read it. A self-report standing in
   // for a review is the self-approval vector the review gates exist to prevent.

@@ -565,3 +565,74 @@ class TestReadArtifactBridge:
         data = json.loads(result.stdout)
         assert "error" in data
         assert data["error"] != "not found"
+
+
+# ─── Mutagen's documented output is writable ─────────────────────────────────
+#
+# Tick 1 of the 2026-10-30 binarization mission failed at step 2: the agent file
+# told Mutagen to omit hypothesis.id ("the server assigns") and to emit
+# mutation_tier, angle, technique_tags and four other fields, and this validator
+# required the id and rejected every one of those fields. Each side had tests;
+# none fed one side's text to the other. This one does.
+
+_MUTAGEN_MD = Path(__file__).resolve().parents[2] / "agents" / "evor-mutagen.md"
+
+
+def _documented_mutagen_output() -> dict:
+    text = _MUTAGEN_MD.read_text()
+    block = text.split("<Output_Format>", 1)[1].split("```json", 1)[1].split("```", 1)[0]
+    lines = []
+    for line in block.splitlines():
+        line = line.split("//", 1)[0].rstrip()
+        # Enumerations are written "a | b | c"; a real payload carries one value.
+        if '"' in line and " | " in line:
+            key, _, value = line.partition(":")
+            first = value.strip().strip(",").strip('"').split(" | ")[0]
+            line = f'{key}: "{first}"' + ("," if value.rstrip().endswith(",") else "")
+        lines.append(line)
+    return json.loads("\n".join(lines))
+
+
+class TestMutagenDocumentedOutput:
+    def test_the_agent_files_example_is_written_as_is(self, tmp_path: Path) -> None:
+        payload = _documented_mutagen_output()
+        assert "id" not in payload["proposals"][0]["hypothesis"], "the doc says the server assigns it"
+        result = write_artifact(tmp_path, 1, "mutagen", payload)
+        assert result.get("ok"), result
+
+    def test_the_server_assigns_both_ids(self, tmp_path: Path) -> None:
+        result = write_artifact(tmp_path, 1, "mutagen", _documented_mutagen_output())
+        written = json.loads(Path(result["path"]).read_text())["proposals"][0]
+        assert written["proposal_id"].startswith("prop-")
+        assert written["hypothesis"]["id"] == f"h-{written['proposal_id']}"
+
+    def test_ids_mutagen_did_supply_are_kept(self, tmp_path: Path) -> None:
+        payload = _documented_mutagen_output()
+        payload["proposals"][0]["proposal_id"] = "t2-p1"
+        payload["proposals"][0]["hypothesis"]["id"] = "h-own"
+        result = write_artifact(tmp_path, 1, "mutagen", payload)
+        written = json.loads(Path(result["path"]).read_text())["proposals"][0]
+        assert (written["proposal_id"], written["hypothesis"]["id"]) == ("t2-p1", "h-own")
+
+    def test_an_undocumented_field_is_still_refused(self, tmp_path: Path) -> None:
+        payload = _documented_mutagen_output()
+        payload["proposals"][0]["critic_approved"] = True
+        assert "error" in write_artifact(tmp_path, 1, "mutagen", payload)
+
+    def test_the_callers_payload_is_not_mutated(self, tmp_path: Path) -> None:
+        payload = _documented_mutagen_output()
+        write_artifact(tmp_path, 1, "mutagen", payload)
+        assert "proposal_id" not in payload["proposals"][0]
+        assert "id" not in payload["proposals"][0]["hypothesis"]
+
+    def test_the_write_returns_the_ids_it_assigned(self, tmp_path: Path) -> None:
+        result = write_artifact(tmp_path, 1, "mutagen", _documented_mutagen_output())
+        written = json.loads(Path(result["path"]).read_text())["proposals"][0]
+        assert result["proposal_ids"] == [
+            {"proposal_id": written["proposal_id"], "hypothesis_id": written["hypothesis"]["id"]}
+        ]
+
+    def test_a_non_string_id_is_rejected_not_replaced(self, tmp_path: Path) -> None:
+        payload = _documented_mutagen_output()
+        payload["proposals"][0]["hypothesis"]["id"] = 7
+        assert "error" in write_artifact(tmp_path, 1, "mutagen", payload)

@@ -318,8 +318,11 @@ skills: [oh-my-evor:evor-mcp]
     frontier too spread out to cross over — the interesting constraint absorbs the
     attention and the count quietly comes out at four. The constraint does not
     reduce dream_k. Nothing reduces dream_k except the formula in 5a.
-    Do NOT generate `proposal_id` or `hypothesis.id` fields — the server assigns these when
-    `evor_validate_proposals` processes the payload. Supply only content fields.
+    Do NOT generate `proposal_id` or `hypothesis.id` fields — `evor_write_artifact` assigns
+    both when it writes your proposals, and returns them as `proposal_ids`. Supply only
+    content fields. Every field in the example above is accepted as written. Before you call
+    `evor_validate_proposals`, put the returned ids on your proposals: validating an id-less
+    copy assigns different ids, and Selector would then judge ids the artifact does not have.
     Do NOT supply `critic_review` gate codes (h001_…, h002_…) — the validator computes them.
     THE VALIDATOR IS A CALL YOU MAKE, not something that happens to your payload.
     After writing the proposals, call `evor_validate_proposals` yourself. Leaving a

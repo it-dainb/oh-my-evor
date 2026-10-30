@@ -140,6 +140,7 @@ For the full signal vocabulary (shapes, axes, severity, kind catalogue), read `a
 |---|---|
 | `evor_run_start` | **Evaluate an already-trained candidate** — runs the sealed `evaluate.py` as a detached job; returns `{job_id, status_path, log_path}` immediately. Does NOT train. |
 | `evor_run_status` | Read run progress and tail the log for a running or completed job |
+| `evor_wait` | **Block inside your turn** until a job finishes (`job_id`), a process exits (`pid`) or a tick artifact is written (`artifact: {tick, agent, kind?}`). Up to 540 s per call (default 300); on `done:false` call it again. This is how every agent waits. |
 | `evor_schedule` | Submit a training job to the run scheduler; returns `{job_id, pid}` |
 | `evor_meta_evolve` | Update the search strategy from the current frontier (meta-evolution of the search policy) |
 | `evor_plot_report` | Render the evolution tree as PNG and/or HTML; writes to `report/` under the run directory |
@@ -200,7 +201,7 @@ For brownfield missions, call `evor_distill_scan` before `evor_init_run` to prod
 
 Use these platform tools directly — do not replicate their behavior in MCP.
 
-- **`evor_run_status`** — Watch a launched run by polling `evor_run_status({run_id})` until `state` reaches `done` or `failed`. It reports progress, the latest metrics, and any error signature — cover both success and failure. Do not tail log files by hand; the tool owns the run's internals.
+- **Waiting: `evor_wait`, never your turn ending.** To wait for a job, a trainer process or another agent's artifact, call `evor_wait` and call it again while it returns `done:false`. Do not end your turn to wait, and do not arm a `Monitor` and stop: both depend on a notice reaching you, and in the 2026-10-30 binarization mission one sat queued for 80 minutes while another wait (a job) had no notice at all. `evor_run_status` then reads the finished job's state, metrics and error signature. Do not tail log files by hand; the tool owns the run's internals.
 - **`AskUserQuestion`** — Capture the mission goal, metric, budget, and autonomy level at setup; any human decision or consent gate. Do not use in the autonomous hot-loop.
 - **`PushNotification`** — Fire when a run finishes, crashes, hits an OOM, achieves a breakthrough (best-score jump), or reaches a human gate. Use for state changes the user would act on.
 - **`TaskCreate` / `TaskList` / `TaskUpdate` / `TaskStop`** — Track per-tick candidates and phase progress as a visible task list. Use `TaskStop` to abort a runaway sub-agent on a `severity=critical` signal.

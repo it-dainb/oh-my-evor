@@ -87,4 +87,14 @@ describe("resource_plan", () => {
   it("rejects a concurrency below 1", () => {
     expect(() => RunStatePatchSchema.parse({ resource_plan: { concurrency: 0 } })).toThrow();
   });
+
+  it("keeps failure_kind and error, which evor_check_stop reads to block a contract failure", () => {
+    stateWrite(RUN, { tick_record: { tick: 1, outcome: "failed", failure_kind: "contract", error: "ids disagree" } }, MISSION);
+    const state = stateRead(RUN, MISSION) as Record<string, unknown>;
+    expect(state.tick_records).toEqual([{ tick: 1, outcome: "failed", failure_kind: "contract", error: "ids disagree" }]);
+  });
+
+  it("refuses a failure_kind outside the three", () => {
+    expect(RunStatePatchSchema.safeParse({ tick_record: { tick: 1, outcome: "failed", failure_kind: "bad-luck" } }).success).toBe(false);
+  });
 });

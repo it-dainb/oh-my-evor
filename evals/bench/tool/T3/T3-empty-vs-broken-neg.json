@@ -13,7 +13,7 @@
   "grounded_rule": {
     "file": "agents/evor-mutagen.md",
     "quote": "2. Call `evor_wiki_query` to check what Sage already found \u2014 emit only queries the wiki cannot answer.",
-    "sha256_at_authoring": "a39fe703f9e90d576b3f71ec6446c156e4a309262818ce55c7381f8a08261d65"
+    "sha256_at_authoring": "68d87eeb36aab1b0d591350fb7a86b7694e1dc3adb27cec45d2646f49ad485ab"
   },
   "grounding": [
     "field-trace:B-05",

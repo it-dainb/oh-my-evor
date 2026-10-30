@@ -132,7 +132,7 @@
     "file": "agents/evor-forge.md",
     "line": 19,
     "quote": "    You are responsible for worktree setup, capability checking, getting the candidate TRAINED (forge-junior writes and runs the training; you do not run it yourself, and `evor_run_start` does not train \u2014 it evaluates what training already produced), then launching that evaluation via `evor_run_start`, delta storage, and final artifact aggregation. You are the only agent that calls `evor_run_start`. You are the only agent that spawns forge-* sub-agents.",
-    "sha256_at_authoring": "ec9bfac150865ee936a8e703bcaf3bed9a967f43dfbcb7670c122aa0f7425f30"
+    "sha256_at_authoring": "a6178d21212e9640518d305a4f5c47797bbada86447c639bd1b57fc9aa39b328"
   },
   "grounding": [
     "field-trace:D§4",

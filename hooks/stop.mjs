@@ -108,6 +108,8 @@ try {
 // with EVOR_SKIP_HOOKS=stop, which disarms every legitimate guard here too.
 //
 // So this runs BEFORE the block counter: a yield must not consume attempts.
+/** Set when the stop would leave a recorded job wait with nobody to wake on it. */
+let deadEndJobWait = null;
 try {
   let tickStateForYield = null;
   try {
@@ -115,7 +117,20 @@ try {
     if (existsSync(tsp)) tickStateForYield = JSON.parse(readFileSync(tsp, 'utf8'));
   } catch { /* unreadable tick-state falls through to the subagent scan */ }
 
-  if (isYieldingStop(payloadForContinuation, tickStateForYield)) {
+  // A JOB wait is not a yield. No host task tracks an evor_run_start job, so no
+  // notice will ever come back for it: stopping here leaves the mission parked
+  // until a human types. That is how the 2026-10-30 binarization mission ended
+  // up: tick 2 yielded on job 91898813, main was denied Monitor, stopped, and the
+  // job finished minutes later with nobody to see it. Handled after the block
+  // counter below, so the ceiling still bounds it.
+  const jobWait = recordedWait(tickStateForYield);
+  const tickLive = liveSubagents(payloadForContinuation?.session_id, payloadForContinuation?.transcript_path)
+    .some((a) => /evor-tick$/.test(String(a.agentType)));
+  // A LIVE tick that recorded a job wait is still waiting on it (e.g. inside
+  // evor_wait); main's stop is then an ordinary yield on the tick.
+  if (jobWait && /^job:/.test(jobWait.on) && !isTickFinished(tickStateForYield) && !tickLive) {
+    deadEndJobWait = jobWait.on.slice('job:'.length);
+  } else if (isYieldingStop(payloadForContinuation, tickStateForYield)) {
     const wait = recordedWait(tickStateForYield);
     const live = liveSubagents(payloadForContinuation?.session_id, payloadForContinuation?.transcript_path);
     process.stderr.write(
@@ -215,6 +230,22 @@ function blockStop(message) {
     writeFileSync(blockCountPath, JSON.stringify({ count: attempt, updated_at: new Date().toISOString() }));
   } catch { /* non-fatal */ }
   process.exit(0);
+}
+
+if (deadEndJobWait) {
+  let state = 'unknown';
+  try {
+    state = String(JSON.parse(readFileSync(join(runDir, 'jobs', deadEndJobWait, 'status.json'), 'utf8'))?.state ?? 'unknown');
+  } catch { /* no status file: say so below rather than guess */ }
+  blockStop(
+    `[evor:stop] The tick is waiting on job ${deadEndJobWait} (state: ${state}), and nothing ` +
+      `will wake you when it finishes: a job is not a task the host tracks. ` +
+      (state === 'running'
+        ? `Call evor_wait({ job_id: "${deadEndJobWait}" }) to hold your turn until it ends. `
+        : `It is no longer running. `) +
+      `Then finish the tick: if you are evor-tick, continue from step 6; if you are the ` +
+      `orchestrator, resume the evor-tick agent with SendMessage.`
+  );
 }
 
 if (!existsSync(runStatePath)) process.exit(0);

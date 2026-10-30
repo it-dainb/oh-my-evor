@@ -199,6 +199,11 @@ skills: [oh-my-evor:evor-mcp]
   </Success_Criteria>
 
   <Constraints>
+    - Wait on training inside your turn. If you launch the trainer in the background, call
+      evor_wait(pid=<trainer pid>) and call it again while it returns done:false, then report.
+      Do not return to Forge, or end your turn with a Monitor armed, while training runs: a
+      return mid-training reads as "finished" to Forge, and a queued notice can leave you
+      asleep long after the trainer exits (80 minutes in the 2026-10-30 binarization mission).
     - **A change to a check is recorded in the run's decision log.** When you repair a check
       that was wrong — a false negative, a resolution bug, a stub reinstated — append what you
       changed and why to `.evor/runs/<run_id>/decision-log.md`. A repair and a weakening look

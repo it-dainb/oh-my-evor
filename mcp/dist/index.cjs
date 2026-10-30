@@ -21199,6 +21199,16 @@ var MutationProposalSchema = external_exports.object({
   hypothesis: HypothesisSchema,
   citations: external_exports.array(external_exports.string()),
   wildness: external_exports.number().min(0).max(1),
+  // The fields agents/evor-mutagen.md tells Mutagen to emit; mirrors
+  // harness/evor/contracts.py. Missing from the Python model, they made the
+  // documented output unwritable (binarization mission, 2026-10-30, tick 1).
+  mutation_tier: external_exports.enum(["parametric", "structural"]).optional(),
+  mutation_locus: MutationLocusSchema.optional(),
+  is_crossover: external_exports.boolean().optional(),
+  angle: external_exports.string().optional(),
+  in_provided_list: external_exports.boolean().optional(),
+  investigation_queries: external_exports.array(external_exports.string()).optional(),
+  technique_tags: external_exports.array(external_exports.string()).optional(),
   // `critic_approved` REMOVED (item 2b.2): the contract required the PROPOSER to
   // assert the REVIEWER's verdict, and nothing read it. A self-report standing in
   // for a review is the self-approval vector the review gates exist to prevent.
@@ -23164,7 +23174,11 @@ var RunStatePatchSchema = external_exports.object({
     outcome: external_exports.enum(["scored", "rejected", "skipped", "failed"]),
     score: external_exports.number().optional().describe(
       "The tick's best fitness, when it evaluated at least one node. Omit otherwise."
-    )
+    ),
+    failure_kind: external_exports.enum(["experiment", "contract", "infrastructure"]).optional().describe(
+      "With outcome 'failed': 'experiment' (the candidate itself failed), 'contract' (two parts of the plugin disagree, so every retry fails the same way), or 'infrastructure' (the machine, a tool or a service failed). 'contract' and 'infrastructure' make evor_check_stop report blocked:true."
+    ),
+    error: external_exports.string().optional().describe("With outcome 'failed': the reason, as the tick reported it")
   }).optional().describe(
     "Call once per tick, after it returns a terminal outcome. Feeds the circuit breaker (consecutive FAILED ticks) and the plateau window (ticks with no improvement), which read nothing else."
   ),
@@ -23328,11 +23342,11 @@ function stateWrite(runId, patch, missionId) {
     for (const r of prev) {
       if (r && typeof r.tick === "number") byTick.set(r.tick, r);
     }
-    byTick.set(tickRecord.tick, {
-      tick: tickRecord.tick,
-      outcome: tickRecord.outcome,
-      ...tickRecord.score !== void 0 ? { score: tickRecord.score } : {}
-    });
+    const record2 = { tick: tickRecord.tick, outcome: tickRecord.outcome };
+    if (tickRecord.score !== void 0) record2.score = tickRecord.score;
+    if (tickRecord.failure_kind !== void 0) record2.failure_kind = tickRecord.failure_kind;
+    if (tickRecord.error !== void 0) record2.error = tickRecord.error;
+    byTick.set(tickRecord.tick, record2);
     const records = [...byTick.values()].sort((a, b) => a.tick - b.tick);
     updated.tick_records = records;
     updated.tick_history_scores = records.map((r) => r.score).filter((v) => typeof v === "number");
@@ -24225,7 +24239,11 @@ function writeArtifact(runId, tick, agent, payload, kind, partial2, missionId) {
   }
   const data = result.data;
   if (data?.ok === true) {
-    return { ok: true, path: String(data.path) };
+    return {
+      ok: true,
+      path: String(data.path),
+      ...data.proposal_ids !== void 0 ? { proposal_ids: data.proposal_ids } : {}
+    };
   }
   return {
     ok: false,
@@ -24385,7 +24403,10 @@ function registerArtifactTools(server) {
               ok: true,
               run_id,
               tick,
-              agent
+              agent,
+              // Mutagen: the ids the server assigned. Validate THESE proposals,
+              // or Selector reads ids that are not in the artifact.
+              ...result.proposal_ids !== void 0 ? { proposal_ids: result.proposal_ids } : {}
             })
           }
         ]
@@ -26200,6 +26221,96 @@ function registerAcquireTools(server) {
   );
 }
 
+// src/tools/wait.ts
+var import_fs20 = require("fs");
+var MAX_WAIT_S = 540;
+var DEFAULT_WAIT_S = 300;
+var POLL_MS = 5e3;
+function pidAlive(pid) {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (e) {
+    return e.code === "EPERM";
+  }
+}
+async function waitFor(probe, waitS, pollMs = POLL_MS) {
+  const started = Date.now();
+  const deadline = started + Math.max(0, waitS) * 1e3;
+  for (; ; ) {
+    const r = probe();
+    const waited_s = Math.round((Date.now() - started) / 1e3);
+    if (r.error) return { done: false, waited_s, error: r.error };
+    if (r.done) return { done: true, waited_s, ...r.detail ?? {} };
+    if (Date.now() + pollMs > deadline) return { done: false, waited_s, ...r.detail ?? {} };
+    await new Promise((res) => setTimeout(res, pollMs));
+  }
+}
+function registerWaitTools(server) {
+  server.tool(
+    "evor_wait",
+    "BLOCK until a condition holds, holding your turn: an evor job finishes (job_id), a process exits (pid), or a tick artifact is written (artifact). Returns {done:true,...} as soon as it holds, or {done:false} after wait_s (default 300, max 540). On done:false, call evor_wait again \u2014 do NOT end your turn to wait, because nothing is guaranteed to wake you. Give exactly one of job_id, pid, artifact.",
+    {
+      run_id: external_exports.string().optional().describe("Active run identifier; resolved from the active run when omitted"),
+      job_id: external_exports.string().optional().describe("Wait for this evor_run_start job to leave state 'running'"),
+      pid: external_exports.number().int().positive().optional().describe("Wait for this process to exit (e.g. a trainer)"),
+      artifact: external_exports.object({
+        tick: external_exports.number().int().min(0),
+        agent: external_exports.string(),
+        kind: external_exports.string().optional()
+      }).optional().describe("Wait for this tick artifact to be written"),
+      wait_s: external_exports.number().int().min(0).max(MAX_WAIT_S).optional().describe(`Seconds to wait at most (default ${DEFAULT_WAIT_S}, max ${MAX_WAIT_S})`),
+      mission_id: external_exports.string().optional().describe("Mission id; resolved from the active run when omitted")
+    },
+    async ({ run_id, job_id, pid, artifact, wait_s, mission_id }) => {
+      const given = [job_id, pid, artifact].filter((v) => v !== void 0).length;
+      if (given !== 1) return err("give exactly one of job_id, pid, artifact");
+      const waitS = wait_s ?? DEFAULT_WAIT_S;
+      if (pid !== void 0) {
+        const r2 = await waitFor(() => ({ done: !pidAlive(pid) }), waitS);
+        return ok({ ...r2, condition: `pid:${pid}`, ...r2.done ? {} : { next: "still running \u2014 call evor_wait again" } });
+      }
+      let runDir;
+      try {
+        const rid = resolveRunId(run_id);
+        if (!rid) return err("no run_id given and no active run found \u2014 pass run_id");
+        runDir = resolveRunPaths(rid, mission_id ?? process.env.EVOR_MISSION_ID).runDir;
+      } catch (e) {
+        return err(`cannot resolve the run: ${String(e)}`);
+      }
+      if (job_id !== void 0) {
+        const r2 = await waitFor(() => {
+          const s = jobStatus(job_id, runDir);
+          if (!s.ok) return { done: false, error: s.error ?? "evor_run_status failed" };
+          const data = { ...s.data ?? {} };
+          delete data.cmd;
+          if (data.state === "unknown" || typeof data.state !== "string") {
+            return { done: false, error: String(data.error ?? `job ${job_id} has no status`) };
+          }
+          return { done: data.state !== "running", detail: { status: data } };
+        }, waitS);
+        if (r2.error) return err(r2.error);
+        return ok({ ...r2, condition: `job:${job_id}`, ...r2.done ? {} : { next: "still running \u2014 call evor_wait again" } });
+      }
+      const agent = artifact.agent.replace(/^(oh-my-evor:)?evor-/, "");
+      if (!VALID_AGENTS.includes(agent)) {
+        return err(`unknown artifact agent ${JSON.stringify(artifact.agent)}; one of ${VALID_AGENTS.join(", ")}`);
+      }
+      if ((agent === "sage-junior" || agent === "acquirer") && !artifact.kind) {
+        return err(`${agent} artifacts are per kind: pass artifact.kind (the junior's angle slug or the acquirer's source slug)`);
+      }
+      artifact.agent = agent;
+      const path = artifactPathFor(runDir, artifact.tick, agent, artifact.kind);
+      const r = await waitFor(() => ({ done: (0, import_fs20.existsSync)(path) }), waitS);
+      return ok({
+        ...r,
+        condition: `artifact:${artifact.agent}${artifact.kind ? `/${artifact.kind}` : ""}@tick${artifact.tick}`,
+        ...r.done ? { next: "written \u2014 read it with evor_read_artifact" } : { next: "not written yet \u2014 call evor_wait again" }
+      });
+    }
+  );
+}
+
 // src/index.ts
 var EVOR_INSTRUCTIONS = "Evor runs an autonomous ML-research evolution: it evolves a model+dataset by mutation tree search under integrity gates. USE these evor_* tools whenever a mission is being set up, run, resumed, or inspected \u2014 any time you change or read .evor state, record a node/eval, launch or check a training run, write or read a tick artifact, cite a paper, emit/query a signal, or manage the run. These evor_* tools are the only sanctioned way to operate a run; do not author .evor state files by hand. Search for them whenever an evor run is active. Core loop: evor_init_run -> evor_record_node -> evor_run_start (async; watch with the native Monitor tool) -> evor_run_status -> evor_record_eval -> evor_integrity_check -> evor_wiki_add. Read upstream tick artifacts with evor_read_artifact before acting. Full catalog, lifecycle recipes, and artifact schemas: invoke the `oh-my-evor:evor-mcp` skill.";
 async function main() {
@@ -26226,6 +26337,7 @@ async function main() {
   registerGotchaTools(server);
   registerProposalTools(server);
   registerAcquireTools(server);
+  registerWaitTools(server);
   const transport = new StdioServerTransport();
   await server.connect(transport);
   process.on("SIGINT", async () => {
