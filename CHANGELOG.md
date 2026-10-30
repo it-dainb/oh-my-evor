@@ -2,6 +2,16 @@
 
 All notable changes to Evor. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.2.18] — 2026-10-30 — setup can ask again
+
+### Fixed
+
+- **The setup interview's questions were denied.** The exception that lets `/evor-setup` ask
+  questions under a never-halt mission looked for the command in the last 400 KB of the session
+  transcript. The command opens the session, and setup's tool results pushed it out of that
+  window within minutes, so every question was refused. The same window hid the person's own
+  prompt from the "a person just typed" exception. Both now read the whole transcript.
+
 ## [1.2.17] — 2026-10-30 — one forge report per candidate
 
 Found in tick 4 of the binarization mission, the first tick with two selected proposals.
