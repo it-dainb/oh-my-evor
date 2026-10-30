@@ -18,6 +18,7 @@ import { z } from "zod";
 import { existsSync, readFileSync } from "fs";
 import { join } from "path";
 import { resolveRunPaths } from "../run-store.js";
+import { readArtifact } from "./artifact.js";
 
 // ── Input schemas ─────────────────────────────────────────────────────────────
 
@@ -295,17 +296,52 @@ export function registerProposalTools(server: McpServer): void {
       "Call this BEFORE spawning the Selector agent each tick to cut LLM cost on clean proposals.",
     {
       proposals: z
-        .array(ProposalInputSchema)
-        .min(1)
-        .describe("Proposals to validate; results are returned in the same order"),
-      strategy: StrategyContextSchema.describe(
+        .array(z.union([ProposalInputSchema, z.object({ proposal_id: z.string() })]))
+        .optional()
+        .describe(
+          "Proposals to validate; results are returned in the same order. An entry may be just " +
+            "{proposal_id}, and with run_id and tick omitted entries are read from that tick's " +
+            "Mutagen proposals. Omit the list to validate all of them.",
+        ),
+      strategy: StrategyContextSchema.optional().describe(
         "Current strategy context; winning_families used for H002 streak check",
       ),
       run_id: z.string().optional().describe(
         "Active run; when given, frontier_size is read from run-state for H004",
       ),
+      tick: z.number().int().positive().optional().describe(
+        "Tick whose Mutagen proposals fill in entries given by proposal_id only",
+      ),
     },
-    async ({ proposals, strategy, run_id }) => {
+    async ({ proposals: given, strategy = {}, run_id, tick }) => {
+      let proposals = given as z.infer<typeof ProposalInputSchema>[] | undefined;
+      const needsLookup = !given || given.some((p) => !("approach_family" in p));
+      if (needsLookup) {
+        const art = run_id && tick ? readArtifact(run_id, tick, "mutagen", undefined, false, process.env.EVOR_MISSION_ID) : null;
+        const all = ((art?.ok ? (art.payload as { proposals?: unknown[] })?.proposals : undefined) ?? []) as
+          z.infer<typeof ProposalInputSchema>[];
+        if (!all.length) {
+          return { content: [{ type: "text" as const, text: JSON.stringify({
+            ok: false,
+            error: "proposals were not given in full, and no Mutagen proposals were found for this tick. " +
+              "Pass run_id and tick, or pass each proposal in full.",
+          }) }] };
+        }
+        const byId = new Map(all.map((p) => [p.proposal_id, p]));
+        const missing = (given ?? []).filter((p) => !("approach_family" in p) && !byId.has(p.proposal_id));
+        if (missing.length) {
+          return { content: [{ type: "text" as const, text: JSON.stringify({
+            ok: false,
+            error: `no Mutagen proposal for tick ${tick} has proposal_id ${missing.map((p) => p.proposal_id).join(", ")}`,
+          }) }] };
+        }
+        proposals = given
+          ? given.map((p) => ("approach_family" in p ? p : byId.get(p.proposal_id)!) as z.infer<typeof ProposalInputSchema>)
+          : all;
+      }
+      if (!proposals?.length) {
+        return { content: [{ type: "text" as const, text: JSON.stringify({ ok: false, error: "no proposals to validate" }) }] };
+      }
       let frontierSize = strategy.frontier_size;
       if (frontierSize === undefined && run_id) {
         try {

@@ -16,6 +16,7 @@ import { spawnSync } from "child_process";
 
 import { storePatch, writeHandoff, drainInbox } from "../src/tools/lineage.js";
 import { ensureRunDirs, resolveRunPaths } from "../src/run-store.js";
+import { writeTree } from "../src/tree-store.js";
 
 // Anchored to this file. Resolving from process.cwd() assumed vitest runs from
 // mcp/ (true under `npm test`, false from the repo root), and from the root these
@@ -111,6 +112,22 @@ describe("storePatch", () => {
     ensureRunDirs(runId, "test-mission");
     const result = storePatch(runId, "node-empty", "");
     expect(result.ok).toBe(true);
+  });
+
+  it("a node named by its name lands in its id's directory, beside its telemetry", () => {
+    const runId = "run-lp-006";
+    ensureRunDirs(runId, "test-mission");
+    const paths = resolveRunPaths(runId);
+    const id = "fef74dcf-f6ee-445f-92da-0b7ff1793b94";
+    writeTree(runId, { [id]: {
+      id, name: "cosine-lr-01", parent_ids: [], approach_family: "arch", hypothesis_id: "h-1",
+      code_ref: "sha:abc", genome_ref: "sha:genome", data_version_ref: "sha:data", config: {},
+      metrics: {}, eval_version: "v1", lesson_ids: [], citations: [], integrity_status: "pending",
+      status: "pending", is_crossover: false, visit_count: 0, depth: 0, created_at: new Date().toISOString(),
+    } as never }, "test-mission");
+    expect(storePatch(runId, "cosine-lr-01", "patch").ok).toBe(true);
+    expect(existsSync(join(paths.nodesDir, id, "parent.patch"))).toBe(true);
+    expect(existsSync(join(paths.nodesDir, "cosine-lr-01"))).toBe(false);
   });
 
   it("returns patchPath in the result", () => {

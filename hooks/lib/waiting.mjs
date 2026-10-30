@@ -131,6 +131,33 @@ export function liveSubagents(sessionId, transcriptPath, now = Date.now()) {
 }
 
 /**
+ * Children this agent spawned in the background that have not finished.
+ *
+ * `liveSubagents` sees the whole session, so for a sub-agent it always includes
+ * the parent waiting on it. A sub-agent has yielded only when one of ITS OWN
+ * children is still running: Sage fanning out to its juniors, or Forge waiting
+ * on its team. The children are the async launches its own transcript records.
+ */
+export function liveChildren(agentTranscriptPath, now = Date.now()) {
+  if (typeof agentTranscriptPath !== 'string' || !agentTranscriptPath.endsWith('.jsonl')) return [];
+  let text;
+  try { text = readFileSync(agentTranscriptPath, 'utf8'); } catch { return []; }
+  const ids = new Set();
+  for (const m of text.matchAll(/"status":"async_launched","agentId":"([\w-]+)"/g)) ids.add(m[1]);
+  const dir = join(agentTranscriptPath, '..');
+  const live = [];
+  for (const id of ids) {
+    const path = join(dir, `agent-${id}.jsonl`);
+    let mtime = 0;
+    try { mtime = statSync(path).mtimeMs; } catch { live.push(id); continue; }  // launched, not written yet
+    const rec = lastRecord(path);
+    const finished = rec?.type === 'assistant' && TERMINAL.has(rec?.message?.stop_reason);
+    if (!finished || now - mtime < RECENT_MS) live.push(id);
+  }
+  return live;
+}
+
+/**
  * True when ending this turn is a yield: the CLI will re-activate the agent.
  * Callers must treat true as "allow the stop", unconditionally.
  */

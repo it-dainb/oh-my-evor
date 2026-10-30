@@ -5,7 +5,7 @@
  */
 
 import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "fs";
-import { join } from "path";
+import { dirname, join } from "path";
 import { randomUUID } from "crypto";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
@@ -418,6 +418,9 @@ export function registerRecordTools(server: McpServer): void {
         filledNode.id,
         "telemetry.jsonl",
       );
+      // The trainer appends to this path and `.evor/` is closed to hand writes,
+      // so the directory has to exist before the path is handed out.
+      try { mkdirSync(dirname(telemetryPath), { recursive: true }); } catch { /* reported by the trainer's open() */ }
       return {
         content: [
           {
@@ -432,7 +435,8 @@ export function registerRecordTools(server: McpServer): void {
               pending_remaining: pendingRemaining,
               telemetry_path: telemetryPath,
               telemetry_note:
-                "Export this EXACTLY as EVOR_TELEMETRY_PATH for the training subprocess. " +
+                "Export this EXACTLY as EVOR_TELEMETRY_PATH for the training subprocess; its " +
+                "directory already exists. " +
                 "Do not rebuild it from the node name — a rebuilt path can split one node's " +
                 "telemetry across two directories.",
             }),

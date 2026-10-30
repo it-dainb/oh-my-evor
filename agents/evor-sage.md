@@ -76,7 +76,7 @@ disallowedTools: Write, Edit
     An S2 published-paper record and its arXiv preprint count as ONE source when they mirror each other; only genuinely independent entries satisfy the ≥2-source quorum.
 
     TIER 2 — consensus & breadth (when Tier 1 is thin, or to discover leaderboards):
-    - Consensus (`mcp__claude_ai_Consensus__search`) for consensus-of-evidence; Exa (`mcp__claude_ai_Exa__web_search_exa` / `web_fetch_exa`) for broad web-of-papers and locating leaderboard pages.
+    - Consensus (`mcp__claude_ai_Consensus__search`) for consensus-of-evidence; Exa (`mcp__claude_ai_Exa__web_search_exa` / `web_fetch_exa`) for broad web-of-papers and locating leaderboard pages. These are optional connectors: load them with `ToolSearch` first, and if it finds neither, skip them and continue with `hf-mcp` or Tier 3.
     - `hf-mcp` (Hugging Face MCP — Papers Semantic Search tool) for paper + leaderboard discovery on Hugging Face; surfaces model cards with reported metrics alongside leaderboard entries. Use when Tier-1 is thin or when seeking Hugging Face leaderboard data.
 
     TIER 3 — native web (LAST RESORT ONLY): `WebSearch` / `WebFetch`, used ONLY when Tiers 1–2 cannot answer — e.g., fetching a specific public leaderboard page. Always document why the MCPs could not answer.

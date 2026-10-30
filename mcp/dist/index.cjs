@@ -22322,6 +22322,10 @@ function registerRecordTools(server) {
         filledNode.id,
         "telemetry.jsonl"
       );
+      try {
+        (0, import_fs5.mkdirSync)((0, import_path6.dirname)(telemetryPath), { recursive: true });
+      } catch {
+      }
       return {
         content: [
           {
@@ -22335,7 +22339,7 @@ function registerRecordTools(server) {
               run_id,
               pending_remaining: pendingRemaining,
               telemetry_path: telemetryPath,
-              telemetry_note: "Export this EXACTLY as EVOR_TELEMETRY_PATH for the training subprocess. Do not rebuild it from the node name \u2014 a rebuilt path can split one node's telemetry across two directories."
+              telemetry_note: "Export this EXACTLY as EVOR_TELEMETRY_PATH for the training subprocess; its directory already exists. Do not rebuild it from the node name \u2014 a rebuilt path can split one node's telemetry across two directories."
             })
           }
         ]
@@ -24031,6 +24035,20 @@ function digestSignals(runId, params, missionId) {
     evidence: s.evidence
   }));
 }
+function jsonArg(schema) {
+  return external_exports.preprocess((v) => {
+    if (typeof v !== "string") return v;
+    try {
+      return JSON.parse(v);
+    } catch {
+      return v;
+    }
+  }, schema);
+}
+var SeverityArg = external_exports.preprocess(
+  (v) => typeof v === "string" ? v.replace(/^["']+|["']+$/g, "").trim() : v,
+  SignalSeveritySchema
+);
 function registerSignalTools(server) {
   server.tool(
     "evor_signal_emit",
@@ -24045,12 +24063,12 @@ function registerSignalTools(server) {
       mission_id: external_exports.string().optional().describe("Mission identifier (resolved automatically when omitted)"),
       kind: external_exports.string().describe("Free-text signal type (e.g. 'cuda-oom', 'training-too-slow')"),
       signature: external_exports.string().describe("Dedup key \u2014 identical signatures aggregate"),
-      shapes: external_exports.array(SignalShapeSchema).min(1).describe("Closed facet set: limit | opportunity | failure | trend"),
-      axes: external_exports.array(SignalAxisSchema).describe("Closed facet set: memory | compute | accuracy | stability | data | generalization | cost"),
-      severity: SignalSeveritySchema.describe("low | medium | high | critical"),
-      evidence: external_exports.record(external_exports.string(), external_exports.unknown()).describe("Structured evidence dict"),
+      shapes: jsonArg(external_exports.array(SignalShapeSchema).min(1)).describe("Closed facet set: limit | opportunity | failure | trend"),
+      axes: jsonArg(external_exports.array(SignalAxisSchema)).describe("Closed facet set: memory | compute | accuracy | stability | data | generalization | cost"),
+      severity: SeverityArg.describe("low | medium | high | critical"),
+      evidence: jsonArg(external_exports.record(external_exports.string(), external_exports.unknown())).describe("Structured evidence dict"),
       source: external_exports.string().describe("Emitting role (e.g. 'evor-forge-analyst')"),
-      tick: external_exports.number().int().optional().describe("Optional evolution tick"),
+      tick: external_exports.coerce.number().int().optional().describe("Optional evolution tick"),
       node_id: external_exports.string().optional().describe("Optional associated node id"),
       confidence: external_exports.number().min(0).max(1).optional().describe("Initial confidence for new signals (0.0\u20131.0). Default 0.5. Ignored on dedup-aggregate.")
     },
@@ -24082,7 +24100,7 @@ function registerSignalTools(server) {
       shapes: external_exports.array(SignalShapeSchema).optional().describe("ANY-overlap shape filter; omit to match all shapes"),
       axes: external_exports.array(SignalAxisSchema).optional().describe("ANY-overlap axis filter; omit to match all axes"),
       kind: external_exports.string().optional().describe("Exact kind filter; omit for all kinds"),
-      min_severity: SignalSeveritySchema.default("low").describe("Severity floor (inclusive). Default: low"),
+      min_severity: SeverityArg.default("low").describe("Severity floor (inclusive). Default: low"),
       since_tick: external_exports.number().int().optional().describe("Only include signals with tick >= this value"),
       limit: external_exports.number().int().min(1).max(500).optional().describe(
         "Cap on returned signals sorted by (severity, confidence, recency) desc. Default 100. Use a smaller value (e.g. 10) for spawn-prompt injection to avoid context bloat."
@@ -24108,7 +24126,7 @@ function registerSignalTools(server) {
       mission_id: external_exports.string().optional().describe("Mission identifier (resolved automatically when omitted)"),
       shapes: external_exports.array(SignalShapeSchema).optional().describe("ANY-overlap shape filter; omit to match all shapes"),
       axes: external_exports.array(SignalAxisSchema).optional().describe("ANY-overlap axis filter; omit to match all axes"),
-      min_severity: SignalSeveritySchema.default("medium").describe(
+      min_severity: SeverityArg.default("medium").describe(
         "Severity floor (inclusive). Default: medium (low kept out of digests by default)"
       ),
       max_items: external_exports.number().int().min(1).max(50).default(8).describe("Maximum signals to return (default 8)")
@@ -24328,7 +24346,7 @@ function artifactPathFor(runDir, tick, agent, kind) {
 function registerArtifactTools(server) {
   server.tool(
     "evor_await_artifact",
-    "Record that this tick is WAITING for an artifact, and report whether it has arrived. Does not block \u2014 use Monitor or TaskOutput(block:true) for that. This makes the wait visible in tick-state so a waiting tick is distinguishable from a stalled one.",
+    "Record that this tick is WAITING for an artifact, and report whether it has arrived. Does not block: to wait, end your turn, and you are woken when the agent you spawned finishes. This makes the wait visible in tick-state so a waiting tick is distinguishable from a stalled one.",
     {
       run_id: external_exports.string().describe("Active run identifier"),
       tick: external_exports.number().int().min(0).describe("Tick number"),
@@ -24373,9 +24391,8 @@ function registerArtifactTools(server) {
         arrived,
         waiting_on: blocked?.on ?? null,
         waiting_since: blocked?.since ?? null,
-        // Told plainly, because the previous instruction was to wait on an event
-        // that does not exist.
-        next: arrived ? "the artifact is present \u2014 read it with evor_read_artifact" : "not yet written. Block with TaskOutput(task_id, block:true) on the agent that owes it, or Monitor the artifact path. Do NOT poll this tool in a loop."
+        // A sub-agent has no TaskOutput or Monitor; ending the turn is how it waits.
+        next: arrived ? "the artifact is present \u2014 read it with evor_read_artifact" : "not yet written. If the agent that owes it is running in the background, end your turn: you are woken when it finishes. Do not poll this tool in a loop."
       });
     }
   );
@@ -24493,7 +24510,7 @@ var import_path16 = require("path");
 var import_os3 = require("os");
 function storePatch(runId, nodeId, patchContent, missionId) {
   const paths = resolveRunPaths(runId, missionId);
-  const nodeDir = (0, import_path16.join)(paths.nodesDir, nodeId);
+  const nodeDir = (0, import_path16.join)(paths.nodesDir, resolveNodeRef(runId, nodeId, missionId));
   try {
     if (!(0, import_fs15.existsSync)(nodeDir)) {
       (0, import_fs15.mkdirSync)(nodeDir, { recursive: true });
@@ -26149,15 +26166,44 @@ function registerProposalTools(server) {
     "evor_validate_proposals",
     "Deterministic structural gate for Mutagen proposals \u2014 runs H001\u2013H004 + schema checks in code before any Selector LLM is invoked. H001: hypothesis.prediction contains a quantified metric claim (digit + unit). H002: approach_family is not in a pure 3-tick win-streak (strategy.winning_families). H003: each approach_family appears at most once within this tick's batch. H004: no single primary parent provides more than floor(N/2) proposals. verdict='pass' \u2192 all gates pass + wildness<0.8 + not acquisition; Selector LLM safe to skip. verdict='needs_llm' \u2192 borderline; must route to Selector for full judgment. verdict='reject' \u2192 hard structural failure (no digit in prediction or missing fields); discard. Call this BEFORE spawning the Selector agent each tick to cut LLM cost on clean proposals.",
     {
-      proposals: external_exports.array(ProposalInputSchema).min(1).describe("Proposals to validate; results are returned in the same order"),
-      strategy: StrategyContextSchema.describe(
+      proposals: external_exports.array(external_exports.union([ProposalInputSchema, external_exports.object({ proposal_id: external_exports.string() })])).optional().describe(
+        "Proposals to validate; results are returned in the same order. An entry may be just {proposal_id}, and with run_id and tick omitted entries are read from that tick's Mutagen proposals. Omit the list to validate all of them."
+      ),
+      strategy: StrategyContextSchema.optional().describe(
         "Current strategy context; winning_families used for H002 streak check"
       ),
       run_id: external_exports.string().optional().describe(
         "Active run; when given, frontier_size is read from run-state for H004"
+      ),
+      tick: external_exports.number().int().positive().optional().describe(
+        "Tick whose Mutagen proposals fill in entries given by proposal_id only"
       )
     },
-    async ({ proposals, strategy, run_id }) => {
+    async ({ proposals: given, strategy = {}, run_id, tick }) => {
+      let proposals = given;
+      const needsLookup = !given || given.some((p) => !("approach_family" in p));
+      if (needsLookup) {
+        const art = run_id && tick ? readArtifact(run_id, tick, "mutagen", void 0, false, process.env.EVOR_MISSION_ID) : null;
+        const all = (art?.ok ? art.payload?.proposals : void 0) ?? [];
+        if (!all.length) {
+          return { content: [{ type: "text", text: JSON.stringify({
+            ok: false,
+            error: "proposals were not given in full, and no Mutagen proposals were found for this tick. Pass run_id and tick, or pass each proposal in full."
+          }) }] };
+        }
+        const byId = new Map(all.map((p) => [p.proposal_id, p]));
+        const missing = (given ?? []).filter((p) => !("approach_family" in p) && !byId.has(p.proposal_id));
+        if (missing.length) {
+          return { content: [{ type: "text", text: JSON.stringify({
+            ok: false,
+            error: `no Mutagen proposal for tick ${tick} has proposal_id ${missing.map((p) => p.proposal_id).join(", ")}`
+          }) }] };
+        }
+        proposals = given ? given.map((p) => "approach_family" in p ? p : byId.get(p.proposal_id)) : all;
+      }
+      if (!proposals?.length) {
+        return { content: [{ type: "text", text: JSON.stringify({ ok: false, error: "no proposals to validate" }) }] };
+      }
       let frontierSize = strategy.frontier_size;
       if (frontierSize === void 0 && run_id) {
         try {

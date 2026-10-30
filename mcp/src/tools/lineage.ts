@@ -12,6 +12,7 @@ import { tmpdir } from "os";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { resolveRunPaths } from "../run-store.js";
+import { resolveNodeRef } from "./node-ref.js";
 import { callBridge } from "../subprocess-bridge.js";
 
 // ── evor_store_patch ──────────────────────────────────────────────────────────
@@ -28,7 +29,9 @@ export function storePatch(
   missionId?: string,
 ): { ok: boolean; patchPath?: string; error?: string } {
   const paths = resolveRunPaths(runId, missionId);
-  const nodeDir = join(paths.nodesDir, nodeId);
+  // A node is addressed by name; its directory is keyed by its id, the one
+  // evor_record_node's telemetry_path and the harness use.
+  const nodeDir = join(paths.nodesDir, resolveNodeRef(runId, nodeId, missionId));
 
   try {
     if (!existsSync(nodeDir)) {
