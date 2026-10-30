@@ -25,8 +25,16 @@ evor-run is the launch skill for an Evor mission. It validates that a mission co
 
 ## Step 1 — Resolve Mission and Run ID
 
+**While a mission is RUNNING, main may not call `evor_state_read` or `evor_tree_read`, or run
+Bash: the governor reserves them for the tick boundary.** A resume therefore reads progress
+from `evor_check_stop` and files with the Read tool, as below. (These steps used to call
+`evor_state_read` three times; on a running mission every call was denied, as in the
+2026-10-30 binarization resume.) When the mission is paused or locked, `evor_state_read` is
+allowed.
+
 If arguments were provided, treat them as mission-id or run-id. Otherwise:
-1. Call `evor_state_read` to check for a current active run.
+1. Read `.evor/active-run.json` with the Read tool to find the current run. If the mission is
+   not running, `evor_state_read` also works.
 2. If found and mission-state shows a non-terminal `status` (not `completed`, `failed` or `superseded`): offer to resume that run. **Read mission-state, not run-state** — `run-state.status` was retired in v1.2.1 (item 1.9b), so a condition on it is vacuously true for every run and would offer to resume runs that are finished.
 3. If not found: list available missions via `evor_state_read` and prompt the user to select one, or redirect to `/evor-setup`.
 
@@ -38,7 +46,9 @@ If it reports missing or invalid fields, print the error and redirect to `/evor-
 
 ## Step 2.5 — Phase-2 Lock Guard
 
-Call `evor_state_read` to check whether the mission is locked.
+Check whether the mission is locked. **A `running` mission is locked by construction**: the
+state machine reaches `running` only from `locked`, so skip this check for a running mission.
+Otherwise call `evor_state_read`, which is allowed when the mission is not running.
 
 - **No mission state present**: print the error below and **stop immediately**. Do not proceed to Step 3.
   ```
@@ -56,7 +66,10 @@ Call `evor_state_read` to check whether the mission is locked.
 
 ## Step 3 — Check for Resume Path
 
-Call `evor_state_read` to check run state:
+Call `evor_check_stop({ run_id })`. It returns `tick_count`, `best_score`, `frontier_count`,
+`budget_remaining` and `blocked`, which is everything the resume summary needs, and main may
+call it while the mission runs. If it reports `blocked: true`, show `blocked_reason` and stop:
+do not resume a run the plugin itself says cannot proceed.
 - If run is unstarted (tick_count = 0): this is a fresh start. Print: "Starting fresh mission: <mission_id> (run_id: <run_id>)."
 - If run is in progress (tick_count > 0): print resume summary:
   ```
@@ -92,14 +105,17 @@ evor_state_write({
 
 Choose the appropriate run-watch mode based on context:
 
-- **Attended** (interactive session, run expected ≤~4h): after `evor_run_start` fires inside the tick loop, the `evor` skill watches the job with the native `Monitor` tool (`tail -f <log_path> | grep -E --line-buffered "elapsed_steps=|val_|Traceback|Error|OOM|Killed|FAILED"`). Session stays live.
+- **Attended** (interactive session, run expected ≤~4h): jobs are waited on INSIDE the tick with `evor_wait({ job_id })`; main waits for the tick's completion notice, and if a tick yields it calls `evor_wait` on what the tick named, then resumes it. Main may not use `Monitor` while the mission runs. The session stays live.
 - **Scheduled / unattended** (multi-hour or overnight runs): the plugin job-status watcher (registered via `watchPaths` at run_start) fires a `FileChanged` wake when `jobs/<id>/status.json` changes. Use `CronCreate` to establish a recurring check-in cadence for multi-day missions. Session sleeps between check-ins.
 
 The tick loop in the `evor` skill manages this automatically; this note is for orientation when choosing `/evor-run` vs a scheduled invocation.
 
 ## Step 6 — Invoke the evor Skill
 
-Read and follow `skills/evor/SKILL.md` exactly, passing:
+Read the evor skill with the **Read tool** and follow it exactly. Its path is
+`<this skill's base directory>/../evor/SKILL.md`; the base directory is printed at the top of
+this skill. Do not resolve the path with Bash, which the governor denies while the mission runs.
+Pass:
 - `run_id` = the resolved run ID
 - `resume` = true if tick_count > 0
 

@@ -14,13 +14,14 @@ import { fileURLToPath } from "url";
 
 const HOOK = resolve(dirname(fileURLToPath(import.meta.url)), "../../hooks/pre-tool-use.mjs");
 
-function decide(payload: Record<string, unknown>, missionStatus = "running") {
+function decide(payload: Record<string, unknown>, missionStatus = "running", posture?: string) {
   const root = mkdtempSync(join(tmpdir(), "evor-resume-"));
   const runDir = join(root, ".evor", "runs", "m1", "r1");
   mkdirSync(runDir, { recursive: true });
   writeFileSync(join(root, ".evor", "active-run.json"), JSON.stringify({ run_id: "r1", mission_id: "m1" }));
   writeFileSync(join(runDir, "mission-state.json"), JSON.stringify({ mission_id: "m1", status: missionStatus }));
   writeFileSync(join(runDir, "run-state.json"), JSON.stringify({ run_id: "r1" }));
+  if (posture) writeFileSync(join(runDir, "goal-contract.json"), JSON.stringify({ autonomy_charter: { posture } }));
   const sessionDir = join(root, "proj", "sess");
   mkdirSync(join(sessionDir, "subagents"), { recursive: true });
   for (const [id, type] of [["atick", "oh-my-evor:evor-tick"], ["aforge", "oh-my-evor:evor-forge"], ["agp", "general-purpose"]]) {
@@ -65,5 +66,14 @@ describe("main resumes only the tick", () => {
   it("lets main call evor_wait", () => {
     const d = decide({ tool_name: "mcp__plugin_oh-my-evor_evor__evor_wait", tool_input: { job_id: "j1" } });
     expect(d.permissionDecision).not.toBe("deny");
+  });
+
+  it("denies main AskUserQuestion on a running aggressive-never-halt mission", () => {
+    const ask = { tool_name: "AskUserQuestion", tool_input: { questions: [] } };
+    const d = decide(ask, "running", "aggressive-never-halt");
+    expect(d.permissionDecision).toBe("deny");
+    expect(d.permissionDecisionReason).toMatch(/Monotonic-Honesty/);
+    expect(decide(ask, "running", "conservative").permissionDecision).not.toBe("deny");
+    expect(decide(ask, "paused", "aggressive-never-halt").permissionDecision).not.toBe("deny");
   });
 });

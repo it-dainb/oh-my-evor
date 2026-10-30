@@ -801,6 +801,29 @@ try {
       );
     }
 
+    // A never-halt mission does not ask. skills/evor/SKILL.md says so ("you NEVER
+    // emit an AskUserQuestion") and main asked anyway in the 2026-10-30
+    // binarization resume, over a fitness discrepancy it could route to the tick.
+    // Prose already failed once here, so it is a deny.
+    if (toolNameB === 'AskUserQuestion') {
+      let posture = '';
+      try {
+        const rd = resolveRunDir();
+        const gc = rd && _exists(_join(rd, 'goal-contract.json'))
+          ? JSON.parse(readFileSync(_join(rd, 'goal-contract.json'), 'utf8')) : null;
+        posture = String(gc?.autonomy_charter?.posture ?? '');
+      } catch (err) { logError('ask-posture', err); }
+      if (posture === 'aggressive-never-halt') {
+        deny(
+          `[EVOR GOVERNOR] This mission's autonomy charter is aggressive-never-halt: nobody is ` +
+            `asked after setup. Decide by the Monotonic-Honesty Invariant: take the option that ` +
+            `keeps the evaluation as hard and honest as it is. Send an audit or a re-check to the ` +
+            `evor-tick agent. If the run genuinely cannot proceed, set mission_status "paused" with ` +
+            `a mission_status_reason through evor_state_write, and say so in plain text.`
+        );
+      }
+    }
+
     // Resuming a tick's CHILD is the same leak through SendMessage. In the
     // 2026-10-30 binarization mission the tick yielded and told main to resume
     // Forge; main did, and from then on every one of Forge's ~45 wake-ups was a

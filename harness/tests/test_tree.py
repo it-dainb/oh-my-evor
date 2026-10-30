@@ -955,3 +955,47 @@ def test_fitness_constraint_missing_metric_violates(tmp_path: Path) -> None:
     engine = TreeEngine(nodes=[], goal=goal, strategy=_make_strategy(), run_dir=tmp_path)
     fitness = engine.compute_fitness(result, goal)
     assert fitness == pytest.approx(0.0), "Missing metric should count as constraint violation"
+
+
+# ─── Per-domain fitness must not read a missing key as zero ──────────────────
+#
+# 2026-10-30 binarization: per_domain[d] carried {"S", "fmeasure"}, the primary
+# metric was `min_domain_ocr_faithful`, and `.get(primary, 0.0)` made the sealed
+# job score a working model 0.0 while its own aggregate said 2.52.
+
+def _res(metrics, per_domain):
+    from evor.contracts import EvaluationResult, TelemetrySummary
+    return EvaluationResult(
+        node_id="n", run_id="r", eval_version="v1", metrics=metrics, per_domain=per_domain,
+        fitness_value=0.0, worst_angle_coverage=None, per_angle_vs_sota=None,
+        telemetry_summary=TelemetrySummary(total_steps=0), status="success",
+        benchmark_raw="", timestamp="2026-10-30T00:00:00Z",
+    )
+
+
+def test_domain_fitness_uses_the_aggregate_when_domains_carry_other_keys():
+    from evor.tree import domain_fitness
+    r = _res({"min_domain_ocr_faithful": 2.52}, {"a": {"S": 87.0}, "b": {"S": 2.52}})
+    assert domain_fitness(r, "min_domain_ocr_faithful", "worst-domain") == 2.52
+
+
+def test_domain_fitness_reduces_when_every_domain_carries_the_primary():
+    from evor.tree import domain_fitness
+    r = _res({}, {"a": {"acc": 0.9}, "b": {"acc": 0.5}})
+    assert domain_fitness(r, "acc", "worst-domain") == 0.5
+    assert domain_fitness(r, "acc", "weighted") == 0.7
+
+
+def test_domain_fitness_refuses_a_report_missing_the_primary_in_some_domains():
+    import pytest
+    from evor.tree import domain_fitness
+    r = _res({"acc": 0.9}, {"a": {"acc": 0.9}, "b": {"S": 1.0}})
+    with pytest.raises(ValueError, match="missing from domains"):
+        domain_fitness(r, "acc", "worst-domain")
+
+
+def test_domain_fitness_refuses_a_primary_reported_nowhere():
+    import pytest
+    from evor.tree import domain_fitness
+    with pytest.raises(ValueError, match="neither per_domain nor metrics"):
+        domain_fitness(_res({}, {"a": {"S": 1.0}}), "acc", "worst-domain")

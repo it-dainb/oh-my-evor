@@ -20,6 +20,7 @@
  * §19: NO `python -m evor` in any agent-facing string.
  */
 
+import { isMissionLive } from './lib/run-status.mjs';
 import { existsSync, readFileSync, writeFileSync, mkdirSync, renameSync } from 'fs';
 import { join } from 'path';
 import { createHash } from 'node:crypto';
@@ -140,10 +141,22 @@ if (unthrottled.includes('resume-run')) {
       tickHint = ` Active run is at tick ${tick}${step !== null ? ` step ${step}` : ''}.`;
     }
   }
+  // While the mission RUNS, the governor denies main evor_state_read and
+  // evor_tree_read: they belong to the tick boundary. This hint used to prescribe
+  // exactly those two calls, so every resume prompt began with two denials.
+  const live = runDir && existsSync(runDir)
+    ? isMissionLive(safeRead(join(runDir, 'mission-state.json')), safeRead(join(runDir, 'run-state.json')))
+    : false;
   nudges.push(
-    `[EVOR RESUME]${tickHint} ` +
-    'Call evor_state_read to check current position, then call evor_tree_read to see the frontier. ' +
-    'If a tick is mid-flight (step < 9), continue from the last completed step.'
+    live
+      ? `[EVOR RESUME]${tickHint} The mission is running, so resume through the tick boundary: ` +
+        'if a tick agent of this session yielded, evor_wait on what it named and SendMessage it; ' +
+        'otherwise spawn oh-my-evor:evor-tick for that tick, which continues from its last completed ' +
+        'step. Progress for the user comes from evor_check_stop. Do not call evor_state_read or ' +
+        'evor_tree_read here; the governor denies them to main while the mission runs.'
+      : `[EVOR RESUME]${tickHint} ` +
+        'Call evor_state_read to check current position, then call evor_tree_read to see the frontier. ' +
+        'If a tick is mid-flight (step < 9), continue from the last completed step.'
   );
 }
 
