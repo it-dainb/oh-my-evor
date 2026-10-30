@@ -29,7 +29,10 @@
  */
 
 import { readFileSync } from 'fs';
-import { resolveActiveRun } from './lib/active-run.mjs';
+import { resolveActiveRun, resolveRunDir } from './lib/active-run.mjs';
+import { isMissionLive } from './lib/run-status.mjs';
+import { existsSync as _exists } from 'fs';
+import { join as _join } from 'path';
 import { resolveWriteTargets } from './lib/write-targets.mjs';
 import { mayPerform, operationFor } from './lib/operations.mjs';
 import { classifyWriteTarget, selfPatchAllowed } from './lib/protected-paths.mjs';
@@ -51,6 +54,45 @@ if (skipHooks.includes('pre-tool-use')) {
 // ── Active run guard — governor only applies during an active evor run ─────────
 const _activeRunId = resolveActiveRun().runId;
 if (!_activeRunId) process.exit(0);
+
+// ── Is a mission actually being ORCHESTRATED right now? ──────────────────────
+//
+// An active-run POINTER is not a live mission. It outlives the mission: a run
+// that was paused by the session-end hook, completed or failed keeps its
+// `active-run.json`, and every later session in the project — including
+// `/evor-setup` for a NEW mission — was then governed as that dead mission's
+// orchestrator. In the field (2026-10-30) a setup session was refused Bash, refused
+// evor_state_read, refused spawning a probe, and refused writing its own memory, on
+// behalf of a mission paused at tick 0 that nobody was running. Setup could not
+// even check whether a run was underway, which is its first step.
+//
+// The Stop hook has asked the right question since §15E — `isMissionLive` — and
+// this hook never did. The ROLE rules below that discipline main as an
+// orchestrator (no Bash, no state reads, spawn only ticks, author nothing) now
+// apply only while a mission is live. The STATE guards — protected paths, the
+// .evor write guard, kind spoofing — do not depend on it and stay unconditional.
+const _missionLive = (() => {
+  try {
+    const runDir = resolveRunDir();
+    if (!runDir) return false;
+    const read = (name) => {
+      const p = _join(runDir, name);
+      return _exists(p) ? JSON.parse(readFileSync(p, 'utf8')) : undefined;
+    };
+    const missionState = read('mission-state.json');
+    const runState = read('run-state.json');
+    // A pointer with no state yet (mid-init, or a run dir being written) is not
+    // evidence the mission is idle. Relax only when state SAYS so.
+    if (missionState === undefined && runState === undefined) return true;
+    return isMissionLive(missionState, runState);
+  } catch (err) {
+    // Unknown liveness: keep the orchestrator rules on. Failing permissive here
+    // would ungovern a running mission; failing strict costs a setup session a
+    // clear denial that names this cause.
+    logError('mission-liveness', err);
+    return true;
+  }
+})();
 
 let input;
 try {
@@ -201,6 +243,14 @@ try {
   // when the payload carries nothing.
   const agentType = ((input?.agent_type ?? process.env.EVOR_AGENT_ROLE ?? '') || '').replace(/^oh-my-evor:/, '');
   const isMain = !agentType; // no agent_type and no declared role ⇒ main Evor
+
+  // Claude's own memory notes (~/.claude/projects/<project>/memory/) are not
+  // mission work and not run state. Denying them pushed main to write findings
+  // into the run wiki instead, and in the field it refused an agent its memory
+  // while it was trying to record why setup was blocked.
+  const isAgentMemoryWrite =
+    (tool === 'Write' || tool === 'Edit') &&
+    /[\\/]\.claude[\\/]projects[\\/][^\\/]+[\\/]memory[\\/]/.test(String(ti?.file_path ?? ''));
 
   const filePath = String(ti?.file_path ?? '');
   const cmd = String(ti?.command ?? '');
@@ -474,7 +524,9 @@ try {
     // grant of its own by design — 4.3 hands it the spawner's constraints,
     // because authority attached to who you ARE is defeated by who you can
     // CREATE, and the path rules (§0.2/0.3) already bind it regardless.
-    const known = agentType === '' || /^evor-/.test(agentType);
+    // Main is held to the orchestrator's grant only while it is orchestrating a
+    // live mission; a setup or maintenance session with a stale pointer is not.
+    const known = (agentType === '' && _missionLive && !isAgentMemoryWrite) || /^evor-/.test(agentType);
     if (operation && known && !mayPerform(agentType, operation)) {
       const who = agentType || 'Evor (orchestrator)';
       // Main's explanation is that it is orchestrator-only — the same phrase the
@@ -510,7 +562,7 @@ try {
     logError('operation-authority', err);  // fail-open, but recorded
   }
 
-  if (isMain) {
+  if (isMain && _missionLive && !isAgentMemoryWrite) {
     // Evor is orchestrator-only — it must delegate all authoring/training.
     if ((tool === 'Write' || tool === 'Edit') && isCodeOrArtifactWrite) {
       deny(
@@ -663,7 +715,10 @@ try {
   const toolNameO = input?.tool_name ?? '';
   // Same rule as above: a declared role is not the orchestrator.
   const isMainO = !((input?.agent_type ?? process.env.EVOR_AGENT_ROLE ?? '') || '');
-  if (isMainO && (toolNameO === 'Bash' || toolNameO === 'Write' || toolNameO === 'Edit')) {
+  const memoryWriteO =
+    (toolNameO === 'Write' || toolNameO === 'Edit') &&
+    /[\\/]\.claude[\\/]projects[\\/][^\\/]+[\\/]memory[\\/]/.test(String(input?.tool_input?.file_path ?? ''));
+  if (isMainO && _missionLive && !memoryWriteO && (toolNameO === 'Bash' || toolNameO === 'Write' || toolNameO === 'Edit')) {
     const tiO = input?.tool_input ?? {};
 
     // Every file in commands/ dispatches with
@@ -728,7 +783,9 @@ try {
   // to observe rather than every site with the same shape is how the same bug gets
   // found three times.
   const isMainB = !((input?.agent_type ?? process.env.EVOR_AGENT_ROLE ?? '') || '');
-  if (isMainB) {
+  // The boundary exists to keep a LIVE mission's orchestrator flat across ticks.
+  // With no live mission there is no tick to sit behind.
+  if (isMainB && _missionLive) {
     const BOUNDARY_ABSORBED = new Set([
       'mcp__plugin_oh-my-evor_evor__evor_read_artifact',
       'mcp__plugin_oh-my-evor_evor__evor_tree_read',

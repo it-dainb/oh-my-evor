@@ -9,9 +9,15 @@ a live training run.  All data matches the Pydantic contracts in
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 
 import pytest
+
+# Some tests import helpers from sibling test modules (``from test_classc import ...``).
+# Those imports resolve only when this directory is on sys.path, which a run from
+# ``harness/`` gives and a run from the repo root does not.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 # ── Constants ─────────────────────────────────────────────────────────────────
 
