@@ -184,3 +184,13 @@ describe("the training watcher is importable", () => {
     expect(decide(bash(`python3 -c "import evor.tree; evor.tree.main()"`)).permissionDecision).toBe("deny");
   });
 });
+
+describe("a write verb counts only as a command", () => {
+  const bash = (command: string) => ({ tool_name: "Bash", tool_input: { command }, agent_type: "oh-my-evor:evor-forge" });
+  it("grep -ln over worktrees is a read", () => {
+    expect(decide(bash(`cd .evor/worktrees; grep -ln "sha256" */data/builder.py`)).permissionDecision).not.toBe("deny");
+  });
+  it("rm through xargs inside run state is still a write", () => {
+    expect(decide({ tool_name: "Bash", tool_input: { command: "ls | xargs rm -f .evor/runs/m1/r1/tree.json" } }, "draft").permissionDecision).toBe("deny");
+  });
+});

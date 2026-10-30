@@ -183,6 +183,8 @@ skills: [oh-my-evor:evor-mcp]
     verdicts with evor_read_artifact(agent=..., kind=<node name>). Do not poll evor_wait on a
     child: each call is a turn. A background shell task (a job watcher) wakes you the same way
     when it exits. Never `sleep` to wait; the shell refuses it.
+    For scratch files make a directory with `mktemp -d` and pass the printed path to your
+    children; never build a `/tmp/claude-*` path by hand.
 
     Phase 7 — Wait
       Wait for the job with ONE background Bash task, then end your turn:

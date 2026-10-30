@@ -2,6 +2,18 @@
 
 All notable changes to Evor. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.2.30] — 2026-10-30 — a write verb is a command
+
+### Fixed
+
+- **A flag or a word was read as a write command.** The write-verb pattern matched `ln`, `rm`,
+  `cp` and the rest anywhere, so `grep -ln "sha256" */data/builder.py` was a write, and its
+  quoted search term a target inside the worktree. A write verb now counts only in command
+  position: at the start of a statement or pipeline stage, or after sudo, xargs, env, nohup,
+  time or find's `-exec`.
+- **Forge built scratch paths by hand and got them wrong.** It now makes a scratch directory with
+  `mktemp -d` and passes the printed path to its children.
+
 ## [1.2.29] — 2026-10-30 — analysis scripts are not candidates
 
 ### Fixed
