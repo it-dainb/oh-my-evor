@@ -2,6 +2,35 @@
 
 All notable changes to Evor. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.2.16] — 2026-10-30 — resumes start clean; heredoc bodies are not shell
+
+Found resuming the binarization mission and in its tick 4.
+
+### Fixed
+
+- **Command stubs shadowed their skills.** `commands/<name>.md` and `skills/<name>/SKILL.md` share
+  the address `oh-my-evor:<name>`, and which one loads was not stable: the same `/evor-run`
+  loaded the skill in one session and the stub in another. The stub's
+  `Read("${EVOR_PLUGIN_ROOT:-$CLAUDE_PLUGIN_ROOT}/…")` cannot be expanded by the Read tool, so
+  those sessions opened with a denied Bash call. The nine stubs that duplicated a skill are
+  removed. `/evor-resume`, which has no skill of its own, invokes `evor-run` through the Skill
+  tool.
+- **A resumed mission investigated the plugin.** A mission paused for a plugin failure records
+  the defect in its pause reason, and the next session spent its first minutes reading plugin
+  source to see whether it was fixed. `evor-run` now resumes it through `evor_check_stop`, which
+  already answers that question.
+- **A Python comparison in a heredoc read as a shell redirect.** `len(x)>200` in a
+  `python3 - <<EOF` body made an architect's read-only comparison "write" a node's
+  `results.json`. Heredoc bodies are now judged by the Python write shapes alone and removed
+  from the text the shell rules read. A Python write in a heredoc after `cd` is still caught.
+- **`python -c` code was read as shell too.** Probe's read-only telemetry analysis printed
+  `'first->last %'`, and `->` read as a redirect, with every string literal taken as a path. The
+  code argument of `python -c` is now judged like a heredoc body. When that code does write, the
+  whole command is judged as before, so a path passed outside the code is still a target.
+- **Probe could not read the reviewers' reports.** Probe analyzes the tick after every verdict
+  is in, but it was granted only the `forge` slot. It may now read the critic's, architect's and
+  analyst's reports. Reviewers still cannot read each other's.
+
 ## [1.2.15] — 2026-10-30 — Forge could not wait for forge-junior, or set up a worktree
 
 Found in tick 4 of the binarization mission on 1.2.14.

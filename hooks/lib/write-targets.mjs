@@ -144,6 +144,14 @@ function heredocs(command, cwd, vars) {
  * env probes, syntax checks, test runs, read-only JSON inspection, `grep` whose
  * PATTERN merely mentions a trigger token, `stat` on a `.py` file.
  */
+function hasPythonWriteIntent(text) {
+  const py = text.match(PY_WRITE_CALL);
+  if (!py) return false;
+  const args = py[1] ?? py[2] ?? '';
+  if (/\.write_text|\.write_bytes|json\.dump|shutil\./.test(py[0])) return true;
+  return /,\s*['"][^'"]*[wax][^'"]*['"]/.test(args);
+}
+
 function hasWriteIntent(text) {
   if (/(^|[^0-9<>&])>>?\s*[^\s|&;>]/.test(text.replace(/2>&1|&>|>&\d/g, ''))) return true;
   if (/\btee\b/.test(text)) return true;
@@ -221,9 +229,23 @@ export function resolveWriteTargets({ tool, toolInput = {}, cwd = process.cwd() 
   if (!command) return { targets: [], writes: false };
 
   const vars = shellVars(command);
+  // Heredoc BODIES are data for an interpreter, not shell: `len(x)>200` in a
+  // python body is a comparison, not a redirect. Reading it as shell made an
+  // architect's read-only JSON comparison "write" a node's results.json
+  // (binarization mission, tick 4). Bodies are judged by the Python write
+  // shapes only, and removed from the text the shell rules read.
+  const bodies = heredocs(command, cwd, vars);
+  let shellText = command.replace(/(<<-?\s*['"]?([A-Za-z_][A-Za-z0-9_]*)['"]?)\n[\s\S]*?\n\s*\2\b/g, '$1');
+  // `python -c "<code>"` is interpreter input too: `'first->last %'` in it read
+  // as a `>` redirect, and its string literals as paths (Probe, tick 4). Only
+  // python's code argument is lifted out; `bash -c "…"` stays shell.
+  shellText = shellText.replace(/(\bpython[0-9.]*(?:\s+-[A-Za-z]+)*\s+-c\s+)(["'])((?:\\.|(?!\2)[^\\])*)\2/g, (_w, pre, _q, code) => {
+    bodies.push({ text: code, cwd });
+    return `${pre}''`;
+  });
   const units = [
-    ...segments(command, cwd, vars),
-    ...heredocs(command, cwd, vars),
+    ...segments(shellText, cwd, vars),
+    ...bodies.map((b) => ({ ...b, pythonOnly: true })),
     // The whole command as one unit. Segment splitting is naive about quoting — a
     // `;` inside a `python3 -c "…"` string looks exactly like a statement
     // separator — which scattered the write call into one segment and its target
@@ -231,13 +253,20 @@ export function resolveWriteTargets({ tool, toolInput = {}, cwd = process.cwd() 
     // protected path" is caught even when the two are not adjacent. It cannot add
     // a false positive on a command that writes nothing, because a unit with no
     // write intent contributes no targets at all.
-    { text: command, cwd },
+    { text: shellText, cwd },
+    // Lifted python code that WRITES may write a path passed outside it
+    // (`python3 -c "…FileIO(sys.argv[1],'w')…" "$D/freeze.py"`). Then the
+    // original command is judged whole, as it was before the lift. A lift can
+    // only remove false positives from code that does not write.
+    ...(bodies.some((b) => hasPythonWriteIntent(foldConcat(expandVars(b.text, vars))))
+      ? [{ text: command, cwd }]
+      : []),
   ];
 
   let writes = false;
   for (const unit of units) {
     const text = foldConcat(expandVars(unit.text, vars));
-    if (!hasWriteIntent(text)) continue;
+    if (!(unit.pythonOnly ? hasPythonWriteIntent(text) : hasWriteIntent(text))) continue;
     writes = true;
     for (const raw of pathTokens(text)) {
       const t = raw.trim();
@@ -251,7 +280,7 @@ export function resolveWriteTargets({ tool, toolInput = {}, cwd = process.cwd() 
   // and the sealed evaluator it copied from (binarization mission, tick 4).
   // Only sources that are not also written elsewhere in the command are dropped;
   // `mv` is excluded because it removes its source.
-  const { sources, written } = copySources(segments(command, cwd, vars), vars, cwd);
+  const { sources, written } = copySources(segments(shellText, cwd, vars), vars, cwd);
   for (const src of sources) if (!written.has(src)) targets.delete(src);
 
   return { targets: [...targets], writes };

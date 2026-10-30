@@ -277,3 +277,49 @@ describe("a reviewer's scratchpad is not candidate code", () => {
     expect(d.permissionDecision).toBe("deny");
   });
 });
+
+describe("a heredoc body is interpreter input, not shell", () => {
+  // `len(json.dumps(v))>200` in a python heredoc read as a shell redirect, so an
+  // architect's read-only JSON comparison "wrote" a node's results.json
+  // (binarization mission, tick 4).
+  const bash = (command: string) => call({
+    hook_event_name: "PreToolUse", agent_type: "oh-my-evor:evor-forge-architect",
+    tool_name: "Bash", tool_input: { command },
+  }).hook;
+
+  it("allows a read-only python heredoc that compares with >", () => {
+    const d = bash('R=/w/.evor/runs/m/r/nodes/n; python3 - <<EOF\nimport json\na=json.load(open("$R/results.json"))\nprint(len(json.dumps(a))>200)\nEOF');
+    expect(d.permissionDecision).not.toBe("deny");
+  });
+
+  it("still refuses a python heredoc that writes run state", () => {
+    const d = bash('cd /w/.evor/runs && python3 - <<EOF\nopen("mission-state.json","w").write("x")\nEOF');
+    expect(d.permissionDecision).toBe("deny");
+  });
+});
+
+describe("analysis edge and python -c", () => {
+  const read = (agent_type: string, agent: string) => call({
+    hook_event_name: "PreToolUse", agent_type,
+    tool_name: "mcp__plugin_oh-my-evor_evor__evor_read_artifact",
+    tool_input: { run_id: "r1", tick: 4, agent },
+  }).hook;
+
+  it("lets evor-probe read the forge reviewers' reports", () => {
+    for (const slot of ["forge-critic", "forge-architect", "forge-analyst"]) {
+      expect(read("oh-my-evor:evor-probe", slot).permissionDecision).not.toBe("deny");
+    }
+  });
+
+  it("still keeps reviewers out of each other's reports", () => {
+    expect(read("oh-my-evor:evor-forge-analyst", "forge-critic").permissionDecision).toBe("deny");
+  });
+
+  it("does not read a python -c string literal containing -> as a redirect", () => {
+    const d = call({
+      hook_event_name: "PreToolUse", agent_type: "oh-my-evor:evor-probe", tool_name: "Bash",
+      tool_input: { command: `cat /w/.evor/runs/m/r/nodes/n/telemetry.jsonl | python3 -I -c "import sys; print('first->last %', 1)"` },
+    }).hook;
+    expect(d.permissionDecision).not.toBe("deny");
+  });
+});

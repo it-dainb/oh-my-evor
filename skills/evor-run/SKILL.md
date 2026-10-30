@@ -32,6 +32,12 @@ from `evor_check_stop` and files with the Read tool, as below. (These steps used
 2026-10-30 binarization resume.) When the mission is paused or locked, `evor_state_read` is
 allowed.
 
+**A mission paused for a plugin failure is resumed, not investigated.** Its pause reason may
+describe a plugin defect. Do not inspect plugin source to decide whether it was fixed:
+`evor_check_stop` answers that. A contract or infrastructure failure blocks only while the
+plugin version that recorded it is the one running. If `blocked` is false, resume; if the defect
+is still there, the next tick fails again and the run blocks again.
+
 If arguments were provided, treat them as mission-id or run-id. Otherwise:
 1. Read `.evor/active-run.json` with the Read tool to find the current run. If the mission is
    not running, `evor_state_read` also works.

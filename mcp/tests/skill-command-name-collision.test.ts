@@ -30,17 +30,15 @@ const commandNames = readdirSync(COMMANDS)
   .filter((f) => f.endsWith(".md"))
   .map((f) => f.replace(/\.md$/, ""));
 
-describe("a command that shadows a skill must dispatch with a tool every agent has", () => {
+describe("no command shadows a skill", () => {
+  // Which of a same-name command and skill wins is not stable: /oh-my-evor:evor-run
+  // loaded the SKILL in one binarization session and the command stub in another
+  // (2026-10-30), and the stub's `Read("${EVOR_PLUGIN_ROOT:-...}")` cannot be
+  // expanded by the Read tool, so that session opened with a denied Bash call.
+  // The stubs carried nothing the skill does not, so they are gone.
   for (const name of commandNames) {
-    if (!existsSync(join(ROOT, "skills", name, "SKILL.md"))) continue;
-    it(`/${name} does not tell the reader to shell out`, () => {
-      const src = readFileSync(join(COMMANDS, `${name}.md`), "utf8");
-      // The dispatch step — everything before the fallback discussion.
-      const dispatch = src.split(/If `\$CLAUDE_PLUGIN_ROOT` happens to be unset/)[0];
-      expect(dispatch, `/${name} dispatch still uses cat`).not.toMatch(
-        /```bash\s*\n\s*cat "/,
-      );
-      expect(dispatch, `/${name} dispatch must name the Read tool`).toMatch(/Read\(/);
+    it(`/${name} has no skills/${name}/SKILL.md behind it`, () => {
+      expect(existsSync(join(ROOT, "skills", name, "SKILL.md"))).toBe(false);
     });
   }
 });

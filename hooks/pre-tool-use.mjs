@@ -1020,6 +1020,15 @@ try {
     // mutagen-to-sage handoff (binarization mission, tick 3), Sage found nothing
     // to research and exited.
     READ_EXTRA_GRANTS['evor-sage'] = new Set([...(READ_EXTRA_GRANTS['evor-sage'] ?? []), 'mutagen']);
+
+    // ANALYSIS EDGE. Probe analyses the whole tick after training, and the
+    // reviewers' reports (critic, architect, analyst) are part of what happened.
+    // The stage rule granted Probe only `forge`, not the forge-* reviewer slots,
+    // so it was denied them twice in tick 4 of the binarization mission.
+    // Reviewers still do not read EACH OTHER; this is the analyst at the end of
+    // the line, after every verdict is in.
+    READ_EXTRA_GRANTS['evor-probe'] = new Set([...(READ_EXTRA_GRANTS['evor-probe'] ?? []),
+      'forge-critic', 'forge-architect', 'forge-analyst']);
     // evor-tick is deliberately absent from AGENT_ROLE_MAP, so this guard skips it
     // entirely: the tick boundary reads every stage's artifact by design — that is
     // the context the orchestrator is denied and evor-tick absorbs on its behalf.
