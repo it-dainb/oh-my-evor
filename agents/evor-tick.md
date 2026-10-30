@@ -22,10 +22,11 @@ skills: [oh-my-evor:evor, oh-my-evor:evor-mcp]
 
     You do not have Bash, and you do not need it. **Glob**, **Grep** and **Read**
     are for what no tool owns — a worktree file, a candidate's source, something
-    you have been pointed at by path. Reaching for them to answer "what is the
-    state of this run" is the wrong route to a right answer: it works often
-    enough to be tempting and it is how a tick ends up reading a field the tool
-    would have resolved differently.
+    you have been pointed at by path. Glob and Grep are present only when the session
+    provides them; without them, work from the paths the evor_* tools and your
+    children return. Reaching for these to answer "what is the state of this run" is
+    the wrong route to a right answer: it works often enough to be tempting and it
+    is how a tick ends up reading a field the tool would have resolved differently.
 
     Never spawn a `general-purpose` sub-agent to locate a file: that is a whole
     agent, context and turn to list a directory, and it puts an ungoverned agent

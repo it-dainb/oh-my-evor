@@ -183,8 +183,8 @@ Then record the returned status, call `evor_check_stop({ run_id })`, decide cont
 meta-evolve, and only then spawn the next tick.
 
 **If `evor_check_stop` returns `blocked: true`, do not spawn the next tick.** Set the mission to
-paused with `evor_state_write({ run_id, mission_status: "paused", mission_status_reason:
-<blocked_reason> })` and tell the user what is blocking and what would unblock it. A tick that
+paused with `evor_state_write({ run_id, patch: { mission_status: "paused", mission_status_reason:
+<blocked_reason> } })` and tell the user what is blocking and what would unblock it. A tick that
 failed because the plugin contradicts itself (`failure_kind: "contract"`), or because the machine
 or a service failed (`"infrastructure"`), blocks the run: a retry can only fail the same way. Do
 not work around it with instructions in the next tick's prompt: such a workaround holds only
@@ -193,7 +193,7 @@ while you keep repeating it, and it hides the defect.
 **Record every terminal outcome, once, as soon as the tick returns it:**
 
 ```
-evor_state_write({ run_id, tick_record: { tick: <n>, outcome: "<scored|rejected|skipped|failed>", score: <best fitness, if any node was evaluated>, failure_kind: <the tick's, when failed>, error: <the tick's, when failed> } })
+evor_state_write({ run_id, patch: { tick_record: { tick: <n>, outcome: "<scored|rejected|skipped|failed>", score: <best fitness, if any node was evaluated>, failure_kind: <the tick's, when failed>, error: <the tick's, when failed> } } })
 ```
 
 This is not bookkeeping. The circuit breaker (consecutive FAILED ticks) and the plateau
@@ -361,7 +361,7 @@ For each node where integrity_status="passed", spawn Probe as a REAL sub-agent. 
 **Prediction bias tracking (Mutagen reads this every tick):**
 After the probe artifact is confirmed, extract `actual_delta_pp` (the numeric metric change Probe measured) and the `predicted_gain` midpoint from the original proposal's hypothesis. Record the sample:
 ```
-evor_state_write({ prediction_bias_sample: { predicted_gain: <midpoint_pp>, actual_gain: <actual_delta_pp> } })
+evor_state_write({ run_id, patch: { prediction_bias_sample: { predicted_gain: <midpoint_pp>, actual_gain: <actual_delta_pp> } } })
 ```
 Skip this write ONLY when `hypothesis_verdict="inconclusive"` (no valid prediction error). The server accumulates the bias history; Mutagen reads it each tick via `evor_state_read` to self-calibrate its quantified predictions — this write is mandatory.
 

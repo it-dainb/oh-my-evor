@@ -292,9 +292,9 @@ Then RECORD it — the tick reads this back, and the "Estimated concurrency" pri
 lost unless it is written here:
 
 ```
-evor_state_write({ run_id, resource_plan: {
+evor_state_write({ run_id, patch: { resource_plan: {
   concurrency: <N>, reason: "<free VRAM vs expected per-job VRAM>",
-  gpu_ids: [...], vram_per_job_gb: <x>, cpu_fallback: <bool> } })
+  gpu_ids: [...], vram_per_job_gb: <x>, cpu_fallback: <bool> } } })
 ```
 
 `concurrency` is how many candidates may train AT ONCE. Use 1 unless free VRAM comfortably holds
@@ -577,7 +577,7 @@ After consent:
 
    On success it returns `run_id` and atomically writes all run artifacts. Surface any `{error}` result to the user — do not attempt to write any artifacts manually.
 
-3. Call `evor_state_write({ mission_status: "draft", active_run: { mission_id, run_id, run_dir, status: "initialized" } })` using the `run_id` returned by `evor_init_run`.
+3. Call `evor_state_write({ run_id, patch: { mission_status: "draft", active_run: { mission_id, run_id, run_dir, status: "initialized" } } })` using the `run_id` returned by `evor_init_run`.
 
 Print: "Mission initialized. Run ID: <run_id>. Running Phase-2 validation gate..."
 Then proceed to Validate_And_Lock.

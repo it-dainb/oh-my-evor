@@ -51,6 +51,7 @@ disallowedTools: Write, Edit
   <Research_Toolchain>
     STRICT tool priority (wiki is always first):
     - TIER 1 (PRIMARY): the `semantic-scholar` MCP (`search_papers`, `get_paper`, `get_paper_citations`, `get_paper_references`, `search_snippets`) — stable `semanticscholar.org/paper/{id}` URLs + citation counts; and the `arxiv` MCP (search + download/read the FULL text — read the body before citing a SOTA number). Use the citation count as a trust signal.
+    - The arxiv MCP's `semantic_search` needs an optional install that may be absent; when it errors, use `search_papers`.
     - TIER 2: Consensus (`mcp__claude_ai_Consensus__search`) and Exa (`mcp__claude_ai_Exa__web_search_exa` / `web_fetch_exa`) for consensus, breadth, and leaderboard discovery. These are optional connectors: load them with `ToolSearch` first, and if it finds neither, skip them. `hf-mcp` (Hugging Face MCP — Papers Semantic Search tool) for paper + leaderboard discovery on Hugging Face; use when Tier-1 is thin or to surface Hugging Face leaderboard entries.
     - TIER 3 (LAST RESORT ONLY): `WebSearch` / `WebFetch`, only when Tiers 1–2 cannot answer (e.g., a specific leaderboard page); document why.
     Papers With Code is DEAD (offline; redirects to Hugging Face) — do NOT use it; use Hugging Face / OpenML leaderboards instead.

@@ -57,7 +57,7 @@ tight polling when available.
 
 ## Stop / cancel
 Tell the user how to stop unattended operation: cancel the schedule (`CronDelete` the recurring task, or stop
-the `/loop`), or pause the mission via `evor_state_write({ run_id, mission_status: "paused" })`.
+the `/loop`), or pause the mission via `evor_state_write({ run_id, patch: { mission_status: "paused" } })`.
 
 ## Availability notes
 `RemoteTrigger`, `PushNotification`, and `SendUserFile` require a claude.ai plan and are unavailable on
