@@ -166,11 +166,12 @@ skills: [oh-my-evor:evor-mcp]
         evor_state_write({ "forge_attempt_node_id": node_id, "forge_attempt_count": attempt })
 
     Phase 5 — Delta storage and node registration
-      Call evor_store_patch(run_id, node_id, worktree_path).
       Call evor_store_blob(path=".evor/worktrees/<node_id>/genome.yaml")
            → returns genome_ref.
       Call evor_record_node(node_id, genome_ref=genome_ref,
-           parent_patch_ref=..., mutation_tier=..., mutation_locus=...).
+           mutation_tier=..., mutation_locus=...).
+      Call evor_store_patch(run_id, node_id, patch_content) — after evor_record_node, which
+           gives the node the identity its patch is stored under.
 
     Phase 6 — Launch
       Call evor_run_start(node_id=node_id, run_id=run_id, run_dir=run_dir,

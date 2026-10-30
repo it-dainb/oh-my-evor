@@ -16,7 +16,7 @@ const HOOKS = resolve(dirname(fileURLToPath(import.meta.url)), "../../hooks");
 const FINISHED = JSON.stringify({ type: "assistant", message: { role: "assistant", stop_reason: "end_turn" } });
 const RUNNING = JSON.stringify({ type: "user", message: { role: "user" } });
 
-function stopSage(child: string | null) {
+function stopSage(child: string | null, extra = "") {
   const root = mkdtempSync(join(tmpdir(), "evor-sagestop-"));
   const runDir = join(root, ".evor", "runs", "m1", "r1");
   mkdirSync(join(runDir, "ticks", "1"), { recursive: true });
@@ -30,7 +30,7 @@ function stopSage(child: string | null) {
   const sage = join(subDir, "agent-asage.jsonl");
   const launch = child === null ? "" :
     JSON.stringify({ type: "user", toolUseResult: { isAsync: true, status: "async_launched", agentId: "ajun1" } }) + "\n";
-  writeFileSync(sage, launch + FINISHED + "\n");
+  writeFileSync(sage, launch + extra + FINISHED + "\n");
   if (child !== null) {
     const f = join(subDir, "agent-ajun1.jsonl");
     writeFileSync(f, child + "\n");
@@ -58,6 +58,13 @@ function stopSage(child: string | null) {
 describe("Sage stopping while its juniors run", () => {
   it("is a yield: no missing-artifact warning", () => {
     expect(stopSage(RUNNING)).not.toMatch(/artifact not confirmed/);
+  });
+
+  it("waiting on its own background task (a job watcher) is a yield too", () => {
+    const task = JSON.stringify({ type: "user", toolUseResult: { backgroundTaskId: "bjob1" } }) + "\n";
+    expect(stopSage(null, task)).not.toMatch(/artifact not confirmed/);
+    const done = task + JSON.stringify({ type: "user", message: { content: "<task-notification>\n<task-id>bjob1</task-id>" } }) + "\n";
+    expect(stopSage(null, done)).toMatch(/artifact not confirmed/);
   });
 
   it("finishing with no live child and no artifact still warns", () => {

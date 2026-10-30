@@ -5,7 +5,7 @@
  * hand writes, so the directory must exist before the trainer appends to it.
  */
 import { describe, it, expect, afterEach } from "vitest";
-import { mkdtempSync, existsSync, rmSync } from "fs";
+import { mkdtempSync, existsSync, rmSync, writeFileSync } from "fs";
 import { join, dirname } from "path";
 import { tmpdir } from "os";
 import { registerRecordTools } from "../src/tools/record.js";
@@ -41,5 +41,28 @@ describe("evor_record_node's telemetry_path", () => {
     const out = JSON.parse(res.content[0].text);
     expect(out.ok).toBe(true);
     expect(existsSync(dirname(out.telemetry_path))).toBe(true);
+  });
+});
+
+describe("pending nodes", () => {
+  it("a node marked pending by name is cleared when it is recorded", async () => {
+    root = mkdtempSync(join(tmpdir(), "evor-rn-"));
+    process.env.EVOR_ROOT = root;
+    process.env.EVOR_MISSION_ID = "m";
+    ensureRunDirs("r", "m");
+    const rs = join(root, "runs", "m", "r", "run-state.json");
+    writeFileSync(rs, JSON.stringify({ tick_count: 0, frontier_ids: [], pending_node_ids: ["cosine-lr-01"] }));
+    const h = new Map<string, Handler>();
+    registerRecordTools({ tool: (n: string, _d: string, _s: unknown, f: Handler) => h.set(n, f) } as never);
+    const res = await h.get("evor_record_node")!({
+      run_id: "r",
+      node: {
+        name: "cosine-lr-01", parent_ids: [], approach_family: "arch", hypothesis_id: "h-1",
+        code_ref: "sha:abc", genome_ref: "sha:g", data_version_ref: "sha:d", config: {}, metrics: {},
+        eval_version: "v1", lesson_ids: [], citations: [], integrity_status: "pending", status: "pending",
+        is_crossover: false, visit_count: 0, depth: 0, created_at: new Date().toISOString(),
+      },
+    });
+    expect(JSON.parse(res.content[0].text).pending_remaining).toBe(0);
   });
 });

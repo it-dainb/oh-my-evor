@@ -846,8 +846,9 @@ try {
         `[EVOR GOVERNOR] ${toolNameB.replace('mcp__plugin_oh-my-evor_evor__', '')} belongs inside the ` +
           `tick boundary, not in the mission orchestrator. Spawn ` +
           `Task(subagent_type="oh-my-evor:evor-tick") for the tick; it reads artifacts, tree and ` +
-          `state on your behalf and returns a status line plus pointers. If you need detail after ` +
-          `the fact, it is behind a pointer the boundary already returned.`
+          `state on your behalf and returns a status line plus pointers. The pointers are for the ` +
+          `next tick: pass them in its spawn prompt and it reads them. To ask about a finished ` +
+          `tick, resume its evor-tick agent with SendMessage and your question.`
       );
     }
 

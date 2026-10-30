@@ -13,7 +13,7 @@ disallowedTools: Write, Edit
 
     You write your own analysis code per modality — you do not use a fixed analysis library. Every EDA script you produce is authored fresh for the current telemetry shape, then executed via the python_repl tool.
 
-    Before running any EDA or opening telemetry data, call `evor_read_handoff(from_agent="forge", to_agent="probe")` to read the Forge job report. The report contains: node_id, worktree path, genome seams written, telemetry injection confirmation, and harness exit status. If the harness did not complete successfully (OOM, import error, or harness never invoked), set `hypothesis_verdict="inconclusive"` immediately and skip all 5 EDA checks — there is no valid telemetry to analyze.
+    Before running any EDA or opening telemetry data, call `evor_read_artifact(agent="forge", kind=<node name>)` to read the Forge report for the node you are analysing. The report contains: node_id, worktree path, genome seams written, telemetry injection confirmation, and harness exit status. If the harness did not complete successfully (OOM, import error, or harness never invoked), set `hypothesis_verdict="inconclusive"` immediately and skip all 5 EDA checks — there is no valid telemetry to analyze.
   </Role>
 
   <Why_This_Matters>
@@ -234,14 +234,14 @@ disallowedTools: Write, Edit
     - Proposing BenchmarkUpgrade prematurely: saturation must be observed over ≥3 ticks, not one stalled tick.
     - Writing EDA scripts to disk: use python_repl only; scripts are ephemeral.
     - Assuming per_domain is populated: always check before pivoting; flag absence as a gap.
-    - Running EDA checks without first verifying the Forge job completed successfully: all 5 checks silently fail on an empty or truncated telemetry stream; always call evor_read_handoff(from_agent="forge", to_agent="probe") first.
+    - Running EDA checks without first verifying the Forge job completed successfully: all 5 checks silently fail on an empty or truncated telemetry stream; always read the Forge report with evor_read_artifact(agent="forge", kind=<node name>) first.
     - Declaring `hypothesis_verdict="confirmed"` when fewer than 30% of expected training steps completed: a truncated run cannot confirm a hypothesis; use "inconclusive" and note the step count in the evidence field.
     - Submitting a `BenchmarkUpgradeProposal` after one stalled tick: saturation requires ≥3 consecutive ticks with improvement < 1%; one stalled tick is noise, not saturation.
     - Writing EDA intermediate results or scripts to the run directory as permanent files: all EDA code and outputs must be ephemeral (python_repl only); permanent files corrupt the run artifact set and may be mistaken for official evaluation results.
   </Failure_Modes_To_Avoid>
 
   <Final_Checklist>
-    - Did I call evor_read_handoff(from_agent="forge", to_agent="probe") before running any EDA?
+    - Did I read the Forge report with evor_read_artifact(agent="forge", kind=<node name>) before running any EDA?
     - Did I complete all 5 EDA checks?
     - Is hypothesis_verdict set (not null)?
     - Is the evidence string specific (actual metric values, not generic)?

@@ -22206,7 +22206,7 @@ function recordNode(runId, node, missionId) {
   ].join("\n");
   (0, import_fs5.appendFileSync)(paths.decisionLogPath, logLine, "utf8");
   const state = readRunState(paths.runStatePath, runId);
-  const pending = Array.isArray(state.pending_node_ids) ? state.pending_node_ids.filter((id) => id !== node.id) : [];
+  const pending = Array.isArray(state.pending_node_ids) ? state.pending_node_ids.filter((id) => id !== node.id && id !== node.name) : [];
   state.pending_node_ids = pending;
   writeRunState(paths.runStatePath, state);
   return { pendingRemaining: pending.length, treePath: paths.treePath };
@@ -22399,14 +22399,20 @@ function registerRecordTools(server) {
     "Return a node's full evaluation result. Identify the node by the `name` you gave it. This is the only way to read a result \u2014 never read files by hand. Call after evor_run_status shows state='done'. Returns the full EvaluationResult object.",
     {
       run_id: external_exports.string().describe("Active run identifier"),
-      node_id: external_exports.string().describe(
+      node_id: external_exports.string().optional().describe(
         "The node's name (e.g. 'immune-memory-02'), as returned by evor_record_node"
       ),
+      name: external_exports.string().optional().describe("Same as node_id"),
+      node: external_exports.string().optional().describe("Same as node_id"),
       mission_id: external_exports.string().optional().describe(
         "Mission identifier (resolved from EVOR_MISSION_ID env when omitted)"
       )
     },
-    async ({ run_id, node_id, mission_id }) => {
+    async ({ run_id, node_id: given, name, node, mission_id }) => {
+      const node_id = given ?? name ?? node;
+      if (!node_id) {
+        return { content: [{ type: "text", text: JSON.stringify({ ok: false, error: "give the node's name as node_id" }) }] };
+      }
       const missionId = mission_id ?? process.env.EVOR_MISSION_ID;
       const result = readResult(run_id, resolveNodeRef(run_id, node_id, missionId), missionId);
       return {
@@ -22512,13 +22518,6 @@ function treeSelect(runId, strategy, count, missionId) {
   const data = pyResult.data;
   const selected = Array.isArray(data.selected) ? data.selected : [];
   const scores = data.scores && typeof data.scores === "object" ? data.scores : {};
-  if (selected.length > 0) {
-    const state = readRunState(paths.runStatePath, runId);
-    const current = Array.isArray(state.pending_node_ids) ? state.pending_node_ids : [];
-    const merged = Array.from(/* @__PURE__ */ new Set([...current, ...selected]));
-    state.pending_node_ids = merged;
-    writeRunState(paths.runStatePath, state);
-  }
   const selected_names = namesForIds(runId, selected, missionId);
   return { selected_names, scores };
 }
@@ -24510,7 +24509,16 @@ var import_path16 = require("path");
 var import_os3 = require("os");
 function storePatch(runId, nodeId, patchContent, missionId) {
   const paths = resolveRunPaths(runId, missionId);
-  const nodeDir = (0, import_path16.join)(paths.nodesDir, resolveNodeRef(runId, nodeId, missionId));
+  let nodeKey;
+  try {
+    nodeKey = resolveNodeRef(runId, nodeId, missionId);
+  } catch {
+    return {
+      ok: false,
+      error: `node '${nodeId}' is not recorded yet. Call evor_record_node first, then store its patch.`
+    };
+  }
+  const nodeDir = (0, import_path16.join)(paths.nodesDir, nodeKey);
   try {
     if (!(0, import_fs15.existsSync)(nodeDir)) {
       (0, import_fs15.mkdirSync)(nodeDir, { recursive: true });
@@ -24626,7 +24634,7 @@ function drainInbox(runId, kind, missionId) {
 function registerLineageTools(server) {
   server.tool(
     "evor_store_patch",
-    "Write a unified-diff parent patch to nodes/<node_id>/parent.patch atomically.",
+    "Write a unified-diff parent patch for a node atomically. Call it after evor_record_node; the node is named by the name it was recorded under.",
     {
       run_id: external_exports.string().describe("Active run identifier"),
       node_id: external_exports.string().describe("Node whose parent patch to store"),
@@ -26167,7 +26175,7 @@ function registerProposalTools(server) {
     "Deterministic structural gate for Mutagen proposals \u2014 runs H001\u2013H004 + schema checks in code before any Selector LLM is invoked. H001: hypothesis.prediction contains a quantified metric claim (digit + unit). H002: approach_family is not in a pure 3-tick win-streak (strategy.winning_families). H003: each approach_family appears at most once within this tick's batch. H004: no single primary parent provides more than floor(N/2) proposals. verdict='pass' \u2192 all gates pass + wildness<0.8 + not acquisition; Selector LLM safe to skip. verdict='needs_llm' \u2192 borderline; must route to Selector for full judgment. verdict='reject' \u2192 hard structural failure (no digit in prediction or missing fields); discard. Call this BEFORE spawning the Selector agent each tick to cut LLM cost on clean proposals.",
     {
       proposals: external_exports.array(external_exports.union([ProposalInputSchema, external_exports.object({ proposal_id: external_exports.string() })])).optional().describe(
-        "Proposals to validate; results are returned in the same order. An entry may be just {proposal_id}, and with run_id and tick omitted entries are read from that tick's Mutagen proposals. Omit the list to validate all of them."
+        "Proposals to validate, each in full; results are returned in the same order. Once Mutagen's proposals for the tick are written, an entry may be just {proposal_id} (with run_id and tick), or the list omitted to validate all of them."
       ),
       strategy: StrategyContextSchema.optional().describe(
         "Current strategy context; winning_families used for H002 streak check"
@@ -26188,7 +26196,7 @@ function registerProposalTools(server) {
         if (!all.length) {
           return { content: [{ type: "text", text: JSON.stringify({
             ok: false,
-            error: "proposals were not given in full, and no Mutagen proposals were found for this tick. Pass run_id and tick, or pass each proposal in full."
+            error: "Mutagen's proposals for this tick are not written yet, so proposals given by id cannot be looked up. Pass each proposal in full."
           }) }] };
         }
         const byId = new Map(all.map((p) => [p.proposal_id, p]));

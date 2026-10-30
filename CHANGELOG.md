@@ -2,6 +2,40 @@
 
 All notable changes to Evor. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.2.23] — 2026-10-30 — a job watcher is a live child
+
+### Fixed
+
+- **Waiting on a background task drew the missing-artifact warning.** Forge launches the
+  evaluation with `evor_run_start`, watches the job with a background shell task and ends its
+  turn; the task's exit wakes it. Liveness counted only spawned agents, so Forge was warned,
+  and main's stall check would have read Forge as finished. A background task whose completion
+  notice has not arrived now counts as a live child.
+- **A job quoted by its short id was not found.** Agents quote a job by the first characters
+  of its uuid, and the tick's status check failed on `be9bd7b6`. Job lookups now accept a
+  prefix that names exactly one job, and the error no longer prints an internal path.
+- **Probe read a handoff Forge never writes.** Its protocol opened with
+  `evor_read_handoff(from_agent="forge", to_agent="probe")`; Forge records its job in the
+  `forge-report` artifact. Probe now reads that, by node name. A forge-family read without a
+  candidate name resolves to the tick's only candidate, and with several it asks for one.
+- **Pending nodes never cleared, and would have held main's stop.** `evor_select` added every
+  parent it picked to `pending_node_ids`, a list meant for nodes started and not yet finished,
+  and nothing removed them; Forge marked its node pending by name and `evor_record_node` cleared
+  only by id. A non-empty list blocks main's stop. Select no longer marks parents, recording
+  clears a node by id or name, and the stop guard ignores entries whose node has finished.
+- **Main was told to follow pointers it may not read.** The tick's return contract and the
+  loop skill said the orchestrator reads a returned pointer with `evor_read_artifact`, and the
+  governor denies main that tool. Both now say what main does: pass the pointers to the next
+  tick, or resume the finished tick with SendMessage and a question.
+- **`evor_validate_proposals` invited the id-only form before it could work.** Mutagen used it
+  before writing its proposals. The description and error now say it applies once the tick's
+  proposals are written.
+- **Forge stored its patch before recording the node.** Since `evor_store_patch` resolves the
+  node's name to its id, a patch stored first had no node to resolve to. Forge's protocol now
+  records the node first, and the tool says so when called out of order.
+- **`evor_read_result` asked for `node_id` while its description said "name".** It now
+  accepts `name` or `node` as well.
+
 ## [1.2.22] — 2026-10-30 — a wait nothing will deliver is a stall
 
 ### Fixed

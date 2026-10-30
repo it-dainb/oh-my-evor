@@ -299,9 +299,9 @@ export function registerProposalTools(server: McpServer): void {
         .array(z.union([ProposalInputSchema, z.object({ proposal_id: z.string() })]))
         .optional()
         .describe(
-          "Proposals to validate; results are returned in the same order. An entry may be just " +
-            "{proposal_id}, and with run_id and tick omitted entries are read from that tick's " +
-            "Mutagen proposals. Omit the list to validate all of them.",
+          "Proposals to validate, each in full; results are returned in the same order. Once " +
+            "Mutagen's proposals for the tick are written, an entry may be just {proposal_id} " +
+            "(with run_id and tick), or the list omitted to validate all of them.",
         ),
       strategy: StrategyContextSchema.optional().describe(
         "Current strategy context; winning_families used for H002 streak check",
@@ -323,8 +323,8 @@ export function registerProposalTools(server: McpServer): void {
         if (!all.length) {
           return { content: [{ type: "text" as const, text: JSON.stringify({
             ok: false,
-            error: "proposals were not given in full, and no Mutagen proposals were found for this tick. " +
-              "Pass run_id and tick, or pass each proposal in full.",
+            error: "Mutagen's proposals for this tick are not written yet, so proposals given by id " +
+              "cannot be looked up. Pass each proposal in full.",
           }) }] };
         }
         const byId = new Map(all.map((p) => [p.proposal_id, p]));

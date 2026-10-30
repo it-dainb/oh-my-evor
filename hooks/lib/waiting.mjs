@@ -127,7 +127,9 @@ export function liveSubagents(sessionId, transcriptPath, now = Date.now()) {
     let mtime = 0;
     try { mtime = statSync(path).mtimeMs; } catch { continue; }
 
-    const finished = agentFinished(path);
+    // Finished by the CLI's reckoning, but still waiting on a task of its own
+    // that will wake it, is not finished.
+    const finished = agentFinished(path) && liveChildren(path, now).length === 0;
     // A parked agent reads as finished. If its transcript moved recently, the
     // chain is still turning over and the parent has not been woken yet.
     const recent = now - mtime < RECENT_MS;
@@ -148,7 +150,8 @@ export function liveSubagents(sessionId, transcriptPath, now = Date.now()) {
  * `liveSubagents` sees the whole session, so for a sub-agent it always includes
  * the parent waiting on it. A sub-agent has yielded only when one of ITS OWN
  * children is still running: Sage fanning out to its juniors, or Forge waiting
- * on its team. The children are the async launches its own transcript records.
+ * on its team, or on a background shell task watching its job. The children are
+ * the async launches and background tasks its own transcript records.
  */
 export function liveChildren(agentTranscriptPath, now = Date.now()) {
   if (typeof agentTranscriptPath !== 'string' || !agentTranscriptPath.endsWith('.jsonl')) return [];
@@ -158,6 +161,12 @@ export function liveChildren(agentTranscriptPath, now = Date.now()) {
   for (const m of text.matchAll(/"status":"async_launched","agentId":"([\w-]+)"/g)) ids.add(m[1]);
   const dir = join(agentTranscriptPath, '..');
   const live = [];
+  // A background shell task (a job watcher, a trainer) wakes its agent when it
+  // exits; its completion notice names it by id in the agent's own transcript.
+  const reported = new Set([...text.matchAll(/<task-id>([\w-]+)<\/task-id>/g)].map((m) => m[1]));
+  for (const m of text.matchAll(/"backgroundTaskId":"([\w-]+)"/g)) {
+    if (!reported.has(m[1]) && !live.includes(m[1])) live.push(m[1]);
+  }
   for (const id of ids) {
     const path = join(dir, `agent-${id}.jsonl`);
     let mtime = 0;

@@ -26,7 +26,6 @@ import { TreeNode, StrategyStateSchema } from "../contracts.js";
 import { readTree } from "../tree-store.js";
 import { resolveRunPaths } from "../run-store.js";
 import { callPythonModule } from "../subprocess-bridge.js";
-import { readRunState, writeRunState } from "./record.js";
 import { nameForId, namesForIds } from "./node-ref.js";
 
 /**
@@ -167,7 +166,6 @@ export function treeRead(
  * Run UCB1 selection via `python -m evor.tree select`.
  * Passes the resolved run directory path (not just the run-id) so tree.py
  * picks it up as a pre-existing directory.
- * Also adds selected IDs to `pending_node_ids` in run-state.json.
  *
  * Returns selected_names (readable, no UUIDs) plus any UCB1 scores emitted by
  * Python. Internal pending_node_ids remains stored as ids — only the
@@ -203,16 +201,9 @@ export function treeSelect(
   const selected = Array.isArray(data.selected) ? data.selected : [];
   const scores = (data.scores && typeof data.scores === "object") ? data.scores : {};
 
-  // Mark selected IDs as pending in run-state.json (internal ids, not names)
-  if (selected.length > 0) {
-    const state = readRunState(paths.runStatePath, runId);
-    const current = Array.isArray(state.pending_node_ids)
-      ? (state.pending_node_ids as string[])
-      : [];
-    const merged = Array.from(new Set([...current, ...selected]));
-    state.pending_node_ids = merged;
-    writeRunState(paths.runStatePath, state);
-  }
+  // Selected nodes are PARENTS: already recorded, so they are not pending.
+  // pending_node_ids holds nodes started and not yet recorded, and a non-empty
+  // list blocks main's stop; a parent added here was never cleared.
 
   // Map ids → readable names for the agent-facing response
   const selected_names = namesForIds(runId, selected, missionId);

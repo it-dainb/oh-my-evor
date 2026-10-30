@@ -178,12 +178,33 @@ try {
   blockCount = typeof bcData?.count === 'number' ? bcData.count : 0;
 } catch { /* no file yet — first block */ }
 
+/**
+ * Pending entries that still owe work. An entry whose node, by id or name, has
+ * already finished (evaluated, failed, rejected) is stale and owes nothing, so it
+ * must not hold the stop.
+ */
+function unrecordedPending(rs) {
+  const ids = Array.isArray(rs?.pending_node_ids) ? rs.pending_node_ids : [];
+  if (!ids.length) return ids;
+  try {
+    const tree = JSON.parse(readFileSync(join(runDir, 'tree.json'), 'utf8'));
+    const settled = new Set();
+    for (const n of Object.values(tree?.nodes ?? {})) {
+      if (!n || ['pending', 'running', undefined].includes(n.status)) continue;
+      if (n.id) settled.add(n.id);
+      if (n.name) settled.add(n.name);
+    }
+    return ids.filter((id) => !settled.has(id));
+  } catch {
+    return ids; // no readable tree: every entry still counts
+  }
+}
+
 /** Read pending_node_ids without assuming run-state.json is loadable yet. */
 function hasPendingNodes() {
   try {
     if (!existsSync(runStatePath)) return false;
-    const rs = JSON.parse(readFileSync(runStatePath, 'utf8'));
-    return (Array.isArray(rs?.pending_node_ids) ? rs.pending_node_ids : []).length > 0;
+    return unrecordedPending(JSON.parse(readFileSync(runStatePath, 'utf8'))).length > 0;
   } catch {
     return false; // fail-open
   }
@@ -280,7 +301,7 @@ try {
 }
 
 // ── Guard 1: continuation guard (existing M7a) ────────────────────────────────
-const pendingIds = Array.isArray(runState?.pending_node_ids) ? runState.pending_node_ids : [];
+const pendingIds = unrecordedPending(runState);
 if (pendingIds.length > 0) {
   const tick = runState?.tick_count ?? '?';
 

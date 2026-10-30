@@ -217,8 +217,9 @@ Do not idle waiting for a yielded tick to re-activate itself: nothing resumes it
 tick that spawns in the foreground rarely needs to yield at all.
 
 Only a terminal outcome (`scored` / `rejected` / `skipped` / `failed`) ends a tick.
-Keep nothing else. Do not read artifacts, tree, or state that the boundary already read — if
-you need detail, it is behind an `evor_read_artifact` pointer the boundary returned.
+Keep nothing else. Do not read artifacts, tree, or state that the boundary already read. Pass
+the pointers it returned to the next tick, which reads them; to ask about a finished tick,
+resume its evor-tick agent with SendMessage and your question.
 
 **If you ARE `evor-tick`**: Steps 0-9 below are yours. Run them, then return the status.
 

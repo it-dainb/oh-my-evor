@@ -189,10 +189,10 @@ tick cannot be completed at all, which is a different and much rarer thing.
 Omit `node_id` and `score` entirely when no node was evaluated. **Omit, not
 `null`**: a reader cannot distinguish "not evaluated" from "evaluated as null".
 `pointers` are the
-`run_id` / `tick` / `agent` triples the orchestrator passes to `evor_read_artifact` when it
-wants detail — they are how detail survives without being carried.
+`run_id` / `tick` / `agent` triples the orchestrator passes to the next tick, which reads them
+with `evor_read_artifact` — they are how detail survives without being carried.
 
-**A pointer is a promise that the call will return something.** The orchestrator will make it.
+**A pointer is a promise that the call will return something.** The next tick will make it.
 Only name an `agent` whose artifact for that tick you know exists — because you wrote it, or
 because you read it. **If nothing was produced, omit `pointers` entirely** — the same
 omit-don't-null discipline as above, for the same reason: an empty fetch is indistinguishable
