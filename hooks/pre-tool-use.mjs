@@ -1073,11 +1073,14 @@ try {
     _activeRunId &&
     (tiU?.run_id === undefined || tiU?.run_id === null || tiU?.run_id === '')
   ) {
-    // Only inject if the tool plausibly accepts run_id (most evor tools do)
+    // Only inject if the tool plausibly accepts run_id (most evor tools do).
+    // evor_init_run creates a run: a run_id there overrides the new run's id, so
+    // filling it from the active run handed a new mission the previous run's id.
     const NO_RUN_ID_TOOLS = new Set([
-      'mcp__plugin_oh-my-evor_evor__capability',
-      'mcp__plugin_oh-my-evor_evor__preflight',
-      'mcp__plugin_oh-my-evor_evor__doctor',
+      'mcp__plugin_oh-my-evor_evor__evor_capability',
+      'mcp__plugin_oh-my-evor_evor__evor_preflight',
+      'mcp__plugin_oh-my-evor_evor__evor_doctor',
+      'mcp__plugin_oh-my-evor_evor__evor_init_run',
     ]);
     if (!NO_RUN_ID_TOOLS.has(toolNameU)) {
       const mId = process.env.EVOR_MISSION_ID ?? '';

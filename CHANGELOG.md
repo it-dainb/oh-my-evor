@@ -2,6 +2,17 @@
 
 All notable changes to Evor. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.2.20] — 2026-10-30 — a new run gets its own id
+
+### Fixed
+
+- **A new mission inherited the previous run's id.** The governor fills a missing `run_id`
+  into evor tool calls from the active run. It did this for `evor_init_run` too, where a
+  `run_id` overrides the generated one, so a superseding mission was created under the old
+  run's id. `evor_init_run` is now exempt. The exemption list for `evor_capability`,
+  `evor_preflight` and `evor_doctor` was also misspelled and matched nothing; it now uses the
+  real tool names.
+
 ## [1.2.19] — 2026-10-30 — reading is not training
 
 ### Fixed
