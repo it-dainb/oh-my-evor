@@ -85,10 +85,11 @@ describe("evor_wait", () => {
     expect(r).toMatchObject({ done: true, condition: "artifact:forge@tick2" });
   });
 
-  it("tells the caller to call again, not to end its turn, when the time runs out", async () => {
+  it("on an artifact still owed by a running agent, says its completion wakes the caller", async () => {
     const r = await call({ run_id: RUN, mission_id: MISSION, artifact: { tick: 3, agent: "forge" }, wait_s: 0 });
     expect(r.done).toBe(false);
-    expect(r.next).toMatch(/call evor_wait again/);
+    expect(r.next).toMatch(/end your turn/);
+    expect(r.next).not.toMatch(/call evor_wait again/);
   });
 
   it("returns done when a pid exits", async () => {
