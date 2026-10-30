@@ -2,6 +2,33 @@
 
 All notable changes to Evor. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.2.13] — 2026-10-30 — open-ended missions overwrote their fitness with an undefined coverage
+
+1.2.12's fix was right but not reached: in an `open_ended` mission the evaluator then replaced
+`fitness_value` with the angle coverage, so the re-scored binarization node still logged 0.0.
+
+### Fixed
+
+- **Domain angles were never scored.** Angles are registered as `domain:<name>`, while
+  evaluators key `per_domain` by `<name>`. All 24 of the mission's angles went unscored, which
+  made coverage undefined, reported as 0.0. Both id forms now match.
+- **Coverage replaced a declared fitness.** In an open-ended mission, coverage (a 0–1 share of
+  domains above their bar) replaced the contract's primary fitness, whose units `baseline_value`
+  and every `best_score` use. A declared primary fitness now wins. Coverage is still recorded as
+  `worst_angle_coverage` for the coverage stop checks, and it is the fitness only when no primary
+  is declared. When no angle can be scored, coverage is undefined and changes nothing.
+
+- **A capability gap blocked the run forever.** No tool can close a gap, so tick 1's Mutagen
+  gap, whose cause was fixed in 1.2.11, still made `evor_check_stop` report `blocked` after tick 2
+  scored. A gap now stops blocking once a later tick finishes without failing. A gap that recurs
+  is raised again and blocks again.
+- **A never-halt mission asked the user while paused.** The 1.2.12 deny applied only while the
+  mission ran; main paused itself and asked anyway. It now applies while paused too, except in a
+  session whose latest command is `evor-setup` or `evor-distill`.
+
+Verified on the mission's real node: the sealed `evor run` now reports fitness 2.5206, with 24
+angles scored and coverage 0.0 (no domain has reached its bar of 98 yet).
+
 ## [1.2.12] — 2026-10-30 — the sealed evaluator scored every worst-domain node 0.0
 
 Found while resuming the binarization mission on 1.2.11.

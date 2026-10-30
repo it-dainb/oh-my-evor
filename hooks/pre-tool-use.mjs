@@ -71,6 +71,20 @@ if (!_activeRunId) process.exit(0);
 // orchestrator (no Bash, no state reads, spawn only ticks, author nothing) now
 // apply only while a mission is live. The STATE guards — protected paths, the
 // .evor write guard, kind spoofing — do not depend on it and stay unconditional.
+/** The latest `/plugin:command` the user ran in this session, without the plugin prefix, or ''. */
+function lastSlashCommand(transcriptPath) {
+  try {
+    if (!transcriptPath.endsWith('.jsonl') || !_exists(transcriptPath)) return '';
+    const text = readFileSync(transcriptPath, 'utf8');
+    const tail = text.slice(-400_000);
+    const all = [...tail.matchAll(/<command-name>\/?(?:[\w-]+:)?([\w-]+)<\/command-name>/g)];
+    return all.length ? all[all.length - 1][1] : '';
+  } catch (err) {
+    logError('last-slash-command', err);
+    return '';
+  }
+}
+
 const _missionLive = (() => {
   try {
     const runDir = resolveRunDir();
@@ -785,6 +799,32 @@ try {
   const isMainB = !((input?.agent_type ?? process.env.EVOR_AGENT_ROLE ?? '') || '');
   // The boundary exists to keep a LIVE mission's orchestrator flat across ticks.
   // With no live mission there is no tick to sit behind.
+  // A never-halt mission does not ask — running OR paused. skills/evor/SKILL.md
+  // says so ("you NEVER emit an AskUserQuestion") and main asked anyway, three
+  // times in the 2026-10-30 binarization resume: twice while running and once
+  // after pausing itself. A pause is reported in plain text, not as a question.
+  // The interactive flows are the exception: a session whose latest slash
+  // command is evor-setup or evor-distill is where the user is meant to be asked.
+  if (isMainB && toolNameB === 'AskUserQuestion') {
+    let posture = '';
+    let missionStatus = '';
+    try {
+      const rd = resolveRunDir();
+      const read = (n) => (rd && _exists(_join(rd, n)) ? JSON.parse(readFileSync(_join(rd, n), 'utf8')) : null);
+      posture = String(read('goal-contract.json')?.autonomy_charter?.posture ?? '');
+      missionStatus = String(read('mission-state.json')?.status ?? '');
+    } catch (err) { logError('ask-posture', err); }
+    if (posture === 'aggressive-never-halt' && (missionStatus === 'running' || missionStatus === 'paused')
+        && !/^(evor-setup|evor-distill)$/.test(lastSlashCommand(String(input?.transcript_path ?? '')))) {
+      deny(
+        `[EVOR GOVERNOR] This mission's autonomy charter is aggressive-never-halt: nobody is ` +
+          `asked after setup. Decide by the Monotonic-Honesty Invariant: take the option that ` +
+          `keeps the evaluation as hard and honest as it is. Send an audit or a re-check to the ` +
+          `evor-tick agent. If the run genuinely cannot proceed, set mission_status "paused" with ` +
+          `a mission_status_reason through evor_state_write, and say so in plain text.`
+      );
+    }
+  }
   if (isMainB && _missionLive) {
     const BOUNDARY_ABSORBED = new Set([
       'mcp__plugin_oh-my-evor_evor__evor_read_artifact',
@@ -799,29 +839,6 @@ try {
           `state on your behalf and returns a status line plus pointers. If you need detail after ` +
           `the fact, it is behind a pointer the boundary already returned.`
       );
-    }
-
-    // A never-halt mission does not ask. skills/evor/SKILL.md says so ("you NEVER
-    // emit an AskUserQuestion") and main asked anyway in the 2026-10-30
-    // binarization resume, over a fitness discrepancy it could route to the tick.
-    // Prose already failed once here, so it is a deny.
-    if (toolNameB === 'AskUserQuestion') {
-      let posture = '';
-      try {
-        const rd = resolveRunDir();
-        const gc = rd && _exists(_join(rd, 'goal-contract.json'))
-          ? JSON.parse(readFileSync(_join(rd, 'goal-contract.json'), 'utf8')) : null;
-        posture = String(gc?.autonomy_charter?.posture ?? '');
-      } catch (err) { logError('ask-posture', err); }
-      if (posture === 'aggressive-never-halt') {
-        deny(
-          `[EVOR GOVERNOR] This mission's autonomy charter is aggressive-never-halt: nobody is ` +
-            `asked after setup. Decide by the Monotonic-Honesty Invariant: take the option that ` +
-            `keeps the evaluation as hard and honest as it is. Send an audit or a re-check to the ` +
-            `evor-tick agent. If the run genuinely cannot proceed, set mission_status "paused" with ` +
-            `a mission_status_reason through evor_state_write, and say so in plain text.`
-        );
-      }
     }
 
     // Resuming a tick's CHILD is the same leak through SendMessage. In the
