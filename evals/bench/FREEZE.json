@@ -281,7 +281,7 @@
   },
   "lifecycle": {
    "author": "?",
-   "frozen_at": "2026-10-30T17:46:30.289Z",
+   "frozen_at": "2026-10-30T18:39:01.263Z",
    "finality_confirmed_by_author": true,
    "count": 595,
    "files": {
@@ -988,7 +988,7 @@
   },
   "evidence": {
    "author": "?",
-   "frozen_at": "2026-10-30T17:46:30.289Z",
+   "frozen_at": "2026-10-30T18:39:01.263Z",
    "finality_confirmed_by_author": true,
    "count": 139,
    "files": {

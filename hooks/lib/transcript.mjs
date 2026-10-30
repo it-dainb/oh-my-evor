@@ -13,7 +13,7 @@ import { existsSync as _exists, readFileSync } from 'fs';
 export function turnStartedByHuman(transcriptPath) {
   try {
     if (!transcriptPath.endsWith('.jsonl') || !_exists(transcriptPath)) return false;
-    const lines = readFileSync(transcriptPath, 'utf8').slice(-400_000).split('\n');
+    const lines = readFileSync(transcriptPath, 'utf8').split('\n');
     for (let i = lines.length - 1; i >= 0; i--) {
       let rec;
       try { rec = JSON.parse(lines[i]); } catch { continue; }
@@ -38,8 +38,9 @@ export function lastSlashCommand(transcriptPath) {
   try {
     if (!transcriptPath.endsWith('.jsonl') || !_exists(transcriptPath)) return '';
     const text = readFileSync(transcriptPath, 'utf8');
-    const tail = text.slice(-400_000);
-    const all = [...tail.matchAll(/<command-name>\/?(?:[\w-]+:)?([\w-]+)<\/command-name>/g)];
+    // The whole file: the command that opened the session sits at its START, and a
+    // setup session's tool results push it past any tail window within minutes.
+    const all = [...text.matchAll(/<command-name>\/?(?:[\w-]+:)?([\w-]+)<\/command-name>/g)];
     return all.length ? all[all.length - 1][1] : '';
   } catch (err) {
     

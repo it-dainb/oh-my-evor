@@ -93,4 +93,11 @@ describe("main resumes only the tick", () => {
     expect(decide(ask, "running", "aggressive-never-halt", "Remove palmleaf_khmer; it is a leaf, not paper").permissionDecision).not.toBe("deny");
     expect(decide(ask, "running", "aggressive-never-halt", "<task-notification>tick 4 done</task-notification>").permissionDecision).toBe("deny");
   });
+
+  it("finds the session's opening /evor-setup even after the transcript grows past any tail window", () => {
+    const ask = { tool_name: "AskUserQuestion", tool_input: { questions: [] } };
+    // The command opens the session; setup's tool results then add megabytes after it.
+    const big = "<command-name>/oh-my-evor:evor-setup</command-name>" + "x".repeat(1_200_000);
+    expect(decide(ask, "paused", "aggressive-never-halt", big).permissionDecision).not.toBe("deny");
+  });
 });
