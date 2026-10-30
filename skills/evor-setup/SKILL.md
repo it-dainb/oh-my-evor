@@ -44,12 +44,19 @@ Determine evorRoot: use `$EVOR_ROOT` if set, else `<cwd>/.evor`.
   - If the user agrees to distill: read and execute the evor-distill skill, then read the resulting `starting-point.json`. Proceed to "Pre-fill" below.
   - If the user chooses 'skip': proceed directly to the interview with no pre-fill.
 
-**Case C — an active run is already underway** (detected by evor_state_read):
-  Stop. Print:
-  ```
-  An active EVOR run is already underway.
-  Use /evor-run to resume it, or use /evor-setup with a different mission to start a new one.
-  ```
+**Case C — `<evorRoot>/active-run.json` points at a non-terminal mission** (status not
+`completed`/`failed`/`superseded`; read it with evor_state_read):
+  Do not stop. Use `AskUserQuestion`, naming the mission id, its status and its tick count:
+  - **Start a new mission** (list first when the status is `paused`, `draft` or `locked`):
+    carry on with setup in this turn. Evaluate Case A, B or D and run the interview.
+    You do not close the old mission by hand: `init_run` marks every non-terminal
+    prior mission `superseded` (with `superseded_by`) when it takes over `active-run.json`.
+  - **Resume it:** read and execute the evor-run skill in this turn.
+  - **Cancel:** stop and leave everything unchanged.
+  When the status is `running`, list **Resume it** first, and warn in the question that
+  starting a new mission supersedes a mission that is mid-tick.
+  While no mission is live (paused or terminal), main may use Bash, read state and spawn
+  evor-probe to investigate. The orchestrator-only rules apply only while a mission is running.
 
 **Case D — Greenfield and no starting-point.json**:
   Proceed directly to the interview with no pre-fill.

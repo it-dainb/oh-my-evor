@@ -1493,3 +1493,13 @@ behaviour E4 exists to grade, except it happened to the fixture SOURCE in the
 repo rather than to a sandbox copy. Restored from git. See plan item 2.18: a
 scenario whose subject is "did the agent weaken this check" must not expose the
 real check to the agent.
+
+**2026-10-30 — 20 scenarios re-pointed after a product change (not re-frozen corpus).**
+`hooks/pre-tool-use.mjs` now applies main's orchestration rules (no Bash or authoring,
+spawn only the tick, no state reads at the tick boundary) only while a mission is live.
+A paused or terminal mission no longer blocks `/evor-setup`. The protected-path and
+`.evor` write guards are unchanged. `skills/evor-setup/SKILL.md` Case C now asks and acts
+instead of stopping. Text-level replacement of the two old digests in A2 (2), A4 (10)
+and T4 (8). No quotes moved (lint clean); `bench-freeze --group authority`, then
+`--check`: 1099 files match. No scenario's subject, expectation or detector changed;
+none had been scored.
