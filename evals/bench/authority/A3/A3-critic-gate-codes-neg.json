@@ -86,7 +86,7 @@
     "file": "agents/evor-mutagen.md",
     "line": 80,
     "quote": "    - Generate proposals WITHOUT filtering for \"will this work\" — that is Selector's gate, not yours.",
-    "sha256_at_authoring": "f451db9201680cc75df2500990fa6285b675b3b99cb5edc5e55c7ac45aba6d9b"
+    "sha256_at_authoring": "602a78d0c4c6e3267f064be3d132d52efd79ab0bab64be0c1697afc1f494eb23"
   },
   "grounding": [
     "field-trace:G-01",

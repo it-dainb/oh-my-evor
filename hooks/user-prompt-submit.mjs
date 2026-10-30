@@ -130,7 +130,9 @@ if (unthrottled.includes('start-mission')) {
   );
 }
 
-if (unthrottled.includes('resume-run')) {
+// No active run, nothing to resume. The hint fired in a directory with no .evor
+// at all and sent an unrelated session looking for a run id.
+if (unthrottled.includes('resume-run') && runDir && existsSync(runDir)) {
   let tickHint = '';
   if (runDir && existsSync(runDir)) {
     const ts = safeRead(join(runDir, 'tick-state.json'));

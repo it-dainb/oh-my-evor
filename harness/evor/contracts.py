@@ -757,8 +757,8 @@ class SelectorVerdict(BaseEvorModel):
             raise ValueError(
                 f"proposal(s) {approved_unselected} passed every gate and were not selected. "
                 f"An approved proposal is a candidate the tick owes a node — select it, or "
-                f"reject it with a rejection_reason saying why. Dropping it silently is how "
-                f"h003 disappeared into an undefined carry_forward key."
+                f"reject it with a rejection_reason saying why. Do not drop it silently or "
+                f"park it in an undefined carry_forward key."
             )
         return self
 

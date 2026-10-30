@@ -184,16 +184,21 @@ export function readArtifact(
 export function artifactPathFor(runDir: string, tick: number, agent: string, kind?: string): string {
   const slug = (kind ?? "").replace(/[^a-zA-Z0-9._-]+/g, "-").replace(/^-+|-+$/g, "");
   const base = join(runDir, "ticks", String(tick));
+  // Mirrors harness/evor/artifacts.py: with a kind (the node name), each
+  // candidate's forge family lives under forge/<kind>/.
+  // Same slug as python's _slugify: lower-case, [^\w-] -> "-", trimmed.
+  const forgeSlug = (kind ?? "").toLowerCase().replace(/[^\w-]/g, "-").replace(/^-+|-+$/g, "");
+  const forgeDir = forgeSlug && /^forge(-architect|-critic|-analyst)?$/.test(agent) ? join("forge", forgeSlug) : "forge";
   switch (agent) {
     case "mutagen":         return join(base, "mutagen", "proposals.json");
     case "selector":        return join(base, "selector", "verdict.json");
     case "probe":           return join(base, "probe", "findings.json");
     case "sage":            return join(base, "sage", "findings.json");
     case "sage-junior":     return join(base, "sage", "juniors", `${slug || "findings"}.json`);
-    case "forge":           return join(base, "forge", "forge-report.json");
-    case "forge-architect": return join(base, "forge", "architect.json");
-    case "forge-critic":    return join(base, "forge", "critic.json");
-    case "forge-analyst":   return join(base, "forge", "analyst.json");
+    case "forge":           return join(base, forgeDir, "forge-report.json");
+    case "forge-architect": return join(base, forgeDir, "architect.json");
+    case "forge-critic":    return join(base, forgeDir, "critic.json");
+    case "forge-analyst":   return join(base, forgeDir, "analyst.json");
     case "acquirer":        return join(base, "acquirer", `${slug || "acquisition"}.json`);
     default:                return join(base, agent, `${slug || "artifact"}.json`);
   }

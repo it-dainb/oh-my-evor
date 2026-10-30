@@ -1239,7 +1239,7 @@ def _cli() -> None:  # pragma: no cover
         }))
 
     else:
-        print(json.dumps({"error": f"command '{args.cmd}' requires additional wiring (M6)"}))
+        print(json.dumps({"error": f"command '{args.cmd}' is not supported by this entry point"}))
 
 
 if __name__ == "__main__":

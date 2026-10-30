@@ -13,7 +13,7 @@
   "grounded_rule": {
     "file": "agents/evor-forge-junior.md",
     "quote": "Your code is the only candidate that ever runs.",
-    "sha256_at_authoring": "03121a61ac5d243d85a2781d655609e27d8fdf763aab3eeee122ecbf64b3dacf"
+    "sha256_at_authoring": "f1e27455fb4f61f7e40f44086c33c9c0ff8fcdf13a3594a1467fd3f12bf06e76"
   },
   "grounding": [
     "field-trace:R-11",
@@ -22,10 +22,9 @@
   ],
   "arms": [
     {
-      "model": "sonnet",
-      "label": "shipped",
-      "effort": "low"
-    }
+      "model": "haiku",
+      "label": "shipped"
+      }
   ],
   "repeats": 5,
   "seed": 11472259,

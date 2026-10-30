@@ -137,8 +137,7 @@ def _check_capability_probe(evor_root_arg: str | None) -> str | None:
         return (
             f"no capability profile at {root / 'capability.json'}. A run sizes its "
             "candidates against the machine, so it may not start before the machine "
-            "has been measured — the field run began 26 minutes before its own probe. "
-            "Run the preflight probe first."
+            "has been measured. Run the preflight probe first."
         )
 
     try:

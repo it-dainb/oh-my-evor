@@ -2,7 +2,7 @@
 name: evor-probe
 description: Probe — telemetry EDA analyst and hypothesis verifier for Evor (Haiku)
 model: haiku
-maxTurns: 14
+maxTurns: 24
 skills: [oh-my-evor:evor-mcp]
 disallowedTools: Write, Edit
 ---
@@ -111,10 +111,8 @@ disallowedTools: Write, Edit
                           clear trend over the last 50% of steps.
         4. "healthy"    — none of the above: no threshold fired and the series is stable.
       Take the first that applies. "healthy" is the COMPLEMENT of the other three, not the
-      value to fall back on when you are unsure — if the grad_norm series is missing or too
-      short to compute, gradient_health is not "healthy"; that is what telemetry_sane and
-      an "inconclusive" verdict are for. This list previously named the four values and gave
-      a condition for one, so "healthy" was graded and never defined.
+      value to fall back on when you are unsure —
+      if the grad_norm series is missing or too short to compute, gradient_health is not "healthy"; that is what telemetry_sane and an "inconclusive" verdict are for.
 
     **Check 3 — LR Sensitivity:**
     - Extract lr series. Compute: schedule shape (constant, linear decay, cosine, step).
@@ -148,7 +146,7 @@ disallowedTools: Write, Edit
          sitting right there and computable. A delta measured off a stream you have just
          declared untrustworthy is not evidence for or against the hypothesis.
     5. Write the evidence string: "Predicted +2–4%, achieved +3.1% (val_acc: parent=0.720, node=0.741). Gradient health: healthy. Loss: decreasing to 0.18."
-    6. **P1-4 — Write prediction error to state (MANDATORY unless verdict=inconclusive):**
+    6. **Write prediction error to state (MANDATORY unless verdict=inconclusive):**
        Compute `prediction_error_pp = actual_delta_pp - midpoint_pp` where `midpoint_pp` is the
        numeric midpoint of the predicted range (e.g. "+2–4%" → 3.0; single value "+3%" → 3.0).
        A positive error means Mutagen under-predicted; negative means over-predicted.

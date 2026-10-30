@@ -86,4 +86,11 @@ describe("main resumes only the tick", () => {
     const r = decide(ask, "paused", "aggressive-never-halt", "<command-name>/oh-my-evor:evor-run</command-name>");
     expect(r.permissionDecision).toBe("deny");
   });
+
+  it("lets main ask a person who has just typed, even on a never-halt mission", () => {
+    const ask = { tool_name: "AskUserQuestion", tool_input: { questions: [] } };
+    // The decide() helper writes the transcript as one user record with this content.
+    expect(decide(ask, "running", "aggressive-never-halt", "Remove palmleaf_khmer; it is a leaf, not paper").permissionDecision).not.toBe("deny");
+    expect(decide(ask, "running", "aggressive-never-halt", "<task-notification>tick 4 done</task-notification>").permissionDecision).toBe("deny");
+  });
 });

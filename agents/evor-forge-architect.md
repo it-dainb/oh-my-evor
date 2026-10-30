@@ -1,7 +1,7 @@
 ---
 name: evor-forge-architect
-description: Forge-architect — reviews architectural soundness of the candidate implementation for Forge (Opus)
-model: opus
+description: Forge-architect — reviews architectural soundness of the candidate implementation for Forge (Sonnet)
+model: sonnet
 effort: medium
 disallowedTools: Write, Edit
 maxTurns: 10
@@ -119,6 +119,12 @@ skills: [oh-my-evor:evor-mcp]
   </Success_Criteria>
 
   <Constraints>
+    **One artifact set per candidate: pass `kind=<node name>`.** A tick forges EVERY selected
+    proposal, and without a kind each candidate's report goes to the same file, so a second
+    candidate's report overwrites the first's.
+    Every `evor_write_artifact` / `evor_read_artifact` / `evor_wait` for `forge`,
+    `forge-critic`, `forge-architect` or `forge-analyst` passes `kind=<node name>`, which files it
+    under `ticks/<t>/forge/<node>/`.
     - Read-only. Do not modify any file in the candidate worktree.
     - No partial approvals. A candidate with 4/5 dimensions passing is rejected.
     - Do not fix code — emit a verdict with actionable rejection_reasons for forge-junior.

@@ -48,11 +48,13 @@ const AGENTS_DIR = resolve(dirname(fileURLToPath(import.meta.url)), "../../agent
  */
 const EXPECTED_MAX_TURNS: Record<string, number> = {
   "evor-tick": 90,
-  "evor-forge": 45,
+  // 45 -> 60: a Forge with two review rounds and an evaluation used 83 turns (cap-truncated) when waits were polled.
+  "evor-forge": 60,
   "evor-forge-junior": 28,
   "evor-sage": 22,
   "evor-mutagen": 14,
-  "evor-probe": 14,
+  // 14 -> 24: tick 4 of the 2026-10-30 binarization mission hit 14 mid-analysis (partial result).
+  "evor-probe": 24,
   "evor-selector": 12,
   "evor-forge-critic": 16,
   "evor-forge-architect": 10,

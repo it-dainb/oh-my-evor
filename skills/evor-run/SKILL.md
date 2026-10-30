@@ -26,11 +26,9 @@ evor-run is the launch skill for an Evor mission. It validates that a mission co
 ## Step 1 — Resolve Mission and Run ID
 
 **While a mission is RUNNING, main may not call `evor_state_read` or `evor_tree_read`, or run
-Bash: the governor reserves them for the tick boundary.** A resume therefore reads progress
-from `evor_check_stop` and files with the Read tool, as below. (These steps used to call
-`evor_state_read` three times; on a running mission every call was denied, as in the
-2026-10-30 binarization resume.) When the mission is paused or locked, `evor_state_read` is
-allowed.
+Bash: they are reserved for the tick boundary, and every such call is denied.** A resume
+therefore reads progress from `evor_check_stop` and files with the Read tool, as below. When
+the mission is paused or locked, `evor_state_read` is allowed.
 
 **A mission paused for a plugin failure is resumed, not investigated.** Its pause reason may
 describe a plugin defect. Do not inspect plugin source to decide whether it was fixed:
@@ -41,7 +39,7 @@ is still there, the next tick fails again and the run blocks again.
 If arguments were provided, treat them as mission-id or run-id. Otherwise:
 1. Read `.evor/active-run.json` with the Read tool to find the current run. If the mission is
    not running, `evor_state_read` also works.
-2. If found and mission-state shows a non-terminal `status` (not `completed`, `failed` or `superseded`): offer to resume that run. **Read mission-state, not run-state** — `run-state.status` was retired in v1.2.1 (item 1.9b), so a condition on it is vacuously true for every run and would offer to resume runs that are finished.
+2. If found and mission-state shows a non-terminal `status` (not `completed`, `failed` or `superseded`): offer to resume that run. **Read mission-state, not run-state** — run-state carries no `status`, so a condition on it is vacuously true for every run and would offer to resume runs that are finished.
 3. If not found: list available missions via `evor_state_read` and prompt the user to select one, or redirect to `/evor-setup`.
 
 ## Step 2 — Load and Validate Mission Contract
@@ -87,10 +85,10 @@ do not resume a run the plugin itself says cannot proceed.
   Last eval version: <current_eval_version>
   ```
   Under an `aggressive-never-halt` autonomy charter, resume without asking: the user's
-  `/evor-run` is the instruction, and the governor denies `AskUserQuestion` to main on such a
+  `/evor-run` is the instruction, and `AskUserQuestion` is denied to main on such a
   mission. Otherwise ask: "Resume from tick <tick_count + 1>? (yes/no)"
   → "no": allow the user to specify a different run or abort.
-- If **mission-state** `status` is terminal (`completed`, `failed` or `superseded`): print "This run is already complete. Use /evor-report to view results or /evor-setup to start a new mission." and stop. **Read mission-state, not run-state** — `run-state.status` was retired in v1.2.1 (item 1.9b), so this branch would never fire again if keyed on it.
+- If **mission-state** `status` is terminal (`completed`, `failed` or `superseded`): print "This run is already complete. Use /evor-report to view results or /evor-setup to start a new mission." and stop. **Read mission-state, not run-state** — run-state carries no `status`, so this branch would never fire if keyed on it.
 
 ## Step 4 — Set Active Run State
 
@@ -122,7 +120,7 @@ The tick loop in the `evor` skill manages this automatically; this note is for o
 
 Read the evor skill with the **Read tool** and follow it exactly. Its path is
 `<this skill's base directory>/../evor/SKILL.md`; the base directory is printed at the top of
-this skill. Do not resolve the path with Bash, which the governor denies while the mission runs.
+this skill. Do not resolve the path with Bash, which is denied while the mission runs.
 Pass:
 - `run_id` = the resolved run ID
 - `resume` = true if tick_count > 0

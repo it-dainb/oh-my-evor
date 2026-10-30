@@ -433,8 +433,8 @@ export function registerRecordTools(server: McpServer): void {
               telemetry_path: telemetryPath,
               telemetry_note:
                 "Export this EXACTLY as EVOR_TELEMETRY_PATH for the training subprocess. " +
-                "Do not rebuild it from the node name — that is what split one node across " +
-                "two directories and failed a node with 12,000 telemetry records.",
+                "Do not rebuild it from the node name — a rebuilt path can split one node's " +
+                "telemetry across two directories.",
             }),
           },
         ],

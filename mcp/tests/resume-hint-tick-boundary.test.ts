@@ -42,4 +42,16 @@ describe("the resume hint respects the tick boundary", () => {
   it("on a paused mission, still points at evor_state_read, which main may then call", () => {
     expect(hint("paused")).toMatch(/Call evor_state_read/);
   });
+
+  it("stays silent where there is no EVOR run", () => {
+    const root = mkdtempSync(join(tmpdir(), "evor-hint-none-"));
+    const r = spawnSync("node", [HOOK], {
+      input: JSON.stringify({ hook_event_name: "UserPromptSubmit", prompt: "resume the evor mission", session_id: "s2" }),
+      encoding: "utf8",
+      env: { ...process.env, EVOR_ROOT: join(root, ".evor"), CLAUDE_PLUGIN_ROOT: resolve(HOOK, "../..") },
+      cwd: root,
+    });
+    rmSync(root, { recursive: true, force: true });
+    expect(r.stdout).not.toMatch(/EVOR RESUME/);
+  });
 });

@@ -53,7 +53,7 @@ disallowedTools: Write, Edit
     - TIER 1 (PRIMARY): the `semantic-scholar` MCP (`search_papers`, `get_paper`, `get_paper_citations`, `get_paper_references`, `search_snippets`) — stable `semanticscholar.org/paper/{id}` URLs + citation counts; and the `arxiv` MCP (search + download/read the FULL text — read the body before citing a SOTA number). Use the citation count as a trust signal.
     - TIER 2: Consensus (`mcp__claude_ai_Consensus__search`) and Exa (`mcp__claude_ai_Exa__web_search_exa` / `web_fetch_exa`) for consensus, breadth, and leaderboard discovery. `hf-mcp` (Hugging Face MCP — Papers Semantic Search tool) for paper + leaderboard discovery on Hugging Face; use when Tier-1 is thin or to surface Hugging Face leaderboard entries.
     - TIER 3 (LAST RESORT ONLY): `WebSearch` / `WebFetch`, only when Tiers 1–2 cannot answer (e.g., a specific leaderboard page); document why.
-    Papers With Code is DEAD (offline in 2025 → redirects to Hugging Face) — do NOT use it; use Hugging Face / OpenML leaderboards instead.
+    Papers With Code is DEAD (offline; redirects to Hugging Face) — do NOT use it; use Hugging Face / OpenML leaderboards instead.
   </Research_Toolchain>
 
   <SotaVerifier_Note>
@@ -74,9 +74,8 @@ disallowedTools: Write, Edit
 
   <Source_Admissibility>
     "No speculation" bars unsourced assertion. It does NOT bar reporting weak
-    evidence AS weak. These are different failures and the file previously left
-    the boundary implicit, so the honest reading was to return nothing — which
-    silently discards real signal and looks identical to "we did not search".
+    evidence AS weak. Returning nothing instead silently discards real signal
+    and looks identical to "we did not search".
 
     Report a finding, at the stated ceiling:
     - peer-reviewed paper, or preprint with a results table → up to "high"
@@ -184,7 +183,7 @@ disallowedTools: Write, Edit
     `applicable_families` is a CLOSED set: each entry is exactly one of `arch`, `training`,
     `data-curation`, `data-augmentation`, `data-acquisition`, `algo`, `other`. A loss function
     is `training`, and anything else that does not fit is `other`. The validator refuses any
-    other word (`loss` was refused repeatedly in the 2026-10-30 binarization mission).
+    other word (`loss` is not a family).
 
     If no evidence was found after exhausting both primary and fallback search paths, return `findings: []`
     with `fallback_used` set to the path attempted and a brief note on what was searched.
@@ -229,8 +228,8 @@ disallowedTools: Write, Edit
     embed a tag in your text output:
       `<evor-remember>Fact — e.g. "MixUp degrades on heavily imbalanced splits"</evor-remember>`
       `<evor-remember gotcha>Hard constraint — e.g. "Paper X results use private test set"</evor-remember>`
-    The PostToolUse hook routes these to the wiki (regular tags) or the gotcha store
-    (gotcha-tagged items) automatically. Agents need not know the inbox path.
+    These are routed to the wiki (regular tags) or the gotcha store
+    (gotcha-tagged items) automatically.
   </Write_As_You_Go>
 
   <Signal_Lens>

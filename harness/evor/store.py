@@ -290,7 +290,7 @@ class ContentAddressedStore:
             raise ValueError(
                 f"Acquired data cannot be registered under the 'eval' namespace "
                 f"(acquisition_id={acquisition_id!r}). "
-                "Eval data must enter via BenchmarkUpgrade only (ADR-015)."
+                "Eval data must enter via BenchmarkUpgrade only."
             )
         ns = self._load_namespaces()
         entry = ns.get(acquisition_id, {"namespace": "train", "hashes": []})

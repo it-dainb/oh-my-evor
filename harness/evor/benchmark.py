@@ -208,8 +208,7 @@ class BenchmarkManager:
             f"_eval_seed_model requires GPU + live eval infrastructure. "
             f"seed_checkpoint_hash={seed_checkpoint_hash!r}, domain_id={domain_id!r}. "
             "Resolve checkpoint via ContentAddressedStore, invoke EvaluatorAdapter "
-            "with --eval-domains, parse EvaluationResult.per_domain[domain_id]. "
-            "See KNOWN_GAPS.md#G1."
+            "with --eval-domains, parse EvaluationResult.per_domain[domain_id]."
         )
 
     def get_eval_suite(self, eval_version: str, run_dir: Path) -> EvalSuite:

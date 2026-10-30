@@ -31,6 +31,7 @@
 import { readFileSync } from 'fs';
 import { resolveActiveRun, resolveRunDir } from './lib/active-run.mjs';
 import { isMissionLive } from './lib/run-status.mjs';
+import { turnStartedByHuman, lastSlashCommand } from './lib/transcript.mjs';
 import { existsSync as _exists } from 'fs';
 import { join as _join } from 'path';
 import { resolveWriteTargets } from './lib/write-targets.mjs';
@@ -71,19 +72,6 @@ if (!_activeRunId) process.exit(0);
 // orchestrator (no Bash, no state reads, spawn only ticks, author nothing) now
 // apply only while a mission is live. The STATE guards — protected paths, the
 // .evor write guard, kind spoofing — do not depend on it and stay unconditional.
-/** The latest `/plugin:command` the user ran in this session, without the plugin prefix, or ''. */
-function lastSlashCommand(transcriptPath) {
-  try {
-    if (!transcriptPath.endsWith('.jsonl') || !_exists(transcriptPath)) return '';
-    const text = readFileSync(transcriptPath, 'utf8');
-    const tail = text.slice(-400_000);
-    const all = [...tail.matchAll(/<command-name>\/?(?:[\w-]+:)?([\w-]+)<\/command-name>/g)];
-    return all.length ? all[all.length - 1][1] : '';
-  } catch (err) {
-    logError('last-slash-command', err);
-    return '';
-  }
-}
 
 const _missionLive = (() => {
   try {
@@ -143,12 +131,19 @@ function deny(reason, meta = {}) {
       hookSpecificOutput: {
         hookEventName: 'PreToolUse',
         permissionDecision: 'deny',
-        permissionDecisionReason: reason,
+        // Said on every denial: in tick 4 of the binarization mission, a Forge
+        // denied a (wrongly blocked) trainer launch spent its turns reading the
+        // governor's source to find a way past it.
+        permissionDecisionReason: reason + DENIAL_FOOTER,
       },
     }) + '\n'
   );
   process.exit(0);
 }
+
+const DENIAL_FOOTER =
+  ' (This denial is recorded. If it is wrong for what you are doing, say so ' +
+  'in your return or take another route; do not look for a way around it.)';
 
 // ── §4.9: `ask` for the two genuinely irreversible decisions ────────────────
 //
@@ -567,8 +562,7 @@ try {
           (opTargets[0] ? ` (target: ${opTargets[0]})` : '') + '.' + roleNote + ' ' +
           (ADVICE[operation] ?? '') +
           ' This rule is scoped to the OPERATION, not to a tool name: the same act through ' +
-          'Bash, a heredoc or a redirect is the same act, which is why naming the tool did ' +
-          'not hold.',
+          'Bash, a heredoc or a redirect is the same act.',
         { rule: `operation:${operation}`, tool, agentType, target: opTargets[0] },
       );
     }
@@ -638,7 +632,9 @@ try {
     const ALLOW_MARKERS_RE  = /[/\\]\.evor[/\\]\.[^/\\]+$|[/\\]\.evor[/\\][^/\\]+-throttle\.json$|[/\\]\.evor[/\\]perm-denied-throttle\.json$|[/\\]\.evor[/\\]user-prompt-throttle\.json$/;
 
     // §15C: python -m evor block (python, python3, python3.x etc.) — any invocation
-    const BASH_PYTHON_EVOR_RE = /python[0-9.]*\s+-m\s+evor(\b|\.)/;
+    // `python -m evor.watch` is exempt: it only reads a telemetry file and a pid, and it
+    // has to run as a background Bash task, which no MCP tool can be.
+    const BASH_PYTHON_EVOR_RE = /python[0-9.]*\s+-m\s+evor(?!\.watch\b)(\b|\.)/;
     // §15C: import evor / from evor... block
     const BASH_IMPORT_EVOR_RE = /\b(import\s+evor|from\s+evor[\s.])/;
     // Only when python is actually invoked. Without this the rule fires on any
@@ -814,8 +810,13 @@ try {
       posture = String(read('goal-contract.json')?.autonomy_charter?.posture ?? '');
       missionStatus = String(read('mission-state.json')?.status ?? '');
     } catch (err) { logError('ask-posture', err); }
+    const tp = String(input?.transcript_path ?? '');
     if (posture === 'aggressive-never-halt' && (missionStatus === 'running' || missionStatus === 'paused')
-        && !/^(evor-setup|evor-distill)$/.test(lastSlashCommand(String(input?.transcript_path ?? '')))) {
+        && !/^(evor-setup|evor-distill)$/.test(lastSlashCommand(tp))
+        // A person who has just typed is present: answering them with a question
+        // is not halting the autonomous loop. The binarization user asked to drop
+        // a "leaf" domain, there were two, and the clarifying question was denied.
+        && !turnStartedByHuman(tp)) {
       deny(
         `[EVOR GOVERNOR] This mission's autonomy charter is aggressive-never-halt: nobody is ` +
           `asked after setup. Decide by the Monotonic-Honesty Invariant: take the option that ` +

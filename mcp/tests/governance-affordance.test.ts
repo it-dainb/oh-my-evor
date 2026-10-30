@@ -323,3 +323,51 @@ describe("analysis edge and python -c", () => {
     expect(d.permissionDecision).not.toBe("deny");
   });
 });
+
+describe("the zero-poll job wait is allowed", () => {
+  it("lets Forge wait on a job with a background until-loop over status.json", () => {
+    const d = call({
+      hook_event_name: "PreToolUse", agent_type: "oh-my-evor:evor-forge", tool_name: "Bash",
+      tool_input: { command: `until ! grep -q '"state": "running"' /w/.evor/runs/m/r/jobs/j1/status.json; do sleep 30; done`, run_in_background: true },
+    }).hook;
+    expect(d.permissionDecision).not.toBe("deny");
+  });
+});
+
+describe("forge-junior can launch its trainer", () => {
+  // The launch redirects the trainer's log (`> train_out.log`) and later reads the
+  // telemetry file with `head -1 $T`. Read as one unit, the redirect made $T —
+  // under .evor/runs — a "write", and the launch was refused (tick 4).
+  it("allows a trainer launch that names the telemetry path in an env assignment and a read", () => {
+    const command = [
+      "W=/w/.evor/worktrees/t4",
+      "T=/w/.evor/runs/m/r/nodes/n/telemetry.jsonl",
+      "cd $W && EVOR_TELEMETRY_PATH=$T setsid nohup python train/trainer.py > $W/train_out.log 2>&1 &",
+      "head -1 $T",
+    ].join("\n");
+    const d = call({ hook_event_name: "PreToolUse", agent_type: "oh-my-evor:evor-forge-junior", tool_name: "Bash", tool_input: { command } }).hook;
+    expect(d.permissionDecision).not.toBe("deny");
+  });
+
+  it("still refuses a junior writing run state through a variable", () => {
+    const d = call({ hook_event_name: "PreToolUse", agent_type: "oh-my-evor:evor-forge-junior", tool_name: "Bash",
+      tool_input: { command: "T=/w/.evor/runs/m/r/run-state.json; echo {} > $T" } }).hook;
+    expect(d.permissionDecision).toBe("deny");
+  });
+});
+
+describe("evor.watch runs as a background task", () => {
+  const bash = (agent_type: string, command: string) => call({
+    hook_event_name: "PreToolUse", agent_type, tool_name: "Bash", tool_input: { command, run_in_background: true },
+  }).hook;
+
+  it("lets forge-junior run python -m evor.watch", () => {
+    const d = bash("oh-my-evor:evor-forge-junior", 'python -m evor.watch --telemetry "$EVOR_TELEMETRY_PATH" --pid 4242 --val-key val_min_S');
+    expect(d.permissionDecision).not.toBe("deny");
+  });
+
+  it("still blocks other python -m evor invocations", () => {
+    const d = bash("oh-my-evor:evor-forge-junior", "python -m evor run --node-id n1");
+    expect(d.permissionDecision).toBe("deny");
+  });
+});

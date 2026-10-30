@@ -454,7 +454,7 @@ export function registerSignalTools(server: McpServer): void {
     "evor_signal_digest",
     "Return a compact top-slice of the signal bus for spawn-prompt injection. " +
     "Defaults to severity>=medium so low-noise signals never flood a digest. " +
-    "Equivalent to Python SignalBus.digest(). Drains inbox first.",
+    "Drains inbox first.",
     {
       run_id: z.string().describe("Active run identifier"),
       mission_id: z.string().optional().describe("Mission identifier (resolved automatically when omitted)"),

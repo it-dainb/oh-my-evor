@@ -685,3 +685,19 @@ def test_sage_may_flag_a_self_directed_finding(tmp_path: Path) -> None:
     """agents/evor-sage.md Step 1b requires `self_directed` on its own angle's findings."""
     finding = {**_documented_junior_output()["findings"][0], "self_directed": True}
     assert write_artifact(tmp_path, 3, "sage", {"findings": [finding]}).get("ok")
+
+
+class TestForgeFamilyPerCandidate:
+    """A tick forges every selected proposal; without a kind the second Forge's report
+    overwrote the first's (binarization mission, tick 4)."""
+
+    def test_kind_files_each_candidate_separately(self, tmp_path: Path) -> None:
+        a = write_artifact(tmp_path, 4, "forge", {"node": "a"}, kind="t4-p0-fullres")
+        b = write_artifact(tmp_path, 4, "forge", {"node": "b"}, kind="t4-p1-polarity")
+        assert a["path"] != b["path"]
+        assert read_artifact(tmp_path, 4, "forge", kind="t4-p0-fullres")["payload"] == {"node": "a"}
+        assert read_artifact(tmp_path, 4, "forge-critic", kind="t4-p0-fullres") == {"error": "not found"}
+
+    def test_no_kind_keeps_the_legacy_path(self, tmp_path: Path) -> None:
+        p = resolve_artifact_path(tmp_path, 4, "forge")
+        assert p == tmp_path / "ticks" / "4" / "forge" / "forge-report.json"

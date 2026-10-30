@@ -95,6 +95,10 @@ function pathTokens(text) {
     out.push(m[2]);
   }
   for (const t of text.split(/[\s;|&()<>]+/)) {
+    // `NAME=/path` assigns a variable (often an env var for the command that
+    // follows, e.g. EVOR_TELEMETRY_PATH=…); it writes nothing. Reading it as a
+    // target refused a trainer launch (binarization mission, tick 4).
+    if (/^[A-Za-z_][A-Za-z0-9_]*=/.test(t)) continue;
     if (/[/]/.test(t) && !/^-/.test(t)) out.push(t.replace(/^['"]|['"]$/g, ''));
   }
   return out;
@@ -253,7 +257,11 @@ export function resolveWriteTargets({ tool, toolInput = {}, cwd = process.cwd() 
     // protected path" is caught even when the two are not adjacent. It cannot add
     // a false positive on a command that writes nothing, because a unit with no
     // write intent contributes no targets at all.
-    { text: shellText, cwd },
+    // The whole command is no longer read as one unit: it existed for `python -c`
+    // code split by `;`, which is now lifted out above. Read whole, a redirect in one
+    // statement made every path in every other statement a target. A junior's trainer
+    // launch (`… > train_out.log`) was refused because a later `head -1 $T` named the
+    // node's telemetry file (binarization mission, tick 4).
     // Lifted python code that WRITES may write a path passed outside it
     // (`python3 -c "…FileIO(sys.argv[1],'w')…" "$D/freeze.py"`). Then the
     // original command is judged whole, as it was before the lift. A lift can

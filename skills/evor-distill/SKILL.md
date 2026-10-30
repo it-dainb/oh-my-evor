@@ -12,7 +12,7 @@ evor-distill scans an existing ML repository and produces a StartingPointReport 
 <Use_When>
 - User says "distill evor", "evor distill", "scan my ML repo", or invokes `/evor-distill`
 - An existing ML codebase is present and the user wants to start an EVOR mission on it
-- The session-start hook emits a brownfield nudge suggesting `/oh-my-evor:evor-distill`
+- A brownfield nudge at the start of the session suggests `/oh-my-evor:evor-distill`
 - User wants to understand what EVOR detected before committing to the setup interview
 </Use_When>
 
@@ -85,7 +85,7 @@ If a `baseline_candidate` is present (non-null), state clearly:
 
 ```
 IMPORTANT: The baseline candidate value (<metric_name>=<claimed_value>) is UNVERIFIED.
-It was scraped from the repository and has NOT been measured on a controlled split.
+It was scraped from the repository and has NOT been verified on a controlled split.
 EVOR will re-measure it on the frozen split during /evor-setup (and on the first tick)
 before it becomes the official baseline value tracked by the mission.
 Never treat a scraped metric as a proven starting point.

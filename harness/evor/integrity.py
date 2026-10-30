@@ -455,8 +455,7 @@ class IntegrityGate:
         """
         raise NotImplementedError(
             "verification_rerun requires a live EvaluatorAdapter and GPU stack. "
-            "Call EvaluatorAdapter.run() directly with the winner node. "
-            "See KNOWN_GAPS.md#G5."
+            "Call EvaluatorAdapter.run() directly with the winner node."
         )
 
     # ------------------------------------------------------------------

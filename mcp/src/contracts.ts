@@ -237,7 +237,7 @@ export const TreeNodeSchema = z.object({
   id: z.string().uuid(),
   name: z.string().optional().describe(
     "Human-readable node slug the agent coined (e.g. 'immune-memory-02'). " +
-    "Optional; when set, every node tool accepts it in place of the UUID (P2-1).",
+    "Optional; when set, every node tool accepts it in place of the UUID.",
   ),
   parent_ids: z.array(z.string()),
   approach_family: ApproachFamilySchema,

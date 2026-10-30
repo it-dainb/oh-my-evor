@@ -15,9 +15,8 @@ $ARGUMENTS
 ```
 
 The skill loads with its own base directory and runs the resume flow: if the run has completed
-ticks and is not finished, it resumes. This stub used to `Read` a path written as
-`${EVOR_PLUGIN_ROOT:-$CLAUDE_PLUGIN_ROOT}/…`. The Read tool cannot expand shell variables, so
-every resume began with a denied Bash call.
+ticks and is not finished, it resumes. Do not `Read` a path written with shell variables such
+as `${EVOR_PLUGIN_ROOT:-$CLAUDE_PLUGIN_ROOT}/…`: the Read tool cannot expand them.
 
 ## Quick Reference
 

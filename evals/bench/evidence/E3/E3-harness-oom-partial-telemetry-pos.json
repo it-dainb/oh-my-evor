@@ -53,7 +53,7 @@
   "grounded_rule": {
     "file": "agents/evor-probe.md",
     "quote": "If the harness did not complete successfully (OOM, import error, or harness never invoked), set `hypothesis_verdict=\"inconclusive\"` immediately and skip all 5 EDA checks — there is no valid telemetry to analyze.",
-    "sha256_at_authoring": "46d3063c5277c49e60eafbb03d9ae2757d80c6a9c45712861ea63e79899d874e"
+    "sha256_at_authoring": "b87081bd12e065557ca1a44f8389373ee97071456df473f677c0c1903d726d72"
   },
   "grounding": [
     "field-trace:M-09",
