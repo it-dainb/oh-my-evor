@@ -130,6 +130,39 @@ def _check_metric_constraint(value: float, op: str, threshold: float) -> bool:
 # ─────────────────────────────────────────────────────────────────────────────
 
 
+def domain_fitness(result: EvaluationResult, primary: str, mode: str) -> float:
+    """Reduce per-domain scores to one fitness (``worst-domain`` = min, ``weighted`` = mean).
+
+    The per-domain entries must carry the primary metric by name. A domain that
+    lacks it is NOT a zero: the 2026-10-30 binarization evaluator reported
+    ``per_domain[d] = {"S": .., "fmeasure": ..}`` and a primary named
+    ``min_domain_ocr_faithful``, every ``.get(primary, 0.0)`` returned 0, and
+    the sealed job scored a working model 0.0 while its own aggregate said 2.52.
+
+    - No domain carries the primary: the evaluator reported the primary only as
+      an aggregate, so use ``metrics[primary]``. It is the evaluator's own
+      reduction over domains.
+    - Some carry it and some do not: the report is inconsistent, so raise.
+      Guessing a value here would make the score look valid when it is not.
+    """
+    per_domain = result.per_domain or {}
+    if not per_domain:
+        return float(result.metrics.get(primary, 0.0))
+    carrying = {d: s[primary] for d, s in per_domain.items() if primary in s}
+    if not carrying:
+        if primary in result.metrics:
+            return float(result.metrics[primary])
+        raise ValueError(
+            f"primary metric {primary!r} is in neither per_domain nor metrics "
+            f"(per_domain keys: {sorted({k for s in per_domain.values() for k in s})})"
+        )
+    missing = sorted(set(per_domain) - set(carrying))
+    if missing:
+        raise ValueError(f"primary metric {primary!r} missing from domains {missing}")
+    values = [float(v) for v in carrying.values()]
+    return min(values) if mode == "worst-domain" else sum(values) / len(values)
+
+
 class TreeEngine:
     """UCB1-based tree engine with genome-aware crossover and meta-evolution."""
 
@@ -515,21 +548,8 @@ class TreeEngine:
             return value
 
         # Standard per-mode computation
-        if goal.fitness_mode == "worst-domain":
-            if not result.per_domain:
-                return result.metrics.get(primary, 0.0)
-            return min(
-                scores.get(primary, 0.0)
-                for scores in result.per_domain.values()
-            )
-
-        if goal.fitness_mode == "weighted":
-            if not result.per_domain:
-                return result.metrics.get(primary, 0.0)
-            total = sum(
-                scores.get(primary, 0.0) for scores in result.per_domain.values()
-            )
-            return total / len(result.per_domain)
+        if goal.fitness_mode in ("worst-domain", "weighted"):
+            return domain_fitness(result, primary, goal.fitness_mode)
 
         # aggregate (default)
         value = result.metrics.get(primary, 0.0)

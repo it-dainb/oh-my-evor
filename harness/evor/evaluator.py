@@ -81,9 +81,12 @@ def _compute_fitness(result: EvaluationResult, goal: GoalContract) -> float:
     if _TREE_ENGINE_AVAILABLE:
         try:
             engine = TreeEngine(goal=goal, nodes=[], run_dir=None)
-            return engine.compute_fitness(result, goal)
         except Exception:
-            pass  # fall through to inline implementation
+            engine = None  # fall through to inline implementation
+        if engine is not None:
+            # Not caught: an inconsistent per-domain report must fail the
+            # evaluation loudly rather than fall back to a silent 0.0.
+            return engine.compute_fitness(result, goal)
 
     primary_metric = next(
         (m.metric_name for m in goal.metric_specs if m.role == "primary_fitness"),
@@ -95,22 +98,10 @@ def _compute_fitness(result: EvaluationResult, goal: GoalContract) -> float:
             return float(result.metrics[primary_metric])
         return result.fitness_value
 
-    if goal.fitness_mode == "worst-domain":
-        if primary_metric and result.per_domain:
-            values = [
-                float(domain_metrics.get(primary_metric, 0.0))
-                for domain_metrics in result.per_domain.values()
-            ]
-            return min(values) if values else result.fitness_value
-        return result.fitness_value
-
-    if goal.fitness_mode == "weighted":
-        if primary_metric and result.per_domain:
-            values = [
-                float(domain_metrics.get(primary_metric, 0.0))
-                for domain_metrics in result.per_domain.values()
-            ]
-            return sum(values) / len(values) if values else result.fitness_value
+    if goal.fitness_mode in ("worst-domain", "weighted"):
+        if primary_metric:
+            from .tree import domain_fitness
+            return domain_fitness(result, primary_metric, goal.fitness_mode)
         return result.fitness_value
 
     return result.fitness_value

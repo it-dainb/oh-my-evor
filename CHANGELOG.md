@@ -2,6 +2,28 @@
 
 All notable changes to Evor. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.2.12] — 2026-10-30 — the sealed evaluator scored every worst-domain node 0.0
+
+Found while resuming the binarization mission on 1.2.11.
+
+### Fixed
+
+- **Worst-domain and weighted fitness read a missing key as zero.** The harness reduced
+  `per_domain[d][primary]` with `.get(primary, 0.0)`. The binarization evaluator reports
+  `per_domain[d] = {S, fmeasure}` and its primary metric (`min_domain_ocr_faithful`) only as an
+  aggregate, so the sealed job scored a working model 0.0 while the evaluator itself said 2.52.
+  The tick then recorded 2.52 by hand. Now, if no domain carries the primary metric, the
+  evaluator's own aggregate is used. A report that has it in some domains and not others, or
+  nowhere at all, fails the evaluation loudly instead of scoring 0.
+- **A never-halt mission asked the user anyway.** `skills/evor/SKILL.md` already forbade
+  `AskUserQuestion` under `aggressive-never-halt`, and main asked twice in one resume. The
+  governor now denies it to main while such a mission runs, and says how to decide instead.
+- **Resuming a running mission began with governor denials.** `evor-run` read state with
+  `evor_state_read` three times, and the `[EVOR RESUME]` hint prescribed `evor_state_read` and
+  `evor_tree_read`: the calls the governor denies main while a mission runs. On a running mission
+  both now go through the tick boundary and `evor_check_stop`. `evor-run` also stopped pointing
+  main at `Monitor` and at a relative skill path that sent it to Bash.
+
 ## [1.2.11] — 2026-10-30 — waits that do not depend on being woken
 
 Fixes from the log of the 2026-10-30 binarization mission. Its tick 1 failed on a plugin
