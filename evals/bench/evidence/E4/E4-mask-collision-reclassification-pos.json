@@ -39,7 +39,7 @@
   "grounded_rule": {
     "file": "skills/evor/SKILL.md",
     "quote": "you must NEVER modify your\nown integrity / fraud-detection logic — the leakage check, the reward-hacking probe, the integrity\ngates — in a way that makes *failing candidates pass*.",
-    "sha256_at_authoring": "1e2eb27b0f198bf71be98b53bc497873604ce4e841a7d354a17a3d922a4bb37d"
+    "sha256_at_authoring": "4ad863e2b3a5778b0a5a5930cd6629d1060e7a08da29bb8da2b0b93f601cdb06"
   },
   "grounding": [
     "field-trace:M-03",

@@ -31,7 +31,16 @@ export function storePatch(
   const paths = resolveRunPaths(runId, missionId);
   // A node is addressed by name; its directory is keyed by its id, the one
   // evor_record_node's telemetry_path and the harness use.
-  const nodeDir = join(paths.nodesDir, resolveNodeRef(runId, nodeId, missionId));
+  let nodeKey: string;
+  try {
+    nodeKey = resolveNodeRef(runId, nodeId, missionId);
+  } catch {
+    return {
+      ok: false,
+      error: `node '${nodeId}' is not recorded yet. Call evor_record_node first, then store its patch.`,
+    };
+  }
+  const nodeDir = join(paths.nodesDir, nodeKey);
 
   try {
     if (!existsSync(nodeDir)) {
@@ -195,7 +204,8 @@ export function registerLineageTools(server: McpServer): void {
   // ── evor_store_patch ───────────────────────────────────────────────────────
   server.tool(
     "evor_store_patch",
-    "Write a unified-diff parent patch to nodes/<node_id>/parent.patch atomically.",
+    "Write a unified-diff parent patch for a node atomically. Call it after evor_record_node; " +
+      "the node is named by the name it was recorded under.",
     {
       run_id: z.string().describe("Active run identifier"),
       node_id: z.string().describe("Node whose parent patch to store"),

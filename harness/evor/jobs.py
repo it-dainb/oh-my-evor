@@ -43,7 +43,20 @@ from typing import Any
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _job_dir(run_dir: Path, job_id: str) -> Path:
-    return run_dir / "jobs" / job_id
+    """jobs/<job_id>/, also found by a unique prefix of the id.
+
+    Agents quote a job by the first characters of its uuid; a prefix that names
+    exactly one existing job is that job. New ids are full uuids, which are never
+    a prefix of another, so creation is unaffected.
+    """
+    exact = run_dir / "jobs" / job_id
+    if exact.exists() or len(job_id) < 6:
+        return exact
+    try:
+        hits = [p for p in (run_dir / "jobs").iterdir() if p.name.startswith(job_id)]
+    except OSError:
+        return exact
+    return hits[0] if len(hits) == 1 else exact
 
 
 def status_path(run_dir: Path, job_id: str) -> Path:
@@ -164,7 +177,7 @@ def status(job_id: str, run_dir: Path) -> dict[str, Any]:
     if not sp.exists():
         return {
             "state": "unknown",
-            "error": f"status.json not found: {sp}",
+            "error": f"no job {job_id!r} in this run",
             "job_id": job_id,
         }
     try:

@@ -270,6 +270,21 @@ describe("stop hook (continuation guard)", () => {
     expect(result.stdout).toMatch(/evor_record_node/);
   });
 
+  it("does not block on a pending entry whose node already finished", () => {
+    const runDir = join(tmpDir, "runs", "run-001");
+    mkdirSync(runDir, { recursive: true });
+    writeFileSync(
+      join(runDir, "tree.json"),
+      JSON.stringify({ nodes: { n1: { id: "n1", name: "node-alpha", status: "done" } } })
+    );
+    writeFileSync(
+      join(runDir, "run-state.json"),
+      JSON.stringify({ tick_count: 5, pending_node_ids: ["n1", "node-alpha"], status: "running" })
+    );
+    const result = runHook(STOP, { EVOR_ACTIVE_RUN_ID: "run-001", EVOR_ROOT: tmpDir });
+    expect(result.stdout).not.toMatch(/EVOR CONTINUATION GUARD/);
+  });
+
   it("includes the correct tick count in the guard message", () => {
     const runDir = join(tmpDir, "runs", "run-001");
     mkdirSync(runDir, { recursive: true });

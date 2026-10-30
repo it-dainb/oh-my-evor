@@ -130,6 +130,21 @@ describe("storePatch", () => {
     expect(existsSync(join(paths.nodesDir, "cosine-lr-01"))).toBe(false);
   });
 
+  it("a name the tree does not know asks for the node to be recorded first", () => {
+    const runId = "run-lp-007";
+    ensureRunDirs(runId, "test-mission");
+    const id = "0b5e1c1e-0000-4000-8000-000000000001";
+    writeTree(runId, { [id]: {
+      id, name: "other-01", parent_ids: [], approach_family: "arch", hypothesis_id: "h-1",
+      code_ref: "sha:abc", genome_ref: "sha:genome", data_version_ref: "sha:data", config: {},
+      metrics: {}, eval_version: "v1", lesson_ids: [], citations: [], integrity_status: "pending",
+      status: "pending", is_crossover: false, visit_count: 0, depth: 0, created_at: new Date().toISOString(),
+    } as never }, "test-mission");
+    const r = storePatch(runId, "not-yet-02", "patch");
+    expect(r.ok).toBe(false);
+    expect(r.error).toMatch(/evor_record_node first/);
+  });
+
   it("returns patchPath in the result", () => {
     const runId = "run-lp-005";
     ensureRunDirs(runId, "test-mission");

@@ -278,6 +278,17 @@ def read_artifact(
     except ValueError as exc:
         return {"error": str(exc)}
 
+    if not target.exists() and not kind and agent in _FIXED_PATHS and _FIXED_PATHS[agent][0] == "forge":
+        # Forge-family artifacts live under forge/<candidate>/. Asked for without
+        # a candidate, the tick's only candidate is the answer; with several,
+        # the caller has to say which.
+        found = sorted((Path(run_dir) / "ticks" / str(tick) / "forge").glob(f"*/{target.name}"))
+        if len(found) == 1:
+            target = found[0]
+        elif len(found) > 1:
+            names = ", ".join(p.parent.name for p in found)
+            return {"error": f"this tick has several candidates ({names}); pass kind=<candidate name>"}
+
     if not target.exists():
         return {"error": "not found"}
 

@@ -76,7 +76,7 @@
     "file": "hooks/pre-tool-use.mjs",
     "line": 298,
     "quote": "      `You may not write to the plugin install, to \\`.evor/runs/**\\` state artifacts, or to the enforcement layer.`,",
-    "sha256_at_authoring": "e599a615d93ffbdaf8040a2e04dfe503b699d2bd85fdc140de480cf2b394f0b0"
+    "sha256_at_authoring": "1ca72a595ccad1a4c4517abeebf192dfe3c3cb21ac69e403fe3cd55b07c27a13"
   },
   "grounding": [
     "field-trace:K-01",

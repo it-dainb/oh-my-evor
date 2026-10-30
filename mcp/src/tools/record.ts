@@ -170,10 +170,11 @@ export function recordNode(runId: string, node: TreeNode, missionId?: string): {
   ].join("\n");
   appendFileSync(paths.decisionLogPath, logLine, "utf8");
 
-  // 3. Remove node.id from pending_node_ids
+  // 3. Remove the node from pending_node_ids, under its id or its name — agents
+  //    mark a node pending by name before it has an id.
   const state = readRunState(paths.runStatePath, runId);
   const pending = Array.isArray(state.pending_node_ids)
-    ? (state.pending_node_ids as string[]).filter((id) => id !== node.id)
+    ? (state.pending_node_ids as string[]).filter((id) => id !== node.id && id !== node.name)
     : [];
   state.pending_node_ids = pending;
   writeRunState(paths.runStatePath, state);
@@ -512,14 +513,20 @@ export function registerRecordTools(server: McpServer): void {
     + "Call after evor_run_status shows state='done'. Returns the full EvaluationResult object.",
     {
       run_id: z.string().describe("Active run identifier"),
-      node_id: z.string().describe(
+      node_id: z.string().optional().describe(
         "The node's name (e.g. 'immune-memory-02'), as returned by evor_record_node",
       ),
+      name: z.string().optional().describe("Same as node_id"),
+      node: z.string().optional().describe("Same as node_id"),
       mission_id: z.string().optional().describe(
         "Mission identifier (resolved from EVOR_MISSION_ID env when omitted)",
       ),
     },
-    async ({ run_id, node_id, mission_id }) => {
+    async ({ run_id, node_id: given, name, node, mission_id }) => {
+      const node_id = given ?? name ?? node;
+      if (!node_id) {
+        return { content: [{ type: "text" as const, text: JSON.stringify({ ok: false, error: "give the node's name as node_id" }) }] };
+      }
       const missionId = mission_id ?? process.env.EVOR_MISSION_ID;
       const result = readResult(run_id, resolveNodeRef(run_id, node_id, missionId), missionId);
       return {
