@@ -163,3 +163,24 @@ describe("a redirect writes only where it points", () => {
     expect(decide(bash("cd .evor/runs/m1/r1 && echo x > mission-state.json"), "draft").permissionDecision).toBe("deny");
   });
 });
+
+describe("an agent's own scratchpad script is not the candidate", () => {
+  const bash = (command: string, agent_type: string) => ({ tool_name: "Bash", tool_input: { command }, agent_type });
+  const S = "/tmp/claude-1006/-home-u-proj/0000-sess/scratchpad";
+  it("Probe running its EDA script over telemetry is allowed", () => {
+    expect(decide(bash(`python3 ${S}/eda.py nodes/n1/telemetry.jsonl`, "oh-my-evor:evor-probe")).permissionDecision).not.toBe("deny");
+  });
+  it("running a worktree's trainer is still training", () => {
+    expect(decide(bash("python3 .evor/worktrees/c1/train/trainer.py", "oh-my-evor:evor-probe")).permissionDecision).toBe("deny");
+  });
+});
+
+describe("the training watcher is importable", () => {
+  const bash = (command: string) => ({ tool_name: "Bash", tool_input: { command }, agent_type: "oh-my-evor:evor-forge-junior" });
+  it("checking that evor.watch imports is allowed", () => {
+    expect(decide(bash(`python3 -c "import evor.watch;print('ok')"`)).permissionDecision).not.toBe("deny");
+  });
+  it("importing the rest of evor is still denied", () => {
+    expect(decide(bash(`python3 -c "import evor.tree; evor.tree.main()"`)).permissionDecision).toBe("deny");
+  });
+});

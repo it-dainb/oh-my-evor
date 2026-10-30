@@ -70,7 +70,7 @@
     "file": "agents/evor-mutagen.md",
     "line": 83,
     "quote": "    - Do NOT modify any evaluation or data-split files. These are protected by the harness.",
-    "sha256_at_authoring": "737656286f598e933a52f8676f7fbb3cdba0c5e2db697aabef4d2213c429d30e"
+    "sha256_at_authoring": "464ec5e41d66b2a40f9fb9b1d9a71a332129c56fa370c7b68c655882684dce16"
   },
   "grounding": [
     "field-trace:G-01",

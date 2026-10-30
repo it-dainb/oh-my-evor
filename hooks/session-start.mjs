@@ -17,7 +17,7 @@
  *   - Python wiki unavailable   → skip priming, still emit env JSON
  */
 
-import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, unlinkSync, writeFileSync } from 'fs';
+import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, statSync, unlinkSync, writeFileSync } from 'fs';
 import { join, dirname, delimiter } from 'path';
 import { spawnSync } from 'child_process';
 import { fileURLToPath } from 'url';
@@ -298,12 +298,30 @@ const evorEnv = existsSync(harnessDir)
     }
   : { EVOR_PLUGIN_ROOT: pluginRoot };
 
+/**
+ * Make the variables visible to the session's shell commands. Claude Code reads
+ * `export` lines a SessionStart hook appends to $CLAUDE_ENV_FILE; the `env` field
+ * of the JSON output alone does not reach Bash, so `python -m evor.watch` found
+ * no `evor` package on the candidate's interpreter.
+ */
+function persistEnv(vars) {
+  const file = process.env.CLAUDE_ENV_FILE;
+  if (!file) return;
+  const q = (v) => `'${String(v).replace(/'/g, `'\\''`)}'`;
+  try {
+    appendFileSync(file, Object.entries(vars).map(([k, v]) => `export ${k}=${q(v)}`).join('\n') + '\n');
+  } catch (err) {
+    process.stderr.write(`[evor:session-start] could not write CLAUDE_ENV_FILE: ${err.message}\n`);
+  }
+}
+
 // One-time harness/deps health check (surfaces a clear fix on incomplete installs).
 const depWarning = checkHarnessDeps(pluginRoot, evorRoot);
 
 /** Emit clear-env JSON and exit 0 gracefully. */
 function clearEnvAndExit(reason) {
   if (reason) process.stderr.write(`[evor:session-start] ${reason}\n`);
+  persistEnv({ ...evorEnv, EVOR_ACTIVE_RUN_ID: '', EVOR_MISSION_ID: '', EVOR_RUN_DIR: '' });
   process.stdout.write(
     JSON.stringify({
       env: { ...evorEnv, EVOR_ACTIVE_RUN_ID: '', EVOR_MISSION_ID: '', EVOR_RUN_DIR: '' },
@@ -343,6 +361,7 @@ if (!existsSync(activeRunFile)) {
   }
 
   const parts = [depWarning, nudge].filter(Boolean);
+  persistEnv(evorEnv);
   process.stdout.write(JSON.stringify({
     env: evorEnv,
     ...(parts.length ? { message: parts.join('\n\n') } : {}),
@@ -535,5 +554,6 @@ try {
 const prefixWarnings = [depWarning].filter(Boolean).join('\n\n');
 if (prefixWarnings) output.message = `${prefixWarnings}\n\n${output.message}`;
 
+persistEnv(output.env);
 process.stdout.write(JSON.stringify(output) + '\n');
 process.exit(0);

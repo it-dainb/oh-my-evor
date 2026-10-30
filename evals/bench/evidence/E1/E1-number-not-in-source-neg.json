@@ -77,7 +77,7 @@
   "grounded_rule": {
     "file": "agents/evor-sage-junior.md",
     "quote": "If you did not fetch it this tick, it does not exist.",
-    "sha256_at_authoring": "f0331f61e383cf90f0b54657f1d1da7b4831bc076757d425e09189de5b3a3ee2"
+    "sha256_at_authoring": "2301af562609f67519b85f2e572cf827d0cbbf7e945ab3a83b280b1e3c7d83b9"
   },
   "grounding": [
     "field-trace:N-02",

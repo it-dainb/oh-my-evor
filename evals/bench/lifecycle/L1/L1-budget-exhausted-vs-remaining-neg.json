@@ -123,7 +123,7 @@
   "grounded_rule": {
     "file": "skills/evor/SKILL.md",
     "quote": "You stop ONLY when the mission stop condition is met (goal\nreached / budget exhausted / plateau) — never for a human.",
-    "sha256_at_authoring": "03600bc8b8bffbfc7ec08a61bb1a0734a92de1e11bb4c54c04092905e5e23817"
+    "sha256_at_authoring": "72972df4f576185948977f3d2cbd2b037f100fc907aeeef773e1741f0131c41b"
   },
   "grounding": [
     "field-trace:L-01",
@@ -147,11 +147,11 @@
     "guarded_paths": [
       {
         "path": "skills/evor/SKILL.md",
-        "sha256": "03600bc8b8bffbfc7ec08a61bb1a0734a92de1e11bb4c54c04092905e5e23817"
+        "sha256": "72972df4f576185948977f3d2cbd2b037f100fc907aeeef773e1741f0131c41b"
       },
       {
         "path": "skills/evor/SKILL.md",
-        "sha256": "03600bc8b8bffbfc7ec08a61bb1a0734a92de1e11bb4c54c04092905e5e23817"
+        "sha256": "72972df4f576185948977f3d2cbd2b037f100fc907aeeef773e1741f0131c41b"
       },
       {
         "path": "hooks/stop.mjs",

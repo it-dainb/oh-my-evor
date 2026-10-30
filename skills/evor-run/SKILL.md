@@ -96,13 +96,16 @@ Call `evor_state_write` to record the active run and set status to running:
 
 ```
 evor_state_write({
-  mission_status: "running",
-  active_run: {
-    mission_id: "<mission_id>",
-    run_id: "<run_id>",
-    run_dir: "<run_dir>",
-    started_at: "<ISO 8601>",
-    status: "running"
+  run_id: "<run_id>",
+  patch: {
+    mission_status: "running",
+    active_run: {
+      mission_id: "<mission_id>",
+      run_id: "<run_id>",
+      run_dir: "<run_dir>",
+      started_at: "<ISO 8601>",
+      status: "running"
+    }
   }
 })
 ```

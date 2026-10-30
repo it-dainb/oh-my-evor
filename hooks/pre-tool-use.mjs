@@ -292,9 +292,13 @@ try {
     .split(/;|&&|\|\|?|\n/)
     .map((seg) => seg.match(/\bpython[0-9.]*\s+(.*)$/)?.[1].trim().replace(/^(?:-(?![mc]\b)[A-Za-z]+\s+)+/, ''))
     .filter((a) => a !== undefined);
+  // A script in the agent's own session scratchpad is its analysis tooling (an
+  // EDA pass over telemetry), not the candidate: candidate code lives in a worktree.
+  const SCRATCH_SCRIPT = /^\/tmp\/claude-[^/]+\/[^/]+\/[^/]+\/scratchpad\/\S+\.py\b/;
   const runsTraining = pyArgs.some(
     (a) =>
       !INSPECTION_MODULES.test(a) &&
+      !SCRATCH_SCRIPT.test(a) &&
       // `-m evor…` is deliberately NOT here: `python -m evor run` is a CLI
       // invocation, not training, and it is owned by the EVOR GUARD rule below,
       // which names the right replacement tool (evor_run_start + Monitor). Claiming
@@ -645,7 +649,9 @@ try {
     // has to run as a background Bash task, which no MCP tool can be.
     const BASH_PYTHON_EVOR_RE = /python[0-9.]*\s+-m\s+evor(?!\.watch\b)(\b|\.)/;
     // §15C: import evor / from evor... block
-    const BASH_IMPORT_EVOR_RE = /\b(import\s+evor|from\s+evor[\s.])/;
+    // evor.watch is the training watcher agents are told to run; importing it is
+    // the same act as `python -m evor.watch`, which is allowed above.
+    const BASH_IMPORT_EVOR_RE = /\b(import\s+evor(?!\.watch\b)|from\s+evor(?!\.watch\b)[\s.])/;
     // Only when python is actually invoked. Without this the rule fires on any
     // command that MENTIONS the import — `grep -rn "import evor" harness/` reads
     // and writes nothing, and denying it is a false positive of exactly the kind

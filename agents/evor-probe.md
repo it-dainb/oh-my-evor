@@ -150,7 +150,7 @@ disallowedTools: Write, Edit
        Compute `prediction_error_pp = actual_delta_pp - midpoint_pp` where `midpoint_pp` is the
        numeric midpoint of the predicted range (e.g. "+2–4%" → 3.0; single value "+3%" → 3.0).
        A positive error means Mutagen under-predicted; negative means over-predicted.
-       Write the prediction error to state via `evor_state_write({ prediction_bias_sample: { predicted_gain: midpoint_pp, actual_gain: actual_delta_pp } })` so Mutagen can self-calibrate.
+       Write the prediction error to state via `evor_state_write({ run_id, patch: { prediction_bias_sample: { predicted_gain: midpoint_pp, actual_gain: actual_delta_pp } } })` so Mutagen can self-calibrate.
        Skip ONLY when `hypothesis_verdict="inconclusive"` (no valid prediction error to compute).
   </Hypothesis_Verdict_Protocol>
 

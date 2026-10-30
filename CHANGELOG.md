@@ -2,6 +2,31 @@
 
 All notable changes to Evor. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.2.29] — 2026-10-30 — analysis scripts are not candidates
+
+### Fixed
+
+- **Probe was refused running its own analysis script.** Any `python <script>.py` counted as
+  running candidate code, so Probe's EDA script over a node's telemetry, written to its session
+  scratchpad, was denied as training. A script in the session scratchpad is now the agent's own
+  tooling; a script anywhere else, a worktree's trainer included, is still candidate code.
+- **The harness never reached shell commands.** The session-start hook exported `PYTHONPATH`
+  only through its JSON `env` field, which shell commands do not see, so `python -m evor.watch`
+  failed to import `evor` from the candidate's interpreter. It now also appends the exports to
+  `$CLAUDE_ENV_FILE`.
+- **Checking the training watcher was refused.** Forge-junior verifies `import evor.watch` before
+  launching the watcher its protocol prescribes; the guard against importing the plugin's own
+  modules blocked it. `evor.watch` is exempt, as `python -m evor.watch` already was.
+- **The arxiv `semantic_search` tool fails without an optional install.** Sage-junior is told
+  to fall back to `search_papers` when it errors.
+- **Every `evor_state_write` example omitted `patch`.** The tool takes `{run_id, patch}`; the
+  examples in the setup, run and loop skills and in Forge, Mutagen and Probe put the fields at
+  the top level, and Probe's prediction-bias write was rejected as copied. All now wrap the
+  fields in `patch`.
+- **The tick was promised file-search tools a session may not have.** Its instructions named
+  Glob and Grep unconditionally; they now say those are present only when the session provides
+  them, and to work from returned paths otherwise.
+
 ## [1.2.28] — 2026-10-30 — hypotheses are registered by the write
 
 ### Fixed

@@ -112,7 +112,7 @@ skills: [oh-my-evor:evor-mcp]
 
       attempt = 1
       # initialize attempt counter in state so the orchestrator and stop hook can enforce the cap.
-      evor_state_write({ "forge_attempt_node_id": node_id, "forge_attempt_count": 0 })
+      evor_state_write({ run_id, patch: { "forge_attempt_node_id": node_id, "forge_attempt_count": 0 } })
       while attempt <= MAX_ATTEMPTS:
         # pass identifiers only; forge-critic reads worktree and proposal via MCP.
         spawn Task(
@@ -163,7 +163,7 @@ skills: [oh-my-evor:evor-mcp]
         Run lsp_diagnostics pre-flight again.
         attempt += 1
         # keep state counter in sync so orchestrator can read live attempt progress.
-        evor_state_write({ "forge_attempt_node_id": node_id, "forge_attempt_count": attempt })
+        evor_state_write({ run_id, patch: { "forge_attempt_node_id": node_id, "forge_attempt_count": attempt } })
 
     Phase 5 — Delta storage and node registration
       Call evor_store_blob(path=".evor/worktrees/<node_id>/genome.yaml")

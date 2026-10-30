@@ -386,7 +386,7 @@ skills: [oh-my-evor:evor-mcp]
     3. **Single-family lock**: H002 was triggered (family streak >= 3) and there are no
        other approved families in recent history.
 
-    HOW to trigger: call `evor_state_write({ meta_evolve_requested: true, reason: "plateau|regression|lock" })`.
+    HOW to trigger: call `evor_state_write({ run_id, patch: { meta_evolve_requested: true, reason: "plateau|regression|lock" } })`.
     The orchestrator checks this at tick start and runs meta-evolution before Sage if set.
     You do not need to block on it — emit proposals for the current tick regardless, but
     the flag ensures the next tick starts with a refreshed strategy.
