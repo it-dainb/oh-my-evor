@@ -2,6 +2,16 @@
 
 All notable changes to Evor. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.2.25] — 2026-10-30 — a notice is not a prompt
+
+### Fixed
+
+- **A completion notice steered main into a blocking wait.** The resume nudge fires on prompt
+  submission, and a background agent's completion notice arrives the same way; its words
+  matched, and the nudge told main to `evor_wait` on what the tick named. Main then held its
+  turn in a wait on a Forge that was still running and would have reported by itself. The
+  nudge now ignores completion notices and says to end the turn while an agent is running.
+
 ## [1.2.24] — 2026-10-30 — sed edits its operands
 
 ### Fixed
@@ -12,7 +22,6 @@ All notable changes to Evor. Format follows [Keep a Changelog](https://keepachan
   the file actually edited when that file was a bare name after a `cd`, so an in-place edit of
   a run's state file inside `.evor/runs/` went unguarded. In-place sed now resolves to the
   operands that follow its script.
-
 ## [1.2.23] — 2026-10-30 — a job watcher is a live child
 
 ### Fixed

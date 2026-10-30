@@ -50,6 +50,10 @@ try {
 }
 
 if (!userText.trim()) process.exit(0);
+// A background task's completion notice arrives through this hook too. It is not
+// a person's intent: its words ("finished", "resume", "tick") matched the resume
+// nudge and steered main into a blocking wait on an agent that was still running.
+if (/^\s*<task-notification>/.test(userText)) process.exit(0);
 
 // ── Intent detection (strict anchored keywords) ───────────────────────────────
 // Only fire on clear, unambiguous intent signals to avoid false positives.
@@ -152,10 +156,11 @@ if (unthrottled.includes('resume-run') && runDir && existsSync(runDir)) {
   nudges.push(
     live
       ? `[EVOR RESUME]${tickHint} The mission is running, so resume through the tick boundary: ` +
-        'if a tick agent of this session yielded, evor_wait on what it named and SendMessage it; ' +
-        'otherwise spawn oh-my-evor:evor-tick for that tick, which continues from its last completed ' +
-        'step. Progress for the user comes from evor_check_stop. Do not call evor_state_read or ' +
-        'evor_tree_read here; the governor denies them to main while the mission runs.'
+        'if an agent of this session is still running, end your turn and its completion notice ' +
+        'wakes you; if a tick agent yielded and nothing is running, SendMessage it; otherwise spawn ' +
+        'oh-my-evor:evor-tick for that tick, which continues from its last completed step. Progress ' +
+        'for the user comes from evor_check_stop. Do not call evor_state_read or evor_tree_read ' +
+        'here; the governor denies them to main while the mission runs.'
       : `[EVOR RESUME]${tickHint} ` +
         'Call evor_state_read to check current position, then call evor_tree_read to see the frontier. ' +
         'If a tick is mid-flight (step < 9), continue from the last completed step.'
