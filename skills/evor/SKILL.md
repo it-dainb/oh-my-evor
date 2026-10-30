@@ -309,8 +309,8 @@ Run Mutagen then Sage sequentially, or both in parallel when `CLAUDE_CODE_EXPERI
 
 For each proposal returned by Mutagen:
 - Confirm the Hypothesis is populated (statement + quantified prediction).
-- Register the Hypothesis in the run state via `evor_state_write` (append to hypotheses[] list).
-- Assign a hypothesis_id and set it on the proposal.
+- Nothing to write: Mutagen's `evor_write_artifact` assigns each proposal its `proposal_id` and
+  `hypothesis.id`, and later steps key on those.
 
 ## Step 4 — Critique
 

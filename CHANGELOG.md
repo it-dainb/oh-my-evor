@@ -2,6 +2,14 @@
 
 All notable changes to Evor. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.2.28] — 2026-10-30 — hypotheses are registered by the write
+
+### Fixed
+
+- **The loop told the tick to append to `hypotheses[]` through `evor_state_write`.** The state
+  patch does not accept that key, nothing reads it, and Mutagen's artifact write already assigns
+  every `proposal_id` and `hypothesis.id`. The step now says there is nothing to write.
+
 ## [1.2.27] — 2026-10-30 — the tick in progress is the default
 
 ### Fixed
