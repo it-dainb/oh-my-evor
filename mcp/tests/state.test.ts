@@ -133,13 +133,16 @@ describe("stateWrite", () => {
   it("merges patch into existing state (non-patched fields preserved)", () => {
     const runId = "run-sw-002";
     // Write initial state
-    stateWrite(runId, { status: "initialized", tick_count: 0, best_score: 0.5 }, "test-mission");
-    // Patch only best_score
-    const updated = stateWrite(runId, { best_score: 0.95 });
+    stateWrite(runId, { status: "initialized", tick_count: 0 }, "test-mission");
+    // Patch only tick_count
+    const updated = stateWrite(runId, { tick_count: 2 });
 
-    expect(updated.best_score).toBe(0.95);
+    expect(updated.tick_count).toBe(2);
     expect(updated.status).toBe("initialized");
-    expect(updated.tick_count).toBe(0);
+  });
+
+  it("refuses best_score: it is derived from recorded evaluations", () => {
+    expect(() => stateWrite("run-sw-002b", { best_score: 0.95 } as never, "test-mission")).toThrow(/derived/);
   });
 
   it("updates pending_node_ids", () => {

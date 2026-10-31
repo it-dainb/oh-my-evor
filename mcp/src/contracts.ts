@@ -253,6 +253,8 @@ export const TreeNodeSchema = z.object({
   metrics: z.record(z.string(), z.number()),
   eval_version: z.string(),
   fitness_value: z.number().optional(),
+  /** fitness under every eval_version the node was scored with; a re-score adds, never erases */
+  scores_by_version: z.record(z.string(), z.number()).optional(),
   telemetry_ref: z.string().optional(),
   // Server-owned bookkeeping — optional in input; server fills defaults before persist.
   lesson_ids: z.array(z.string()).optional().default([]),
@@ -343,6 +345,13 @@ export const EvaluationResultSchema = z.object({
   benchmark_raw: z.string(),
   // Server-owned: filled via now().
   timestamp: ISODate.optional(),
+  // Set by the runner under a metric-hardening eval version: the same node
+  // scored by the sealed parent evaluator. Evaluator-owned, like fitness_value.
+  parent_eval_version: z.string().optional(),
+  parent_fitness_value: z.number().optional(),
+  parent_metrics: z.record(z.string(), z.number()).optional(),
+  /** false = parent and hardened evaluators scored different inputs */
+  parent_inputs_match: z.boolean().optional(),
 });
 export type EvaluationResult = z.infer<typeof EvaluationResultSchema>;
 
@@ -369,6 +378,10 @@ export const IntegrityReportSchema = z.object({
     acquisition_namespace_enforced: z.boolean().nullable(),
     structure_ok: z.boolean().nullable().optional().describe(
       "ForgeStructureGate: genome seams + forward pass + telemetry + eval lock. null = gate not run."
+    ),
+    not_softer_than_parent: z.boolean().nullable().optional().describe(
+      "Under a metric-hardening eval version: fitness <= the sealed parent evaluator's fitness. "
+      + "null = not a hardened version."
     ),
   }),
   verdict: z.enum(["passed", "failed"]),
@@ -514,10 +527,15 @@ export const DecisionLogEntrySchema = z.object({
     // representable part is the vocabulary: an agent that has proved the
     // contract unsatisfiable records that, instead of silently asking a human.
     "contract-infeasible",
+    // A metric hardening: a stricter evaluator under a new eval_version,
+    // pre-authorized by the Monotonic-Honesty Invariant.
+    "harden-eval",
   ]),
   rationale: z.string(),
   node_ids: z.array(z.string()),
   strategy_delta: StrategyStateSchema.partial().optional(),
+  /** what the decision rests on — a wiki lesson id, a probe proposal pointer */
+  evidence: z.array(z.string()).optional(),
 });
 export type DecisionLogEntry = z.infer<typeof DecisionLogEntrySchema>;
 
@@ -629,6 +647,9 @@ export const EvalSuiteSchema = z.object({
   created_at: ISODate,
   created_by: z.enum(["user", "policy"]),
   consent_log_ref: z.string(),
+  /** absent = the initial suite; metric_hardening = same domains, stricter evaluator */
+  kind: z.enum(["domain_upgrade", "metric_hardening"]).optional(),
+  hardening_rationale: z.string().optional(),
 });
 export type EvalSuite = z.infer<typeof EvalSuiteSchema>;
 
@@ -657,6 +678,13 @@ export const BenchmarkUpgradeSchema = z.object({
   rescore_deadline_ticks: z.number().int().min(0),
   decision_log_ref: z.string(),
   created_at: ISODate,
+  kind: z.enum(["domain_upgrade", "metric_hardening"]).default("domain_upgrade"),
+  /** frontier nodes marked for re-score under to_eval_version */
+  rescore_node_ids: z.array(z.string()).default([]),
+  /** marked nodes already re-scored; rescore_status is complete when it covers all */
+  rescored_node_ids: z.array(z.string()).default([]),
+  /** marked nodes whose re-score errored or failed integrity */
+  rescore_failed_node_ids: z.array(z.string()).default([]),
 });
 export type BenchmarkUpgrade = z.infer<typeof BenchmarkUpgradeSchema>;
 
@@ -669,6 +697,11 @@ export const BenchmarkUpgradeProposalSchema = z.object({
   new_domains: z.array(z.string()),
   rationale: z.string(),
   citations: z.array(z.string()),
+  kind: z.enum(["domain_upgrade", "metric_hardening"]).default("domain_upgrade"),
+  /** metric_hardening: the stricter gate */
+  proposed_gate: z.string().optional(),
+  /** metric_hardening: the contract text whose intent the current metric fails to enforce */
+  contract_grounding: z.string().optional(),
 });
 export type BenchmarkUpgradeProposal = z.infer<typeof BenchmarkUpgradeProposalSchema>;
 

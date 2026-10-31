@@ -151,6 +151,7 @@ For the full signal vocabulary (shapes, axes, severity, kind catalogue), read `a
 | `evor_freeze_splits` | Freeze test and val splits from a dataset directory; seals the contract against future split changes |
 | `evor_init_eval_suite` | Create the initial evaluation suite and angle registry |
 | `evor_seal_eval_script` | Lock the evaluator so it cannot be changed after setup; call after writing the evaluator file |
+| `evor_harden_eval` | Replace the evaluator with a STRICTER one under a new eval_version mid-mission (metric hardening). Called by evor-tick only. Needs `contract_grounding` (a verbatim quote of the contract's intent) and `evidence` (lesson id / probe proposal pointer). Always takes the reviewed source; all-or-nothing; `best_score` restarts under the new version. Returns the frontier nodes to re-score with `evor_run_start(eval_version=<new>)`. Every node scored under it also carries its parent-version score, and integrity fails it when the hardened score is higher. Earlier-version results stay readable with `evor_read_result(eval_version=<old>)`. |
 | `evor_distill_scan` | Deep-scan a workspace for brownfield onboarding; writes and returns a `StartingPointReport` |
 | `evor_check_leakage` | Screen candidate acquisition items against the frozen test split and return the clean set |
 

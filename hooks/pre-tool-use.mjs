@@ -930,6 +930,55 @@ try {
   logError('role-rules', err);
 }
 
+// ── Metric hardening is applied by the tick, and only by the tick ────────────
+//
+// evor_harden_eval moves the run's eval_version and replaces the evaluator every
+// later score is measured with. Probe and Sage PROPOSE it, Forge's team WRITES the
+// stricter evaluator, and the tick — the loop that owns the step — APPLIES it. A
+// proposer that could apply its own proposal, or a Forge that could seal its own
+// evaluator, would be self-approval; main during a live mission follows pointers
+// only. Main outside a live mission (maintenance) is not judged here.
+try {
+  const toolNameH = input?.tool_name ?? '';
+  if (/(^|_)evor_harden_eval$/.test(toolNameH)) {
+    const roleH = ((input?.agent_type ?? process.env.EVOR_AGENT_ROLE ?? '') || '').replace(/^oh-my-evor:/, '');
+    const mainH = !roleH;
+    if (!(roleH === 'evor-tick' || (mainH && !_missionLive))) {
+      deny(
+        `[EVOR GOVERNOR] evor_harden_eval is applied by the evor-tick agent. ` +
+          (mainH
+            ? 'Spawn Task(subagent_type="oh-my-evor:evor-tick") and pass the hardening proposal as a pointer; the tick applies it.'
+            : `${roleH} proposes a hardening (metric_hardening proposal) or writes the stricter evaluator; the tick applies it.`),
+        { rule: 'harden-eval-tick-only', tool: toolNameH, agentType: roleH },
+      );
+    }
+  }
+  // During a live mission the general evaluator tools may only touch the
+  // version in force: staging a new version's evaluator, or replacing the shared
+  // score_plugin.py, outside evor_harden_eval would put an unreviewed metric one
+  // call away from adoption.
+  if (_missionLive && /(^|_)evor_((write|seal)_eval_script|scaffold_evaluator)$/.test(toolNameH)) {
+    const tiH = input?.tool_input ?? {};
+    const rd = resolveRunDir();
+    const inForce = rd && _exists(_join(rd, 'goal-contract.json'))
+      ? String(JSON.parse(readFileSync(_join(rd, 'goal-contract.json'), 'utf8'))?.eval_version ?? '')
+      : '';
+    const wantsPlugin = tiH?.target === 'score_plugin' || tiH?.overwrite_plugin === true;
+    if (wantsPlugin || (inForce && String(tiH?.eval_version ?? 'v1') !== inForce)) {
+      deny(
+        `[EVOR GOVERNOR] While the mission runs, ${toolNameH.replace(/^mcp__plugin_oh-my-evor_evor__/, '')} ` +
+          `touches only the eval version in force${inForce ? ` (${inForce})` : ''}` +
+          (wantsPlugin ? ' and never score_plugin.py, the metric every version shares' : '') +
+          '. A stricter evaluator under a new version is applied by evor-tick with evor_harden_eval, ' +
+          'which takes the reviewed source with its rationale and evidence.',
+        { rule: 'eval-script-version-in-force', tool: toolNameH },
+      );
+    }
+  }
+} catch (err) {
+  logError('harden-eval-role', err);  // fail-open, but recorded
+}
+
 // ── §15C: Agent-kind spoofing guard (always-on when run is active) ────────────
 // Prevents one role from writing into another role's artifact slot.
 // Orchestrator (no agent_type) may write handoff kinds.

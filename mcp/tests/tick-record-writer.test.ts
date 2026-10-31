@@ -46,9 +46,10 @@ describe("tick_record", () => {
     // plugin root is resolvable; the order and the rest are what is asserted.
     const recs = (state.tick_records as Array<Record<string, unknown>>).map(({ plugin_version: _v, ...r }) => r);
     expect(recs).toEqual([
-      { tick: 1, outcome: "scored", score: 0.4 },
-      { tick: 2, outcome: "failed" },
-      { tick: 3, outcome: "scored", score: 0.6 },
+      // Each record carries the eval version it was scored under (the version in force).
+      { tick: 1, outcome: "scored", score: 0.4, eval_version: "v1" },
+      { tick: 2, outcome: "failed", eval_version: "v1" },
+      { tick: 3, outcome: "scored", score: 0.6, eval_version: "v1" },
     ]);
   });
 
@@ -56,7 +57,7 @@ describe("tick_record", () => {
     rec(1, "failed");
     rec(1, "scored", 0.5);
     const state = stateRead(RUN, MISSION) as Record<string, unknown>;
-    expect(state.tick_records).toEqual([{ tick: 1, outcome: "scored", score: 0.5 }]);
+    expect(state.tick_records).toEqual([{ tick: 1, outcome: "scored", score: 0.5, eval_version: "v1" }]);
   });
 
   it("derives tick_history_scores from the records — the key the plateau checks read", () => {

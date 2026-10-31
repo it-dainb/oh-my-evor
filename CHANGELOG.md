@@ -2,6 +2,108 @@
 
 All notable changes to Evor. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.2.38] — 2026-10-31 — the evaluator can only get stricter; a dashboard for the team
+
+### Added
+
+- **A running mission can make its evaluator stricter.** A binarization mission found that
+  candidates raised worst-domain S by erasing faint ink (removing ink from a too-thick domain
+  lifts m_width off a cliff), and its own lesson said the fix was a recall gate under a new
+  eval_version — which nothing could apply mid-mission: a sealed evaluator cannot be rewritten,
+  and `apply_upgrade` only adds domains. `evor_harden_eval` (evor-tick only) validates, records
+  and seals `eval-suites/<to>.py` as EvalSuite `<to>` with `kind: "metric_hardening"` (same
+  domains, same frozen split, parent `<from>`), moves the contract and run state to it, logs a
+  `harden-eval` DecisionLogEntry naming the parent, the rationale and its evidence, and returns
+  the frontier to re-score. No consent step: the Monotonic-Honesty Invariant pre-authorizes a
+  harder evaluation. The rationale must quote the contract (`contract_grounding`), or it is
+  refused as a new objective.
+- **Only stricter.** Under a hardened version `python -m evor run` also scores the node with the
+  sealed parent evaluator and records `parent_fitness_value` (evaluator-owned, like
+  `fitness_value`). Integrity check 15, `not_softer_than_parent`, fails a node whose hardened
+  fitness exceeds its parent fitness, or that carries no parent score.
+- **Evidence, not override.** Results are kept per version (`results.<v>.json`,
+  `results.evaluator.<v>.json`; `results.json` is the current version's), the tree node keeps
+  `scores_by_version`, and `evor_read_result(eval_version=…)` reads an earlier version.
+- **Re-score path.** `evor_run_start(eval_version=<v>)` installs and re-locks the sealed `<v>`
+  evaluator in the worktree — only when it matches its seal and the contract anchor.
+  `evor_record_eval` moves the tree node's `eval_version` before the integrity check, so check
+  10 passes after a re-score, and marks the hardening's re-score progress.
+- Probe `Metric_Artefact_Protocol`, Forge `Metric_Hardening_Request`, skill Step 7b, and an
+  evor-tick section describe the flow.
+
+- **Review hardening of the path.**
+  - The parent is scored only with its sealed bytes: a seal receipt is verified over every file
+    it records, `score_plugin.py` included, and the plugin can no longer be replaced once any
+    version is sealed with it — nor sealed differently under another version.
+  - `best_score` is per eval version: adoption clears it (the parent's best is logged) and only
+    scores under the version in force set it. Check 15 bounds every primary metric as well as
+    fitness, follows the contract's direction (lower-is-better included), fails closed on a
+    missing or unreadable suite record, and fails when the parent and hardened evaluators did
+    not score the same inputs (`parent_inputs_match`).
+  - Adoption is one transaction in `BenchmarkManager.apply_hardening` (write, seal, record,
+    move): any failure puts every file back. The tool always takes the reviewed source; a file
+    already on disk is adopted only when sealed with exactly those bytes. During a mission,
+    `evor_write_eval_script` / `evor_seal_eval_script` touch only the version in force and never
+    the plugin (server-side and in the governor). A mission that is not running is refused.
+  - Version strings that build paths must be `v<N>`. Only completed evaluations enter
+    `scores_by_version`; failed re-scores are listed and keep the upgrade `partial`. The tree
+    node moves to the new version only after integrity passes (check 10 judges the scored
+    version). Receipt-less versions are told to verify against the contract anchor before
+    sealing. `rescore_deadline_ticks` is a parameter; an unknown proposer is refused.
+  - A stricter metric caps each node's score and may reorder the frontier: the decision log
+    records the order under the parent at adoption and under the new version when the re-score
+    finishes.
+  - `evor_scaffold_evaluator` is held to the same rule (tool, harness and governor): it never
+    regenerates a sealed harness or overwrites a sealed plugin, and during a mission touches
+    only the version in force.
+  - Stop checks compare scores within one eval version: tick records carry the version they
+    were scored under, adoption restarts `tick_history_scores`, and `check_stop_condition`
+    reads the in-force version's records, so a hardening does not read as a regression.
+  - Adoption is journaled: a process killed mid-adoption leaves a journal that the next
+    attempt rolls back (or, if the contract already moved, finishes) before it starts.
+  - `best_score` / `best_node_id` are no longer writable through `evor_state_write`; they come
+    only from recorded evaluations. The version in force is read from the contract first.
+  - The re-score's frontier order follows the metric's direction; a receipt that predates
+    plugin manifests is checked against the contract's `eval_plugin_hash`, and its refusal
+    says so.
+
+### Known limitations
+
+- `parent_inputs_match` is structural — same frozen split, same domain set — not a per-item
+  comparison. The guarantee is the score bound itself (fitness and primary metrics).
+- A node's worktree `evaluate.py` imports the `score_plugin.py` beside it in the worktree, not
+  the sealed copy in `eval-suites/` (this predates metric hardening). The integrity gate checks
+  the sealed copy; a worktree plugin that differs from it is not detected at score time.
+
+### Fixed
+
+- `evor_run_start` with `eval_version` passed `--eval-version` to `python -m evor run`, which
+  did not accept it, so every such job exited 2. It is accepted now and must equal the
+  contract's current version.
+- Sealing a version that is not the contract's `eval_version` moved the contract anchor and
+  failed `no_eval_shift` for every node of the version in force; outside a mission it now
+  writes the receipt only, and during one it is refused.
+- The integrity tool cached the contract's eval_version per run and never saw it change; a
+  hardening invalidates it. The integrity bridge resolves a hardened version's frozen split
+  through its parent.
+
+### Added (dashboard)
+
+- **A research-team dashboard.** The live dashboard leads with a best-so-far staircase of the
+  approved primary metric over ticks (best nodes joined by horizontal-then-vertical steps, all
+  other nodes dimmed beneath, the baseline as a reference line, parent links on hover), then node
+  details on click, the lineage tree with seed siblings grouped into recipes and coloured by
+  verdict, and a learnings section (what worked, what did not, metric artefacts, pitfalls,
+  decisions) beside health alerts (metric gaming, plateau, stalls, integrity, seed spread). The
+  headline robust best is the best non-suspect recipe's median across seeds. A steer box appends a
+  `human-steer` note to the run's inbox and requires a token printed at server start; viewing is
+  open on the local network. `--export <file>` writes the same view as one self-contained page.
+
+### Fixed (also)
+
+- **Sage-junior retried rate-limited sources in a loop.** On an arXiv or Semantic Scholar rate
+  limit it now switches to another source for the rest of the angle and says which was unavailable.
+
 ## [1.2.37] — 2026-10-31 — a large artifact goes by file
 
 ### Fixed

@@ -30,9 +30,9 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
   mod
 ));
 
-// ../node_modules/ajv/dist/compile/codegen/code.js
+// ../../oh-my-evor/node_modules/ajv/dist/compile/codegen/code.js
 var require_code = __commonJS({
-  "../node_modules/ajv/dist/compile/codegen/code.js"(exports2) {
+  "../../oh-my-evor/node_modules/ajv/dist/compile/codegen/code.js"(exports2) {
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.regexpCode = exports2.getEsmExportName = exports2.getProperty = exports2.safeStringify = exports2.stringify = exports2.strConcat = exports2.addCodeArg = exports2.str = exports2._ = exports2.nil = exports2._Code = exports2.Name = exports2.IDENTIFIER = exports2._CodeOrName = void 0;
@@ -184,9 +184,9 @@ var require_code = __commonJS({
   }
 });
 
-// ../node_modules/ajv/dist/compile/codegen/scope.js
+// ../../oh-my-evor/node_modules/ajv/dist/compile/codegen/scope.js
 var require_scope = __commonJS({
-  "../node_modules/ajv/dist/compile/codegen/scope.js"(exports2) {
+  "../../oh-my-evor/node_modules/ajv/dist/compile/codegen/scope.js"(exports2) {
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.ValueScope = exports2.ValueScopeName = exports2.Scope = exports2.varKinds = exports2.UsedValueState = void 0;
@@ -329,9 +329,9 @@ var require_scope = __commonJS({
   }
 });
 
-// ../node_modules/ajv/dist/compile/codegen/index.js
+// ../../oh-my-evor/node_modules/ajv/dist/compile/codegen/index.js
 var require_codegen = __commonJS({
-  "../node_modules/ajv/dist/compile/codegen/index.js"(exports2) {
+  "../../oh-my-evor/node_modules/ajv/dist/compile/codegen/index.js"(exports2) {
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.or = exports2.and = exports2.not = exports2.CodeGen = exports2.operators = exports2.varKinds = exports2.ValueScopeName = exports2.ValueScope = exports2.Scope = exports2.Name = exports2.regexpCode = exports2.stringify = exports2.getProperty = exports2.nil = exports2.strConcat = exports2.str = exports2._ = void 0;
@@ -1049,9 +1049,9 @@ var require_codegen = __commonJS({
   }
 });
 
-// ../node_modules/ajv/dist/compile/util.js
+// ../../oh-my-evor/node_modules/ajv/dist/compile/util.js
 var require_util = __commonJS({
-  "../node_modules/ajv/dist/compile/util.js"(exports2) {
+  "../../oh-my-evor/node_modules/ajv/dist/compile/util.js"(exports2) {
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.checkStrictMode = exports2.getErrorPath = exports2.Type = exports2.useFunc = exports2.setEvaluated = exports2.evaluatedPropsToName = exports2.mergeEvaluated = exports2.eachItem = exports2.unescapeJsonPointer = exports2.escapeJsonPointer = exports2.escapeFragment = exports2.unescapeFragment = exports2.schemaRefOrVal = exports2.schemaHasRulesButRef = exports2.schemaHasRules = exports2.checkUnknownRules = exports2.alwaysValidSchema = exports2.toHash = void 0;
@@ -1216,9 +1216,9 @@ var require_util = __commonJS({
   }
 });
 
-// ../node_modules/ajv/dist/compile/names.js
+// ../../oh-my-evor/node_modules/ajv/dist/compile/names.js
 var require_names = __commonJS({
-  "../node_modules/ajv/dist/compile/names.js"(exports2) {
+  "../../oh-my-evor/node_modules/ajv/dist/compile/names.js"(exports2) {
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
     var codegen_1 = require_codegen();
@@ -1255,9 +1255,9 @@ var require_names = __commonJS({
   }
 });
 
-// ../node_modules/ajv/dist/compile/errors.js
+// ../../oh-my-evor/node_modules/ajv/dist/compile/errors.js
 var require_errors = __commonJS({
-  "../node_modules/ajv/dist/compile/errors.js"(exports2) {
+  "../../oh-my-evor/node_modules/ajv/dist/compile/errors.js"(exports2) {
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.extendErrors = exports2.resetErrorsCount = exports2.reportExtraError = exports2.reportError = exports2.keyword$DataError = exports2.keywordError = void 0;
@@ -1377,9 +1377,9 @@ var require_errors = __commonJS({
   }
 });
 
-// ../node_modules/ajv/dist/compile/validate/boolSchema.js
+// ../../oh-my-evor/node_modules/ajv/dist/compile/validate/boolSchema.js
 var require_boolSchema = __commonJS({
-  "../node_modules/ajv/dist/compile/validate/boolSchema.js"(exports2) {
+  "../../oh-my-evor/node_modules/ajv/dist/compile/validate/boolSchema.js"(exports2) {
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.boolOrEmptySchema = exports2.topBoolOrEmptySchema = void 0;
@@ -1428,9 +1428,9 @@ var require_boolSchema = __commonJS({
   }
 });
 
-// ../node_modules/ajv/dist/compile/rules.js
+// ../../oh-my-evor/node_modules/ajv/dist/compile/rules.js
 var require_rules = __commonJS({
-  "../node_modules/ajv/dist/compile/rules.js"(exports2) {
+  "../../oh-my-evor/node_modules/ajv/dist/compile/rules.js"(exports2) {
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.getRules = exports2.isJSONType = void 0;
@@ -1459,9 +1459,9 @@ var require_rules = __commonJS({
   }
 });
 
-// ../node_modules/ajv/dist/compile/validate/applicability.js
+// ../../oh-my-evor/node_modules/ajv/dist/compile/validate/applicability.js
 var require_applicability = __commonJS({
-  "../node_modules/ajv/dist/compile/validate/applicability.js"(exports2) {
+  "../../oh-my-evor/node_modules/ajv/dist/compile/validate/applicability.js"(exports2) {
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.shouldUseRule = exports2.shouldUseGroup = exports2.schemaHasRulesForType = void 0;
@@ -1482,9 +1482,9 @@ var require_applicability = __commonJS({
   }
 });
 
-// ../node_modules/ajv/dist/compile/validate/dataType.js
+// ../../oh-my-evor/node_modules/ajv/dist/compile/validate/dataType.js
 var require_dataType = __commonJS({
-  "../node_modules/ajv/dist/compile/validate/dataType.js"(exports2) {
+  "../../oh-my-evor/node_modules/ajv/dist/compile/validate/dataType.js"(exports2) {
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.reportTypeError = exports2.checkDataTypes = exports2.checkDataType = exports2.coerceAndCheckDataType = exports2.getJSONTypes = exports2.getSchemaTypes = exports2.DataType = void 0;
@@ -1666,9 +1666,9 @@ var require_dataType = __commonJS({
   }
 });
 
-// ../node_modules/ajv/dist/compile/validate/defaults.js
+// ../../oh-my-evor/node_modules/ajv/dist/compile/validate/defaults.js
 var require_defaults = __commonJS({
-  "../node_modules/ajv/dist/compile/validate/defaults.js"(exports2) {
+  "../../oh-my-evor/node_modules/ajv/dist/compile/validate/defaults.js"(exports2) {
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.assignDefaults = void 0;
@@ -1703,9 +1703,9 @@ var require_defaults = __commonJS({
   }
 });
 
-// ../node_modules/ajv/dist/vocabularies/code.js
+// ../../oh-my-evor/node_modules/ajv/dist/vocabularies/code.js
 var require_code2 = __commonJS({
-  "../node_modules/ajv/dist/vocabularies/code.js"(exports2) {
+  "../../oh-my-evor/node_modules/ajv/dist/vocabularies/code.js"(exports2) {
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.validateUnion = exports2.validateArray = exports2.usePattern = exports2.callValidateCode = exports2.schemaProperties = exports2.allSchemaProperties = exports2.noPropertyInData = exports2.propertyInData = exports2.isOwnProperty = exports2.hasPropFunc = exports2.reportMissingProp = exports2.checkMissingProp = exports2.checkReportMissingProp = void 0;
@@ -1836,9 +1836,9 @@ var require_code2 = __commonJS({
   }
 });
 
-// ../node_modules/ajv/dist/compile/validate/keyword.js
+// ../../oh-my-evor/node_modules/ajv/dist/compile/validate/keyword.js
 var require_keyword = __commonJS({
-  "../node_modules/ajv/dist/compile/validate/keyword.js"(exports2) {
+  "../../oh-my-evor/node_modules/ajv/dist/compile/validate/keyword.js"(exports2) {
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.validateKeywordUsage = exports2.validSchemaType = exports2.funcKeywordCode = exports2.macroKeywordCode = void 0;
@@ -1954,9 +1954,9 @@ var require_keyword = __commonJS({
   }
 });
 
-// ../node_modules/ajv/dist/compile/validate/subschema.js
+// ../../oh-my-evor/node_modules/ajv/dist/compile/validate/subschema.js
 var require_subschema = __commonJS({
-  "../node_modules/ajv/dist/compile/validate/subschema.js"(exports2) {
+  "../../oh-my-evor/node_modules/ajv/dist/compile/validate/subschema.js"(exports2) {
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.extendSubschemaMode = exports2.extendSubschemaData = exports2.getSubschema = void 0;
@@ -2037,9 +2037,9 @@ var require_subschema = __commonJS({
   }
 });
 
-// ../node_modules/fast-deep-equal/index.js
+// ../../oh-my-evor/node_modules/fast-deep-equal/index.js
 var require_fast_deep_equal = __commonJS({
-  "../node_modules/fast-deep-equal/index.js"(exports2, module2) {
+  "../../oh-my-evor/node_modules/fast-deep-equal/index.js"(exports2, module2) {
     "use strict";
     module2.exports = function equal(a, b) {
       if (a === b) return true;
@@ -2072,9 +2072,9 @@ var require_fast_deep_equal = __commonJS({
   }
 });
 
-// ../node_modules/json-schema-traverse/index.js
+// ../../oh-my-evor/node_modules/json-schema-traverse/index.js
 var require_json_schema_traverse = __commonJS({
-  "../node_modules/json-schema-traverse/index.js"(exports2, module2) {
+  "../../oh-my-evor/node_modules/json-schema-traverse/index.js"(exports2, module2) {
     "use strict";
     var traverse = module2.exports = function(schema, opts, cb) {
       if (typeof opts == "function") {
@@ -2160,9 +2160,9 @@ var require_json_schema_traverse = __commonJS({
   }
 });
 
-// ../node_modules/ajv/dist/compile/resolve.js
+// ../../oh-my-evor/node_modules/ajv/dist/compile/resolve.js
 var require_resolve = __commonJS({
-  "../node_modules/ajv/dist/compile/resolve.js"(exports2) {
+  "../../oh-my-evor/node_modules/ajv/dist/compile/resolve.js"(exports2) {
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.getSchemaRefs = exports2.resolveUrl = exports2.normalizeId = exports2._getFullPath = exports2.getFullPath = exports2.inlineRef = void 0;
@@ -2316,9 +2316,9 @@ var require_resolve = __commonJS({
   }
 });
 
-// ../node_modules/ajv/dist/compile/validate/index.js
+// ../../oh-my-evor/node_modules/ajv/dist/compile/validate/index.js
 var require_validate = __commonJS({
-  "../node_modules/ajv/dist/compile/validate/index.js"(exports2) {
+  "../../oh-my-evor/node_modules/ajv/dist/compile/validate/index.js"(exports2) {
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.getData = exports2.KeywordCxt = exports2.validateFunctionCode = void 0;
@@ -2824,9 +2824,9 @@ var require_validate = __commonJS({
   }
 });
 
-// ../node_modules/ajv/dist/runtime/validation_error.js
+// ../../oh-my-evor/node_modules/ajv/dist/runtime/validation_error.js
 var require_validation_error = __commonJS({
-  "../node_modules/ajv/dist/runtime/validation_error.js"(exports2) {
+  "../../oh-my-evor/node_modules/ajv/dist/runtime/validation_error.js"(exports2) {
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
     var ValidationError = class extends Error {
@@ -2840,9 +2840,9 @@ var require_validation_error = __commonJS({
   }
 });
 
-// ../node_modules/ajv/dist/compile/ref_error.js
+// ../../oh-my-evor/node_modules/ajv/dist/compile/ref_error.js
 var require_ref_error = __commonJS({
-  "../node_modules/ajv/dist/compile/ref_error.js"(exports2) {
+  "../../oh-my-evor/node_modules/ajv/dist/compile/ref_error.js"(exports2) {
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
     var resolve_1 = require_resolve();
@@ -2857,9 +2857,9 @@ var require_ref_error = __commonJS({
   }
 });
 
-// ../node_modules/ajv/dist/compile/index.js
+// ../../oh-my-evor/node_modules/ajv/dist/compile/index.js
 var require_compile = __commonJS({
-  "../node_modules/ajv/dist/compile/index.js"(exports2) {
+  "../../oh-my-evor/node_modules/ajv/dist/compile/index.js"(exports2) {
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.resolveSchema = exports2.getCompilingSchema = exports2.resolveRef = exports2.compileSchema = exports2.SchemaEnv = void 0;
@@ -3081,9 +3081,9 @@ var require_compile = __commonJS({
   }
 });
 
-// ../node_modules/ajv/dist/refs/data.json
+// ../../oh-my-evor/node_modules/ajv/dist/refs/data.json
 var require_data = __commonJS({
-  "../node_modules/ajv/dist/refs/data.json"(exports2, module2) {
+  "../../oh-my-evor/node_modules/ajv/dist/refs/data.json"(exports2, module2) {
     module2.exports = {
       $id: "https://raw.githubusercontent.com/ajv-validator/ajv/master/lib/refs/data.json#",
       description: "Meta-schema for $data reference (JSON AnySchema extension proposal)",
@@ -3100,9 +3100,9 @@ var require_data = __commonJS({
   }
 });
 
-// ../node_modules/fast-uri/lib/utils.js
+// ../../oh-my-evor/node_modules/fast-uri/lib/utils.js
 var require_utils = __commonJS({
-  "../node_modules/fast-uri/lib/utils.js"(exports2, module2) {
+  "../../oh-my-evor/node_modules/fast-uri/lib/utils.js"(exports2, module2) {
     "use strict";
     var isUUID = RegExp.prototype.test.bind(/^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/iu);
     var isIPv4 = RegExp.prototype.test.bind(/^(?:(?:25[0-5]|2[0-4]\d|1\d{2}|[1-9]\d|\d)\.){3}(?:25[0-5]|2[0-4]\d|1\d{2}|[1-9]\d|\d)$/u);
@@ -3357,9 +3357,9 @@ var require_utils = __commonJS({
   }
 });
 
-// ../node_modules/fast-uri/lib/schemes.js
+// ../../oh-my-evor/node_modules/fast-uri/lib/schemes.js
 var require_schemes = __commonJS({
-  "../node_modules/fast-uri/lib/schemes.js"(exports2, module2) {
+  "../../oh-my-evor/node_modules/fast-uri/lib/schemes.js"(exports2, module2) {
     "use strict";
     var { isUUID } = require_utils();
     var URN_REG = /([\da-z][\d\-a-z]{0,31}):((?:[\w!$'()*+,\-.:;=@]|%[\da-f]{2})+)/iu;
@@ -3567,9 +3567,9 @@ var require_schemes = __commonJS({
   }
 });
 
-// ../node_modules/fast-uri/index.js
+// ../../oh-my-evor/node_modules/fast-uri/index.js
 var require_fast_uri = __commonJS({
-  "../node_modules/fast-uri/index.js"(exports2, module2) {
+  "../../oh-my-evor/node_modules/fast-uri/index.js"(exports2, module2) {
     "use strict";
     var { normalizeIPv6, removeDotSegments, recomposeAuthority, normalizeComponentEncoding, isIPv4, nonSimpleDomain } = require_utils();
     var { SCHEMES, getSchemeHandler } = require_schemes();
@@ -3822,9 +3822,9 @@ var require_fast_uri = __commonJS({
   }
 });
 
-// ../node_modules/ajv/dist/runtime/uri.js
+// ../../oh-my-evor/node_modules/ajv/dist/runtime/uri.js
 var require_uri = __commonJS({
-  "../node_modules/ajv/dist/runtime/uri.js"(exports2) {
+  "../../oh-my-evor/node_modules/ajv/dist/runtime/uri.js"(exports2) {
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
     var uri = require_fast_uri();
@@ -3833,9 +3833,9 @@ var require_uri = __commonJS({
   }
 });
 
-// ../node_modules/ajv/dist/core.js
+// ../../oh-my-evor/node_modules/ajv/dist/core.js
 var require_core = __commonJS({
-  "../node_modules/ajv/dist/core.js"(exports2) {
+  "../../oh-my-evor/node_modules/ajv/dist/core.js"(exports2) {
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.CodeGen = exports2.Name = exports2.nil = exports2.stringify = exports2.str = exports2._ = exports2.KeywordCxt = void 0;
@@ -4444,9 +4444,9 @@ var require_core = __commonJS({
   }
 });
 
-// ../node_modules/ajv/dist/vocabularies/core/id.js
+// ../../oh-my-evor/node_modules/ajv/dist/vocabularies/core/id.js
 var require_id = __commonJS({
-  "../node_modules/ajv/dist/vocabularies/core/id.js"(exports2) {
+  "../../oh-my-evor/node_modules/ajv/dist/vocabularies/core/id.js"(exports2) {
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
     var def = {
@@ -4459,9 +4459,9 @@ var require_id = __commonJS({
   }
 });
 
-// ../node_modules/ajv/dist/vocabularies/core/ref.js
+// ../../oh-my-evor/node_modules/ajv/dist/vocabularies/core/ref.js
 var require_ref = __commonJS({
-  "../node_modules/ajv/dist/vocabularies/core/ref.js"(exports2) {
+  "../../oh-my-evor/node_modules/ajv/dist/vocabularies/core/ref.js"(exports2) {
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.callRef = exports2.getValidate = void 0;
@@ -4581,9 +4581,9 @@ var require_ref = __commonJS({
   }
 });
 
-// ../node_modules/ajv/dist/vocabularies/core/index.js
+// ../../oh-my-evor/node_modules/ajv/dist/vocabularies/core/index.js
 var require_core2 = __commonJS({
-  "../node_modules/ajv/dist/vocabularies/core/index.js"(exports2) {
+  "../../oh-my-evor/node_modules/ajv/dist/vocabularies/core/index.js"(exports2) {
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
     var id_1 = require_id();
@@ -4602,9 +4602,9 @@ var require_core2 = __commonJS({
   }
 });
 
-// ../node_modules/ajv/dist/vocabularies/validation/limitNumber.js
+// ../../oh-my-evor/node_modules/ajv/dist/vocabularies/validation/limitNumber.js
 var require_limitNumber = __commonJS({
-  "../node_modules/ajv/dist/vocabularies/validation/limitNumber.js"(exports2) {
+  "../../oh-my-evor/node_modules/ajv/dist/vocabularies/validation/limitNumber.js"(exports2) {
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
     var codegen_1 = require_codegen();
@@ -4634,9 +4634,9 @@ var require_limitNumber = __commonJS({
   }
 });
 
-// ../node_modules/ajv/dist/vocabularies/validation/multipleOf.js
+// ../../oh-my-evor/node_modules/ajv/dist/vocabularies/validation/multipleOf.js
 var require_multipleOf = __commonJS({
-  "../node_modules/ajv/dist/vocabularies/validation/multipleOf.js"(exports2) {
+  "../../oh-my-evor/node_modules/ajv/dist/vocabularies/validation/multipleOf.js"(exports2) {
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
     var codegen_1 = require_codegen();
@@ -4662,9 +4662,9 @@ var require_multipleOf = __commonJS({
   }
 });
 
-// ../node_modules/ajv/dist/runtime/ucs2length.js
+// ../../oh-my-evor/node_modules/ajv/dist/runtime/ucs2length.js
 var require_ucs2length = __commonJS({
-  "../node_modules/ajv/dist/runtime/ucs2length.js"(exports2) {
+  "../../oh-my-evor/node_modules/ajv/dist/runtime/ucs2length.js"(exports2) {
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
     function ucs2length(str) {
@@ -4688,9 +4688,9 @@ var require_ucs2length = __commonJS({
   }
 });
 
-// ../node_modules/ajv/dist/vocabularies/validation/limitLength.js
+// ../../oh-my-evor/node_modules/ajv/dist/vocabularies/validation/limitLength.js
 var require_limitLength = __commonJS({
-  "../node_modules/ajv/dist/vocabularies/validation/limitLength.js"(exports2) {
+  "../../oh-my-evor/node_modules/ajv/dist/vocabularies/validation/limitLength.js"(exports2) {
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
     var codegen_1 = require_codegen();
@@ -4720,9 +4720,9 @@ var require_limitLength = __commonJS({
   }
 });
 
-// ../node_modules/ajv/dist/vocabularies/validation/pattern.js
+// ../../oh-my-evor/node_modules/ajv/dist/vocabularies/validation/pattern.js
 var require_pattern = __commonJS({
-  "../node_modules/ajv/dist/vocabularies/validation/pattern.js"(exports2) {
+  "../../oh-my-evor/node_modules/ajv/dist/vocabularies/validation/pattern.js"(exports2) {
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
     var code_1 = require_code2();
@@ -4757,9 +4757,9 @@ var require_pattern = __commonJS({
   }
 });
 
-// ../node_modules/ajv/dist/vocabularies/validation/limitProperties.js
+// ../../oh-my-evor/node_modules/ajv/dist/vocabularies/validation/limitProperties.js
 var require_limitProperties = __commonJS({
-  "../node_modules/ajv/dist/vocabularies/validation/limitProperties.js"(exports2) {
+  "../../oh-my-evor/node_modules/ajv/dist/vocabularies/validation/limitProperties.js"(exports2) {
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
     var codegen_1 = require_codegen();
@@ -4786,9 +4786,9 @@ var require_limitProperties = __commonJS({
   }
 });
 
-// ../node_modules/ajv/dist/vocabularies/validation/required.js
+// ../../oh-my-evor/node_modules/ajv/dist/vocabularies/validation/required.js
 var require_required = __commonJS({
-  "../node_modules/ajv/dist/vocabularies/validation/required.js"(exports2) {
+  "../../oh-my-evor/node_modules/ajv/dist/vocabularies/validation/required.js"(exports2) {
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
     var code_1 = require_code2();
@@ -4868,9 +4868,9 @@ var require_required = __commonJS({
   }
 });
 
-// ../node_modules/ajv/dist/vocabularies/validation/limitItems.js
+// ../../oh-my-evor/node_modules/ajv/dist/vocabularies/validation/limitItems.js
 var require_limitItems = __commonJS({
-  "../node_modules/ajv/dist/vocabularies/validation/limitItems.js"(exports2) {
+  "../../oh-my-evor/node_modules/ajv/dist/vocabularies/validation/limitItems.js"(exports2) {
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
     var codegen_1 = require_codegen();
@@ -4897,9 +4897,9 @@ var require_limitItems = __commonJS({
   }
 });
 
-// ../node_modules/ajv/dist/runtime/equal.js
+// ../../oh-my-evor/node_modules/ajv/dist/runtime/equal.js
 var require_equal = __commonJS({
-  "../node_modules/ajv/dist/runtime/equal.js"(exports2) {
+  "../../oh-my-evor/node_modules/ajv/dist/runtime/equal.js"(exports2) {
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
     var equal = require_fast_deep_equal();
@@ -4908,9 +4908,9 @@ var require_equal = __commonJS({
   }
 });
 
-// ../node_modules/ajv/dist/vocabularies/validation/uniqueItems.js
+// ../../oh-my-evor/node_modules/ajv/dist/vocabularies/validation/uniqueItems.js
 var require_uniqueItems = __commonJS({
-  "../node_modules/ajv/dist/vocabularies/validation/uniqueItems.js"(exports2) {
+  "../../oh-my-evor/node_modules/ajv/dist/vocabularies/validation/uniqueItems.js"(exports2) {
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
     var dataType_1 = require_dataType();
@@ -4975,9 +4975,9 @@ var require_uniqueItems = __commonJS({
   }
 });
 
-// ../node_modules/ajv/dist/vocabularies/validation/const.js
+// ../../oh-my-evor/node_modules/ajv/dist/vocabularies/validation/const.js
 var require_const = __commonJS({
-  "../node_modules/ajv/dist/vocabularies/validation/const.js"(exports2) {
+  "../../oh-my-evor/node_modules/ajv/dist/vocabularies/validation/const.js"(exports2) {
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
     var codegen_1 = require_codegen();
@@ -5004,9 +5004,9 @@ var require_const = __commonJS({
   }
 });
 
-// ../node_modules/ajv/dist/vocabularies/validation/enum.js
+// ../../oh-my-evor/node_modules/ajv/dist/vocabularies/validation/enum.js
 var require_enum = __commonJS({
-  "../node_modules/ajv/dist/vocabularies/validation/enum.js"(exports2) {
+  "../../oh-my-evor/node_modules/ajv/dist/vocabularies/validation/enum.js"(exports2) {
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
     var codegen_1 = require_codegen();
@@ -5053,9 +5053,9 @@ var require_enum = __commonJS({
   }
 });
 
-// ../node_modules/ajv/dist/vocabularies/validation/index.js
+// ../../oh-my-evor/node_modules/ajv/dist/vocabularies/validation/index.js
 var require_validation = __commonJS({
-  "../node_modules/ajv/dist/vocabularies/validation/index.js"(exports2) {
+  "../../oh-my-evor/node_modules/ajv/dist/vocabularies/validation/index.js"(exports2) {
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
     var limitNumber_1 = require_limitNumber();
@@ -5091,9 +5091,9 @@ var require_validation = __commonJS({
   }
 });
 
-// ../node_modules/ajv/dist/vocabularies/applicator/additionalItems.js
+// ../../oh-my-evor/node_modules/ajv/dist/vocabularies/applicator/additionalItems.js
 var require_additionalItems = __commonJS({
-  "../node_modules/ajv/dist/vocabularies/applicator/additionalItems.js"(exports2) {
+  "../../oh-my-evor/node_modules/ajv/dist/vocabularies/applicator/additionalItems.js"(exports2) {
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.validateAdditionalItems = void 0;
@@ -5144,9 +5144,9 @@ var require_additionalItems = __commonJS({
   }
 });
 
-// ../node_modules/ajv/dist/vocabularies/applicator/items.js
+// ../../oh-my-evor/node_modules/ajv/dist/vocabularies/applicator/items.js
 var require_items = __commonJS({
-  "../node_modules/ajv/dist/vocabularies/applicator/items.js"(exports2) {
+  "../../oh-my-evor/node_modules/ajv/dist/vocabularies/applicator/items.js"(exports2) {
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.validateTuple = void 0;
@@ -5201,9 +5201,9 @@ var require_items = __commonJS({
   }
 });
 
-// ../node_modules/ajv/dist/vocabularies/applicator/prefixItems.js
+// ../../oh-my-evor/node_modules/ajv/dist/vocabularies/applicator/prefixItems.js
 var require_prefixItems = __commonJS({
-  "../node_modules/ajv/dist/vocabularies/applicator/prefixItems.js"(exports2) {
+  "../../oh-my-evor/node_modules/ajv/dist/vocabularies/applicator/prefixItems.js"(exports2) {
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
     var items_1 = require_items();
@@ -5218,9 +5218,9 @@ var require_prefixItems = __commonJS({
   }
 });
 
-// ../node_modules/ajv/dist/vocabularies/applicator/items2020.js
+// ../../oh-my-evor/node_modules/ajv/dist/vocabularies/applicator/items2020.js
 var require_items2020 = __commonJS({
-  "../node_modules/ajv/dist/vocabularies/applicator/items2020.js"(exports2) {
+  "../../oh-my-evor/node_modules/ajv/dist/vocabularies/applicator/items2020.js"(exports2) {
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
     var codegen_1 = require_codegen();
@@ -5253,9 +5253,9 @@ var require_items2020 = __commonJS({
   }
 });
 
-// ../node_modules/ajv/dist/vocabularies/applicator/contains.js
+// ../../oh-my-evor/node_modules/ajv/dist/vocabularies/applicator/contains.js
 var require_contains = __commonJS({
-  "../node_modules/ajv/dist/vocabularies/applicator/contains.js"(exports2) {
+  "../../oh-my-evor/node_modules/ajv/dist/vocabularies/applicator/contains.js"(exports2) {
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
     var codegen_1 = require_codegen();
@@ -5347,9 +5347,9 @@ var require_contains = __commonJS({
   }
 });
 
-// ../node_modules/ajv/dist/vocabularies/applicator/dependencies.js
+// ../../oh-my-evor/node_modules/ajv/dist/vocabularies/applicator/dependencies.js
 var require_dependencies = __commonJS({
-  "../node_modules/ajv/dist/vocabularies/applicator/dependencies.js"(exports2) {
+  "../../oh-my-evor/node_modules/ajv/dist/vocabularies/applicator/dependencies.js"(exports2) {
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.validateSchemaDeps = exports2.validatePropertyDeps = exports2.error = void 0;
@@ -5441,9 +5441,9 @@ var require_dependencies = __commonJS({
   }
 });
 
-// ../node_modules/ajv/dist/vocabularies/applicator/propertyNames.js
+// ../../oh-my-evor/node_modules/ajv/dist/vocabularies/applicator/propertyNames.js
 var require_propertyNames = __commonJS({
-  "../node_modules/ajv/dist/vocabularies/applicator/propertyNames.js"(exports2) {
+  "../../oh-my-evor/node_modules/ajv/dist/vocabularies/applicator/propertyNames.js"(exports2) {
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
     var codegen_1 = require_codegen();
@@ -5484,9 +5484,9 @@ var require_propertyNames = __commonJS({
   }
 });
 
-// ../node_modules/ajv/dist/vocabularies/applicator/additionalProperties.js
+// ../../oh-my-evor/node_modules/ajv/dist/vocabularies/applicator/additionalProperties.js
 var require_additionalProperties = __commonJS({
-  "../node_modules/ajv/dist/vocabularies/applicator/additionalProperties.js"(exports2) {
+  "../../oh-my-evor/node_modules/ajv/dist/vocabularies/applicator/additionalProperties.js"(exports2) {
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
     var code_1 = require_code2();
@@ -5590,9 +5590,9 @@ var require_additionalProperties = __commonJS({
   }
 });
 
-// ../node_modules/ajv/dist/vocabularies/applicator/properties.js
+// ../../oh-my-evor/node_modules/ajv/dist/vocabularies/applicator/properties.js
 var require_properties = __commonJS({
-  "../node_modules/ajv/dist/vocabularies/applicator/properties.js"(exports2) {
+  "../../oh-my-evor/node_modules/ajv/dist/vocabularies/applicator/properties.js"(exports2) {
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
     var validate_1 = require_validate();
@@ -5648,9 +5648,9 @@ var require_properties = __commonJS({
   }
 });
 
-// ../node_modules/ajv/dist/vocabularies/applicator/patternProperties.js
+// ../../oh-my-evor/node_modules/ajv/dist/vocabularies/applicator/patternProperties.js
 var require_patternProperties = __commonJS({
-  "../node_modules/ajv/dist/vocabularies/applicator/patternProperties.js"(exports2) {
+  "../../oh-my-evor/node_modules/ajv/dist/vocabularies/applicator/patternProperties.js"(exports2) {
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
     var code_1 = require_code2();
@@ -5722,9 +5722,9 @@ var require_patternProperties = __commonJS({
   }
 });
 
-// ../node_modules/ajv/dist/vocabularies/applicator/not.js
+// ../../oh-my-evor/node_modules/ajv/dist/vocabularies/applicator/not.js
 var require_not = __commonJS({
-  "../node_modules/ajv/dist/vocabularies/applicator/not.js"(exports2) {
+  "../../oh-my-evor/node_modules/ajv/dist/vocabularies/applicator/not.js"(exports2) {
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
     var util_1 = require_util();
@@ -5753,9 +5753,9 @@ var require_not = __commonJS({
   }
 });
 
-// ../node_modules/ajv/dist/vocabularies/applicator/anyOf.js
+// ../../oh-my-evor/node_modules/ajv/dist/vocabularies/applicator/anyOf.js
 var require_anyOf = __commonJS({
-  "../node_modules/ajv/dist/vocabularies/applicator/anyOf.js"(exports2) {
+  "../../oh-my-evor/node_modules/ajv/dist/vocabularies/applicator/anyOf.js"(exports2) {
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
     var code_1 = require_code2();
@@ -5770,9 +5770,9 @@ var require_anyOf = __commonJS({
   }
 });
 
-// ../node_modules/ajv/dist/vocabularies/applicator/oneOf.js
+// ../../oh-my-evor/node_modules/ajv/dist/vocabularies/applicator/oneOf.js
 var require_oneOf = __commonJS({
-  "../node_modules/ajv/dist/vocabularies/applicator/oneOf.js"(exports2) {
+  "../../oh-my-evor/node_modules/ajv/dist/vocabularies/applicator/oneOf.js"(exports2) {
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
     var codegen_1 = require_codegen();
@@ -5828,9 +5828,9 @@ var require_oneOf = __commonJS({
   }
 });
 
-// ../node_modules/ajv/dist/vocabularies/applicator/allOf.js
+// ../../oh-my-evor/node_modules/ajv/dist/vocabularies/applicator/allOf.js
 var require_allOf = __commonJS({
-  "../node_modules/ajv/dist/vocabularies/applicator/allOf.js"(exports2) {
+  "../../oh-my-evor/node_modules/ajv/dist/vocabularies/applicator/allOf.js"(exports2) {
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
     var util_1 = require_util();
@@ -5855,9 +5855,9 @@ var require_allOf = __commonJS({
   }
 });
 
-// ../node_modules/ajv/dist/vocabularies/applicator/if.js
+// ../../oh-my-evor/node_modules/ajv/dist/vocabularies/applicator/if.js
 var require_if = __commonJS({
-  "../node_modules/ajv/dist/vocabularies/applicator/if.js"(exports2) {
+  "../../oh-my-evor/node_modules/ajv/dist/vocabularies/applicator/if.js"(exports2) {
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
     var codegen_1 = require_codegen();
@@ -5924,9 +5924,9 @@ var require_if = __commonJS({
   }
 });
 
-// ../node_modules/ajv/dist/vocabularies/applicator/thenElse.js
+// ../../oh-my-evor/node_modules/ajv/dist/vocabularies/applicator/thenElse.js
 var require_thenElse = __commonJS({
-  "../node_modules/ajv/dist/vocabularies/applicator/thenElse.js"(exports2) {
+  "../../oh-my-evor/node_modules/ajv/dist/vocabularies/applicator/thenElse.js"(exports2) {
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
     var util_1 = require_util();
@@ -5942,9 +5942,9 @@ var require_thenElse = __commonJS({
   }
 });
 
-// ../node_modules/ajv/dist/vocabularies/applicator/index.js
+// ../../oh-my-evor/node_modules/ajv/dist/vocabularies/applicator/index.js
 var require_applicator = __commonJS({
-  "../node_modules/ajv/dist/vocabularies/applicator/index.js"(exports2) {
+  "../../oh-my-evor/node_modules/ajv/dist/vocabularies/applicator/index.js"(exports2) {
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
     var additionalItems_1 = require_additionalItems();
@@ -5990,9 +5990,9 @@ var require_applicator = __commonJS({
   }
 });
 
-// ../node_modules/ajv/dist/vocabularies/format/format.js
+// ../../oh-my-evor/node_modules/ajv/dist/vocabularies/format/format.js
 var require_format = __commonJS({
-  "../node_modules/ajv/dist/vocabularies/format/format.js"(exports2) {
+  "../../oh-my-evor/node_modules/ajv/dist/vocabularies/format/format.js"(exports2) {
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
     var codegen_1 = require_codegen();
@@ -6080,9 +6080,9 @@ var require_format = __commonJS({
   }
 });
 
-// ../node_modules/ajv/dist/vocabularies/format/index.js
+// ../../oh-my-evor/node_modules/ajv/dist/vocabularies/format/index.js
 var require_format2 = __commonJS({
-  "../node_modules/ajv/dist/vocabularies/format/index.js"(exports2) {
+  "../../oh-my-evor/node_modules/ajv/dist/vocabularies/format/index.js"(exports2) {
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
     var format_1 = require_format();
@@ -6091,9 +6091,9 @@ var require_format2 = __commonJS({
   }
 });
 
-// ../node_modules/ajv/dist/vocabularies/metadata.js
+// ../../oh-my-evor/node_modules/ajv/dist/vocabularies/metadata.js
 var require_metadata = __commonJS({
-  "../node_modules/ajv/dist/vocabularies/metadata.js"(exports2) {
+  "../../oh-my-evor/node_modules/ajv/dist/vocabularies/metadata.js"(exports2) {
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.contentVocabulary = exports2.metadataVocabulary = void 0;
@@ -6114,9 +6114,9 @@ var require_metadata = __commonJS({
   }
 });
 
-// ../node_modules/ajv/dist/vocabularies/draft7.js
+// ../../oh-my-evor/node_modules/ajv/dist/vocabularies/draft7.js
 var require_draft7 = __commonJS({
-  "../node_modules/ajv/dist/vocabularies/draft7.js"(exports2) {
+  "../../oh-my-evor/node_modules/ajv/dist/vocabularies/draft7.js"(exports2) {
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
     var core_1 = require_core2();
@@ -6136,9 +6136,9 @@ var require_draft7 = __commonJS({
   }
 });
 
-// ../node_modules/ajv/dist/vocabularies/discriminator/types.js
+// ../../oh-my-evor/node_modules/ajv/dist/vocabularies/discriminator/types.js
 var require_types = __commonJS({
-  "../node_modules/ajv/dist/vocabularies/discriminator/types.js"(exports2) {
+  "../../oh-my-evor/node_modules/ajv/dist/vocabularies/discriminator/types.js"(exports2) {
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.DiscrError = void 0;
@@ -6150,9 +6150,9 @@ var require_types = __commonJS({
   }
 });
 
-// ../node_modules/ajv/dist/vocabularies/discriminator/index.js
+// ../../oh-my-evor/node_modules/ajv/dist/vocabularies/discriminator/index.js
 var require_discriminator = __commonJS({
-  "../node_modules/ajv/dist/vocabularies/discriminator/index.js"(exports2) {
+  "../../oh-my-evor/node_modules/ajv/dist/vocabularies/discriminator/index.js"(exports2) {
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
     var codegen_1 = require_codegen();
@@ -6255,9 +6255,9 @@ var require_discriminator = __commonJS({
   }
 });
 
-// ../node_modules/ajv/dist/refs/json-schema-draft-07.json
+// ../../oh-my-evor/node_modules/ajv/dist/refs/json-schema-draft-07.json
 var require_json_schema_draft_07 = __commonJS({
-  "../node_modules/ajv/dist/refs/json-schema-draft-07.json"(exports2, module2) {
+  "../../oh-my-evor/node_modules/ajv/dist/refs/json-schema-draft-07.json"(exports2, module2) {
     module2.exports = {
       $schema: "http://json-schema.org/draft-07/schema#",
       $id: "http://json-schema.org/draft-07/schema#",
@@ -6412,9 +6412,9 @@ var require_json_schema_draft_07 = __commonJS({
   }
 });
 
-// ../node_modules/ajv/dist/ajv.js
+// ../../oh-my-evor/node_modules/ajv/dist/ajv.js
 var require_ajv = __commonJS({
-  "../node_modules/ajv/dist/ajv.js"(exports2, module2) {
+  "../../oh-my-evor/node_modules/ajv/dist/ajv.js"(exports2, module2) {
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.MissingRefError = exports2.ValidationError = exports2.CodeGen = exports2.Name = exports2.nil = exports2.stringify = exports2.str = exports2._ = exports2.KeywordCxt = exports2.Ajv = void 0;
@@ -6482,9 +6482,9 @@ var require_ajv = __commonJS({
   }
 });
 
-// ../node_modules/ajv-formats/dist/formats.js
+// ../../oh-my-evor/node_modules/ajv-formats/dist/formats.js
 var require_formats = __commonJS({
-  "../node_modules/ajv-formats/dist/formats.js"(exports2) {
+  "../../oh-my-evor/node_modules/ajv-formats/dist/formats.js"(exports2) {
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.formatNames = exports2.fastFormats = exports2.fullFormats = void 0;
@@ -6685,9 +6685,9 @@ var require_formats = __commonJS({
   }
 });
 
-// ../node_modules/ajv-formats/dist/limit.js
+// ../../oh-my-evor/node_modules/ajv-formats/dist/limit.js
 var require_limit = __commonJS({
-  "../node_modules/ajv-formats/dist/limit.js"(exports2) {
+  "../../oh-my-evor/node_modules/ajv-formats/dist/limit.js"(exports2) {
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.formatLimitDefinition = void 0;
@@ -6757,9 +6757,9 @@ var require_limit = __commonJS({
   }
 });
 
-// ../node_modules/ajv-formats/dist/index.js
+// ../../oh-my-evor/node_modules/ajv-formats/dist/index.js
 var require_dist = __commonJS({
-  "../node_modules/ajv-formats/dist/index.js"(exports2, module2) {
+  "../../oh-my-evor/node_modules/ajv-formats/dist/index.js"(exports2, module2) {
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
     var formats_1 = require_formats();
@@ -6799,7 +6799,7 @@ var require_dist = __commonJS({
   }
 });
 
-// ../node_modules/zod/v3/external.js
+// ../../oh-my-evor/node_modules/zod/v3/external.js
 var external_exports = {};
 __export(external_exports, {
   BRAND: () => BRAND,
@@ -6911,7 +6911,7 @@ __export(external_exports, {
   void: () => voidType
 });
 
-// ../node_modules/zod/v3/helpers/util.js
+// ../../oh-my-evor/node_modules/zod/v3/helpers/util.js
 var util;
 (function(util2) {
   util2.assertEqual = (_) => {
@@ -7045,7 +7045,7 @@ var getParsedType = (data) => {
   }
 };
 
-// ../node_modules/zod/v3/ZodError.js
+// ../../oh-my-evor/node_modules/zod/v3/ZodError.js
 var ZodIssueCode = util.arrayToEnum([
   "invalid_type",
   "invalid_literal",
@@ -7163,7 +7163,7 @@ ZodError.create = (issues) => {
   return error2;
 };
 
-// ../node_modules/zod/v3/locales/en.js
+// ../../oh-my-evor/node_modules/zod/v3/locales/en.js
 var errorMap = (issue2, _ctx) => {
   let message;
   switch (issue2.code) {
@@ -7266,7 +7266,7 @@ var errorMap = (issue2, _ctx) => {
 };
 var en_default = errorMap;
 
-// ../node_modules/zod/v3/errors.js
+// ../../oh-my-evor/node_modules/zod/v3/errors.js
 var overrideErrorMap = en_default;
 function setErrorMap(map) {
   overrideErrorMap = map;
@@ -7275,7 +7275,7 @@ function getErrorMap() {
   return overrideErrorMap;
 }
 
-// ../node_modules/zod/v3/helpers/parseUtil.js
+// ../../oh-my-evor/node_modules/zod/v3/helpers/parseUtil.js
 var makeIssue = (params) => {
   const { data, path, errorMaps, issueData } = params;
   const fullPath = [...path, ...issueData.path || []];
@@ -7385,14 +7385,14 @@ var isDirty = (x) => x.status === "dirty";
 var isValid = (x) => x.status === "valid";
 var isAsync = (x) => typeof Promise !== "undefined" && x instanceof Promise;
 
-// ../node_modules/zod/v3/helpers/errorUtil.js
+// ../../oh-my-evor/node_modules/zod/v3/helpers/errorUtil.js
 var errorUtil;
 (function(errorUtil2) {
   errorUtil2.errToObj = (message) => typeof message === "string" ? { message } : message || {};
   errorUtil2.toString = (message) => typeof message === "string" ? message : message?.message;
 })(errorUtil || (errorUtil = {}));
 
-// ../node_modules/zod/v3/types.js
+// ../../oh-my-evor/node_modules/zod/v3/types.js
 var ParseInputLazyPath = class {
   constructor(parent, value, path, key) {
     this._cachedPath = [];
@@ -10840,7 +10840,7 @@ var coerce = {
 };
 var NEVER = INVALID;
 
-// ../node_modules/zod/v4/core/core.js
+// ../../oh-my-evor/node_modules/zod/v4/core/core.js
 var NEVER2 = Object.freeze({
   status: "aborted"
 });
@@ -10900,7 +10900,7 @@ function config(newConfig) {
   return globalConfig;
 }
 
-// ../node_modules/zod/v4/core/util.js
+// ../../oh-my-evor/node_modules/zod/v4/core/util.js
 var util_exports = {};
 __export(util_exports, {
   BIGINT_FORMAT_RANGES: () => BIGINT_FORMAT_RANGES,
@@ -11421,7 +11421,7 @@ var Class = class {
   }
 };
 
-// ../node_modules/zod/v4/core/errors.js
+// ../../oh-my-evor/node_modules/zod/v4/core/errors.js
 var initializer = (inst, def) => {
   inst.name = "$ZodError";
   Object.defineProperty(inst, "_zod", {
@@ -11496,7 +11496,7 @@ function formatError(error2, _mapper) {
   return fieldErrors;
 }
 
-// ../node_modules/zod/v4/core/parse.js
+// ../../oh-my-evor/node_modules/zod/v4/core/parse.js
 var _parse = (_Err) => (schema, value, _ctx, _params) => {
   const ctx = _ctx ? Object.assign(_ctx, { async: false }) : { async: false };
   const result = schema._zod.run({ value, issues: [] }, ctx);
@@ -11548,7 +11548,7 @@ var _safeParseAsync = (_Err) => async (schema, value, _ctx) => {
 };
 var safeParseAsync = /* @__PURE__ */ _safeParseAsync($ZodRealError);
 
-// ../node_modules/zod/v4/core/regexes.js
+// ../../oh-my-evor/node_modules/zod/v4/core/regexes.js
 var cuid = /^[cC][^\s-]{8,}$/;
 var cuid2 = /^[0-9a-z]+$/;
 var ulid = /^[0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{26}$/;
@@ -11606,7 +11606,7 @@ var _null = /null/i;
 var lowercase = /^[^A-Z]*$/;
 var uppercase = /^[^a-z]*$/;
 
-// ../node_modules/zod/v4/core/checks.js
+// ../../oh-my-evor/node_modules/zod/v4/core/checks.js
 var $ZodCheck = /* @__PURE__ */ $constructor("$ZodCheck", (inst, def) => {
   var _a;
   inst._zod ?? (inst._zod = {});
@@ -11991,7 +11991,7 @@ var $ZodCheckOverwrite = /* @__PURE__ */ $constructor("$ZodCheckOverwrite", (ins
   };
 });
 
-// ../node_modules/zod/v4/core/doc.js
+// ../../oh-my-evor/node_modules/zod/v4/core/doc.js
 var Doc = class {
   constructor(args = []) {
     this.content = [];
@@ -12027,14 +12027,14 @@ var Doc = class {
   }
 };
 
-// ../node_modules/zod/v4/core/versions.js
+// ../../oh-my-evor/node_modules/zod/v4/core/versions.js
 var version = {
   major: 4,
   minor: 0,
   patch: 0
 };
 
-// ../node_modules/zod/v4/core/schemas.js
+// ../../oh-my-evor/node_modules/zod/v4/core/schemas.js
 var $ZodType = /* @__PURE__ */ $constructor("$ZodType", (inst, def) => {
   var _a;
   inst ?? (inst = {});
@@ -13272,7 +13272,7 @@ function handleRefineResult(result, payload, input, inst) {
   }
 }
 
-// ../node_modules/zod/v4/locales/en.js
+// ../../oh-my-evor/node_modules/zod/v4/locales/en.js
 var parsedType = (data) => {
   const t = typeof data;
   switch (t) {
@@ -13390,7 +13390,7 @@ function en_default2() {
   };
 }
 
-// ../node_modules/zod/v4/core/registries.js
+// ../../oh-my-evor/node_modules/zod/v4/core/registries.js
 var $output = Symbol("ZodOutput");
 var $input = Symbol("ZodInput");
 var $ZodRegistry = class {
@@ -13440,7 +13440,7 @@ function registry() {
 }
 var globalRegistry = /* @__PURE__ */ registry();
 
-// ../node_modules/zod/v4/core/api.js
+// ../../oh-my-evor/node_modules/zod/v4/core/api.js
 function _string(Class2, params) {
   return new Class2({
     type: "string",
@@ -13879,7 +13879,7 @@ function _refine(Class2, fn, _params) {
   return schema;
 }
 
-// ../node_modules/zod/v4/core/to-json-schema.js
+// ../../oh-my-evor/node_modules/zod/v4/core/to-json-schema.js
 var JSONSchemaGenerator = class {
   constructor(params) {
     this.counter = 0;
@@ -14644,7 +14644,7 @@ function isTransforming(_schema, _ctx) {
   throw new Error(`Unknown schema type: ${def.type}`);
 }
 
-// ../node_modules/zod/v4/mini/schemas.js
+// ../../oh-my-evor/node_modules/zod/v4/mini/schemas.js
 var ZodMiniType = /* @__PURE__ */ $constructor("ZodMiniType", (inst, def) => {
   if (!inst._zod)
     throw new Error("Uninitialized schema in ZodMiniType.");
@@ -14690,7 +14690,7 @@ function object(shape, params) {
   return new ZodMiniObject(def);
 }
 
-// ../node_modules/@modelcontextprotocol/sdk/dist/esm/server/zod-compat.js
+// ../../oh-my-evor/node_modules/@modelcontextprotocol/sdk/dist/esm/server/zod-compat.js
 function isZ4Schema(s) {
   const schema = s;
   return !!schema._zod;
@@ -14834,7 +14834,7 @@ function getLiteralValue(schema) {
   return void 0;
 }
 
-// ../node_modules/zod/v4/classic/iso.js
+// ../../oh-my-evor/node_modules/zod/v4/classic/iso.js
 var iso_exports2 = {};
 __export(iso_exports2, {
   ZodISODate: () => ZodISODate,
@@ -14875,7 +14875,7 @@ function duration2(params) {
   return _isoDuration(ZodISODuration, params);
 }
 
-// ../node_modules/zod/v4/classic/errors.js
+// ../../oh-my-evor/node_modules/zod/v4/classic/errors.js
 var initializer2 = (inst, issues) => {
   $ZodError.init(inst, issues);
   inst.name = "ZodError";
@@ -14909,13 +14909,13 @@ var ZodRealError = $constructor("ZodError", initializer2, {
   Parent: Error
 });
 
-// ../node_modules/zod/v4/classic/parse.js
+// ../../oh-my-evor/node_modules/zod/v4/classic/parse.js
 var parse2 = /* @__PURE__ */ _parse(ZodRealError);
 var parseAsync2 = /* @__PURE__ */ _parseAsync(ZodRealError);
 var safeParse3 = /* @__PURE__ */ _safeParse(ZodRealError);
 var safeParseAsync3 = /* @__PURE__ */ _safeParseAsync(ZodRealError);
 
-// ../node_modules/zod/v4/classic/schemas.js
+// ../../oh-my-evor/node_modules/zod/v4/classic/schemas.js
 var ZodType2 = /* @__PURE__ */ $constructor("ZodType", (inst, def) => {
   $ZodType.init(inst, def);
   inst.def = def;
@@ -15526,10 +15526,10 @@ function preprocess(fn, schema) {
   return pipe(transform(fn), schema);
 }
 
-// ../node_modules/zod/v4/classic/external.js
+// ../../oh-my-evor/node_modules/zod/v4/classic/external.js
 config(en_default2());
 
-// ../node_modules/@modelcontextprotocol/sdk/dist/esm/types.js
+// ../../oh-my-evor/node_modules/@modelcontextprotocol/sdk/dist/esm/types.js
 var LATEST_PROTOCOL_VERSION = "2025-11-25";
 var SUPPORTED_PROTOCOL_VERSIONS = [LATEST_PROTOCOL_VERSION, "2025-06-18", "2025-03-26", "2024-11-05", "2024-10-07"];
 var RELATED_TASK_META_KEY = "io.modelcontextprotocol/related-task";
@@ -17058,12 +17058,12 @@ var UrlElicitationRequiredError = class extends McpError {
   }
 };
 
-// ../node_modules/@modelcontextprotocol/sdk/dist/esm/experimental/tasks/interfaces.js
+// ../../oh-my-evor/node_modules/@modelcontextprotocol/sdk/dist/esm/experimental/tasks/interfaces.js
 function isTerminal(status) {
   return status === "completed" || status === "failed" || status === "cancelled";
 }
 
-// ../node_modules/zod-to-json-schema/dist/esm/Options.js
+// ../../oh-my-evor/node_modules/zod-to-json-schema/dist/esm/Options.js
 var ignoreOverride = Symbol("Let zodToJsonSchema decide on which parser to use");
 var defaultOptions = {
   name: void 0,
@@ -17097,7 +17097,7 @@ var getDefaultOptions = (options) => typeof options === "string" ? {
   ...options
 };
 
-// ../node_modules/zod-to-json-schema/dist/esm/Refs.js
+// ../../oh-my-evor/node_modules/zod-to-json-schema/dist/esm/Refs.js
 var getRefs = (options) => {
   const _options = getDefaultOptions(options);
   const currentPath = _options.name !== void 0 ? [..._options.basePath, _options.definitionPath, _options.name] : _options.basePath;
@@ -17118,7 +17118,7 @@ var getRefs = (options) => {
   };
 };
 
-// ../node_modules/zod-to-json-schema/dist/esm/errorMessages.js
+// ../../oh-my-evor/node_modules/zod-to-json-schema/dist/esm/errorMessages.js
 function addErrorMessage(res, key, errorMessage, refs) {
   if (!refs?.errorMessages)
     return;
@@ -17134,7 +17134,7 @@ function setResponseValueAndErrors(res, key, value, errorMessage, refs) {
   addErrorMessage(res, key, errorMessage, refs);
 }
 
-// ../node_modules/zod-to-json-schema/dist/esm/getRelativePath.js
+// ../../oh-my-evor/node_modules/zod-to-json-schema/dist/esm/getRelativePath.js
 var getRelativePath = (pathA, pathB) => {
   let i = 0;
   for (; i < pathA.length && i < pathB.length; i++) {
@@ -17144,7 +17144,7 @@ var getRelativePath = (pathA, pathB) => {
   return [(pathA.length - i).toString(), ...pathB.slice(i)].join("/");
 };
 
-// ../node_modules/zod-to-json-schema/dist/esm/parsers/any.js
+// ../../oh-my-evor/node_modules/zod-to-json-schema/dist/esm/parsers/any.js
 function parseAnyDef(refs) {
   if (refs.target !== "openAi") {
     return {};
@@ -17160,7 +17160,7 @@ function parseAnyDef(refs) {
   };
 }
 
-// ../node_modules/zod-to-json-schema/dist/esm/parsers/array.js
+// ../../oh-my-evor/node_modules/zod-to-json-schema/dist/esm/parsers/array.js
 function parseArrayDef(def, refs) {
   const res = {
     type: "array"
@@ -17184,7 +17184,7 @@ function parseArrayDef(def, refs) {
   return res;
 }
 
-// ../node_modules/zod-to-json-schema/dist/esm/parsers/bigint.js
+// ../../oh-my-evor/node_modules/zod-to-json-schema/dist/esm/parsers/bigint.js
 function parseBigintDef(def, refs) {
   const res = {
     type: "integer",
@@ -17230,24 +17230,24 @@ function parseBigintDef(def, refs) {
   return res;
 }
 
-// ../node_modules/zod-to-json-schema/dist/esm/parsers/boolean.js
+// ../../oh-my-evor/node_modules/zod-to-json-schema/dist/esm/parsers/boolean.js
 function parseBooleanDef() {
   return {
     type: "boolean"
   };
 }
 
-// ../node_modules/zod-to-json-schema/dist/esm/parsers/branded.js
+// ../../oh-my-evor/node_modules/zod-to-json-schema/dist/esm/parsers/branded.js
 function parseBrandedDef(_def, refs) {
   return parseDef(_def.type._def, refs);
 }
 
-// ../node_modules/zod-to-json-schema/dist/esm/parsers/catch.js
+// ../../oh-my-evor/node_modules/zod-to-json-schema/dist/esm/parsers/catch.js
 var parseCatchDef = (def, refs) => {
   return parseDef(def.innerType._def, refs);
 };
 
-// ../node_modules/zod-to-json-schema/dist/esm/parsers/date.js
+// ../../oh-my-evor/node_modules/zod-to-json-schema/dist/esm/parsers/date.js
 function parseDateDef(def, refs, overrideDateStrategy) {
   const strategy = overrideDateStrategy ?? refs.dateStrategy;
   if (Array.isArray(strategy)) {
@@ -17306,7 +17306,7 @@ var integerDateParser = (def, refs) => {
   return res;
 };
 
-// ../node_modules/zod-to-json-schema/dist/esm/parsers/default.js
+// ../../oh-my-evor/node_modules/zod-to-json-schema/dist/esm/parsers/default.js
 function parseDefaultDef(_def, refs) {
   return {
     ...parseDef(_def.innerType._def, refs),
@@ -17314,12 +17314,12 @@ function parseDefaultDef(_def, refs) {
   };
 }
 
-// ../node_modules/zod-to-json-schema/dist/esm/parsers/effects.js
+// ../../oh-my-evor/node_modules/zod-to-json-schema/dist/esm/parsers/effects.js
 function parseEffectsDef(_def, refs) {
   return refs.effectStrategy === "input" ? parseDef(_def.schema._def, refs) : parseAnyDef(refs);
 }
 
-// ../node_modules/zod-to-json-schema/dist/esm/parsers/enum.js
+// ../../oh-my-evor/node_modules/zod-to-json-schema/dist/esm/parsers/enum.js
 function parseEnumDef(def) {
   return {
     type: "string",
@@ -17327,7 +17327,7 @@ function parseEnumDef(def) {
   };
 }
 
-// ../node_modules/zod-to-json-schema/dist/esm/parsers/intersection.js
+// ../../oh-my-evor/node_modules/zod-to-json-schema/dist/esm/parsers/intersection.js
 var isJsonSchema7AllOfType = (type) => {
   if ("type" in type && type.type === "string")
     return false;
@@ -17369,7 +17369,7 @@ function parseIntersectionDef(def, refs) {
   } : void 0;
 }
 
-// ../node_modules/zod-to-json-schema/dist/esm/parsers/literal.js
+// ../../oh-my-evor/node_modules/zod-to-json-schema/dist/esm/parsers/literal.js
 function parseLiteralDef(def, refs) {
   const parsedType2 = typeof def.value;
   if (parsedType2 !== "bigint" && parsedType2 !== "number" && parsedType2 !== "boolean" && parsedType2 !== "string") {
@@ -17389,7 +17389,7 @@ function parseLiteralDef(def, refs) {
   };
 }
 
-// ../node_modules/zod-to-json-schema/dist/esm/parsers/string.js
+// ../../oh-my-evor/node_modules/zod-to-json-schema/dist/esm/parsers/string.js
 var emojiRegex2 = void 0;
 var zodPatterns = {
   /**
@@ -17714,7 +17714,7 @@ function stringifyRegExpWithFlags(regex, refs) {
   return pattern;
 }
 
-// ../node_modules/zod-to-json-schema/dist/esm/parsers/record.js
+// ../../oh-my-evor/node_modules/zod-to-json-schema/dist/esm/parsers/record.js
 function parseRecordDef(def, refs) {
   if (refs.target === "openAi") {
     console.warn("Warning: OpenAI may not support records in schemas! Try an array of key-value pairs instead.");
@@ -17766,7 +17766,7 @@ function parseRecordDef(def, refs) {
   return schema;
 }
 
-// ../node_modules/zod-to-json-schema/dist/esm/parsers/map.js
+// ../../oh-my-evor/node_modules/zod-to-json-schema/dist/esm/parsers/map.js
 function parseMapDef(def, refs) {
   if (refs.mapStrategy === "record") {
     return parseRecordDef(def, refs);
@@ -17791,7 +17791,7 @@ function parseMapDef(def, refs) {
   };
 }
 
-// ../node_modules/zod-to-json-schema/dist/esm/parsers/nativeEnum.js
+// ../../oh-my-evor/node_modules/zod-to-json-schema/dist/esm/parsers/nativeEnum.js
 function parseNativeEnumDef(def) {
   const object3 = def.values;
   const actualKeys = Object.keys(def.values).filter((key) => {
@@ -17805,7 +17805,7 @@ function parseNativeEnumDef(def) {
   };
 }
 
-// ../node_modules/zod-to-json-schema/dist/esm/parsers/never.js
+// ../../oh-my-evor/node_modules/zod-to-json-schema/dist/esm/parsers/never.js
 function parseNeverDef(refs) {
   return refs.target === "openAi" ? void 0 : {
     not: parseAnyDef({
@@ -17815,7 +17815,7 @@ function parseNeverDef(refs) {
   };
 }
 
-// ../node_modules/zod-to-json-schema/dist/esm/parsers/null.js
+// ../../oh-my-evor/node_modules/zod-to-json-schema/dist/esm/parsers/null.js
 function parseNullDef(refs) {
   return refs.target === "openApi3" ? {
     enum: ["null"],
@@ -17825,7 +17825,7 @@ function parseNullDef(refs) {
   };
 }
 
-// ../node_modules/zod-to-json-schema/dist/esm/parsers/union.js
+// ../../oh-my-evor/node_modules/zod-to-json-schema/dist/esm/parsers/union.js
 var primitiveMappings = {
   ZodString: "string",
   ZodNumber: "number",
@@ -17893,7 +17893,7 @@ var asAnyOf = (def, refs) => {
   return anyOf.length ? { anyOf } : void 0;
 };
 
-// ../node_modules/zod-to-json-schema/dist/esm/parsers/nullable.js
+// ../../oh-my-evor/node_modules/zod-to-json-schema/dist/esm/parsers/nullable.js
 function parseNullableDef(def, refs) {
   if (["ZodString", "ZodNumber", "ZodBigInt", "ZodBoolean", "ZodNull"].includes(def.innerType._def.typeName) && (!def.innerType._def.checks || !def.innerType._def.checks.length)) {
     if (refs.target === "openApi3") {
@@ -17925,7 +17925,7 @@ function parseNullableDef(def, refs) {
   return base && { anyOf: [base, { type: "null" }] };
 }
 
-// ../node_modules/zod-to-json-schema/dist/esm/parsers/number.js
+// ../../oh-my-evor/node_modules/zod-to-json-schema/dist/esm/parsers/number.js
 function parseNumberDef(def, refs) {
   const res = {
     type: "number"
@@ -17974,7 +17974,7 @@ function parseNumberDef(def, refs) {
   return res;
 }
 
-// ../node_modules/zod-to-json-schema/dist/esm/parsers/object.js
+// ../../oh-my-evor/node_modules/zod-to-json-schema/dist/esm/parsers/object.js
 function parseObjectDef(def, refs) {
   const forceOptionalIntoNullable = refs.target === "openAi";
   const result = {
@@ -18044,7 +18044,7 @@ function safeIsOptional(schema) {
   }
 }
 
-// ../node_modules/zod-to-json-schema/dist/esm/parsers/optional.js
+// ../../oh-my-evor/node_modules/zod-to-json-schema/dist/esm/parsers/optional.js
 var parseOptionalDef = (def, refs) => {
   if (refs.currentPath.toString() === refs.propertyPath?.toString()) {
     return parseDef(def.innerType._def, refs);
@@ -18063,7 +18063,7 @@ var parseOptionalDef = (def, refs) => {
   } : parseAnyDef(refs);
 };
 
-// ../node_modules/zod-to-json-schema/dist/esm/parsers/pipeline.js
+// ../../oh-my-evor/node_modules/zod-to-json-schema/dist/esm/parsers/pipeline.js
 var parsePipelineDef = (def, refs) => {
   if (refs.pipeStrategy === "input") {
     return parseDef(def.in._def, refs);
@@ -18083,12 +18083,12 @@ var parsePipelineDef = (def, refs) => {
   };
 };
 
-// ../node_modules/zod-to-json-schema/dist/esm/parsers/promise.js
+// ../../oh-my-evor/node_modules/zod-to-json-schema/dist/esm/parsers/promise.js
 function parsePromiseDef(def, refs) {
   return parseDef(def.type._def, refs);
 }
 
-// ../node_modules/zod-to-json-schema/dist/esm/parsers/set.js
+// ../../oh-my-evor/node_modules/zod-to-json-schema/dist/esm/parsers/set.js
 function parseSetDef(def, refs) {
   const items = parseDef(def.valueType._def, {
     ...refs,
@@ -18108,7 +18108,7 @@ function parseSetDef(def, refs) {
   return schema;
 }
 
-// ../node_modules/zod-to-json-schema/dist/esm/parsers/tuple.js
+// ../../oh-my-evor/node_modules/zod-to-json-schema/dist/esm/parsers/tuple.js
 function parseTupleDef(def, refs) {
   if (def.rest) {
     return {
@@ -18136,24 +18136,24 @@ function parseTupleDef(def, refs) {
   }
 }
 
-// ../node_modules/zod-to-json-schema/dist/esm/parsers/undefined.js
+// ../../oh-my-evor/node_modules/zod-to-json-schema/dist/esm/parsers/undefined.js
 function parseUndefinedDef(refs) {
   return {
     not: parseAnyDef(refs)
   };
 }
 
-// ../node_modules/zod-to-json-schema/dist/esm/parsers/unknown.js
+// ../../oh-my-evor/node_modules/zod-to-json-schema/dist/esm/parsers/unknown.js
 function parseUnknownDef(refs) {
   return parseAnyDef(refs);
 }
 
-// ../node_modules/zod-to-json-schema/dist/esm/parsers/readonly.js
+// ../../oh-my-evor/node_modules/zod-to-json-schema/dist/esm/parsers/readonly.js
 var parseReadonlyDef = (def, refs) => {
   return parseDef(def.innerType._def, refs);
 };
 
-// ../node_modules/zod-to-json-schema/dist/esm/selectParser.js
+// ../../oh-my-evor/node_modules/zod-to-json-schema/dist/esm/selectParser.js
 var selectParser = (def, typeName, refs) => {
   switch (typeName) {
     case ZodFirstPartyTypeKind.ZodString:
@@ -18229,7 +18229,7 @@ var selectParser = (def, typeName, refs) => {
   }
 };
 
-// ../node_modules/zod-to-json-schema/dist/esm/parseDef.js
+// ../../oh-my-evor/node_modules/zod-to-json-schema/dist/esm/parseDef.js
 function parseDef(def, refs, forceResolution = false) {
   const seenItem = refs.seen.get(def);
   if (refs.override) {
@@ -18285,7 +18285,7 @@ var addMeta = (def, refs, jsonSchema) => {
   return jsonSchema;
 };
 
-// ../node_modules/zod-to-json-schema/dist/esm/zodToJsonSchema.js
+// ../../oh-my-evor/node_modules/zod-to-json-schema/dist/esm/zodToJsonSchema.js
 var zodToJsonSchema = (schema, options) => {
   const refs = getRefs(options);
   let definitions = typeof options === "object" && options.definitions ? Object.entries(options.definitions).reduce((acc, [name2, schema2]) => ({
@@ -18347,7 +18347,7 @@ var zodToJsonSchema = (schema, options) => {
   return combined;
 };
 
-// ../node_modules/@modelcontextprotocol/sdk/dist/esm/server/zod-json-schema-compat.js
+// ../../oh-my-evor/node_modules/@modelcontextprotocol/sdk/dist/esm/server/zod-json-schema-compat.js
 function mapMiniTarget(t) {
   if (!t)
     return "draft-7";
@@ -18389,7 +18389,7 @@ function parseWithCompat(schema, data) {
   return result.data;
 }
 
-// ../node_modules/@modelcontextprotocol/sdk/dist/esm/shared/protocol.js
+// ../../oh-my-evor/node_modules/@modelcontextprotocol/sdk/dist/esm/shared/protocol.js
 var DEFAULT_REQUEST_TIMEOUT_MSEC = 6e4;
 var Protocol = class {
   constructor(_options) {
@@ -19343,7 +19343,7 @@ function mergeCapabilities(base, additional) {
   return result;
 }
 
-// ../node_modules/@modelcontextprotocol/sdk/dist/esm/validation/ajv-provider.js
+// ../../oh-my-evor/node_modules/@modelcontextprotocol/sdk/dist/esm/validation/ajv-provider.js
 var import_ajv = __toESM(require_ajv(), 1);
 var import_ajv_formats = __toESM(require_dist(), 1);
 function createDefaultAjvInstance() {
@@ -19411,7 +19411,7 @@ var AjvJsonSchemaValidator = class {
   }
 };
 
-// ../node_modules/@modelcontextprotocol/sdk/dist/esm/experimental/tasks/server.js
+// ../../oh-my-evor/node_modules/@modelcontextprotocol/sdk/dist/esm/experimental/tasks/server.js
 var ExperimentalServerTasks = class {
   constructor(_server) {
     this._server = _server;
@@ -19624,7 +19624,7 @@ var ExperimentalServerTasks = class {
   }
 };
 
-// ../node_modules/@modelcontextprotocol/sdk/dist/esm/experimental/tasks/helpers.js
+// ../../oh-my-evor/node_modules/@modelcontextprotocol/sdk/dist/esm/experimental/tasks/helpers.js
 function assertToolsCallTaskCapability(requests, method, entityName) {
   if (!requests) {
     throw new Error(`${entityName} does not support task creation (required for ${method})`);
@@ -19659,7 +19659,7 @@ function assertClientRequestTaskCapability(requests, method, entityName) {
   }
 }
 
-// ../node_modules/@modelcontextprotocol/sdk/dist/esm/server/index.js
+// ../../oh-my-evor/node_modules/@modelcontextprotocol/sdk/dist/esm/server/index.js
 var Server = class extends Protocol {
   /**
    * Initializes this server with the given name and version information.
@@ -20039,7 +20039,7 @@ var Server = class extends Protocol {
   }
 };
 
-// ../node_modules/@modelcontextprotocol/sdk/dist/esm/server/completable.js
+// ../../oh-my-evor/node_modules/@modelcontextprotocol/sdk/dist/esm/server/completable.js
 var COMPLETABLE_SYMBOL = Symbol.for("mcp.completable");
 function isCompletable(schema) {
   return !!schema && typeof schema === "object" && COMPLETABLE_SYMBOL in schema;
@@ -20053,7 +20053,7 @@ var McpZodTypeKind;
   McpZodTypeKind2["Completable"] = "McpCompletable";
 })(McpZodTypeKind || (McpZodTypeKind = {}));
 
-// ../node_modules/@modelcontextprotocol/sdk/dist/esm/shared/toolNameValidation.js
+// ../../oh-my-evor/node_modules/@modelcontextprotocol/sdk/dist/esm/shared/toolNameValidation.js
 var TOOL_NAME_REGEX = /^[A-Za-z0-9._-]{1,128}$/;
 function validateToolName(name) {
   const warnings = [];
@@ -20111,7 +20111,7 @@ function validateAndWarnToolName(name) {
   return result.isValid;
 }
 
-// ../node_modules/@modelcontextprotocol/sdk/dist/esm/experimental/tasks/mcp-server.js
+// ../../oh-my-evor/node_modules/@modelcontextprotocol/sdk/dist/esm/experimental/tasks/mcp-server.js
 var ExperimentalMcpServerTasks = class {
   constructor(_mcpServer) {
     this._mcpServer = _mcpServer;
@@ -20126,7 +20126,7 @@ var ExperimentalMcpServerTasks = class {
   }
 };
 
-// ../node_modules/@modelcontextprotocol/sdk/dist/esm/server/mcp.js
+// ../../oh-my-evor/node_modules/@modelcontextprotocol/sdk/dist/esm/server/mcp.js
 var McpServer = class {
   constructor(serverInfo, options) {
     this._registeredResources = {};
@@ -20918,10 +20918,10 @@ var EMPTY_COMPLETION_RESULT = {
   }
 };
 
-// ../node_modules/@modelcontextprotocol/sdk/dist/esm/server/stdio.js
+// ../../oh-my-evor/node_modules/@modelcontextprotocol/sdk/dist/esm/server/stdio.js
 var import_node_process = __toESM(require("node:process"), 1);
 
-// ../node_modules/@modelcontextprotocol/sdk/dist/esm/shared/stdio.js
+// ../../oh-my-evor/node_modules/@modelcontextprotocol/sdk/dist/esm/shared/stdio.js
 var ReadBuffer = class {
   append(chunk) {
     this._buffer = this._buffer ? Buffer.concat([this._buffer, chunk]) : chunk;
@@ -20949,7 +20949,7 @@ function serializeMessage(message) {
   return JSON.stringify(message) + "\n";
 }
 
-// ../node_modules/@modelcontextprotocol/sdk/dist/esm/server/stdio.js
+// ../../oh-my-evor/node_modules/@modelcontextprotocol/sdk/dist/esm/server/stdio.js
 var StdioServerTransport = class {
   constructor(_stdin = import_node_process.default.stdin, _stdout = import_node_process.default.stdout) {
     this._stdin = _stdin;
@@ -21177,6 +21177,8 @@ var TreeNodeSchema = external_exports.object({
   metrics: external_exports.record(external_exports.string(), external_exports.number()),
   eval_version: external_exports.string(),
   fitness_value: external_exports.number().optional(),
+  /** fitness under every eval_version the node was scored with; a re-score adds, never erases */
+  scores_by_version: external_exports.record(external_exports.string(), external_exports.number()).optional(),
   telemetry_ref: external_exports.string().optional(),
   // Server-owned bookkeeping — optional in input; server fills defaults before persist.
   lesson_ids: external_exports.array(external_exports.string()).optional().default([]),
@@ -21252,7 +21254,14 @@ var EvaluationResultSchema = external_exports.object({
   status: external_exports.enum(["success", "regression", "error", "timeout", "oom"]),
   benchmark_raw: external_exports.string(),
   // Server-owned: filled via now().
-  timestamp: ISODate.optional()
+  timestamp: ISODate.optional(),
+  // Set by the runner under a metric-hardening eval version: the same node
+  // scored by the sealed parent evaluator. Evaluator-owned, like fitness_value.
+  parent_eval_version: external_exports.string().optional(),
+  parent_fitness_value: external_exports.number().optional(),
+  parent_metrics: external_exports.record(external_exports.string(), external_exports.number()).optional(),
+  /** false = parent and hardened evaluators scored different inputs */
+  parent_inputs_match: external_exports.boolean().optional()
 });
 var IntegrityReportSchema = external_exports.object({
   node_id: external_exports.string(),
@@ -21273,6 +21282,9 @@ var IntegrityReportSchema = external_exports.object({
     acquisition_namespace_enforced: external_exports.boolean().nullable(),
     structure_ok: external_exports.boolean().nullable().optional().describe(
       "ForgeStructureGate: genome seams + forward pass + telemetry + eval lock. null = gate not run."
+    ),
+    not_softer_than_parent: external_exports.boolean().nullable().optional().describe(
+      "Under a metric-hardening eval version: fitness <= the sealed parent evaluator's fitness. null = not a hardened version."
     )
   }),
   verdict: external_exports.enum(["passed", "failed"]),
@@ -21387,11 +21399,16 @@ var DecisionLogEntrySchema = external_exports.object({
     // on AutonomyCharter.invariant, with no code branch — so the one
     // representable part is the vocabulary: an agent that has proved the
     // contract unsatisfiable records that, instead of silently asking a human.
-    "contract-infeasible"
+    "contract-infeasible",
+    // A metric hardening: a stricter evaluator under a new eval_version,
+    // pre-authorized by the Monotonic-Honesty Invariant.
+    "harden-eval"
   ]),
   rationale: external_exports.string(),
   node_ids: external_exports.array(external_exports.string()),
-  strategy_delta: StrategyStateSchema.partial().optional()
+  strategy_delta: StrategyStateSchema.partial().optional(),
+  /** what the decision rests on — a wiki lesson id, a probe proposal pointer */
+  evidence: external_exports.array(external_exports.string()).optional()
 });
 var GenomeConfigSchema = external_exports.object({
   genome_version: external_exports.string(),
@@ -21466,7 +21483,10 @@ var EvalSuiteSchema = external_exports.object({
   split_hashes: external_exports.record(external_exports.string(), external_exports.string()),
   created_at: ISODate,
   created_by: external_exports.enum(["user", "policy"]),
-  consent_log_ref: external_exports.string()
+  consent_log_ref: external_exports.string(),
+  /** absent = the initial suite; metric_hardening = same domains, stricter evaluator */
+  kind: external_exports.enum(["domain_upgrade", "metric_hardening"]).optional(),
+  hardening_rationale: external_exports.string().optional()
 });
 var BenchmarkUpgradeSchema = external_exports.object({
   upgrade_id: external_exports.string(),
@@ -21484,13 +21504,25 @@ var BenchmarkUpgradeSchema = external_exports.object({
   /** tick count after which not-yet-rescored nodes are demoted to v{old}-only (R-2) */
   rescore_deadline_ticks: external_exports.number().int().min(0),
   decision_log_ref: external_exports.string(),
-  created_at: ISODate
+  created_at: ISODate,
+  kind: external_exports.enum(["domain_upgrade", "metric_hardening"]).default("domain_upgrade"),
+  /** frontier nodes marked for re-score under to_eval_version */
+  rescore_node_ids: external_exports.array(external_exports.string()).default([]),
+  /** marked nodes already re-scored; rescore_status is complete when it covers all */
+  rescored_node_ids: external_exports.array(external_exports.string()).default([]),
+  /** marked nodes whose re-score errored or failed integrity */
+  rescore_failed_node_ids: external_exports.array(external_exports.string()).default([])
 });
 var BenchmarkUpgradeProposalSchema = external_exports.object({
   proposed_by: external_exports.enum(["probe", "sage"]),
   new_domains: external_exports.array(external_exports.string()),
   rationale: external_exports.string(),
-  citations: external_exports.array(external_exports.string())
+  citations: external_exports.array(external_exports.string()),
+  kind: external_exports.enum(["domain_upgrade", "metric_hardening"]).default("domain_upgrade"),
+  /** metric_hardening: the stricter gate */
+  proposed_gate: external_exports.string().optional(),
+  /** metric_hardening: the contract text whose intent the current metric fails to enforce */
+  contract_grounding: external_exports.string().optional()
 });
 var AngleRegistrySchema = external_exports.object({
   mission_id: external_exports.string(),
@@ -22057,7 +22089,7 @@ function resolveIntegrityPaths(runDir, contract) {
     splitPath: (0, import_path5.join)(runDir, "frozen-splits", `${contract.eval_version}.json`)
   };
 }
-function integrityCheck(runId, nodeId, missionId) {
+function integrityCheck(runId, nodeId, missionId, scoredEvalVersion) {
   const paths = resolveRunPaths(runId, missionId);
   const bridgeArgs = [
     "--run-id",
@@ -22065,7 +22097,8 @@ function integrityCheck(runId, nodeId, missionId) {
     "--node-id",
     nodeId,
     "--run-dir",
-    paths.runDir
+    paths.runDir,
+    ...scoredEvalVersion && /^v\d+$/.test(scoredEvalVersion) ? ["--scored-eval-version", scoredEvalVersion] : []
   ];
   const cachedEvalVersion = evalVersionCache.get(runId);
   const cachedHash = frozenSplitHashCache.get(runId);
@@ -22227,6 +22260,9 @@ function updateBestScore(runId, nodeId, result, integrityVerdict, missionId) {
     if (typeof value !== "number" || Number.isNaN(value)) return;
     const runStatePath = (0, import_path6.join)(paths.runDir, "run-state.json");
     const state = readRunState(runStatePath, runId);
+    const scoredUnder = result?.eval_version;
+    const inForce = contract?.eval_version ?? state.current_eval_version;
+    if (typeof scoredUnder === "string" && typeof inForce === "string" && scoredUnder !== inForce) return;
     const current = state.best_score;
     const lowerIsBetter = primary.direction === "lower";
     const improves = typeof current !== "number" ? true : lowerIsBetter ? value < current : value > current;
@@ -22237,7 +22273,71 @@ function updateBestScore(runId, nodeId, result, integrityVerdict, missionId) {
   } catch {
   }
 }
-var EVALUATOR_FIELDS = ["fitness_value", "metrics", "per_domain", "status", "benchmark_raw", "eval_version"];
+var EVALUATOR_FIELDS = [
+  "fitness_value",
+  "metrics",
+  "per_domain",
+  "status",
+  "benchmark_raw",
+  "eval_version",
+  // The parent evaluator's score under a metric hardening is measured by the
+  // runner; a recording agent's copy must not be able to raise it.
+  "parent_eval_version",
+  "parent_fitness_value",
+  "parent_metrics",
+  "parent_inputs_match"
+];
+var VERSION_RE = /^v\d+$/;
+function fitnessLowerIsBetter(runDir) {
+  try {
+    const c = JSON.parse((0, import_fs5.readFileSync)((0, import_path6.join)(runDir, "goal-contract.json"), "utf8"));
+    const spec = (c.metric_specs ?? []).find((m) => m?.role === "primary_fitness");
+    if (!spec || spec.direction !== "lower") return false;
+    if ((c.fitness_mode === "worst-domain" || c.fitness_mode === "weighted") && !spec.fitness_formula) return true;
+    return c.target_value === void 0 || c.target_value === null;
+  } catch {
+    return false;
+  }
+}
+function markRescored(runId, runDir, nodeId, evalVersion, succeeded, missionId) {
+  if (!evalVersion) return;
+  const dir = (0, import_path6.join)(runDir, "benchmark-upgrades");
+  if (!(0, import_fs5.existsSync)(dir)) return;
+  try {
+    for (const f of (0, import_fs5.readdirSync)(dir).filter((n) => n.endsWith(".json"))) {
+      const path = (0, import_path6.join)(dir, f);
+      const up = JSON.parse((0, import_fs5.readFileSync)(path, "utf8"));
+      const ids = Array.isArray(up.rescore_node_ids) ? up.rescore_node_ids : [];
+      if (up.to_eval_version !== evalVersion || !ids.includes(nodeId)) continue;
+      const done = new Set(Array.isArray(up.rescored_node_ids) ? up.rescored_node_ids : []);
+      const failed = new Set(Array.isArray(up.rescore_failed_node_ids) ? up.rescore_failed_node_ids : []);
+      if (succeeded) {
+        done.add(nodeId);
+        failed.delete(nodeId);
+      } else {
+        failed.add(nodeId);
+        done.delete(nodeId);
+      }
+      up.rescored_node_ids = [...done];
+      up.rescore_failed_node_ids = [...failed];
+      const wasComplete = up.rescore_status === "complete";
+      up.rescore_status = ids.every((i) => done.has(i)) ? "complete" : "partial";
+      const tmp = `${path}.tmp`;
+      (0, import_fs5.writeFileSync)(tmp, JSON.stringify(up, null, 2), "utf8");
+      (0, import_fs5.renameSync)(tmp, path);
+      if (!wasComplete && ids.every((i) => done.has(i) || failed.has(i))) {
+        const tree = readTree(runId, missionId);
+        const sign = fitnessLowerIsBetter(runDir) ? 1 : -1;
+        const order = ids.filter((i) => done.has(i) && typeof tree[i]?.scores_by_version?.[evalVersion] === "number").sort((x, y) => sign * (tree[x].scores_by_version[evalVersion] - tree[y].scores_by_version[evalVersion])).map((i) => tree[i]?.name ?? i);
+        (0, import_fs5.appendFileSync)(
+          (0, import_path6.join)(runDir, "decision-log.md"),
+          `- \`${(/* @__PURE__ */ new Date()).toISOString()}\` **re-score under ${evalVersion} finished** \u2014 frontier order under ${evalVersion}: ${order.join(", ") || "(none)"}` + (failed.size ? `; failed: ${[...failed].map((i) => tree[i]?.name ?? i).join(", ")}` : "") + "\n"
+        );
+      }
+    }
+  } catch {
+  }
+}
 function recordEval(runId, nodeId, result, missionId) {
   const paths = resolveRunPaths(runId, missionId);
   const nodeDir = (0, import_path6.join)(paths.nodesDir, nodeId);
@@ -22261,11 +22361,29 @@ function recordEval(runId, nodeId, result, missionId) {
     }
   }
   const resultsPath = (0, import_path6.join)(nodeDir, "results.json");
+  const rawVersion = result?.eval_version;
+  const scoredUnder = typeof rawVersion === "string" && VERSION_RE.test(rawVersion) ? rawVersion : void 0;
+  const r = result;
+  const evaluated = r?.status === "success" || r?.status === "regression";
+  if (scoredUnder) {
+    try {
+      const prior = JSON.parse((0, import_fs5.readFileSync)(resultsPath, "utf8"));
+      const priorVersion = prior.eval_version;
+      if (typeof priorVersion === "string" && VERSION_RE.test(priorVersion) && priorVersion !== scoredUnder) {
+        const kept = (0, import_path6.join)(nodeDir, `results.${priorVersion}.json`);
+        if (!(0, import_fs5.existsSync)(kept)) (0, import_fs5.writeFileSync)(kept, JSON.stringify(prior, null, 2), "utf8");
+      }
+    } catch {
+    }
+  }
   (0, import_fs5.writeFileSync)(resultsPath, JSON.stringify(result, null, 2), "utf8");
+  if (scoredUnder) {
+    (0, import_fs5.writeFileSync)((0, import_path6.join)(nodeDir, `results.${scoredUnder}.json`), JSON.stringify(result, null, 2), "utf8");
+  }
   let integrityVerdict = null;
   let integrityError = null;
   let integrityReport = null;
-  const integrityResult = integrityCheck(runId, nodeId, missionId);
+  const integrityResult = integrityCheck(runId, nodeId, missionId, scoredUnder);
   if (integrityResult.ok && integrityResult.report != null) {
     const report = integrityResult.report;
     integrityVerdict = typeof report.verdict === "string" ? report.verdict : null;
@@ -22281,23 +22399,36 @@ function recordEval(runId, nodeId, result, missionId) {
       if (integrityVerdict === "passed" || integrityVerdict === "failed") {
         updates.integrity_status = integrityVerdict;
       }
-      const r = result;
-      if (r && typeof r.metrics === "object" && r.metrics !== null) {
-        updates.metrics = r.metrics;
+      const moves = !!scoredUnder && node.eval_version !== scoredUnder;
+      if (!moves || integrityVerdict === "passed") {
+        if (r && typeof r.metrics === "object" && r.metrics !== null) {
+          updates.metrics = r.metrics;
+        }
+        if (typeof r?.fitness_value === "number") updates.fitness_value = r.fitness_value;
+        if (moves) updates.eval_version = scoredUnder;
       }
-      if (typeof r?.fitness_value === "number") {
-        updates.fitness_value = r.fitness_value;
+      const scores = { ...node.scores_by_version ?? {} };
+      if (moves && typeof node.fitness_value === "number" && !(node.eval_version in scores)) {
+        scores[node.eval_version] = node.fitness_value;
       }
+      if (scoredUnder && evaluated && typeof r?.fitness_value === "number") {
+        scores[scoredUnder] = r.fitness_value;
+      }
+      if (Object.keys(scores).length) updates.scores_by_version = scores;
       upsertNode(runId, { ...node, ...updates }, missionId);
     }
   } catch {
   }
   updateBestScore(runId, nodeId, result, integrityVerdict, missionId);
+  markRescored(runId, paths.runDir, nodeId, scoredUnder, evaluated && integrityVerdict === "passed", missionId);
   return { resultsPath, integrityVerdict, integrityError, integrityReport, evaluatorValuesKept: evaluatorKept };
 }
-function readResult(runId, nodeId, missionId) {
+function readResult(runId, nodeId, missionId, evalVersion) {
   const paths = resolveRunPaths(runId, missionId);
-  const resultPath = (0, import_path6.join)(paths.nodesDir, nodeId, "results.json");
+  if (evalVersion !== void 0 && !VERSION_RE.test(evalVersion)) {
+    return { ok: false, error: "eval_version must be a version name such as v1." };
+  }
+  const resultPath = (0, import_path6.join)(paths.nodesDir, nodeId, evalVersion ? `results.${evalVersion}.json` : "results.json");
   if (!(0, import_fs5.existsSync)(resultPath)) {
     return {
       ok: false,
@@ -22427,15 +22558,18 @@ function registerRecordTools(server) {
       node: external_exports.string().optional().describe("Same as node_id"),
       mission_id: external_exports.string().optional().describe(
         "Mission identifier (resolved from EVOR_MISSION_ID env when omitted)"
+      ),
+      eval_version: external_exports.string().optional().describe(
+        "Read the result under this eval_version (e.g. the parent of a hardening); omit for the current one"
       )
     },
-    async ({ run_id, node_id: given, name, node, mission_id }) => {
+    async ({ run_id, node_id: given, name, node, mission_id, eval_version }) => {
       const node_id = given ?? name ?? node;
       if (!node_id) {
         return { content: [{ type: "text", text: JSON.stringify({ ok: false, error: "give the node's name as node_id" }) }] };
       }
       const missionId = mission_id ?? process.env.EVOR_MISSION_ID;
-      const result = readResult(run_id, resolveNodeRef(run_id, node_id, missionId), missionId);
+      const result = readResult(run_id, resolveNodeRef(run_id, node_id, missionId), missionId, eval_version);
       return {
         content: [
           {
@@ -23115,7 +23249,6 @@ var TickStateSchema = external_exports.object({
 var RunStatePatchSchema = external_exports.object({
   status: external_exports.enum(["initialized", "running", "paused", "completed", "failed"]).optional().describe("Run lifecycle status"),
   tick_count: external_exports.number().int().min(0).optional().describe("Number of completed ticks"),
-  best_score: external_exports.number().optional().describe("Best primary metric value achieved so far"),
   frontier_ids: external_exports.array(external_exports.string()).optional().describe("Node IDs currently on the frontier"),
   current_eval_version: external_exports.string().optional().describe("Active EvalSuite version"),
   pending_node_ids: external_exports.array(external_exports.string()).optional().describe("Node names started in this tick but not yet recorded to the tree"),
@@ -23341,6 +23474,13 @@ function stateWrite(runId, patch, missionId) {
     tick_record: tickRecord,
     ...statePatch
   } = patch;
+  for (const k of ["best_score", "best_node_id"]) {
+    if (k in statePatch) {
+      throw new Error(
+        `${k} is derived from recorded evaluations (evor_record_eval) and cannot be written directly; record the node's evaluation instead.`
+      );
+    }
+  }
   const current = readRunState(paths.runStatePath, runId);
   const updated = { ...current };
   for (const [k, v] of Object.entries(statePatch)) {
@@ -23367,6 +23507,14 @@ function stateWrite(runId, patch, missionId) {
       if (r && typeof r.tick === "number") byTick.set(r.tick, r);
     }
     const record2 = { tick: tickRecord.tick, outcome: tickRecord.outcome };
+    let inForce;
+    try {
+      const v = JSON.parse((0, import_fs8.readFileSync)((0, import_path9.join)(paths.runDir, "goal-contract.json"), "utf8")).eval_version;
+      if (typeof v === "string") inForce = v;
+    } catch {
+    }
+    inForce ??= typeof current.current_eval_version === "string" ? current.current_eval_version : void 0;
+    if (inForce) record2.eval_version = inForce;
     if (tickRecord.score !== void 0) record2.score = tickRecord.score;
     if (tickRecord.failure_kind !== void 0) record2.failure_kind = tickRecord.failure_kind;
     if (tickRecord.error !== void 0) record2.error = tickRecord.error;
@@ -23375,7 +23523,7 @@ function stateWrite(runId, patch, missionId) {
     byTick.set(tickRecord.tick, record2);
     const records = [...byTick.values()].sort((a, b) => a.tick - b.tick);
     updated.tick_records = records;
-    updated.tick_history_scores = records.map((r) => r.score).filter((v) => typeof v === "number");
+    updated.tick_history_scores = records.filter((r) => !inForce || (r.eval_version ?? inForce) === inForce).map((r) => r.score).filter((v) => typeof v === "number");
   }
   writeRunState(paths.runStatePath, updated);
   if (strategyDelta && Object.keys(strategyDelta).length > 0) {
@@ -23607,7 +23755,17 @@ function registerStateTools(server) {
     },
     async ({ run_id, patch }) => {
       const missionId = process.env.EVOR_MISSION_ID;
-      const updated = stateWrite(run_id, patch, missionId);
+      let updated;
+      try {
+        updated = stateWrite(run_id, patch, missionId);
+      } catch (e) {
+        return {
+          content: [{
+            type: "text",
+            text: JSON.stringify({ ok: false, error: e instanceof Error ? e.message : String(e) })
+          }]
+        };
+      }
       return {
         content: [
           {
@@ -25134,6 +25292,70 @@ function lockEvaluate(runId, nodeRef, missionId) {
     return { ok: false, node_name: nodeRef, error: "could not lock evaluate.py" };
   }
 }
+function relockForRescore(runId, worktree, evalVersion, missionId) {
+  if (!/^v\d+$/.test(evalVersion)) return { ok: false, error: `'${evalVersion}' is not an eval version (expected v<N>).` };
+  const { runDir } = resolveRunPaths(runId, missionId);
+  let contract;
+  try {
+    contract = JSON.parse((0, import_fs18.readFileSync)((0, import_path19.join)(runDir, "goal-contract.json"), "utf8"));
+  } catch {
+    return { ok: false, error: "the goal contract is unreadable, so the evaluator to install cannot be verified." };
+  }
+  if (contract.eval_version !== evalVersion) {
+    return {
+      ok: false,
+      error: `eval_version ${evalVersion} is not the version in force (${String(contract.eval_version)}); nodes are re-scored only under the contract's current eval_version.`
+    };
+  }
+  const canonical = (0, import_path19.join)(runDir, "eval-suites", `${evalVersion}.py`);
+  let sealedHash;
+  let canonicalBytes;
+  const receiptPath = (0, import_path19.join)(runDir, "eval-suites", `${evalVersion}.sealed.json`);
+  if ((0, import_fs18.existsSync)(receiptPath) && !(0, import_fs18.existsSync)(canonical)) {
+    return { ok: false, error: `the ${evalVersion} seal receipt exists but eval-suites/${evalVersion}.py does not; nothing sealed can be installed.` };
+  }
+  try {
+    const receipt = JSON.parse((0, import_fs18.readFileSync)(receiptPath, "utf8"));
+    sealedHash = receipt.files?.[`${evalVersion}.py`] ?? receipt.hash;
+    canonicalBytes = (0, import_fs18.readFileSync)(canonical);
+  } catch {
+    return {
+      ok: false,
+      error: `the ${evalVersion} evaluator has no seal receipt. Verify eval-suites/${evalVersion}.py against the contract's eval_script_hash first (evor_integrity_check reports a mismatch as no_eval_shift); seal it only if it matches, since a seal records whatever is on disk.`
+    };
+  }
+  const sha = (b) => (0, import_crypto4.createHash)("sha256").update(b).digest("hex");
+  const hash = sha(canonicalBytes);
+  if (!sealedHash || sealedHash !== hash || contract.eval_script_hash !== hash) {
+    return {
+      ok: false,
+      error: `the ${evalVersion} evaluator on disk does not match its seal and the contract anchor; refusing to lock a node onto it.`
+    };
+  }
+  const evalPath = (0, import_path19.join)(worktree, "evaluate.py");
+  try {
+    const current = (0, import_fs18.existsSync)(evalPath) ? sha((0, import_fs18.readFileSync)(evalPath)) : "";
+    const replaced = current !== hash;
+    if (replaced) {
+      if ((0, import_fs18.existsSync)(evalPath)) (0, import_fs18.chmodSync)(evalPath, 420);
+      const tmp = `${evalPath}.rescore-tmp`;
+      (0, import_fs18.writeFileSync)(tmp, canonicalBytes);
+      (0, import_fs18.renameSync)(tmp, evalPath);
+    }
+    (0, import_fs18.writeFileSync)((0, import_path19.join)(worktree, "evaluate.py.lock"), hash, "utf8");
+    (0, import_fs18.chmodSync)(evalPath, 292);
+    if (replaced) {
+      appendDecision2(
+        runDir,
+        `evaluate.py re-locked to sealed ${evalVersion} for a re-score`,
+        `worktree ${(0, import_path19.basename)(worktree)} now carries the evaluator the contract anchors`
+      );
+    }
+    return { ok: true, replaced };
+  } catch {
+    return { ok: false, error: "could not install the sealed evaluator into the node worktree." };
+  }
+}
 function verifyArtifacts(runId, nodeRef, missionId) {
   const nodeId = tryResolveNodeRef(runId, nodeRef, missionId);
   const runDir = resolveRunPaths(runId, missionId).runDir;
@@ -25204,6 +25426,124 @@ function digestEvaluator(runDir, evalVersion) {
   }
   return { hash: acc.digest("hex"), files };
 }
+function evaluatorWriteRefusal(runDir, evalVersion, target) {
+  if (!/^v\d+$/.test(evalVersion)) return `'${evalVersion}' is not an eval version (expected v<N>).`;
+  let status = "";
+  let inForce;
+  try {
+    status = String(JSON.parse((0, import_fs18.readFileSync)((0, import_path19.join)(runDir, "mission-state.json"), "utf8")).status ?? "");
+  } catch {
+  }
+  try {
+    inForce = JSON.parse((0, import_fs18.readFileSync)((0, import_path19.join)(runDir, "goal-contract.json"), "utf8")).eval_version;
+  } catch {
+  }
+  if (status !== "running" && status !== "paused") return null;
+  if (target === "score_plugin") {
+    return "score_plugin.py is the metric every eval version of this mission shares; it is not replaced while the mission runs. A stricter metric is a new evaluator applied with evor_harden_eval.";
+  }
+  if (typeof inForce === "string" && inForce !== evalVersion) {
+    return `${evalVersion} is not the eval version in force (${inForce}). A new eval version is introduced during a mission only by evor_harden_eval, which takes the reviewed evaluator with its rationale and evidence and writes and seals it itself.`;
+  }
+  return null;
+}
+function sealEvalScript(runDir, eval_version) {
+  const fail = (error2) => ({ ok: false, error: error2 });
+  const refusal = evaluatorWriteRefusal(runDir, eval_version, "evaluator");
+  if (refusal) return fail(refusal);
+  const evalScriptPath = `${runDir}/eval-suites/${eval_version}.py`;
+  if (!(0, import_fs18.existsSync)(evalScriptPath)) {
+    return fail(
+      "no evaluation script found for this version \u2014 write the canonical evaluator before sealing it, then try again."
+    );
+  }
+  const content = (0, import_fs18.readFileSync)(evalScriptPath);
+  const fileSha = (path) => (0, import_crypto4.createHash)("sha256").update((0, import_fs18.readFileSync)(path)).digest("hex");
+  const hash = fileSha(evalScriptPath);
+  const pluginPath = `${runDir}/eval-suites/score_plugin.py`;
+  const pluginHash = (0, import_fs18.existsSync)(pluginPath) ? fileSha(pluginPath) : void 0;
+  const { files } = digestEvaluator(runDir, eval_version);
+  const receiptPath = `${runDir}/eval-suites/${eval_version}.sealed.json`;
+  let receipt = null;
+  try {
+    receipt = JSON.parse((0, import_fs18.readFileSync)(receiptPath, "utf8"));
+  } catch {
+    receipt = null;
+  }
+  const sealedMain = receipt?.files?.[`${eval_version}.py`] ?? receipt?.hash;
+  const sealedPlugin = receipt?.files?.["score_plugin.py"] ?? receipt?.plugin_hash;
+  try {
+    for (const f of (0, import_fs18.readdirSync)((0, import_path19.join)(runDir, "eval-suites")).filter((n) => n.endsWith(".sealed.json"))) {
+      if (f === `${eval_version}.sealed.json`) continue;
+      const other = JSON.parse((0, import_fs18.readFileSync)((0, import_path19.join)(runDir, "eval-suites", f), "utf8"));
+      const theirs = other.files?.["score_plugin.py"] ?? other.plugin_hash;
+      if (theirs && theirs !== pluginHash) {
+        return fail(
+          `refusing to seal ${eval_version}: score_plugin.py differs from the one ${f.split(".")[0]} was sealed with. The plugin is shared by every version, so sealing it would change that version's metric too.`
+        );
+      }
+    }
+  } catch {
+  }
+  if (sealedPlugin && pluginHash && sealedPlugin !== pluginHash) {
+    return fail(
+      `refusing to re-seal ${eval_version}: score_plugin.py changed after it was sealed (${sealedPlugin.slice(0, 12)}\u2026 \u2192 ${pluginHash.slice(0, 12)}\u2026). The plugin is the metric; replacing it under the same anchor would revalidate every score already recorded. Seal the new metric under a NEW eval_version.`
+    );
+  }
+  if (sealedMain && sealedMain !== hash) {
+    return fail(
+      `refusing to re-seal ${eval_version}: this run sealed it at ${String(receipt?.sealed_at ?? "an earlier time")} with hash ${sealedMain.slice(0, 12)}\u2026, and the file on disk now hashes to ${hash.slice(0, 12)}\u2026. The evaluator changed after it was sealed. Re-sealing would make the changed file the sealed one and retroactively validate every score recorded under the old anchor. If replacing the evaluator is intended, seal it under a NEW eval_version so existing scores keep the evaluator they were measured with.`
+    );
+  }
+  try {
+    if ((0, import_fs18.statSync)(evalScriptPath).nlink > 1) {
+      const tmp = `${evalScriptPath}.seal-tmp`;
+      (0, import_fs18.writeFileSync)(tmp, content);
+      (0, import_fs18.renameSync)(tmp, evalScriptPath);
+    }
+  } catch (e) {
+    return fail(
+      `could not take custody of ${eval_version}: ${String(e)}. The evaluator is hardlinked outside the run, so sealing it would anchor a file another path can still rewrite.`
+    );
+  }
+  let inForce = true;
+  try {
+    const v = JSON.parse((0, import_fs18.readFileSync)(`${runDir}/goal-contract.json`, "utf8")).eval_version;
+    inForce = typeof v !== "string" || v === eval_version;
+  } catch {
+  }
+  if (inForce) {
+    patchGoalContract(runDir, {
+      eval_script_hash: hash,
+      ...pluginHash !== void 0 ? { eval_plugin_hash: pluginHash } : {}
+    });
+  }
+  try {
+    (0, import_fs18.writeFileSync)(
+      receiptPath,
+      JSON.stringify(
+        {
+          eval_version,
+          hash,
+          ...pluginHash !== void 0 ? { plugin_hash: pluginHash } : {},
+          files,
+          sealed_at: (/* @__PURE__ */ new Date()).toISOString()
+        },
+        null,
+        2
+      ),
+      "utf8"
+    );
+  } catch {
+  }
+  return {
+    ok: true,
+    eval_version,
+    hash,
+    ...pluginHash !== void 0 ? { plugin_hash: pluginHash } : {},
+    files
+  };
+}
 function registerComputeTools(server) {
   server.tool(
     "evor_run_start",
@@ -25215,7 +25555,9 @@ function registerComputeTools(server) {
         "Absolute path to the run directory; derived from run_id when omitted"
       ),
       worktree: external_exports.string().describe("Absolute path to the candidate git worktree"),
-      eval_version: external_exports.string().optional().describe("Eval suite version override (e.g. v1)")
+      eval_version: external_exports.string().optional().describe(
+        "Eval version to score under \u2014 the contract's current one. Pass it to re-score an existing node after a metric hardening: the worktree's evaluate.py is replaced by that version's sealed evaluator and re-locked before the job starts."
+      )
     },
     async ({ run_id, node_id, run_dir, worktree, eval_version }) => {
       const missionId = process.env.EVOR_MISSION_ID;
@@ -25225,6 +25567,10 @@ function registerComputeTools(server) {
         resolvedNodeId = resolveNodeRef(run_id, node_id, missionId);
       } catch (e) {
         return err2(String(e instanceof Error ? e.message : e));
+      }
+      if (eval_version) {
+        const relock = relockForRescore(run_id, worktree, eval_version, missionId);
+        if (!relock.ok) return err2(relock.error);
       }
       const result = jobStart(resolvedNodeId, run_id, resolvedDir, worktree, eval_version);
       if (!result.ok) return err2(result.error ?? "evor_run_start failed");
@@ -25462,7 +25808,7 @@ function registerComputeTools(server) {
   );
   server.tool(
     "evor_seal_eval_script",
-    "Seal the canonical evaluator into goal-contract.json: eval_script_hash = sha256 of eval-suites/<eval_version>.py, and \u2014 when the mission has one \u2014 eval_plugin_hash = sha256 of score_plugin.py, the metric itself. The integrity gate's no_eval_shift check verifies both. Call once after the canonical evaluator is written.",
+    "Seal the canonical evaluator into goal-contract.json: eval_script_hash = sha256 of eval-suites/<eval_version>.py, and \u2014 when the mission has one \u2014 eval_plugin_hash = sha256 of score_plugin.py, the metric itself. The integrity gate's no_eval_shift check verifies both. Call once after the canonical evaluator is written. Sealing a version that is not the contract's eval_version writes its seal receipt only; evor_harden_eval adopts it and moves the anchor.",
     {
       run_id: external_exports.string().describe("Active run identifier"),
       eval_version: external_exports.string().describe("Eval version string (e.g. v1)"),
@@ -25471,77 +25817,8 @@ function registerComputeTools(server) {
     async ({ run_id, eval_version, mission_id }) => {
       const resolvedMission = mission_id ?? process.env.EVOR_MISSION_ID;
       const { runDir } = resolveRunPaths(run_id, resolvedMission);
-      const evalScriptPath = `${runDir}/eval-suites/${eval_version}.py`;
-      if (!(0, import_fs18.existsSync)(evalScriptPath)) {
-        return err2(
-          "no evaluation script found for this version \u2014 write the canonical evaluator before sealing it, then try again."
-        );
-      }
-      const content = (0, import_fs18.readFileSync)(evalScriptPath);
-      const fileSha = (path) => (0, import_crypto4.createHash)("sha256").update((0, import_fs18.readFileSync)(path)).digest("hex");
-      const hash = fileSha(evalScriptPath);
-      const pluginPath = `${runDir}/eval-suites/score_plugin.py`;
-      const pluginHash = (0, import_fs18.existsSync)(pluginPath) ? fileSha(pluginPath) : void 0;
-      const { files } = digestEvaluator(runDir, eval_version);
-      const receiptPath = `${runDir}/eval-suites/${eval_version}.sealed.json`;
-      let receipt = null;
-      try {
-        receipt = JSON.parse((0, import_fs18.readFileSync)(receiptPath, "utf8"));
-      } catch {
-        receipt = null;
-      }
-      const sealedMain = receipt?.files?.[`${eval_version}.py`] ?? receipt?.hash;
-      const sealedPlugin = receipt?.files?.["score_plugin.py"] ?? receipt?.plugin_hash;
-      if (sealedPlugin && pluginHash && sealedPlugin !== pluginHash) {
-        return err2(
-          `refusing to re-seal ${eval_version}: score_plugin.py changed after it was sealed (${sealedPlugin.slice(0, 12)}\u2026 \u2192 ${pluginHash.slice(0, 12)}\u2026). The plugin is the metric; replacing it under the same anchor would revalidate every score already recorded. Seal the new metric under a NEW eval_version.`
-        );
-      }
-      if (sealedMain && sealedMain !== hash) {
-        return err2(
-          `refusing to re-seal ${eval_version}: this run sealed it at ${String(receipt?.sealed_at ?? "an earlier time")} with hash ${sealedMain.slice(0, 12)}\u2026, and the file on disk now hashes to ${hash.slice(0, 12)}\u2026. The evaluator changed after it was sealed. Re-sealing would make the changed file the sealed one and retroactively validate every score recorded under the old anchor. If replacing the evaluator is intended, seal it under a NEW eval_version so existing scores keep the evaluator they were measured with.`
-        );
-      }
-      try {
-        if ((0, import_fs18.statSync)(evalScriptPath).nlink > 1) {
-          const tmp = `${evalScriptPath}.seal-tmp`;
-          (0, import_fs18.writeFileSync)(tmp, content);
-          (0, import_fs18.renameSync)(tmp, evalScriptPath);
-        }
-      } catch (e) {
-        return err2(
-          `could not take custody of ${eval_version}: ${String(e)}. The evaluator is hardlinked outside the run, so sealing it would anchor a file another path can still rewrite.`
-        );
-      }
-      patchGoalContract(runDir, {
-        eval_script_hash: hash,
-        ...pluginHash !== void 0 ? { eval_plugin_hash: pluginHash } : {}
-      });
-      try {
-        (0, import_fs18.writeFileSync)(
-          receiptPath,
-          JSON.stringify(
-            {
-              eval_version,
-              hash,
-              ...pluginHash !== void 0 ? { plugin_hash: pluginHash } : {},
-              files,
-              sealed_at: (/* @__PURE__ */ new Date()).toISOString()
-            },
-            null,
-            2
-          ),
-          "utf8"
-        );
-      } catch {
-      }
-      return ok2({
-        ok: true,
-        eval_version,
-        hash,
-        ...pluginHash !== void 0 ? { plugin_hash: pluginHash } : {},
-        files
-      });
+      const sealed = sealEvalScript(runDir, eval_version);
+      return sealed.ok ? ok2(sealed) : err2(sealed.error);
     }
   );
   server.tool(
@@ -25589,6 +25866,8 @@ function registerComputeTools(server) {
     async ({ run_id, eval_version, source, target, mission_id }) => {
       const resolvedMission = mission_id ?? process.env.EVOR_MISSION_ID;
       const { runDir } = resolveRunPaths(run_id, resolvedMission);
+      const refusal = evaluatorWriteRefusal(runDir, eval_version, target === "score_plugin" ? "score_plugin" : "evaluator");
+      if (refusal) return err2(refusal);
       const dir = (0, import_path19.join)(runDir, "eval-suites");
       const name = target === "score_plugin" ? "score_plugin.py" : `${eval_version}.py`;
       const dest = (0, import_path19.join)(dir, name);
@@ -25613,6 +25892,109 @@ function registerComputeTools(server) {
     }
   );
   server.tool(
+    "evor_harden_eval",
+    "Replace the run's evaluator with a STRICTER one under a new eval_version, mid-mission. Use when the metric is gameable: fitness rises while the contract's stated intent regresses. Takes the reviewed evaluator (source or source_worktree), validates it, and in one all-or-nothing step writes and seals eval-suites/<to_version>.py, records EvalSuite <to_version> (same domains, same frozen split, parent <from_version>), moves the contract and run state to it (best_score restarts under the new version), logs the decision, and returns the frontier nodes to re-score. No consent step: making evaluation harder is pre-authorized. Only stricter is accepted \u2014 every node scored under <to_version> is also scored by the sealed parent, and integrity fails it when the hardened fitness or primary metric is better. A stricter metric may reorder the frontier. The new evaluator reads the parent's frozen split (frozen-splits/<from_version>-test) and must emit eval_version=<to_version>. Then re-score each returned node with evor_run_start(eval_version=<to_version>) and record it with evor_record_eval.",
+    {
+      run_id: external_exports.string().describe("Active run identifier"),
+      from_version: external_exports.string().regex(/^v\d+$/).describe("The eval_version in force (e.g. v1)"),
+      to_version: external_exports.string().regex(/^v\d+$/).describe("The new, stricter eval_version (e.g. v2)"),
+      source: external_exports.string().min(1).optional().describe(
+        "Complete Python source of the reviewed hardened evaluator. Give exactly one of source and source_worktree."
+      ),
+      source_worktree: external_exports.string().optional().describe(
+        "Name of the worktree whose evaluate.py holds the hardened evaluator (as written by forge-junior and reviewed by forge-critic)."
+      ),
+      rationale: external_exports.string().min(1).describe(
+        "The gate the hardened evaluator adds and the metric artefact it closes"
+      ),
+      contract_grounding: external_exports.string().min(12).describe(
+        "A verbatim quote from the goal contract stating the intent the current metric fails to enforce. Refused when the contract does not contain it."
+      ),
+      evidence: external_exports.array(external_exports.string().min(1)).min(1).describe(
+        "What found the metric artefact: wiki lesson ids and/or the probe proposal pointer (e.g. 'probe@tick7'). Recorded in the decision log beside the parent version."
+      ),
+      proposed_by: external_exports.enum(["probe", "sage", "policy"]).default("probe").describe(
+        "Who proposed the hardening"
+      ),
+      rescore_deadline_ticks: external_exports.number().int().min(0).default(3).describe(
+        "Ticks within which the frontier is to be re-scored under the new version"
+      ),
+      tick: external_exports.number().int().min(0).optional().describe("The tick applying it"),
+      mission_id: external_exports.string().optional().describe("Mission id; resolved from the active run when omitted")
+    },
+    async ({
+      run_id,
+      from_version,
+      to_version,
+      source,
+      source_worktree,
+      rationale,
+      contract_grounding,
+      evidence,
+      proposed_by,
+      rescore_deadline_ticks,
+      tick,
+      mission_id
+    }) => {
+      const resolvedMission = mission_id ?? process.env.EVOR_MISSION_ID;
+      const { runDir } = resolveRunPaths(run_id, resolvedMission);
+      for (const v of [from_version, to_version]) {
+        if (!/^v\d+$/.test(String(v))) return err2(`'${String(v)}' is not an eval version (expected v<N>).`);
+      }
+      if (proposed_by !== void 0 && !["probe", "sage", "policy"].includes(proposed_by)) {
+        return err2(`proposed_by '${String(proposed_by)}' is not one of probe, sage, policy.`);
+      }
+      if (source === void 0 === (source_worktree === void 0)) {
+        return err2(
+          "give exactly one of source or source_worktree: the reviewed evaluator. A file already on disk for the new version is never adopted on its own say-so."
+        );
+      }
+      let code = source ?? "";
+      if (source_worktree !== void 0) {
+        if (!/^[A-Za-z0-9._-]+$/.test(source_worktree)) {
+          return err2("source_worktree must be a worktree name, not a path.");
+        }
+        try {
+          code = (0, import_fs18.readFileSync)((0, import_path19.join)(getEvorRoot(), "worktrees", source_worktree, "evaluate.py"), "utf8");
+        } catch {
+          return err2(`worktree '${source_worktree}' has no evaluate.py to harden with.`);
+        }
+      }
+      const hardened = callPythonModule("evor.benchmark", [
+        "harden",
+        "--run-dir",
+        runDir,
+        "--from-version",
+        from_version,
+        "--to-version",
+        to_version,
+        "--rationale",
+        rationale,
+        "--contract-grounding",
+        contract_grounding,
+        "--proposed-by",
+        proposed_by ?? "probe",
+        "--rescore-deadline-ticks",
+        String(rescore_deadline_ticks ?? 3),
+        ...evidence.flatMap((e) => ["--evidence", e]),
+        ...tick !== void 0 ? ["--tick", String(tick)] : [],
+        "--stdin-source"
+      ], { stdin: code });
+      if (!hardened.ok) return err2(hardened.error ?? "evor_harden_eval failed");
+      evalVersionCache.delete(run_id);
+      const data = hardened.data;
+      return ok2({
+        ok: true,
+        from_version,
+        to_version,
+        upgrade_id: data?.upgrade_id,
+        rescore: data?.rescore ?? [],
+        frontier_order_before: data?.frontier_order_before ?? [],
+        next: `re-score each node in rescore with evor_run_start(eval_version="${to_version}"), then evor_record_eval; integrity passes it only when its ${to_version} scores are no better than its ${from_version} scores.`
+      });
+    }
+  );
+  server.tool(
     "evor_scaffold_evaluator",
     "Generate the evaluator harness for this run from the goal contract, eval suite and frozen index. The mission then writes ONLY score(pred, gt) in score_plugin.py. Deterministic: the server can regenerate and byte-compare, which is what makes the seal custody rather than an assertion.",
     {
@@ -25626,12 +26008,15 @@ function registerComputeTools(server) {
     async ({ run_id, eval_version, mission_id, overwrite_plugin }) => {
       const resolvedMission = mission_id ?? process.env.EVOR_MISSION_ID;
       const { runDir } = resolveRunPaths(run_id, resolvedMission);
+      const version2 = eval_version ?? "v1";
+      const refusal = evaluatorWriteRefusal(runDir, version2, overwrite_plugin ? "score_plugin" : "evaluator");
+      if (refusal) return err2(refusal);
       const result = callPythonModule("evor.scaffold_evaluator", [
         "generate",
         "--run-dir",
         runDir,
         "--eval-version",
-        eval_version,
+        version2,
         ...overwrite_plugin ? ["--overwrite-plugin"] : []
       ]);
       if (!result.ok || result.data == null) {

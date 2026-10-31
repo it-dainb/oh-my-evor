@@ -118,7 +118,7 @@
   "grounded_rule": {
     "file": "agents/evor-probe.md",
     "quote": "Vague evidence strings: \"the model improved\" is not evidence. Report actual metric deltas with parent comparison.",
-    "sha256_at_authoring": "40f005e8d34f40941cf6e1f7a18b1cb9ff358dbd6a996faca5a119cc11ea4e75"
+    "sha256_at_authoring": "912d2155cecf2d62339938b8b8d771b120bead434467d8d10babc0dcc9e34e4c"
   },
   "grounding": [
     "field-trace:M-04",
@@ -142,11 +142,11 @@
     "guarded_paths": [
       {
         "path": "agents/evor-probe.md",
-        "sha256": "40f005e8d34f40941cf6e1f7a18b1cb9ff358dbd6a996faca5a119cc11ea4e75"
+        "sha256": "912d2155cecf2d62339938b8b8d771b120bead434467d8d10babc0dcc9e34e4c"
       },
       {
         "path": "skills/evor/SKILL.md",
-        "sha256": "72972df4f576185948977f3d2cbd2b037f100fc907aeeef773e1741f0131c41b"
+        "sha256": "7f029aea0b19132b1c09801cc854832c23ef1716677a33b01cf8d2f75b81fedd"
       },
       {
         "path": "hooks/stop.mjs",

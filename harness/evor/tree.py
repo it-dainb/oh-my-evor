@@ -849,6 +849,17 @@ def check_stop_condition(
         float(x) for x in run_state.get("tick_history_scores", [])
         if isinstance(x, (int, float))
     ]
+    # Scores are comparable only under one eval version. When the per-tick
+    # records carry their version, the history is the in-force version's alone:
+    # right after a metric hardening the stricter scores would otherwise read as
+    # a regression from the parent's.
+    records = run_state.get("tick_records")
+    if isinstance(records, list) and any(isinstance(r, dict) and "eval_version" in r for r in records):
+        tick_history = [
+            float(r["score"]) for r in records
+            if isinstance(r, dict) and isinstance(r.get("score"), (int, float))
+            and r.get("eval_version", goal.eval_version) == goal.eval_version
+        ]
 
     budget = goal.budget
     stop = goal.stop_condition

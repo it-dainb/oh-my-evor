@@ -98,6 +98,13 @@ guard/spec to contract intent (Step above) is NOT it.
    the frontier (score only the new items, combine with cached old-item scores) so all scores stay
    comparable within the run.
 
+**When the mis-specified guard is the metric itself** — fitness rises while the contract's stated
+intent regresses — the reconciliation is a *metric hardening*: a stricter evaluator under a new
+`eval_version` (Step 7b). It needs no consent; it is the harder/more-honest move. It cannot soften:
+every node scored under the hardened version is also scored by the sealed parent evaluator, and
+integrity fails the node when the hardened score is higher. The parent stays sealed and its scores
+stay on record.
+
 
 </Autonomy_Charter>
 
@@ -370,6 +377,43 @@ Skip this write ONLY when `hypothesis_verdict="inconclusive"` (no valid predicti
   - Apply the benchmark upgrade.
   - If consent_granted=true (user confirmed): bump eval_version via `evor_state_write`, rescore frontier nodes.
 
+## Step 7b — Metric hardening (conditional)
+
+Run this when Probe's artifact carries a `benchmark_upgrade_proposal` with
+`kind: "metric_hardening"`. It is the tick's job; the mission orchestrator only passes pointers.
+
+1. **Write the stricter evaluator.** Spawn Forge with the proposal: "Metric hardening of
+   <from_version>: write the hardened evaluator into worktree `harden-<to_version>` as
+   `evaluate.py`. It adds <proposed_gate> to the sealed <from_version> evaluator and changes
+   nothing else; it reads the frozen split of <from_version> and emits
+   `eval_version=<to_version>`. Have forge-critic review that the gate only makes scores
+   harder to earn." Forge's junior writes it, the critic reviews it, and Forge files its report.
+   Read the report with `evor_read_artifact({ tick: n, agent: "forge", kind: "harden-<to_version>" })`;
+   if the critic did not approve, record the gap and stop here.
+2. **Apply it.**
+   ```
+   evor_harden_eval({ run_id, from_version, to_version, source_worktree: "harden-<to_version>",
+                      rationale: <proposed_gate and the artefact it closes>,
+                      contract_grounding: <the proposal's verbatim contract quote>,
+                      evidence: [<lesson id>, "probe@tick<n>"], tick: n })
+   ```
+   In one all-or-nothing step it validates, writes, seals and records `<to_version>` and moves
+   the contract to it; `best_score` restarts under the new version. If it refuses, its error
+   says what to fix, and the run is still entirely on `<from_version>`. Always pass the reviewed
+   source: a file already on disk for `<to_version>` is adopted only when it is sealed with
+   exactly those bytes. During the mission, `evor_write_eval_script` and `evor_seal_eval_script`
+   touch only the version in force and never `score_plugin.py`.
+3. **Re-score the frontier.** For each name in the result's `rescore`: `evor_run_start({ node_id,
+   worktree, eval_version: <to_version> })` (it installs the sealed hardened evaluator into the
+   worktree first), `evor_wait({ job_id })`, then `evor_record_eval`. Integrity passes a
+   re-scored node only when `not_softer_than_parent` holds and `eval_version_consistent` passes.
+   The node's `<from_version>` result stays readable with `evor_read_result({ node_id,
+   eval_version: <from_version> })`, and the tree node keeps both in `scores_by_version`.
+   A stricter metric caps each node's score; it may reorder the frontier, and the decision log
+   records the order under both versions.
+4. **Record** it in Step 8 like any other result. The decision log already holds the
+   `harden-eval` entry naming the parent version, the rationale and the evidence.
+
 ## Step 8 — Record
 
 For all nodes this tick:
@@ -546,6 +590,7 @@ always exists; take it and continue.
 - `evor_record_node` — register a new node in the evolution tree; returns node_name
 - `evor_record_eval` — record evaluation result and auto-trigger integrity check
 - `evor_integrity_check` — run the integrity checks
+- `evor_harden_eval` — apply a metric hardening: stricter evaluator under a new eval_version (Step 7b; evor-tick only)
 - `evor_wiki_add` — persist a lesson entry from Probe
 - `evor_wiki_query` — query prior lessons
 - `evor_state_read` / `evor_state_write` — run state, tick-state, and tick_state writes
