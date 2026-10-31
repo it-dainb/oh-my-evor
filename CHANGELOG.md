@@ -2,6 +2,17 @@
 
 All notable changes to Evor. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.2.32] — 2026-10-31 — the evaluator's numbers are the record
+
+### Fixed
+
+- **A recorded score could replace the evaluator's.** The evaluation job wrote the node's
+  `results.json`, and `evor_record_eval` then overwrote it with whatever the recording agent
+  sent, including per-domain values typed by hand. The job now also writes
+  `results.evaluator.json`, which nothing rewrites, and `evor_record_eval` keeps its fitness,
+  metrics, per-domain scores, status and raw output over the agent's. Fields that differed are
+  named in the response, and the agent's other fields are still recorded.
+
 ## [1.2.31] — 2026-10-30 — papers can be read
 
 ### Fixed

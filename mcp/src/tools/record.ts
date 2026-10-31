@@ -256,6 +256,9 @@ export function updateBestScore(
   }
 }
 
+/** Fields only the sealed evaluator may set; a recording agent's copy never replaces them. */
+const EVALUATOR_FIELDS = ["fitness_value", "metrics", "per_domain", "status", "benchmark_raw", "eval_version"];
+
 export function recordEval(
   runId: string,
   nodeId: string,
@@ -266,12 +269,31 @@ export function recordEval(
   integrityVerdict: string | null;
   integrityError: string | null;
   integrityReport: unknown | null;
+  evaluatorValuesKept: string[];
 } {
   const paths = resolveRunPaths(runId, missionId);
   const nodeDir = join(paths.nodesDir, nodeId);
 
   if (!existsSync(nodeDir)) {
     mkdirSync(nodeDir, { recursive: true });
+  }
+
+  // When the evaluation job wrote its own output, its numbers are the record: the
+  // agent's transcription can add fields but cannot replace a score.
+  const evaluatorKept: string[] = [];
+  const evaluatorPath = join(nodeDir, "results.evaluator.json");
+  if (existsSync(evaluatorPath) && result && typeof result === "object") {
+    try {
+      const ev = JSON.parse(readFileSync(evaluatorPath, "utf8")) as Record<string, unknown>;
+      const given = result as Record<string, unknown>;
+      const merged: Record<string, unknown> = { ...given };
+      for (const k of EVALUATOR_FIELDS) {
+        if (!(k in ev)) continue;
+        if (k in given && JSON.stringify(given[k]) !== JSON.stringify(ev[k])) evaluatorKept.push(k);
+        merged[k] = ev[k];
+      }
+      result = merged;
+    } catch { /* unreadable evaluator copy: record what was given */ }
   }
 
   const resultsPath = join(nodeDir, "results.json");
@@ -330,7 +352,7 @@ export function recordEval(
   // Stage 1.7: propagate fitness so the score-based stop conditions can fire.
   updateBestScore(runId, nodeId, result, integrityVerdict, missionId);
 
-  return { resultsPath, integrityVerdict, integrityError, integrityReport };
+  return { resultsPath, integrityVerdict, integrityError, integrityReport, evaluatorValuesKept: evaluatorKept };
 }
 
 /**
@@ -481,7 +503,7 @@ export function registerRecordTools(server: McpServer): void {
           filledResult.eval_version = "v1";
         }
       }
-      const { integrityVerdict, integrityError, integrityReport } =
+      const { integrityVerdict, integrityError, integrityReport, evaluatorValuesKept } =
         recordEval(run_id, resolvedId, filledResult, missionId);
       return {
         content: [
@@ -498,6 +520,12 @@ export function registerRecordTools(server: McpServer): void {
               integrity_verdict: integrityVerdict,
               integrity_error: integrityError,
               integrity_report: integrityReport,
+              ...(evaluatorValuesKept.length
+                ? {
+                    evaluator_values_kept: evaluatorValuesKept,
+                    note: "these fields differed from the evaluation job's own output; its values were recorded",
+                  }
+                : {}),
             }),
           },
         ],
