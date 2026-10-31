@@ -22261,7 +22261,7 @@ function updateBestScore(runId, nodeId, result, integrityVerdict, missionId) {
     const runStatePath = (0, import_path6.join)(paths.runDir, "run-state.json");
     const state = readRunState(runStatePath, runId);
     const scoredUnder = result?.eval_version;
-    const inForce = state.current_eval_version ?? contract?.eval_version;
+    const inForce = contract?.eval_version ?? state.current_eval_version;
     if (typeof scoredUnder === "string" && typeof inForce === "string" && scoredUnder !== inForce) return;
     const current = state.best_score;
     const lowerIsBetter = primary.direction === "lower";
@@ -22288,6 +22288,17 @@ var EVALUATOR_FIELDS = [
   "parent_inputs_match"
 ];
 var VERSION_RE = /^v\d+$/;
+function fitnessLowerIsBetter(runDir) {
+  try {
+    const c = JSON.parse((0, import_fs5.readFileSync)((0, import_path6.join)(runDir, "goal-contract.json"), "utf8"));
+    const spec = (c.metric_specs ?? []).find((m) => m?.role === "primary_fitness");
+    if (!spec || spec.direction !== "lower") return false;
+    if ((c.fitness_mode === "worst-domain" || c.fitness_mode === "weighted") && !spec.fitness_formula) return true;
+    return c.target_value === void 0 || c.target_value === null;
+  } catch {
+    return false;
+  }
+}
 function markRescored(runId, runDir, nodeId, evalVersion, succeeded, missionId) {
   if (!evalVersion) return;
   const dir = (0, import_path6.join)(runDir, "benchmark-upgrades");
@@ -22316,7 +22327,8 @@ function markRescored(runId, runDir, nodeId, evalVersion, succeeded, missionId) 
       (0, import_fs5.renameSync)(tmp, path);
       if (!wasComplete && ids.every((i) => done.has(i) || failed.has(i))) {
         const tree = readTree(runId, missionId);
-        const order = ids.filter((i) => done.has(i) && typeof tree[i]?.scores_by_version?.[evalVersion] === "number").sort((x, y) => tree[y].scores_by_version[evalVersion] - tree[x].scores_by_version[evalVersion]).map((i) => tree[i]?.name ?? i);
+        const sign = fitnessLowerIsBetter(runDir) ? 1 : -1;
+        const order = ids.filter((i) => done.has(i) && typeof tree[i]?.scores_by_version?.[evalVersion] === "number").sort((x, y) => sign * (tree[x].scores_by_version[evalVersion] - tree[y].scores_by_version[evalVersion])).map((i) => tree[i]?.name ?? i);
         (0, import_fs5.appendFileSync)(
           (0, import_path6.join)(runDir, "decision-log.md"),
           `- \`${(/* @__PURE__ */ new Date()).toISOString()}\` **re-score under ${evalVersion} finished** \u2014 frontier order under ${evalVersion}: ${order.join(", ") || "(none)"}` + (failed.size ? `; failed: ${[...failed].map((i) => tree[i]?.name ?? i).join(", ")}` : "") + "\n"
@@ -23237,7 +23249,6 @@ var TickStateSchema = external_exports.object({
 var RunStatePatchSchema = external_exports.object({
   status: external_exports.enum(["initialized", "running", "paused", "completed", "failed"]).optional().describe("Run lifecycle status"),
   tick_count: external_exports.number().int().min(0).optional().describe("Number of completed ticks"),
-  best_score: external_exports.number().optional().describe("Best primary metric value achieved so far"),
   frontier_ids: external_exports.array(external_exports.string()).optional().describe("Node IDs currently on the frontier"),
   current_eval_version: external_exports.string().optional().describe("Active EvalSuite version"),
   pending_node_ids: external_exports.array(external_exports.string()).optional().describe("Node names started in this tick but not yet recorded to the tree"),
@@ -23463,6 +23474,13 @@ function stateWrite(runId, patch, missionId) {
     tick_record: tickRecord,
     ...statePatch
   } = patch;
+  for (const k of ["best_score", "best_node_id"]) {
+    if (k in statePatch) {
+      throw new Error(
+        `${k} is derived from recorded evaluations (evor_record_eval) and cannot be written directly; record the node's evaluation instead.`
+      );
+    }
+  }
   const current = readRunState(paths.runStatePath, runId);
   const updated = { ...current };
   for (const [k, v] of Object.entries(statePatch)) {
@@ -23489,6 +23507,14 @@ function stateWrite(runId, patch, missionId) {
       if (r && typeof r.tick === "number") byTick.set(r.tick, r);
     }
     const record2 = { tick: tickRecord.tick, outcome: tickRecord.outcome };
+    let inForce;
+    try {
+      const v = JSON.parse((0, import_fs8.readFileSync)((0, import_path9.join)(paths.runDir, "goal-contract.json"), "utf8")).eval_version;
+      if (typeof v === "string") inForce = v;
+    } catch {
+    }
+    inForce ??= typeof current.current_eval_version === "string" ? current.current_eval_version : void 0;
+    if (inForce) record2.eval_version = inForce;
     if (tickRecord.score !== void 0) record2.score = tickRecord.score;
     if (tickRecord.failure_kind !== void 0) record2.failure_kind = tickRecord.failure_kind;
     if (tickRecord.error !== void 0) record2.error = tickRecord.error;
@@ -23497,7 +23523,7 @@ function stateWrite(runId, patch, missionId) {
     byTick.set(tickRecord.tick, record2);
     const records = [...byTick.values()].sort((a, b) => a.tick - b.tick);
     updated.tick_records = records;
-    updated.tick_history_scores = records.map((r) => r.score).filter((v) => typeof v === "number");
+    updated.tick_history_scores = records.filter((r) => !inForce || (r.eval_version ?? inForce) === inForce).map((r) => r.score).filter((v) => typeof v === "number");
   }
   writeRunState(paths.runStatePath, updated);
   if (strategyDelta && Object.keys(strategyDelta).length > 0) {
@@ -23729,7 +23755,17 @@ function registerStateTools(server) {
     },
     async ({ run_id, patch }) => {
       const missionId = process.env.EVOR_MISSION_ID;
-      const updated = stateWrite(run_id, patch, missionId);
+      let updated;
+      try {
+        updated = stateWrite(run_id, patch, missionId);
+      } catch (e) {
+        return {
+          content: [{
+            type: "text",
+            text: JSON.stringify({ ok: false, error: e instanceof Error ? e.message : String(e) })
+          }]
+        };
+      }
       return {
         content: [
           {
@@ -25259,8 +25295,12 @@ function relockForRescore(runId, worktree, evalVersion, missionId) {
   const canonical = (0, import_path19.join)(runDir, "eval-suites", `${evalVersion}.py`);
   let sealedHash;
   let canonicalBytes;
+  const receiptPath = (0, import_path19.join)(runDir, "eval-suites", `${evalVersion}.sealed.json`);
+  if ((0, import_fs18.existsSync)(receiptPath) && !(0, import_fs18.existsSync)(canonical)) {
+    return { ok: false, error: `the ${evalVersion} seal receipt exists but eval-suites/${evalVersion}.py does not; nothing sealed can be installed.` };
+  }
   try {
-    const receipt = JSON.parse((0, import_fs18.readFileSync)((0, import_path19.join)(runDir, "eval-suites", `${evalVersion}.sealed.json`), "utf8"));
+    const receipt = JSON.parse((0, import_fs18.readFileSync)(receiptPath, "utf8"));
     sealedHash = receipt.files?.[`${evalVersion}.py`] ?? receipt.hash;
     canonicalBytes = (0, import_fs18.readFileSync)(canonical);
   } catch {
@@ -25953,12 +25993,15 @@ function registerComputeTools(server) {
     async ({ run_id, eval_version, mission_id, overwrite_plugin }) => {
       const resolvedMission = mission_id ?? process.env.EVOR_MISSION_ID;
       const { runDir } = resolveRunPaths(run_id, resolvedMission);
+      const version2 = eval_version ?? "v1";
+      const refusal = evaluatorWriteRefusal(runDir, version2, overwrite_plugin ? "score_plugin" : "evaluator");
+      if (refusal) return err2(refusal);
       const result = callPythonModule("evor.scaffold_evaluator", [
         "generate",
         "--run-dir",
         runDir,
         "--eval-version",
-        eval_version,
+        version2,
         ...overwrite_plugin ? ["--overwrite-plugin"] : []
       ]);
       if (!result.ok || result.data == null) {

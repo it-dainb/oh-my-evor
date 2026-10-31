@@ -239,7 +239,7 @@ export function updateBestScore(
     // best_score is per eval version: a score under a version that is not in
     // force (the parent of a hardening, say) must not set the best of this one.
     const scoredUnder = (result as Record<string, unknown> | null)?.eval_version;
-    const inForce = state.current_eval_version ?? contract?.eval_version;
+    const inForce = contract?.eval_version ?? state.current_eval_version;
     if (typeof scoredUnder === "string" && typeof inForce === "string" && scoredUnder !== inForce) return;
     const current = state.best_score;
     const lowerIsBetter = primary.direction === "lower";
@@ -271,6 +271,23 @@ const EVALUATOR_FIELDS = [
 
 /** The only shape an eval version takes where it builds a path. */
 const VERSION_RE = /^v\d+$/;
+
+/**
+ * Is a LOWER fitness better under this run's contract? Mirror of
+ * `evor.benchmark.fitness_lower_is_better`: fitness is the primary metric's raw
+ * value unless baseline→target normalisation applies.
+ */
+function fitnessLowerIsBetter(runDir: string): boolean {
+  try {
+    const c = JSON.parse(readFileSync(join(runDir, "goal-contract.json"), "utf8")) as Record<string, unknown>;
+    const spec = ((c.metric_specs ?? []) as Record<string, unknown>[]).find((m) => m?.role === "primary_fitness");
+    if (!spec || spec.direction !== "lower") return false;
+    if ((c.fitness_mode === "worst-domain" || c.fitness_mode === "weighted") && !spec.fitness_formula) return true;
+    return c.target_value === undefined || c.target_value === null;
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Re-score bookkeeping for a metric hardening. A node counts as re-scored only
@@ -305,9 +322,10 @@ function markRescored(
       renameSync(tmp, path);
       if (!wasComplete && ids.every((i) => done.has(i) || failed.has(i))) {
         const tree = readTree(runId, missionId);
+        const sign = fitnessLowerIsBetter(runDir) ? 1 : -1;
         const order = ids
           .filter((i) => done.has(i) && typeof tree[i]?.scores_by_version?.[evalVersion] === "number")
-          .sort((x, y) => tree[y]!.scores_by_version![evalVersion]! - tree[x]!.scores_by_version![evalVersion]!)
+          .sort((x, y) => sign * (tree[x]!.scores_by_version![evalVersion]! - tree[y]!.scores_by_version![evalVersion]!))
           .map((i) => tree[i]?.name ?? i);
         appendFileSync(
           join(runDir, "decision-log.md"),

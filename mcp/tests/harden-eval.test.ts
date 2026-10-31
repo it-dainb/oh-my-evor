@@ -22,6 +22,7 @@ import { fileURLToPath } from "url";
 import { registerComputeTools, lockEvaluate, relockForRescore } from "../src/tools/compute.js";
 import { recordEval, readResult, updateBestScore } from "../src/tools/record.js";
 import { integrityCheck, evalVersionCache, frozenSplitHashCache } from "../src/tools/integrity.js";
+import { registerStateTools, stateWrite } from "../src/tools/state.js";
 
 const TEST_DIR = dirname(fileURLToPath(import.meta.url));
 const HARNESS = resolve(TEST_DIR, "../../harness");
@@ -404,6 +405,75 @@ describe("re-scoring a node under the hardened version", () => {
   });
 });
 
+describe("re-review: scaffold, state and ordering", () => {
+  it("evor_scaffold_evaluator cannot rewrite the sealed parent or the shared plugin during a mission", async () => {
+    const before = readFileSync(join(runDir, "eval-suites", "v1.py"), "utf8");
+    for (const args of [
+      { eval_version: "v1", overwrite_plugin: true },
+      { eval_version: "v2" },
+    ]) {
+      const out = await tool("evor_scaffold_evaluator", { run_id: "r1", ...args });
+      expect(out.ok, JSON.stringify(args)).toBe(false);
+    }
+    expect(readFileSync(join(runDir, "eval-suites", "v1.py"), "utf8")).toBe(before);
+    expect(existsSync(join(runDir, "eval-suites", "score_plugin.py"))).toBe(false);
+  });
+
+  it("best_score and best_node_id are not writable through evor_state_write", async () => {
+    expect(() => stateWrite("r1", { best_score: 0.99 } as never, "m1")).toThrow(/derived from recorded evaluations/);
+    expect(() => stateWrite("r1", { best_node_id: "x" } as never, "m1")).toThrow(/derived/);
+    const handlers = new Map<string, (a: never) => Promise<{ content: { text: string }[] }>>();
+    registerStateTools({ tool: (n: string, _d: string, _s: unknown, h: never) => handlers.set(n, h) } as never);
+    const res = JSON.parse((await handlers.get("evor_state_write")!({ run_id: "r1", patch: { best_score: 1 } } as never)).content[0].text);
+    expect(res.ok).toBe(false);
+    expect(JSON.parse(readFileSync(join(runDir, "run-state.json"), "utf8")).best_score).toBeUndefined();
+  });
+
+  it("tick records carry their eval version and the history is the in-force version's", async () => {
+    stateWrite("r1", { tick_record: { tick: 1, outcome: "scored", score: 0.9 } }, "m1");
+    expect((await harden()).ok).toBe(true);
+    const updated = stateWrite("r1", { tick_record: { tick: 2, outcome: "scored", score: 0.4 } }, "m1");
+    expect((updated.tick_records as { eval_version?: string }[]).map((r) => r.eval_version)).toEqual(["v1", "v2"]);
+    expect(updated.tick_history_scores).toEqual([0.4]);
+  });
+
+  it("the version in force is the contract's even when run-state lags", async () => {
+    expect((await harden()).ok).toBe(true);
+    const rs = JSON.parse(readFileSync(join(runDir, "run-state.json"), "utf8"));
+    writeFileSync(join(runDir, "run-state.json"), JSON.stringify({ ...rs, current_eval_version: "v1" }));
+    updateBestScore("r1", UUID, { eval_version: "v1", metrics: { accuracy: 0.99 } }, "passed", "m1");
+    expect(JSON.parse(readFileSync(join(runDir, "run-state.json"), "utf8")).best_score).toBeUndefined();
+    updateBestScore("r1", UUID, { eval_version: "v2", metrics: { accuracy: 0.4 } }, "passed", "m1");
+    expect(JSON.parse(readFileSync(join(runDir, "run-state.json"), "utf8")).best_score).toBe(0.4);
+  });
+
+  it("the frontier order after a re-score follows the metric's direction", async () => {
+    const UUID2 = "33333333-4444-4555-8666-777777777777";
+    const c = contract();
+    c.metric_specs[0].direction = "lower";
+    delete c.target_value;
+    writeFileSync(join(runDir, "goal-contract.json"), JSON.stringify(c));
+    const tree = JSON.parse(readFileSync(join(runDir, "tree.json"), "utf8"));
+    tree.nodes[UUID2] = { ...tree.nodes[UUID], id: UUID2, name: "n2-other" };
+    writeFileSync(join(runDir, "tree.json"), JSON.stringify(tree));
+    writeFileSync(join(runDir, "run-state.json"), JSON.stringify({
+      ...JSON.parse(readFileSync(join(runDir, "run-state.json"), "utf8")), frontier_ids: [UUID, UUID2],
+    }));
+    mkdirSync(join(runDir, "nodes", UUID2), { recursive: true });
+    copyFileSync(join(runDir, "nodes", UUID, "telemetry.jsonl"), join(runDir, "nodes", UUID2, "telemetry.jsonl"));
+    expect((await harden()).ok).toBe(true);
+    const scored = (v: number, p: number) => ({
+      eval_version: "v2", metrics: { accuracy: v }, per_domain: {}, fitness_value: v, status: "success",
+      benchmark_raw: "", telemetry_summary: { total_steps: 0 },
+      parent_eval_version: "v1", parent_fitness_value: p, parent_metrics: { accuracy: p }, parent_inputs_match: true,
+    });
+    // Node 2 is better (lower) under v2; recorded first so a wrong sort would list it last.
+    expect(recordEval("r1", UUID2, scored(0.3, 0.2), "m1").integrityVerdict).toBe("passed");
+    expect(recordEval("r1", UUID, scored(0.6, 0.5), "m1").integrityVerdict).toBe("passed");
+    expect(readFileSync(join(runDir, "decision-log.md"), "utf8")).toMatch(/frontier order under v2: n2-other, n1-seed/);
+  });
+});
+
 describe("governor — the tick applies a hardening", () => {
   function governor(
     agent: string | null, live: boolean,
@@ -455,6 +525,9 @@ describe("governor — the tick applies a hardening", () => {
       expect(governor(agent, true, S, { run_id: "r1", eval_version: "v2" })?.permissionDecision).toBe("deny");
       expect(governor(agent, true, W, { run_id: "r1", eval_version: "v1", target: "score_plugin", source: "x" })?.permissionDecision).toBe("deny");
     }
+    const F = "mcp__plugin_oh-my-evor_evor__evor_scaffold_evaluator";
+    expect(governor("evor-tick", true, F, { run_id: "r1", eval_version: "v1", overwrite_plugin: true })?.permissionDecision).toBe("deny");
+    expect(governor(null, true, F, { run_id: "r1", eval_version: "v2" })?.permissionDecision).toBe("deny");
     expect(governor(null, true, S, { run_id: "r1", eval_version: "v1" })?.permissionDecision).not.toBe("deny");
     expect(governor(null, false, W, { run_id: "r1", eval_version: "v2", source: "x" })?.permissionDecision, "setup is not gated").not.toBe("deny");
   });

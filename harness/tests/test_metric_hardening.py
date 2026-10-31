@@ -521,3 +521,106 @@ def test_open_question_frontier_order_before_is_logged(run_dir: Path) -> None:
     out = _harden(run_dir)
     assert out["frontier_order_before"] == ["n1-seed"]
     assert "frontier order under v1: n1-seed" in (run_dir / "decision-log.md").read_text()
+
+
+# ── re-review: blocking + fold-ins ───────────────────────────────────────────
+
+
+def test_b1_scaffold_does_not_rewrite_a_sealed_parent_or_the_shared_plugin(run_dir: Path) -> None:
+    from evor.scaffold_evaluator import scaffold_evaluator
+
+    _seal_v1_with_plugin(run_dir)
+    out = scaffold_evaluator(run_dir, "v1", overwrite_plugin=True)
+    assert "error" in out and "sealed" in out["error"]
+    assert sealed_script(run_dir, "v1") is not None, "the sealed parent is untouched"
+    assert (run_dir / "eval-suites" / "score_plugin.py").read_text() == PLUGIN_SRC
+
+
+def test_b1_scaffold_of_a_new_version_cannot_overwrite_the_sealed_plugin(run_dir: Path) -> None:
+    from evor.scaffold_evaluator import scaffold_evaluator
+
+    _seal_v1_with_plugin(run_dir)
+    out = scaffold_evaluator(run_dir, "v3", overwrite_plugin=True)
+    assert "error" in out and "score_plugin.py is sealed into v1" in out["error"]
+    assert (run_dir / "eval-suites" / "score_plugin.py").read_text() == PLUGIN_SRC
+
+
+def test_f2_the_regression_stop_compares_only_scores_under_one_version(run_dir: Path) -> None:
+    from evor.tree import TreeEngine, check_stop_condition
+
+    contract = json.loads((run_dir / "goal-contract.json").read_text())
+    contract["stop_condition"] = {"type": "evolve-until-regression"}
+    (run_dir / "goal-contract.json").write_text(json.dumps(contract))
+    state = json.loads((run_dir / "run-state.json").read_text())
+    state["tick_records"] = [
+        {"tick": t, "outcome": "scored", "score": s} for t, s in ((1, 0.80), (2, 0.90), (3, 0.85))
+    ]
+    (run_dir / "run-state.json").write_text(json.dumps(state))
+    _harden(run_dir)
+
+    state = json.loads((run_dir / "run-state.json").read_text())
+    assert state["tick_history_scores"] == [], "the history restarts under the new version"
+    assert all(r["eval_version"] == "v1" for r in state["tick_records"])
+    # One stricter tick under v2: lower than the v1 scores, which is no regression.
+    # Mixed with the v1 history it would read as two (0.90 -> 0.85 -> 0.42).
+    state["tick_records"].append({"tick": 4, "outcome": "scored", "score": 0.42, "eval_version": "v2"})
+    state["tick_history_scores"] = [0.80, 0.90, 0.85, 0.42]  # what a version-blind writer derives
+    goal = GoalContract.model_validate(json.loads((run_dir / "goal-contract.json").read_text()))
+    strategy = StrategyState.model_validate({
+        "meta_iteration": 0, "selection_policy": "ucb1", "ucb1_c": 1.41, "wildness": 0.5,
+        "family_mix": {"arch": 1.0}, "winning_families": [], "wins_by_family": {},
+        "meta_loop_interval": 5, "post_upgrade_exploration_ticks": 0, "rescore_mode": "async",
+        "updated_at": "2026-10-31T00:00:00Z",
+    })
+    engine = TreeEngine(goal=goal, nodes=[], strategy=strategy, run_dir=run_dir)
+    verdict = check_stop_condition(goal, state, engine)
+    assert verdict.should_stop is False, verdict.reason
+
+
+def test_f3_a_kill_mid_adoption_is_recovered_on_retry(run_dir: Path, monkeypatch) -> None:
+    import evor.benchmark as bm
+
+    draft = run_dir / "eval-suites" / "v2.py"
+    draft.write_text("# draft\n")
+    contract_before = (run_dir / "goal-contract.json").read_bytes()
+
+    def killed(*_a, **_k):
+        raise KeyboardInterrupt("process killed")
+
+    # Simulate a kill: the contract write never happens and no rollback runs.
+    with monkeypatch.context() as m:
+        m.setattr(bm, "_write_contract", killed)
+        m.setattr(bm._Transaction, "rollback", lambda self: None)
+        with pytest.raises(KeyboardInterrupt):
+            _harden(run_dir)
+    assert (run_dir / "eval-suites" / "v2.json").exists(), "partial state is left behind"
+    assert json.loads((run_dir / "run-state.json").read_text())["current_eval_version"] == "v2"
+    assert (run_dir / "goal-contract.json").read_bytes() == contract_before
+
+    out = _harden(run_dir)
+    assert out["recovered_partial_adoption"] == "rolled_back"
+    assert json.loads((run_dir / "goal-contract.json").read_text())["eval_version"] == "v2"
+    assert (run_dir / "decision-log.md").read_text().count("## Metric hardening") == 1
+    assert not (run_dir / "benchmark-upgrades" / ".harden-journal.json").exists()
+
+
+def test_f3_a_kill_after_the_contract_moved_finishes_on_recovery(run_dir: Path, monkeypatch) -> None:
+    import evor.benchmark as bm
+
+    with monkeypatch.context() as m:
+        m.setattr(bm._Transaction, "commit", lambda self: None)  # killed before the journal is removed
+        _harden(run_dir)
+    assert (run_dir / "benchmark-upgrades" / ".harden-journal.json").exists()
+    assert bm.recover_journal(run_dir) == "completed"
+    assert json.loads((run_dir / "goal-contract.json").read_text())["eval_version"] == "v2"
+    assert (run_dir / "eval-suites" / "v2.json").exists()
+
+
+def test_f5_a_legacy_receipt_without_a_plugin_manifest_gets_an_accurate_refusal(run_dir: Path) -> None:
+    (run_dir / "eval-suites" / "score_plugin.py").write_text(PLUGIN_SRC)  # receipt lists v1.py only
+    with pytest.raises(IntegrityError, match="predates plugin manifests"):
+        _harden(run_dir)
+    contract = json.loads((run_dir / "goal-contract.json").read_text())
+    contract["eval_plugin_hash"] = _sha(run_dir / "eval-suites" / "score_plugin.py")
+    (run_dir / "goal-contract.json").write_text(json.dumps(contract))
+    assert _harden(run_dir)["ok"] is True, "the contract's plugin anchor verifies it"

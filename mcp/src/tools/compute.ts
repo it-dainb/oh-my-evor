@@ -443,8 +443,12 @@ export function relockForRescore(
   const canonical = join(runDir, "eval-suites", `${evalVersion}.py`);
   let sealedHash: string | undefined;
   let canonicalBytes: Buffer;
+  const receiptPath = join(runDir, "eval-suites", `${evalVersion}.sealed.json`);
+  if (existsSync(receiptPath) && !existsSync(canonical)) {
+    return { ok: false, error: `the ${evalVersion} seal receipt exists but eval-suites/${evalVersion}.py does not; nothing sealed can be installed.` };
+  }
   try {
-    const receipt = JSON.parse(readFileSync(join(runDir, "eval-suites", `${evalVersion}.sealed.json`), "utf8")) as {
+    const receipt = JSON.parse(readFileSync(receiptPath, "utf8")) as {
       hash?: string; files?: Record<string, string>;
     };
     sealedHash = receipt.files?.[`${evalVersion}.py`] ?? receipt.hash;
@@ -1514,8 +1518,13 @@ export function registerComputeTools(server: McpServer): void {
       // harness; the mission owns one function.
       const resolvedMission = mission_id ?? process.env.EVOR_MISSION_ID;
       const { runDir } = resolveRunPaths(run_id, resolvedMission);
+      const version = eval_version ?? "v1";
+      // Same rule as evor_write_eval_script: during a mission this tool touches
+      // only the version in force, and never the shared plugin.
+      const refusal = evaluatorWriteRefusal(runDir, version, overwrite_plugin ? "score_plugin" : "evaluator");
+      if (refusal) return err(refusal);
       const result = callPythonModule("evor.scaffold_evaluator", [
-        "generate", "--run-dir", runDir, "--eval-version", eval_version,
+        "generate", "--run-dir", runDir, "--eval-version", version,
         ...(overwrite_plugin ? ["--overwrite-plugin"] : []),
       ]);
       if (!result.ok || result.data == null) {

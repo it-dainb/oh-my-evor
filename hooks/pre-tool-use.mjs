@@ -957,14 +957,14 @@ try {
   // version in force: staging a new version's evaluator, or replacing the shared
   // score_plugin.py, outside evor_harden_eval would put an unreviewed metric one
   // call away from adoption.
-  if (_missionLive && /(^|_)evor_(write|seal)_eval_script$/.test(toolNameH)) {
+  if (_missionLive && /(^|_)evor_((write|seal)_eval_script|scaffold_evaluator)$/.test(toolNameH)) {
     const tiH = input?.tool_input ?? {};
     const rd = resolveRunDir();
     const inForce = rd && _exists(_join(rd, 'goal-contract.json'))
       ? String(JSON.parse(readFileSync(_join(rd, 'goal-contract.json'), 'utf8'))?.eval_version ?? '')
       : '';
-    const wantsPlugin = tiH?.target === 'score_plugin';
-    if (wantsPlugin || (inForce && String(tiH?.eval_version ?? '') !== inForce)) {
+    const wantsPlugin = tiH?.target === 'score_plugin' || tiH?.overwrite_plugin === true;
+    if (wantsPlugin || (inForce && String(tiH?.eval_version ?? 'v1') !== inForce)) {
       deny(
         `[EVOR GOVERNOR] While the mission runs, ${toolNameH.replace(/^mcp__plugin_oh-my-evor_evor__/, '')} ` +
           `touches only the eval version in force${inForce ? ` (${inForce})` : ''}` +

@@ -149,9 +149,23 @@ def sealed_script(run_dir: Path, eval_version: str) -> Path | None:
         for name, digest in files.items():
             if _sha256(base / name) != digest:
                 return None
+        # A receipt older than plugin manifests records the harness only; the
+        # plugin beside it is then held to the contract's own plugin anchor.
+        plugin = base / SCORE_PLUGIN
+        if SCORE_PLUGIN not in files and plugin.exists():
+            anchor = _contract_plugin_anchor(run_dir)
+            if anchor and _sha256(plugin) != anchor:
+                return None
     except OSError:
         return None
     return script
+
+
+def _contract_plugin_anchor(run_dir: Path) -> str | None:
+    try:
+        return json.loads((Path(run_dir) / "goal-contract.json").read_text()).get("eval_plugin_hash")
+    except (OSError, ValueError):
+        return None
 
 
 def fitness_lower_is_better(goal: dict | object) -> bool:
@@ -201,42 +215,106 @@ def _write_contract(tx: "_Transaction", path: Path, contract: dict) -> None:
 
 
 class _Transaction:
-    """All-or-nothing file writes: every write is recorded, and rollback() puts
-    back the bytes of each file that existed and removes each file that did not."""
+    """All-or-nothing file writes that survive the process being killed.
 
-    def __init__(self) -> None:
+    begin() snapshots every file the transaction will touch into a JOURNAL on
+    disk before anything changes; rollback() puts back the bytes of each file
+    that existed, removes each one that did not, and truncates appended logs;
+    commit() removes the journal. A journal left behind means the process died
+    mid-transaction — recover_journal() rolls it back (or, when the final write
+    landed, simply finishes) so a retry starts from a consistent run.
+    """
+
+    def __init__(self, journal: Path) -> None:
+        self._journal = journal
         self._before: dict[Path, bytes | None] = {}
         self._appended: dict[Path, int] = {}
 
+    def begin(self, paths: list[Path], appends: list[Path], meta: dict) -> None:
+        import base64
+
+        self._before = {p: (p.read_bytes() if p.exists() else None) for p in paths}
+        self._appended = {p: (p.stat().st_size if p.exists() else -1) for p in appends}
+        self._journal.parent.mkdir(parents=True, exist_ok=True)
+        _atomic_write_json(self._journal, {
+            **meta,
+            "files": {
+                str(p): (None if b is None else base64.b64encode(b).decode())
+                for p, b in self._before.items()
+            },
+            "appends": {str(p): n for p, n in self._appended.items()},
+        })
+
     def write(self, path: Path, data: bytes) -> None:
         if path not in self._before:
-            self._before[path] = path.read_bytes() if path.exists() else None
+            raise RuntimeError(f"{path} was not declared to the transaction")
         _atomic_write_bytes(path, data)
 
     def append(self, path: Path, text: str) -> None:
         if path not in self._appended:
-            self._appended[path] = path.stat().st_size if path.exists() else -1
+            raise RuntimeError(f"{path} was not declared to the transaction")
         with open(path, "a") as fh:
             fh.write(text)
 
+    def commit(self) -> None:
+        self._journal.unlink(missing_ok=True)
+
     def rollback(self) -> None:
-        for path, before in self._before.items():
-            try:
-                if before is None:
-                    path.unlink(missing_ok=True)
-                else:
-                    _atomic_write_bytes(path, before)
-            except OSError:
-                pass
-        for path, size in self._appended.items():
-            try:
-                if size < 0:
-                    path.unlink(missing_ok=True)
-                else:
-                    with open(path, "r+b") as fh:
-                        fh.truncate(size)
-            except OSError:
-                pass
+        _restore(self._before, self._appended)
+        self._journal.unlink(missing_ok=True)
+
+
+def _restore(before: dict[Path, bytes | None], appended: dict[Path, int]) -> None:
+    for path, data in before.items():
+        try:
+            if data is None:
+                path.unlink(missing_ok=True)
+            else:
+                _atomic_write_bytes(path, data)
+        except OSError:
+            pass
+    for path, size in appended.items():
+        try:
+            if size < 0:
+                path.unlink(missing_ok=True)
+            else:
+                with open(path, "r+b") as fh:
+                    fh.truncate(size)
+        except OSError:
+            pass
+
+
+def recover_journal(run_dir: Path) -> str | None:
+    """Finish or undo a hardening the process died in the middle of.
+
+    The contract is the transaction's last write. If it already names the new
+    version the adoption landed and only the journal is left to remove; anything
+    else is undone from the snapshot. Returns "completed", "rolled_back" or None.
+    """
+    import base64
+
+    journal = Path(run_dir) / "benchmark-upgrades" / HARDEN_JOURNAL
+    try:
+        data = json.loads(journal.read_text())
+    except (OSError, ValueError):
+        return None
+    try:
+        in_force = json.loads((Path(run_dir) / "goal-contract.json").read_text()).get("eval_version")
+    except (OSError, ValueError):
+        in_force = None
+    if in_force == data.get("to_eval_version"):
+        journal.unlink(missing_ok=True)
+        return "completed"
+    _restore(
+        {Path(p): (None if b is None else base64.b64decode(b)) for p, b in (data.get("files") or {}).items()},
+        {Path(p): int(n) for p, n in (data.get("appends") or {}).items()},
+    )
+    journal.unlink(missing_ok=True)
+    return "rolled_back"
+
+
+#: The journal of an in-flight hardening (one at a time per run).
+HARDEN_JOURNAL = ".harden-journal.json"
 
 
 class BenchmarkManager:
@@ -447,6 +525,9 @@ class BenchmarkManager:
 
         run_dir = self._run_dir
         base = run_dir / "eval-suites"
+        # A hardening the process died inside is finished or undone first, so
+        # the run is consistent before any precondition reads it.
+        recovered = recover_journal(run_dir)
         for v in (from_eval_version, to_eval_version):
             if not valid_version(v):
                 raise IntegrityError(f"{v!r} is not an eval version (expected v<N>).")
@@ -546,7 +627,16 @@ class BenchmarkManager:
         plugin = base / SCORE_PLUGIN
         plugin_sha = _sha256(plugin) if plugin.exists() else None
         parent_files = receipt_files(run_dir, from_eval_version) or {}
-        if parent_files.get(SCORE_PLUGIN) != plugin_sha:
+        parent_plugin = parent_files.get(SCORE_PLUGIN) or contract.get("eval_plugin_hash")
+        if plugin_sha and parent_plugin is None:
+            raise IntegrityError(
+                f"score_plugin.py is on disk, but neither the {from_eval_version!r} seal receipt "
+                "(it predates plugin manifests) nor the contract's eval_plugin_hash records "
+                "it, so the plugin the parent is scored with cannot be verified. Re-seal "
+                f"{from_eval_version} with evor_seal_eval_script after checking score_plugin.py "
+                "is the metric the parent was scored with."
+            )
+        if parent_plugin != plugin_sha:
             raise IntegrityError(
                 "score_plugin.py differs from the one the parent was sealed with; a "
                 "hardening changes the evaluator, never the shared metric under the parent."
@@ -654,20 +744,36 @@ class BenchmarkManager:
             f"- entry: {entry.model_dump_json()}\n"
         )
 
-        tx = _Transaction()
+        upgrades_dir = run_dir / "benchmark-upgrades"
+        upgrades_dir.mkdir(parents=True, exist_ok=True)
+        planned = [self._suite_path(to_eval_version), upgrades_dir / f"{upgrade_id}.json", contract_path]
+        if not adopt:
+            planned += [script, base / f"{to_eval_version}.sealed.json"]
+        if state is not None:
+            planned.append(state_path)
+        tx = _Transaction(upgrades_dir / HARDEN_JOURNAL)
+        tx.begin(planned, [self._decision_log_path()], {
+            "from_eval_version": from_eval_version, "to_eval_version": to_eval_version, "started_at": now,
+        })
         try:
             if not adopt:
                 tx.write(script, source_bytes)
                 tx.write(base / f"{to_eval_version}.sealed.json", json.dumps(receipt, indent=2).encode())
             tx.write(self._suite_path(to_eval_version), suite.model_dump_json(indent=2).encode())
-            upgrades_dir = run_dir / "benchmark-upgrades"
-            upgrades_dir.mkdir(parents=True, exist_ok=True)
             tx.write(upgrades_dir / f"{upgrade_id}.json", upgrade.model_dump_json(indent=2).encode())
             if state is not None:
                 new_state = dict(state)
                 new_state["current_eval_version"] = to_eval_version
                 new_state.pop("best_score", None)
                 new_state.pop("best_node_id", None)
+                # Scores compare only within a version: the history restarts, and
+                # every earlier tick record keeps the version it was scored under.
+                new_state["tick_records"] = [
+                    {**r, "eval_version": r.get("eval_version", from_eval_version)}
+                    if isinstance(r, dict) else r
+                    for r in new_state.get("tick_records") or []
+                ]
+                new_state["tick_history_scores"] = []
                 tx.write(state_path, json.dumps(new_state, indent=2).encode())
             tx.append(self._decision_log_path(), log_text)
             # The contract moves last: until it does, the run is on the parent.
@@ -675,6 +781,7 @@ class BenchmarkManager:
         except BaseException:
             tx.rollback()
             raise
+        tx.commit()
 
         return {
             "ok": True,
@@ -684,6 +791,7 @@ class BenchmarkManager:
             "adopted_sealed": adopt,
             "rescore": [name_of(i) for i in frontier],
             "frontier_order_before": order_before,
+            **({"recovered_partial_adoption": recovered} if recovered else {}),
         }
 
     def _eval_seed_model(

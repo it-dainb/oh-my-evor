@@ -53,6 +53,27 @@ All notable changes to Evor. Format follows [Keep a Changelog](https://keepachan
   - A stricter metric caps each node's score and may reorder the frontier: the decision log
     records the order under the parent at adoption and under the new version when the re-score
     finishes.
+  - `evor_scaffold_evaluator` is held to the same rule (tool, harness and governor): it never
+    regenerates a sealed harness or overwrites a sealed plugin, and during a mission touches
+    only the version in force.
+  - Stop checks compare scores within one eval version: tick records carry the version they
+    were scored under, adoption restarts `tick_history_scores`, and `check_stop_condition`
+    reads the in-force version's records, so a hardening does not read as a regression.
+  - Adoption is journaled: a process killed mid-adoption leaves a journal that the next
+    attempt rolls back (or, if the contract already moved, finishes) before it starts.
+  - `best_score` / `best_node_id` are no longer writable through `evor_state_write`; they come
+    only from recorded evaluations. The version in force is read from the contract first.
+  - The re-score's frontier order follows the metric's direction; a receipt that predates
+    plugin manifests is checked against the contract's `eval_plugin_hash`, and its refusal
+    says so.
+
+### Known limitations
+
+- `parent_inputs_match` is structural — same frozen split, same domain set — not a per-item
+  comparison. The guarantee is the score bound itself (fitness and primary metrics).
+- A node's worktree `evaluate.py` imports the `score_plugin.py` beside it in the worktree, not
+  the sealed copy in `eval-suites/` (this predates metric hardening). The integrity gate checks
+  the sealed copy; a worktree plugin that differs from it is not detected at score time.
 
 ### Fixed
 
