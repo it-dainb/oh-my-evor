@@ -86,10 +86,9 @@ def main() -> None:
     )
     parser.add_argument(
         "--steer-token",
-        default=os.environ.get("EVOR_DASHBOARD_STEER_TOKEN"),
+        default=None,
         metavar="TOKEN",
-        help="Token required to post steer notes (default: random, printed once at startup). "
-        "Also read from EVOR_DASHBOARD_STEER_TOKEN.",
+        help="Token required to post steer notes (default: random, printed once at startup)",
     )
     parser.add_argument(
         "--export",

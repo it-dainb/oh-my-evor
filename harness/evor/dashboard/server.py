@@ -563,7 +563,9 @@ def _open_browser_after(url: str, delay: float = 1.5) -> None:
 def _app_from_env() -> FastAPI:
     """Build the app from ``EVOR_RUN_DIR`` (a run dir) or ``EVOR_ROOT`` (a .evor root).
 
-    ``EVOR_DASHBOARD_NO_STEER=1`` disables the steer endpoint.
+    ``EVOR_DASHBOARD_NO_STEER=1`` disables the steer endpoint. The steer token
+    is generated and printed at startup; credentials are not read from the
+    environment (see tests/test_wave1_environment_secrets.py).
     """
     import os
 
@@ -581,7 +583,6 @@ def _app_from_env() -> FastAPI:
         root or ".evor",
         default_run_dir=default_run,
         allow_steer=os.environ.get("EVOR_DASHBOARD_NO_STEER", "") not in ("1", "true", "yes"),
-        steer_token=os.environ.get("EVOR_DASHBOARD_STEER_TOKEN") or None,
     )
     _announce_token(built)
     return built
