@@ -111,11 +111,10 @@ export function resolveNodeRef(runId: string, ref: string, missionId?: string): 
   if (Object.keys(nodes).length === 0) return ref;
 
   throw new Error(
-    `node '${ref}' is not in this run's tree. Check the name with evor_tree_read. ` +
-    `The tree lists ${Object.keys(nodes).length} node(s) and none of them claims this ` +
-    `reference; resolving it to itself would mint a second identity for a node that ` +
-    `already has one, which is how a node's telemetry becomes invisible to the gate ` +
-    `that scores it.`,
+    `node '${ref}' is not in this run's tree. A new candidate is recorded with ` +
+    `evor_record_node before it is launched, patched or scored; an existing one is named ` +
+    `as evor_record_node returned it. The tree lists ${Object.keys(nodes).length} node(s) ` +
+    `and none of them has this name or id.`,
   );
 }
 

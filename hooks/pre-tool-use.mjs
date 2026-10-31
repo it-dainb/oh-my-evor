@@ -34,7 +34,7 @@ import { isMissionLive } from './lib/run-status.mjs';
 import { turnStartedByHuman, lastSlashCommand } from './lib/transcript.mjs';
 import { existsSync as _exists } from 'fs';
 import { join as _join } from 'path';
-import { resolveWriteTargets } from './lib/write-targets.mjs';
+import { resolveWriteTargets, shellVars, expandVars } from './lib/write-targets.mjs';
 import { mayPerform, operationFor } from './lib/operations.mjs';
 import { classifyWriteTarget, selfPatchAllowed } from './lib/protected-paths.mjs';
 import { emitDenialSignal, logDecision, logError, logSkip } from './lib/audit.mjs';
@@ -288,7 +288,8 @@ try {
   // Judge each python invocation by what it runs — the script or module right
   // after the interpreter's flags — not by any `.py` path later in the command
   // line: `python3 -c "…"; grep -n x eval.py` reads a file, it runs nothing.
-  const pyArgs = cmdUnquoted
+  const cmdVars = shellVars(cmd);
+  const pyArgs = expandVars(cmdUnquoted, cmdVars)
     .split(/;|&&|\|\|?|\n/)
     .map((seg) => seg.match(/\bpython[0-9.]*\s+(.*)$/)?.[1].trim().replace(/^(?:-(?![mc]\b)[A-Za-z]+\s+)+/, ''))
     .filter((a) => a !== undefined);

@@ -45,7 +45,7 @@ const PY_WRITE_CALL =
  * Only literal assignments are tracked — anything computed is left alone, which
  * means the token stays unresolved and contributes no target rather than a wrong one.
  */
-function shellVars(command) {
+export function shellVars(command) {
   const vars = new Map();
   const re = /(?:^|[;&|\n]|\bthen\b|\bdo\b)\s*([A-Za-z_][A-Za-z0-9_]*)=("([^"]*)"|'([^']*)'|([^\s;&|]*))/g;
   let m;
@@ -59,7 +59,7 @@ function shellVars(command) {
   return vars;
 }
 
-function expandVars(token, vars) {
+export function expandVars(token, vars) {
   let out = token;
   for (let i = 0; i < 3; i++) {
     const next = out.replace(/\$\{([A-Za-z_][A-Za-z0-9_]*)\}|\$([A-Za-z_][A-Za-z0-9_]*)/g, (whole, a, b) => {
