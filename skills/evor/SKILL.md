@@ -43,8 +43,11 @@ If an artifact is missing, the sub-agent failed — re-spawn it with a correctiv
 fabricate the artifact yourself and do NOT proceed without it.
 
 **State-persistence post-condition — non-skippable:** running a candidate is not "done" until it
-is recorded. After Forge trains a candidate you MUST call `evor_record_node` then
-`evor_record_eval`. After calling `evor_record_node`, verify the returned node_name is non-null — a null or error result means the record failed. Do not advance the tick without a confirmed node_name from `evor_record_node`.
+is recorded. Forge records each candidate with `evor_record_node` BEFORE it trains (its junior
+needs the `telemetry_path` that call returns) and records its evaluation with `evor_record_eval`.
+The tick confirms every node name in Forge's report exists in the tree; a missing one is a gap to
+send back to Forge, not a node for the tick to record. Do not advance the tick without a confirmed
+node_name for every candidate that trained.
 
 **Why this is not optional:** an inline orchestrator that role-plays all five agents has no
 independent critic (Selector self-approves what it just proposed), no isolated ideation
@@ -342,8 +345,8 @@ For each approved proposal, spawn Forge as a REAL sub-agent. Do NOT write or run
 - **POST-CONDITION:** call `evor_read_artifact({ run_id, tick: n, agent: "forge" })`. If it returns `{error:"not found"}`, re-spawn Forge.
 - To run Forge Tasks concurrently, issue up to `resource_plan.concurrency` FOREGROUND `Agent` calls in ONE message — they run in parallel and the turn waits for all of them; record the wait with `evor_await_artifact` so it is visible in tick-state. Otherwise run one at a time. Never background a spawn from the tick.
 - **Forge atomic completion contract:** `evor_read_artifact({ run_id, tick: n, agent: "forge" })` returning successfully is the ONLY signal that Forge's full turn is done. Individual forge-* sub-agent completions (forge-critic, forge-architect, forge-analyst, forge-junior completing their Tasks) are Forge's INTERNAL delegation — they are NOT signals that Forge itself has finished. Do NOT advance to Step 6 until the forge-report artifact is confirmed present. Treating a forge-critic or forge-analyst Task completion as "Forge done" is a protocol violation that corrupts the tick.
-- Then YOU (orchestrator) call `evor_record_node` to register each new node, and append a DecisionLogEntry (decision_type="implement", node_ids=[node_id]) via `evor_state_write`.
-- **Verify the returned node_name is non-null before advancing.** Training a candidate without a confirmed node record is a FAILED tick (the Stop hook enforces this).
+- Forge has recorded each new node (`evor_record_node`, before training). Confirm each name from Forge's report with `evor_tree_read`, and append a DecisionLogEntry (decision_type="implement", node_ids=[node_id]) via `evor_state_write`.
+- **A trained candidate without a node record is a FAILED tick** (the Stop hook enforces this): send it back to Forge with `SendMessage` to record it.
 
 ## Step 6 — Evaluate + Integrity
 

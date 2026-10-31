@@ -2,6 +2,26 @@
 
 All notable changes to Evor. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.2.50] — 2026-10-31 — the guard writes the guard
+
+### Changed
+
+- **An unguarded `rm` is rewritten, not refused.** Juniors kept writing `rm -rf "$W/x"`; each was
+  refused and retried by hand. The governor now rewrites every path variable of an `rm` to its
+  guarded form (`"${W:?}/x"`), judges the rewritten command with every later rule, and passes it
+  to the client as `updatedInput` only if nothing refuses it. A single-quoted path, where `$` is
+  literal, is still refused with the rewrite named.
+
+### Fixed
+
+- **Nobody recorded the node.** Forge's protocol records each node before training (the junior
+  needs its telemetry path), while the evor skill told the tick to record nodes after Forge
+  trained. Each side waited on the other: tick 17 trained two ideas with no node in the tree, and
+  Forge asked main to record them. The skill now says Forge records and the tick confirms.
+- **A guarded variable hid its path from the write rules.** `${R:?}` (and `${R:-x}`, `${R=x}` …)
+  was left unexpanded, so `rm -f "${R:?}/eval-suites/v1.py"` did not resolve to the sealed
+  evaluator. Every parameter form now expands like `$R`.
+
 ## [1.2.49] — 2026-10-31 — names agents can find
 
 ### Fixed
