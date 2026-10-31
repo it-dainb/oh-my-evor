@@ -136,7 +136,7 @@ main { padding: 18px 20px 60px; display: flex; flex-direction: column; gap: 18px
 .vb { display: inline-flex; align-items: center; gap: 5px; padding: 1px 8px; border-radius: 999px; font: 600 11px/1.6 var(--cond); letter-spacing: .06em; text-transform: uppercase; border: 1px solid currentColor; white-space: nowrap; }
 .vb.confirmed { color: var(--ok); } .vb.refuted { color: var(--bad); } .vb.artefact { color: var(--art); } .vb.pending { color: var(--pend); } .vb.inconclusive { color: var(--inc); border-style: dashed; }
 .bd { display: inline-flex; align-items: center; gap: 4px; padding: 0 6px; border-radius: 5px; font: 11px/1.7 var(--mono); background: var(--panel-2); border: 1px solid var(--line-2); color: var(--ink-2); white-space: nowrap; }
-.bd.lucky-seed { color: var(--art); } .bd.integrity-failed { color: var(--bad); } .bd.pruned { text-decoration: line-through; } .bd.artefact-suspect { color: var(--art); } .bd.seed-spread { color: var(--robust); }
+.bd.lucky-seed { color: var(--art); } .bd.integrity-failed { color: var(--bad); } .bd.pruned { text-decoration: line-through; } .bd.artefact-suspect { color: var(--art); } .bd.artefact { color: var(--art); border-color: var(--art); } .bd.seed-spread { color: var(--robust); }
 .tk { all: unset; cursor: pointer; font: 600 11px/1.6 var(--mono); padding: 0 6px; border-radius: 5px; background: var(--panel-2); border: 1px solid var(--line-2); color: var(--ink-2); }
 .tk:hover { color: var(--best); border-color: var(--best); }
 .nl { all: unset; cursor: pointer; font-family: var(--mono); font-size: 12px; color: var(--ink); border-bottom: 1px dotted var(--ink-3); }
@@ -288,11 +288,11 @@ details > summary { cursor: pointer; color: var(--ink-2); font-size: 12px; }
         <span><i class="sw best"></i>best so far</span><span><i class="ln"></i>staircase</span>
         <span><i class="sw other"></i>other nodes</span><span><i class="ln med"></i>recipe median</span>
         <span id="lgRobust"><i class="ln rob"></i>robust best (median of seeds)</span>
-        <span><i class="ln dash"></i>baseline</span><span><i class="sw hollow"></i>artefact</span><span><i class="sw x"></i>failed integrity</span>
+        <span><i class="ln dash"></i>baseline</span><span><i class="sw hollow"></i>tagged artefact (excluded)</span><span><i class="sw x"></i>failed integrity</span>
       </div>
     </div>
     <div class="fig-wrap"><svg id="fig" role="img" aria-label="Best-so-far staircase of the primary metric over ticks"></svg><div class="tip" id="tip" role="tooltip"></div></div>
-    <div class="card-b faint" style="padding-top:0;font-size:12px" id="figNote">Hover a point to see its lineage; click to open its details. Integrity-failed and artefact nodes never set the best.</div>
+    <div class="card-b faint" style="padding-top:0;font-size:12px" id="figNote">Hover a point to see its lineage; click to open its details. Integrity-failed and explicitly tagged artefact nodes never set the best; their siblings still count.</div>
   </section>
 
   <section class="card" aria-labelledby="treeTitle">
@@ -315,10 +315,11 @@ details > summary { cursor: pointer; color: var(--ink-2); font-size: 12px; }
             <textarea id="steerNote" maxlength="4000" placeholder="e.g. Stop tuning checkpoint selection; test a recall floor inside the loss with 3 seeds." required></textarea>
             <div class="row">
               <label class="sr" for="steerAuthor">Your name</label><input id="steerAuthor" maxlength="80" placeholder="your name" required>
+              <label class="sr" for="steerToken">Steer token</label><input id="steerToken" type="password" autocomplete="off" placeholder="steer token" required title="Printed once in the dashboard server's console at startup">
               <label class="sr" for="steerAxis">Axis</label><select id="steerAxis"></select>
               <button class="btn" id="steerBtn" type="submit">Send</button>
             </div>
-            <div class="msg muted" id="steerMsg">The note is queued in the run's signals inbox and read when the next tick drains it.</div>
+            <div class="msg muted" id="steerMsg">Needs the steer token printed in the server console. The note is queued in the run's signals inbox and read when the next tick drains it.</div>
           </form>
           <ul class="steer-list" id="steerList"></ul>
         </div>
@@ -348,8 +349,8 @@ const S = { bundle: null, run: null, metric: null, ylog: false, sel: null, hover
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const VCOL = { confirmed: "var(--ok)", refuted: "var(--bad)", artefact: "var(--art)", pending: "var(--pend)", inconclusive: "var(--inc)" };
-const GLYPH = { "lucky-seed": "★", "integrity-failed": "⨯", "pruned": "✂", "artefact-suspect": "⚠", "seed-spread": "↕" };
-const BLABEL = { "lucky-seed": "lucky seed", "integrity-failed": "integrity failed", "pruned": "pruned", "artefact-suspect": "artefact suspect", "seed-spread": "seed spread" };
+const GLYPH = { "artefact": "⚠", "lucky-seed": "★", "integrity-failed": "⨯", "pruned": "✂", "artefact-suspect": "⚠", "seed-spread": "↕" };
+const BLABEL = { "artefact": "tagged artefact", "lucky-seed": "lucky seed", "integrity-failed": "integrity failed", "pruned": "pruned", "artefact-suspect": "artefact suspect", "seed-spread": "seed spread" };
 
 function fmt(v) {
   if (v === null || v === undefined || Number.isNaN(v)) return "—";
@@ -449,7 +450,7 @@ function renderVerdict() {
     <div class="kpi"><div class="eyebrow">Robust best · median of seeds</div>
       <div class="val" style="color:var(--robust)">${fmt(rb && rb.median)}</div>
       <div class="sub">${rb ? `<button class="link" data-node="${esc(topMember ? topMember.id : "")}">${esc(rb.label)}</button> · ${rb.n} seeds · ${esc(x(rb.median))}` : "needs ≥ 2 credible seeds"}</div>
-      <div class="sub">${rr ? `${vbadge(rr.verdict)} <span class="faint mono">range ${fmt(rr.min)} – ${fmt(rr.max)}</span>` : ""}</div></div>
+      <div class="sub">${rr ? `${vbadge(rr.verdict)} ${rr.suspect ? badges(["artefact-suspect"]) : ""} <span class="faint mono">range ${fmt(rr.min)} – ${fmt(rr.max)}</span>` : ""}</div></div>
     <div class="kpi"><div class="eyebrow">Single best node</div>
       <div class="val" style="color:var(--best)">${fmt(bn && bn.fitness)}</div>
       <div class="sub">${bn ? `${nodeBtn(bn.id, bn.name)} · tick ${esc(bn.tick)} · ${esc(x(bn.fitness))}` : "no scored node"}</div>
@@ -772,7 +773,7 @@ function renderDrawer(ev) {
   H.push(`<div class="sec"><h4>Forge${fg ? ` · tick ${fg.tick}` : ""}</h4>${fg ? `<dl class="kv">${Object.entries(fg.fields).filter(([k]) => !["report"].includes(k)).slice(0, 14).map(([k, v]) => `<dt>${esc(k)}</dt><dd class="mono" style="font-size:12px">${esc(typeof v === "string" ? v : JSON.stringify(v))}</dd>`).join("")}</dl>
     ${fg.fields.report ? `<details style="margin-top:8px"><summary>full Forge report</summary><pre class="code">${esc(fg.fields.report)}</pre></details>` : ""}` : `<p class="prose dim">No Forge report found.</p>`}</div>`);
   const pr = ev.probe || {};
-  H.push(`<div class="sec"><h4>Probe verdict</h4>${pr.verdict || pr.artefact_suspect ? `<p class="prose">${vbadge(pr.verdict || "artefact")} ${pr.tick ? tickBtn(pr.tick) : ""} ${pr.artefact_suspect ? '<span class="bd artefact-suspect">⚠ artefact suspect</span>' : ""}</p>${pr.evidence ? `<p class="prose dim">${esc(pr.evidence)}</p>` : ""}` : `<p class="prose dim">Probe has not issued a verdict for this node.</p>`}</div>`);
+  H.push(`<div class="sec"><h4>Probe verdict</h4>${pr.verdict || pr.artefact_suspect || pr.recipe_artefact ? `<p class="prose">${pr.verdict ? vbadge(pr.verdict) : ""} ${pr.tick ? tickBtn(pr.tick) : ""} ${pr.artefact_suspect ? '<span class="bd artefact">⚠ tagged artefact — excluded from the robust median</span>' : pr.recipe_artefact ? '<span class="bd artefact-suspect">⚠ recipe suspect — still counts</span>' : ""}</p>${pr.evidence ? `<p class="prose dim">${esc(pr.evidence)}</p>` : ""}` : `<p class="prose dim">Probe has not issued a verdict for this node.</p>`}</div>`);
   // per-domain
   if ((ev.per_domain || []).length) {
     const cols = ev.columns, fm = ev.floor_metric;
@@ -817,7 +818,7 @@ function renderLearnings() {
   const recipeLi = (r) => `<li><div class="li-h">${vbadge(r.verdict)}<b>${esc(r.label)}</b>${tickBtn(r.tick)}<span class="faint mono" style="font-size:11px">med ${fmt(r.median)} · ${r.n} seed${r.n === 1 ? "" : "s"}</span><button class="nl" data-recipe="${esc(r.recipe)}">open</button></div>${r.evidence ? `<div class="clamp">${esc(r.evidence)}</div>` : ""}</li>`;
   const lessonLi = (l) => `<li><div class="li-h"><b>${esc(prettyId(l.lesson_id))}</b>${tickBtn(l.tick)}${l.node_id ? nodeBtn(l.node_id, l.node) : l.node ? `<span class="faint mono">${esc(l.node)}</span>` : ""}</div><div class="clamp">${esc(l.lesson || l.observation || "")}</div></li>`;
   const col = (title, c, items, empty) => `<div class="lcol" style="--c:${c}"><h3>${esc(title)}<span class="n">${items.length}</span></h3>${items.length ? `<ul>${items.join("")}</ul>` : `<div class="empty">${esc(empty)}</div>`}</div>`;
-  const susp = (L.suspicious || []).map((s) => `<li><div class="li-h"><span class="bd ${esc(s.kind)}">${GLYPH[s.kind] || "!"} ${esc(s.kind.replace(/-/g, " "))}</span>${nodeBtn(s.node_id, s.name)}${tickBtn(s.tick)}</div><div class="clamp">${esc(s.text)}</div></li>`);
+  const susp = (L.suspicious || []).map((s) => `<li><div class="li-h"><span class="bd ${esc(s.kind)}">${GLYPH[s.kind] || "!"} ${esc(s.kind.replace(/-/g, " "))}</span>${s.recipe ? `<button class="nl" data-recipe="${esc(s.recipe)}">${esc(s.name)}</button>` : nodeBtn(s.node_id, s.name)}${tickBtn(s.tick)}</div><div class="clamp">${esc(s.text)}</div></li>`);
   const gotchas = (L.gotchas || []).map((g) => `<li><div class="li-h"><b>${esc(g.signature || g.kind)}</b>${tickBtn(g.tick)}<span class="faint mono" style="font-size:11px">${esc(g.scope)} · ×${esc(g.occurrences ?? 1)}</span></div><div class="clamp">${esc(g.avoidance)}</div></li>`);
   const decisions = (L.decisions || []).map((d) => `<li><div class="li-h">${tickBtn(d.tick)}<span class="faint mono" style="font-size:11px">${esc((d.at || "").replace("T", " ").slice(0, 16))}</span></div><div class="clamp">${esc(d.text)}</div></li>`);
   $("learn").innerHTML = [
@@ -847,6 +848,7 @@ function renderSteer() {
   const axSel = $("steerAxis");
   if (!axSel.options.length) axSel.innerHTML = ["accuracy", "generalization", "data", "stability", "compute", "memory", "cost"].map((a) => `<option>${a}</option>`).join("");
   try { const a = localStorage.getItem("evor-author"); if (a && !$("steerAuthor").value) $("steerAuthor").value = a; } catch (e) {}
+  try { const k = localStorage.getItem("evor-steer-token"); if (k && !$("steerToken").value) $("steerToken").value = k; } catch (e) {}
   $("steerBtn").disabled = !enabled;
   if (!enabled) $("steerMsg").textContent = "Steering is disabled on this dashboard (--no-steer).";
   const ts = S.bundle.overview.stall || {};
@@ -855,12 +857,12 @@ function renderSteer() {
 }
 $("steerForm").addEventListener("submit", async (e) => {
   e.preventDefault();
-  const note = $("steerNote").value.trim(), author = $("steerAuthor").value.trim(), axis = $("steerAxis").value;
-  if (!note || !author) return;
+  const note = $("steerNote").value.trim(), author = $("steerAuthor").value.trim(), axis = $("steerAxis").value, token = $("steerToken").value.trim();
+  if (!note || !author || !token) return;
   $("steerBtn").disabled = true; $("steerMsg").textContent = "Sending…";
   try {
-    await api(`${runBase()}/steer`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ note, author, axis }) });
-    try { localStorage.setItem("evor-author", author); } catch (er) {}
+    await api(`${runBase()}/steer`, { method: "POST", headers: { "Content-Type": "application/json", "X-Evor-Steer-Token": token }, body: JSON.stringify({ note, author, axis }) });
+    try { localStorage.setItem("evor-author", author); localStorage.setItem("evor-steer-token", token); } catch (er) {}
     $("steerNote").value = ""; $("steerMsg").textContent = "Queued in signals-inbox.jsonl. The next tick drains it onto the signal bus.";
     await refresh(true);
   } catch (er) { $("steerMsg").textContent = `Not sent: ${er.message}`; }

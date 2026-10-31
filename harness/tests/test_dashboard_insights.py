@@ -23,6 +23,7 @@ import pytest
 MISSION = "viz-mission-2026-10"
 RUN = "viz-mission-2026-10-20261030T000000Z"
 BASELINE = 0.010
+TOKEN = "test-steer-token"
 
 
 # ── fixture builder ───────────────────────────────────────────────────────────
@@ -192,7 +193,7 @@ def viz(tmp_path: Path):
 
     from evor.dashboard.server import create_app
 
-    return TestClient(create_app(root, default_run_dir=run)), run, root
+    return TestClient(create_app(root, default_run_dir=run, steer_token=TOKEN), headers={"X-Evor-Steer-Token": TOKEN}), run, root
 
 
 def url(suffix: str) -> str:
@@ -248,8 +249,14 @@ def test_verdicts_from_probe_and_wiki(viz) -> None:
     recipes = client.get(url("/recipes")).json()
     assert _recipe(recipes, "ema")["verdict"] == "confirmed"          # single verdict + proposal_id
     assert _recipe(recipes, "ema")["verdict_source"] == "probe:tick2"
-    assert _recipe(recipes, "band")["verdict"] == "artefact"          # wiki tag metric-artefact
-    assert _recipe(recipes, "band")["verdict_source"] == "wiki:lesson-band-erasure"
+    # One seed tagged metric-artefact by a wiki lesson + a recipe-wide audit:
+    # the recipe keeps its Probe verdict, is flagged suspect, and still counts.
+    band = _recipe(recipes, "band")
+    assert band["verdict"] == "refuted" and band["verdict_source"] == "probe:tick3"
+    assert band["suspect"] is True and "artefact-suspect" in band["badges"]
+    tagged = {m["name"]: m["artefact"] for m in band["members"]}
+    assert tagged == {"band-s42-01": True, "band-s7-01": False}
+    assert band["median"] == pytest.approx(0.022) and band["n_valid"] == 1 and band["credible"] is True
     alt = next(r for r in recipes if r["members"][0]["name"] == "alt-a")
     assert alt["verdict"] == "refuted"                                # hypothesis_verdicts list
     assert _recipe(recipes, "base")["verdict"] == "inconclusive"      # no-target verdict -> selected proposal
@@ -333,7 +340,9 @@ def test_points_carry_metrics_lineage_and_flags(viz) -> None:
     assert pts["ema-s7-01"]["values"]["fmeasure"] is not None
     assert pts["alt-a"]["parents"] == [{"id": "u-e42", "name": "ema-s42-01"}]
     assert pts["bad-01"]["integrity_failed"] is True
-    assert pts["band-s7-01"]["artefact"] is True
+    assert pts["band-s42-01"]["artefact"] is True     # explicitly tagged node
+    assert pts["band-s7-01"]["artefact"] is False     # its sibling still counts
+    assert pts["band-s7-01"]["suspect"] is True
 
 
 # ── timeline / learnings ──────────────────────────────────────────────────────
@@ -364,9 +373,10 @@ def test_learnings_groups_what_worked_and_what_did_not(viz) -> None:
     L = client.get(url("/learnings")).json()
     assert [l["lesson_id"] for l in L["worked"]] == ["ema-confirmed"]
     assert [l["lesson_id"] for l in L["artefacts"]] == ["lesson-band-erasure"]
-    assert [r["label"] for r in L["recipes_artefact"]] == ["band"]
+    assert L["recipes_artefact"] == []
+    assert [r["label"] for r in L["recipes_suspect"]] == ["band"]
     kinds = {s["kind"] for s in L["suspicious"]}
-    assert {"metric-gaming", "lucky-seed"} <= kinds
+    assert {"metric-gaming", "lucky-seed", "artefact", "artefact-suspect"} <= kinds
     assert L["gotchas"][0]["signature"] == "bs512-oom"
     assert any("locked" in d["text"] for d in L["decisions"])
 
@@ -517,7 +527,7 @@ def test_live_run_copy(tmp_path: Path) -> None:
 
     from evor.dashboard.server import create_app
 
-    client = TestClient(create_app(tmp_path / ".evor", default_run_dir=dst))
+    client = TestClient(create_app(tmp_path / ".evor", default_run_dir=dst, steer_token=TOKEN), headers={"X-Evor-Steer-Token": TOKEN})
     base = f"/api/runs/{src.parent.name}/{src.name}"
     t = time.time()
     b = client.get(f"{base}/bundle").json()
@@ -597,3 +607,65 @@ def test_run_path_traversal_and_cross_origin_steer_rejected(viz) -> None:
     assert not (run / "signals-inbox.jsonl").exists()
     ok = client.post(url("/steer"), json={"note": "x", "author": "y"}, headers={"Origin": "http://testserver"})
     assert ok.status_code == 201
+
+
+# ── node-level artefacts, steer token, run listing ────────────────────────────
+
+
+def test_recipe_is_artefact_only_when_every_seed_is_tagged(tmp_path: Path) -> None:
+    from evor.dashboard.insights import RunInsights
+
+    run = build_viz_run(tmp_path / ".evor")
+    (run / "wiki/lesson-band-s7.md").write_text(
+        "# Lesson: lesson-band-s7\n\n**Node:** band-s7-01  |  **Run:**   |  **Mission:** \n**Family:** training  |  **Verdict:** refuted\n"
+        "**Created:** 2026-10-30T00:00:00Z\n\n## Actionable Lesson\n\nErasure again.\n\n**Tags:** metric-artefact\n")
+    ins = RunInsights(run)
+    band = next(r for r in ins.recipes() if r["label"] == "band")
+    assert band["verdict"] == "artefact" and band["median"] is None and band["credible"] is False
+    assert all(p["artefact"] for p in ins.points() if p["name"].startswith("band"))
+    assert ins.overview()["robust_best"]["label"] == "alt"
+
+
+def test_steer_token_required(tmp_path: Path) -> None:
+    from fastapi.testclient import TestClient
+
+    from evor.dashboard.server import create_app
+
+    run = build_viz_run(tmp_path / ".evor")
+    app = create_app(tmp_path / ".evor", steer_token=TOKEN)
+    client = TestClient(app)
+    body = {"note": "Try a recall floor.", "author": "dai"}
+    assert client.post(url("/steer"), json=body).status_code == 401
+    assert client.post(url("/steer"), json=body, headers={"X-Evor-Steer-Token": "wrong"}).status_code == 401
+    assert client.post(url("/steer"), json=dict(body, token="wrong")).status_code == 401
+    assert not (run / "signals-inbox.jsonl").exists()
+    assert client.post(url("/steer"), json=body, headers={"X-Evor-Steer-Token": TOKEN}).status_code == 201
+    assert client.post(url("/steer"), data=dict(body, token=TOKEN)).status_code == 201       # form field
+    assert client.post(url("/steer"), json=dict(body, token=TOKEN)).status_code == 201       # JSON field
+    lines = (run / "signals-inbox.jsonl").read_text().splitlines()
+    assert len(lines) == 3 and all(TOKEN not in l for l in lines)   # the token is never written
+    assert client.get(url("/steer")).json()["token_required"] is True
+
+
+def test_generated_token_is_random_and_printed_once(tmp_path: Path, capsys) -> None:
+    from evor.dashboard.server import _announce_token, create_app
+
+    build_viz_run(tmp_path / ".evor")
+    a, b = create_app(tmp_path / ".evor"), create_app(tmp_path / ".evor")
+    assert a.state.steer_token and a.state.steer_token != b.state.steer_token and len(a.state.steer_token) >= 20
+    _announce_token(a)
+    out = capsys.readouterr().out
+    assert out.count(a.state.steer_token) == 1
+    assert create_app(tmp_path / ".evor", allow_steer=False).state.steer_token is None
+
+
+def test_run_listing_skips_non_run_folders(tmp_path: Path) -> None:
+    from fastapi.testclient import TestClient
+
+    from evor.dashboard.server import create_app
+
+    root = tmp_path / ".evor"
+    build_viz_run(root)
+    (root / "runs" / MISSION / "jobs" / "abc").mkdir(parents=True)
+    runs = TestClient(create_app(root)).get("/api/runs").json()
+    assert [r["run_id"] for r in runs] == [RUN]

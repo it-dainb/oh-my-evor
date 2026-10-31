@@ -85,6 +85,13 @@ def main() -> None:
         help="Disable the steer box (the only endpoint that writes: one line to signals-inbox.jsonl)",
     )
     parser.add_argument(
+        "--steer-token",
+        default=os.environ.get("EVOR_DASHBOARD_STEER_TOKEN"),
+        metavar="TOKEN",
+        help="Token required to post steer notes (default: random, printed once at startup). "
+        "Also read from EVOR_DASHBOARD_STEER_TOKEN.",
+    )
+    parser.add_argument(
         "--export",
         metavar="OUT.html",
         help="Write a self-contained static HTML snapshot of the run and exit (requires a specific run dir)",
@@ -113,6 +120,7 @@ def main() -> None:
         open_browser=not args.no_browser,
         default_run_dir=run_path if is_run else None,
         allow_steer=not args.no_steer,
+        steer_token=args.steer_token,
     )
 
 

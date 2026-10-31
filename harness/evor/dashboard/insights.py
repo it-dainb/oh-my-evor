@@ -703,8 +703,17 @@ class RunInsights:
                 if len(common) >= 3:
                     label = recipe_label(common)
             parent = meta[gid]["parent"]
+            member_names = {str(n.get("name") or "") for n in members} | {n["id"] for n in members}
+            rec_lessons = [
+                l for l in lessons
+                if (l.get("node") and l["node"] in member_names)
+                or any(t.lower() == label.lower() for t in l.get("tags") or [])
+            ]
             rows = []
             for n in members:
+                nv = verdicts.get(n["id"]) or {}
+                tagged = bool(nv.get("artefact_suspect")) or any(
+                    l["artefact"] and l.get("node") in (n["id"], n.get("name")) for l in rec_lessons)
                 fit = self.fitness(n)
                 res = self.result(n)
                 rows.append({
@@ -717,11 +726,13 @@ class RunInsights:
                     "integrity_failed": self.integrity_failed(n),
                     "pruned": n["id"] in pruned,
                     "verdict": (verdicts.get(n["id"]) or {}).get("verdict"),
-                    "artefact_suspect": bool((verdicts.get(n["id"]) or {}).get("artefact_suspect")),
+                    "artefact": tagged,
                     "tick": node_tick.get(n["id"]),
                     "badges": [],
                 })
-            valid = [r["fitness"] for r in rows if r["fitness"] is not None and not r["integrity_failed"]]
+            # Only nodes explicitly tagged as artefacts leave the robust median;
+            # their siblings still count.
+            valid = [r["fitness"] for r in rows if r["fitness"] is not None and not r["integrity_failed"] and not r["artefact"]]
             med = _median(valid)
             lo, hi = (min(valid), max(valid)) if valid else (None, None)
             spread = None
@@ -737,9 +748,9 @@ class RunInsights:
                 top = hi if higher else lo
                 for r in rows:
                     f = r["fitness"]
-                    if f is None or r["integrity_failed"] or f != top:
+                    if f is None or r["integrity_failed"] or r["artefact"] or f != top:
                         continue
-                    others = [x["fitness"] for x in rows if x is not r and x["fitness"] is not None and not x["integrity_failed"]]
+                    others = [x["fitness"] for x in rows if x is not r and x["fitness"] is not None and not x["integrity_failed"] and not x["artefact"]]
                     om = _median(others)
                     if om is None:
                         continue
@@ -751,24 +762,19 @@ class RunInsights:
                     r["badges"].append("pruned")
                 if r["integrity_failed"]:
                     r["badges"].append("integrity-failed")
-                if r["artefact_suspect"]:
-                    r["badges"].append("artefact-suspect")
+                if r["artefact"]:
+                    r["badges"].append("artefact")
 
-            # Verdict: artefact (lesson / audit / most seeds) > Probe > lesson > pending.
-            names = {r["name"] for r in rows} | {r["id"] for r in rows}
-            rec_lessons = [
-                l for l in lessons
-                if (l.get("node") and l["node"] in names)
-                or any(t.lower() == label.lower() for t in l.get("tags") or [])
-            ]
+            # Verdict: artefact only when every scored seed is tagged one;
+            # otherwise Probe > lesson > pending, with a "suspect" flag when any
+            # seed is tagged or an audit / lesson names the whole recipe.
             node_vs = [r["verdict"] for r in rows if r["verdict"]]
-            recipe_level_artefact = any(
+            suspect = any(r["artefact"] for r in rows) or any(
                 (verdicts.get(r["id"]) or {}).get("recipe_artefact") for r in rows
-            )
+            ) or any(l["artefact"] for l in rec_lessons)
+            scored = [r for r in rows if r["fitness"] is not None and not r["integrity_failed"]]
             source, evidence = None, None
-            if recipe_level_artefact or any(l["artefact"] for l in rec_lessons) or (
-                rows and sum(r["artefact_suspect"] for r in rows) * 2 > len(rows)
-            ):
+            if scored and all(r["artefact"] for r in scored):
                 verdict = "artefact"
                 art = next((l for l in rec_lessons if l["artefact"]), None)
                 source = f"wiki:{art['lesson_id']}" if art else "probe"
@@ -788,7 +794,9 @@ class RunInsights:
             else:
                 verdict_display = verdict
 
-            badges = sorted({b for r in rows for b in r["badges"]})
+            badges = sorted({b for r in rows for b in r["badges"] if b != "artefact"})
+            if suspect:
+                badges.append("artefact-suspect")
             if spread is not None and spread >= SPREAD_WARN:
                 badges.append("seed-spread")
             first = members[0]
@@ -817,7 +825,11 @@ class RunInsights:
                 "verdict": verdict_display,
                 "verdict_source": source,
                 "verdict_evidence": _text(evidence, 700) or None,
-                "credible": verdict != "artefact" and med is not None,
+                "credible": med is not None,
+                "suspect": suspect,
+                "suspect_evidence": _text(next((l.get("lesson") for l in rec_lessons if l["artefact"]), None) or next(
+                    ((verdicts.get(r["id"]) or {}).get("evidence") for r in rows
+                     if (verdicts.get(r["id"]) or {}).get("artefact_suspect") or (verdicts.get(r["id"]) or {}).get("recipe_artefact")), None), 700) or None,
                 "badges": badges,
                 "lessons": [l["lesson_id"] for l in rec_lessons],
                 "members": rows,
@@ -955,6 +967,7 @@ class RunInsights:
                     n = self.resolve(ref)
                     if n is not None:
                         targets.append(n)
+                explicit = {n["id"] for n in targets}
                 if it["hyps"]:
                     targets += [n for n in nodes if str(n.get("hypothesis_id")) in it["hyps"]]
                 recipe_wide = False
@@ -966,6 +979,7 @@ class RunInsights:
                         targets, recipe_wide = stem_hits, True
                     else:
                         targets = name_hits
+                        explicit = {n["id"] for n in name_hits}
                 seen = set()
                 for n in targets:
                     if n["id"] in seen:
@@ -973,9 +987,12 @@ class RunInsights:
                     seen.add(n["id"])
                     rec = out.setdefault(n["id"], {})
                     if it["verdict"] == "artefact":
-                        rec["artefact_suspect"] = True
-                        if recipe_wide:
+                        # A node is tagged only when the call names it; a call on
+                        # the recipe or hypothesis marks the recipe suspect.
+                        if recipe_wide or n["id"] not in explicit:
                             rec["recipe_artefact"] = True
+                        else:
+                            rec["artefact_suspect"] = True
                         rec.setdefault("evidence", it["evidence"])
                         rec.setdefault("tick", t)
                         continue
@@ -996,6 +1013,7 @@ class RunInsights:
         if not ticks:
             ticks = sorted({t for t in node_tick.values()})
         scores = {r.get("tick"): r for r in self.run_state().get("tick_records") or [] if isinstance(r, dict)}
+        tagged_ids = {m["id"] for r in recipes for m in r["members"] if m["artefact"]}
         out = []
         robust_best = None
         any_best = None
@@ -1005,7 +1023,7 @@ class RunInsights:
             # when a new seed disappoints, and the robust trend must show that.
             cur_robust, cur_any = None, None
             for r in recipes:
-                vals = [m["fitness"] for m in r["members"] if m["fitness"] is not None and not m["integrity_failed"] and m["tick"] is not None and m["tick"] <= t]
+                vals = [m["fitness"] for m in r["members"] if m["fitness"] is not None and not m["integrity_failed"] and not m["artefact"] and m["tick"] is not None and m["tick"] <= t]
                 med = _median(vals)
                 if med is None or not r["credible"]:
                     continue
@@ -1019,7 +1037,7 @@ class RunInsights:
                     cur["since_tick"] = prev["since_tick"]
             robust_best, any_best = cur_robust, cur_any
             for n in self.nodes():
-                if node_tick.get(n["id"]) == t and not self.integrity_failed(n):
+                if node_tick.get(n["id"]) == t and not self.integrity_failed(n) and n["id"] not in tagged_ids:
                     f = self.fitness(n)
                     if f is not None and (node_best is None or self.better(f, node_best["fitness"])):
                         node_best = {"id": n["id"], "name": n.get("name"), "fitness": f, "since_tick": t}
@@ -1282,7 +1300,7 @@ class RunInsights:
         best = None
         for r in self.recipes():
             for m in r["members"]:
-                if m["fitness"] is None or m["integrity_failed"]:
+                if m["fitness"] is None or m["integrity_failed"] or m["artefact"]:
                     continue
                 if best is None or self.better(m["fitness"], best["fitness"]):
                     best = dict(m, recipe=r["id"], recipe_label=r["label"], recipe_median=r["median"], recipe_n=r["n_valid"], recipe_verdict=r["verdict"])
@@ -1327,7 +1345,9 @@ class RunInsights:
         if robust:
             ratio = f" ({robust['median'] / base:.1f}× baseline)" if base and robust["median"] and base > 0 else ""
             why.append(f"Robust best recipe {robust['label']}: median {_fmt(robust['median'])} over {robust['n']} seeds{ratio}"
-                       + (f", first credible beat of the baseline at tick {first_beat}." if first_beat else ", still below the baseline."))
+                       + (f", first credible beat of the baseline at tick {first_beat}." if first_beat else ", still below the baseline.")
+                       + (" It is flagged suspect: sibling seeds or the recipe were tagged as artefacts (tagged seeds are excluded from the median)."
+                          if rob_recipe and rob_recipe.get("suspect") else ""))
         else:
             why.append("No recipe has two or more credible seeds yet, so there is no robust trend.")
         if best:
@@ -1341,7 +1361,7 @@ class RunInsights:
             "why": why,
             "metric": pm,
             "robust_best": robust,
-            "robust_recipe": {k: rob_recipe[k] for k in ("id", "label", "verdict", "n_valid", "min", "max", "median", "family")} if rob_recipe else None,
+            "robust_recipe": {k: rob_recipe[k] for k in ("id", "label", "verdict", "n_valid", "min", "max", "median", "family", "suspect")} if rob_recipe else None,
             "best_node": best,
             "first_beat_tick": first_beat,
             "tick": self.tick_state().get("tick") or (prog[-1]["tick"] if prog else None),
@@ -1698,7 +1718,6 @@ class RunInsights:
         recipes = {r["id"]: r for r in self.recipes()}
         node_tick = self.node_ticks()
         pidx = self.proposal_index()
-        verdicts = self.node_verdicts()
         out = []
         for n in self.nodes():
             res = self.result(n)
@@ -1733,7 +1752,8 @@ class RunInsights:
                 "family": n.get("approach_family"),
                 "idea": _first_sentence(_text(prop.get("idea"), 600), 200) or None,
                 "integrity_failed": self.integrity_failed(n),
-                "artefact": rec.get("verdict") == "artefact" or bool((verdicts.get(n["id"]) or {}).get("artefact_suspect")),
+                "artefact": bool(mem.get("artefact")),
+                "suspect": bool(rec.get("suspect")),
                 "verdict": rec.get("verdict"),
                 "badges": mem.get("badges", []),
             })
@@ -1848,10 +1868,13 @@ class RunInsights:
                 if "lucky-seed" in m["badges"]:
                     suspicious.append({"kind": "lucky-seed", "node_id": m["id"], "name": m["name"], "tick": m["tick"],
                                        "text": f"{_fmt(m['fitness'])} against a recipe median of {_fmt(r['median'])} over {r['n_valid']} seeds"})
-                if "artefact-suspect" in m["badges"] and r["verdict"] != "artefact":
+                if m["artefact"]:
                     ev = (self.node_verdicts().get(m["id"]) or {}).get("evidence")
-                    suspicious.append({"kind": "artefact-suspect", "node_id": m["id"], "name": m["name"], "tick": m["tick"],
-                                       "text": f"Probe audit: {ev}" if ev else "Probe audit flagged an artefact"})
+                    suspicious.append({"kind": "artefact", "node_id": m["id"], "name": m["name"], "tick": m["tick"],
+                                       "text": (f"Tagged as an artefact: {ev}" if ev else "Tagged as an artefact by a wiki lesson") + " — excluded from the robust median."})
+            if r["suspect"] and r["verdict"] != "artefact":
+                suspicious.append({"kind": "artefact-suspect", "node_id": None, "name": r["label"], "recipe": r["id"], "tick": r["tick"],
+                                   "text": f"Recipe still counts but is suspect: {r['suspect_evidence']}" if r["suspect_evidence"] else "Recipe still counts but is suspect."})
         decisions = [{"at": e["at"], "tick": e.get("tick"), "kind": e["kind"], "text": e["text"]}
                      for e in self.decision_log() if e["kind"] != "record"][-12:]
         records = [e for e in self.decision_log() if e["kind"] == "record"]
@@ -1865,6 +1888,7 @@ class RunInsights:
             "recipes_confirmed": [rsum(r) for r in recipes if r["verdict"] == "confirmed"],
             "recipes_refuted": [rsum(r) for r in recipes if r["verdict"] == "refuted"],
             "recipes_artefact": [rsum(r) for r in recipes if r["verdict"] == "artefact"],
+            "recipes_suspect": [rsum(r) for r in recipes if r["suspect"] and r["verdict"] != "artefact"],
             "suspicious": suspicious,
             "gotchas": self.gotchas(),
             "decisions": decisions,

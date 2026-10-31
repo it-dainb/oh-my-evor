@@ -25,13 +25,14 @@ from __future__ import annotations
 
 import asyncio
 import json
+import secrets
 import threading
 from pathlib import Path
 from typing import Any
 
 from ..run_status import read_run_status
 
-from fastapi import Body, FastAPI, HTTPException, Query, Request
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import FileResponse, StreamingResponse
 
 from evor.dashboard.insights import SIGNAL_AXES, RunInsights, append_steer
@@ -61,15 +62,19 @@ def create_app(
     evor_root: str | Path,
     default_run_dir: str | Path | None = None,
     allow_steer: bool = True,
+    steer_token: str | None = None,
 ) -> FastAPI:
     """Build the FastAPI application serving all runs under *evor_root*.
 
     *evor_root* is the ``.evor/`` directory; run directories are discovered at
     ``<evor_root>/runs/<mission_id>/<run_id>/``. *default_run_dir* marks the run
-    the page opens on; *allow_steer* enables the steer inbox endpoint.
+    the page opens on; *allow_steer* enables the steer inbox endpoint, which
+    accepts a post only with *steer_token* (generated when not given; read it
+    back from ``app.state.steer_token``).
     """
     root = Path(evor_root).resolve()
     default_run = Path(default_run_dir).resolve() if default_run_dir else None
+    token = steer_token or secrets.token_urlsafe(18)
 
     def _insights(mission_id: str, run_id: str) -> RunInsights:
         store = _get_store(root, mission_id, run_id)
@@ -85,6 +90,7 @@ def create_app(
         docs_url="/api/docs",
         openapi_url="/api/openapi.json",
     )
+    app.state.steer_token = token if allow_steer else None
 
     # ── List all runs ──────────────────────────────────────────────────────────
 
@@ -98,7 +104,8 @@ def create_app(
             if not mission_dir.is_dir():
                 continue
             for run_dir in sorted(mission_dir.iterdir()):
-                if not run_dir.is_dir():
+                # Skip sibling folders that are not runs (e.g. jobs/).
+                if not run_dir.is_dir() or not ((run_dir / "run-state.json").exists() or (run_dir / "tree.json").exists()):
                     continue
                 store = RunStore(run_dir)
                 state = store.run_state()
@@ -177,17 +184,27 @@ def create_app(
     @app.get("/api/runs/{mission_id}/{run_id}/steer", summary="Human steer notes and whether a tick has drained them")
     def get_steer(mission_id: str, run_id: str) -> dict[str, Any]:
         ins = _insights(mission_id, run_id)
-        return {"enabled": allow_steer, "axes": list(SIGNAL_AXES), "notes": ins.steer_notes()}
+        return {"enabled": allow_steer, "token_required": True, "axes": list(SIGNAL_AXES), "notes": ins.steer_notes()}
 
     @app.post("/api/runs/{mission_id}/{run_id}/steer", summary="Append a human-steer note to the run's signals inbox", status_code=201)
-    def post_steer(
-        mission_id: str,
-        run_id: str,
-        request: Request,
-        payload: dict[str, Any] = Body(..., examples=[{"note": "Stop tuning ckpt selection; test a recall floor in the loss.", "author": "dai"}]),
-    ) -> dict[str, Any]:
+    async def post_steer(mission_id: str, run_id: str, request: Request) -> dict[str, Any]:
+        """Body: JSON or form with ``note``, ``author``, optional ``axis`` and
+        ``token``; the token may instead come in the ``X-Evor-Steer-Token`` header."""
         if not allow_steer:
             raise HTTPException(status_code=403, detail="Steering is disabled on this dashboard")
+        ctype = request.headers.get("content-type", "")
+        try:
+            if ctype.startswith(("application/x-www-form-urlencoded", "multipart/form-data")):
+                payload = dict(await request.form())
+            else:
+                payload = await request.json()
+        except Exception as exc:
+            raise HTTPException(status_code=422, detail="Body must be JSON or a form") from exc
+        if not isinstance(payload, dict):
+            raise HTTPException(status_code=422, detail="Body must be an object")
+        given = request.headers.get("x-evor-steer-token") or str(payload.get("token") or "")
+        if not given or not secrets.compare_digest(given.encode(), token.encode()):
+            raise HTTPException(status_code=401, detail="Steer token missing or wrong")
         # Cross-site guard: a page on another origin must not be able to post
         # notes into the run's inbox through a researcher's browser.
         origin = request.headers.get("origin")
@@ -483,11 +500,13 @@ def serve(
     open_browser: bool = True,
     default_run_dir: str | Path | None = None,
     allow_steer: bool = True,
+    steer_token: str | None = None,
 ) -> None:
     """Run the dashboard server in the foreground (blocks)."""
     import uvicorn
 
-    app = create_app(evor_root, default_run_dir=default_run_dir, allow_steer=allow_steer)
+    app = create_app(evor_root, default_run_dir=default_run_dir, allow_steer=allow_steer, steer_token=steer_token)
+    _announce_token(app)
     display_host = "localhost" if host in ("0.0.0.0", "::") else host
     url = f"http://{display_host}:{port}"
     print(f"[evor] Dashboard serving {Path(evor_root).resolve()} at {url}")
@@ -558,11 +577,23 @@ def _app_from_env() -> FastAPI:
             root = root or str(p.parent.parent.parent)
         else:
             root = root or str(p)
-    return create_app(
+    built = create_app(
         root or ".evor",
         default_run_dir=default_run,
         allow_steer=os.environ.get("EVOR_DASHBOARD_NO_STEER", "") not in ("1", "true", "yes"),
+        steer_token=os.environ.get("EVOR_DASHBOARD_STEER_TOKEN") or None,
     )
+    _announce_token(built)
+    return built
+
+
+def _announce_token(app: FastAPI) -> None:
+    """Print the steer token once, to the server's stdout only."""
+    tok = getattr(app.state, "steer_token", None)
+    if tok:
+        print(f"[evor] Steer token (paste into the steer box to post notes): {tok}", flush=True)
+    else:
+        print("[evor] Steering disabled", flush=True)
 
 
 def __getattr__(name: str) -> Any:
