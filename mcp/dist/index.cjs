@@ -24445,7 +24445,8 @@ function registerArtifactTools(server) {
       "Validate and atomically write a tick artifact for the given agent kind.",
       "The destination is derived automatically from the agent and tick.",
       "Payload is validated against the contract for that agent kind where one exists;",
-      "unknown/loose agents pass through as plain JSON."
+      "unknown/loose agents pass through as plain JSON.",
+      "A large payload can be written to a JSON file first and passed as payload_path."
     ].join(" "),
     {
       // Optional with an active-run fallback. Required-with-no-default is what
@@ -24461,12 +24462,26 @@ function registerArtifactTools(server) {
       kind: external_exports.string().optional().describe(
         "Kind slug: required for sage-junior (finding kind) and acquirer (source slug)"
       ),
-      payload: external_exports.record(external_exports.unknown()).describe("Artifact payload object to write"),
+      payload: external_exports.record(external_exports.unknown()).optional().describe("Artifact payload object to write"),
+      payload_path: external_exports.string().optional().describe(
+        "Absolute path of a JSON file holding the payload, for one too large to send inline"
+      ),
       partial: external_exports.boolean().optional().describe("If true, write as an in-progress (partial) artifact")
     },
-    async ({ run_id: run_id_in, tick, agent, kind, payload, partial: partial2 }) => {
+    async ({ run_id: run_id_in, tick, agent, kind, payload: given, payload_path, partial: partial2 }) => {
       const run_id = resolveRunId(run_id_in);
       if (!run_id) return err("no run_id given and no active run found \u2014 start a run or pass run_id explicitly");
+      let payload = given;
+      if (!payload && payload_path) {
+        if (/[/\\]\.evor[/\\]runs[/\\]/.test(payload_path)) return err("payload_path is inside the run's own state; write the payload file elsewhere");
+        if (!(0, import_fs14.existsSync)(payload_path)) return err(`no file at ${payload_path}`);
+        try {
+          payload = JSON.parse((0, import_fs14.readFileSync)(payload_path, "utf8"));
+        } catch (e) {
+          return err(`payload_path does not hold valid JSON: ${e.message}`);
+        }
+      }
+      if (!payload || typeof payload !== "object" || Array.isArray(payload)) return err("give payload, or payload_path to a JSON object");
       const missionId = process.env.EVOR_MISSION_ID;
       const result = writeArtifact(run_id, tick, agent, payload, kind, partial2, missionId);
       if (!result.ok) {
