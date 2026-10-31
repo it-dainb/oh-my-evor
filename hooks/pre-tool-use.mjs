@@ -289,9 +289,19 @@ try {
   // after the interpreter's flags — not by any `.py` path later in the command
   // line: `python3 -c "…"; grep -n x eval.py` reads a file, it runs nothing.
   const cmdVars = shellVars(cmd);
+  // Each python invocation, with a relative script resolved against the directory
+  // a preceding `cd` moved to: `cd <scratchpad> && python compose.py` runs a
+  // scratchpad script.
+  let pyCwd = '';
   const pyArgs = expandVars(cmdUnquoted, cmdVars)
     .split(/;|&&|\|\|?|\n/)
-    .map((seg) => seg.match(/\bpython[0-9.]*\s+(.*)$/)?.[1].trim().replace(/^(?:-(?![mc]\b)[A-Za-z]+\s+)+/, ''))
+    .map((seg) => {
+      const cd = seg.match(/^\s*cd\s+(\S+)/);
+      if (cd) { pyCwd = cd[1].startsWith('/') ? cd[1] : (pyCwd ? `${pyCwd}/${cd[1]}` : ''); return undefined; }
+      const a = seg.match(/\bpython[0-9.]*\s+(.*)$/)?.[1].trim().replace(/^(?:-(?![mc]\b)[A-Za-z]+\s+)+/, '');
+      if (a === undefined) return undefined;
+      return pyCwd && /^[^\s/-][^\s]*\.py\b/.test(a) ? `${pyCwd.replace(/\/$/, '')}/${a}` : a;
+    })
     .filter((a) => a !== undefined);
   // A script in the agent's own session scratchpad is its analysis tooling (an
   // EDA pass over telemetry), not the candidate: candidate code lives in a worktree.
@@ -610,7 +620,9 @@ try {
     // emits JSON artifacts and delegates code to the junior. The lead launches evaluation
     // through the evor_run_start MCP tool, not raw training.
     const isForgeLead = agentType === 'evor-forge';
-    if ((tool === 'Write' || tool === 'Edit') && /\.py$/.test(filePath)) {
+    // A script in the agent's own session scratchpad is its tooling, not candidate code.
+    const inScratchpad = /^\/tmp\/claude-[^/]+\/[^/]+\/[^/]+\/scratchpad\//.test(filePath);
+    if ((tool === 'Write' || tool === 'Edit') && /\.py$/.test(filePath) && !inScratchpad) {
       deny(
         `[EVOR GOVERNOR] ${agentType} does not author code. ` +
           (isForgeLead

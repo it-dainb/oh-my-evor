@@ -2,6 +2,16 @@
 
 All notable changes to Evor. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.2.36] — 2026-10-31 — scratch tooling is not candidate code
+
+### Fixed
+
+- **An agent could not write or run a plotting script in its own scratchpad.** Writing any
+  `.py` counted as authoring candidate code, and `cd <scratchpad> && python compose.py` as running
+  it, because the scratchpad exemption saw only absolute script paths. A `.py` written into the
+  session scratchpad is now the agent's tooling, and a relative script is resolved against the
+  directory a preceding `cd` moved to. Worktree code is still candidate code.
+
 ## [1.2.35] — 2026-10-31 — an unknown node says what to do
 
 ### Fixed
