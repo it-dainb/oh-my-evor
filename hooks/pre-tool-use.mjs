@@ -752,7 +752,9 @@ try {
 
       if (BASH_IMPORT_EVOR_RE.test(cmdG) && BASH_RUNS_PYTHON_RE.test(cmdG)) {
         deny(
-          `[EVOR GUARD] This operation is not permitted. Use the appropriate evor_* MCP tool instead.`
+          `[EVOR GUARD] Importing the evor harness from Bash is not allowed: it reads and writes ` +
+            `run state outside the evor_* tools. Use the evor_* tool for the job; to check the ` +
+            `trainer watcher, run \`python -m evor.watch --help\`, which is allowed.`
         );
       }
 

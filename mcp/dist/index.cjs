@@ -24739,6 +24739,12 @@ function storePatch(runId, nodeId, patchContent, missionId) {
       error: `node '${nodeId}' is not recorded yet. Call evor_record_node first, then store its patch.`
     };
   }
+  if (patchContent.trim() !== "" && (!/^(diff --git |--- |@@ )/m.test(patchContent) || !/^@@ /m.test(patchContent))) {
+    return {
+      ok: false,
+      error: "patch_content is not a unified diff. Give the full change from the parent, e.g. the output of `git -C <worktree> diff <parent-ref>` or `diff -ru <parent-dir> <worktree>`, with its ---/+++ headers and @@ hunks; a summary cannot reproduce the node."
+    };
+  }
   const nodeDir = (0, import_path16.join)(paths.nodesDir, nodeKey);
   try {
     if (!(0, import_fs15.existsSync)(nodeDir)) {

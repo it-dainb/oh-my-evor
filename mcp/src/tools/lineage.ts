@@ -40,6 +40,17 @@ export function storePatch(
       error: `node '${nodeId}' is not recorded yet. Call evor_record_node first, then store its patch.`,
     };
   }
+  // The patch is what reproduces the node from its parent; a summary of the change
+  // reproduces nothing. An empty patch is a node with no code change (a seed or a control).
+  if (patchContent.trim() !== "" && (!/^(diff --git |--- |@@ )/m.test(patchContent) || !/^@@ /m.test(patchContent))) {
+    return {
+      ok: false,
+      error:
+        "patch_content is not a unified diff. Give the full change from the parent, e.g. the " +
+        "output of `git -C <worktree> diff <parent-ref>` or `diff -ru <parent-dir> <worktree>`, " +
+        "with its ---/+++ headers and @@ hunks; a summary cannot reproduce the node.",
+    };
+  }
   const nodeDir = join(paths.nodesDir, nodeKey);
 
   try {

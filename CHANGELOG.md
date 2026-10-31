@@ -2,6 +2,17 @@
 
 All notable changes to Evor. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.2.46] — 2026-10-31 — a patch reproduces the node
+
+### Fixed
+
+- **A node's patch could be a summary.** `evor_store_patch` stored any text, so a short
+  description of the change was recorded where the diff belongs, and the node could not be
+  rebuilt from its parent. It now requires a unified diff (headers and hunks), and still accepts
+  an empty patch for a node with no code change.
+- **The refusal for importing the harness from Bash said nothing useful.** It now says why and
+  names the allowed `python -m evor.watch` check.
+
 ## [1.2.45] — 2026-10-31 — a heartbeat someone hears
 
 ### Fixed

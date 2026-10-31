@@ -87,7 +87,7 @@ describe("storePatch", () => {
     ensureRunDirs(runId, "test-mission");
     const nodeId = "node-new-xyz";
 
-    const result = storePatch(runId, nodeId, "--- /dev/null\n+++ b/foo.py\n");
+    const result = storePatch(runId, nodeId, "--- /dev/null\n+++ b/foo.py\n@@ -0,0 +1 @@\n+x\n");
     expect(result.ok).toBe(true);
 
     const paths = resolveRunPaths(runId);
@@ -99,12 +99,20 @@ describe("storePatch", () => {
     ensureRunDirs(runId, "test-mission");
     const nodeId = "node-overwrite";
 
-    storePatch(runId, nodeId, "first content");
-    storePatch(runId, nodeId, "second content");
+    storePatch(runId, nodeId, "--- a/f.py\n+++ b/f.py\n@@ -1 +1 @@\n-x\n+first\n");
+    storePatch(runId, nodeId, "--- a/f.py\n+++ b/f.py\n@@ -1 +1 @@\n-x\n+second\n");
 
     const paths = resolveRunPaths(runId);
     const content = readFileSync(join(paths.nodesDir, nodeId, "parent.patch"), "utf8");
-    expect(content).toBe("second content");
+    expect(content).toContain("+second");
+  });
+
+  it("refuses a summary in place of a diff", () => {
+    const runId = "run-lp-summary";
+    ensureRunDirs(runId, "test-mission");
+    const r = storePatch(runId, "node-summary", "Added a clDice loss term with weight 0.5 to trainer.py");
+    expect(r.ok).toBe(false);
+    expect(r.error).toMatch(/not a unified diff/);
   });
 
   it("writes empty patch content without error", () => {
@@ -125,7 +133,7 @@ describe("storePatch", () => {
       metrics: {}, eval_version: "v1", lesson_ids: [], citations: [], integrity_status: "pending",
       status: "pending", is_crossover: false, visit_count: 0, depth: 0, created_at: new Date().toISOString(),
     } as never }, "test-mission");
-    expect(storePatch(runId, "cosine-lr-01", "patch").ok).toBe(true);
+    expect(storePatch(runId, "cosine-lr-01", "--- a/f.py\n+++ b/f.py\n@@ -1 +1 @@\n-x\n+y\n").ok).toBe(true);
     expect(existsSync(join(paths.nodesDir, id, "parent.patch"))).toBe(true);
     expect(existsSync(join(paths.nodesDir, "cosine-lr-01"))).toBe(false);
   });
@@ -140,7 +148,7 @@ describe("storePatch", () => {
       metrics: {}, eval_version: "v1", lesson_ids: [], citations: [], integrity_status: "pending",
       status: "pending", is_crossover: false, visit_count: 0, depth: 0, created_at: new Date().toISOString(),
     } as never }, "test-mission");
-    const r = storePatch(runId, "not-yet-02", "patch");
+    const r = storePatch(runId, "not-yet-02", "--- a/f.py\n+++ b/f.py\n@@ -1 +1 @@\n-x\n+y\n");
     expect(r.ok).toBe(false);
     expect(r.error).toMatch(/evor_record_node first/);
   });
@@ -148,7 +156,7 @@ describe("storePatch", () => {
   it("returns patchPath in the result", () => {
     const runId = "run-lp-005";
     ensureRunDirs(runId, "test-mission");
-    const result = storePatch(runId, "node-path-check", "patch");
+    const result = storePatch(runId, "node-path-check", "--- a/f.py\n+++ b/f.py\n@@ -1 +1 @@\n-x\n+y\n");
     expect(result.patchPath).toMatch(/parent\.patch$/);
   });
 });
