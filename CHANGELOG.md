@@ -2,6 +2,14 @@
 
 All notable changes to Evor. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.2.43] — 2026-10-31 — review is not optional
+
+### Fixed
+
+- **A tick told Forge to skip code review for screen runs.** Forge's critic gate runs for every
+  candidate, screen or confirmation; Forge refuses an instruction to skip it, and the tick's
+  instructions say it is not the tick's to waive.
+
 ## [1.2.42] — 2026-10-31 — screen ideas, confirm winners
 
 ### Changed
