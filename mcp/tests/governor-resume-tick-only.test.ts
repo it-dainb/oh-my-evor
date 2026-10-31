@@ -218,3 +218,20 @@ describe("a scratchpad script named through a variable", () => {
     expect(d.permissionDecision).not.toBe("deny");
   });
 });
+
+describe("scratchpad tooling written and run from inside the scratchpad", () => {
+  const S = "/tmp/claude-1006/-home-u-proj/0000-sess/scratchpad";
+  it("a relative script after cd into the scratchpad is not candidate code", () => {
+    const d = decide({ tool_name: "Bash", agent_type: "general-purpose", tool_input: { command: `cd ${S} && /opt/conda/bin/python compose.py` } });
+    expect(d.permissionDecision).not.toBe("deny");
+  });
+  it("writing a .py into the scratchpad is not authoring candidate code", () => {
+    const d = decide({ tool_name: "Write", agent_type: "general-purpose", tool_input: { file_path: `${S}/compose.py`, content: "print(1)" } });
+    expect(d.permissionDecision).not.toBe("deny");
+  });
+  it("writing a worktree's trainer still is", () => {
+    const d = decide({ tool_name: "Write", agent_type: "oh-my-evor:evor-forge", tool_input: { file_path: "/w/.evor/worktrees/c1/train/trainer.py", content: "x" } });
+    expect(d.permissionDecision).toBe("deny");
+  });
+});
+
