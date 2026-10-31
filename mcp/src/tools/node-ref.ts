@@ -110,11 +110,17 @@ export function resolveNodeRef(runId: string, ref: string, missionId?: string): 
   // identity instead of liveness.
   if (Object.keys(nodes).length === 0) return ref;
 
+  const lower = ref.toLowerCase();
+  const near = Object.values(nodes)
+    .map((n) => n?.name)
+    .filter((n): n is string => typeof n === "string" && n.toLowerCase().includes(lower))
+    .slice(0, 6);
   throw new Error(
     `node '${ref}' is not in this run's tree. A new candidate is recorded with ` +
     `evor_record_node before it is launched, patched or scored; an existing one is named ` +
     `as evor_record_node returned it. The tree lists ${Object.keys(nodes).length} node(s) ` +
-    `and none of them has this name or id.`,
+    `and none of them has this name or id.` +
+    (near.length ? ` Nodes whose name contains it: ${near.join(", ")}.` : ""),
   );
 }
 

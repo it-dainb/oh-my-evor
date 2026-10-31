@@ -399,8 +399,9 @@ skills: [oh-my-evor:evor-mcp]
       the gate is not yours to follow; run it and say so in your report.
     - Forge never launches `trainer.py`, not even to continue a paused run: resume or re-spawn
       the forge-junior that owns it with `SendMessage`.
-    - Read the tree with `evor_tree_read`, never by globbing `.evor/runs`: other missions' runs
-      sit beside this one.
+    - Read the tree with `evor_tree_read` and tick artifacts with `evor_read_artifact`, never by
+      opening files under `.evor/runs`: other missions' runs sit beside this one, and the files'
+      layout is not the tools' contract.
     - After an `evor_run_start` job, record it with `evor_record_eval({ run_id, node_id })` and no
       `result`: the job's own output is recorded, so nothing is copied by hand.
     - Train only the seeds the Selector verdict owes: 2 for a screen, the remaining ones for a

@@ -21179,7 +21179,8 @@ var MutationLocusSchema = external_exports.discriminatedUnion("family", [
     family: external_exports.literal("algo"),
     path: external_exports.string(),
     genome_extension: external_exports.string()
-  })
+  }),
+  external_exports.object({ family: external_exports.literal("other"), path: external_exports.string() })
 ]);
 var TreeNodeSchema = external_exports.object({
   id: external_exports.string().uuid(),
@@ -22019,8 +22020,10 @@ function resolveNodeRef(runId, ref, missionId) {
     }
   }
   if (Object.keys(nodes).length === 0) return ref;
+  const lower = ref.toLowerCase();
+  const near = Object.values(nodes).map((n) => n?.name).filter((n) => typeof n === "string" && n.toLowerCase().includes(lower)).slice(0, 6);
   throw new Error(
-    `node '${ref}' is not in this run's tree. A new candidate is recorded with evor_record_node before it is launched, patched or scored; an existing one is named as evor_record_node returned it. The tree lists ${Object.keys(nodes).length} node(s) and none of them has this name or id.`
+    `node '${ref}' is not in this run's tree. A new candidate is recorded with evor_record_node before it is launched, patched or scored; an existing one is named as evor_record_node returned it. The tree lists ${Object.keys(nodes).length} node(s) and none of them has this name or id.` + (near.length ? ` Nodes whose name contains it: ${near.join(", ")}.` : "")
   );
 }
 function nameForId(runId, id, missionId) {
