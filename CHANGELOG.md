@@ -2,6 +2,17 @@
 
 All notable changes to Evor. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.2.39] — 2026-10-31 — no removal waits for a person
+
+### Fixed
+
+- **A mission stalled for forty minutes on a confirmation prompt.** The client asks a person to
+  confirm any removal whose path is built from an unguarded shell variable, even with
+  permissions bypassed, and a junior's worktree setup (`rm -rf "$W/$n/data/__pycache__"`) sat on
+  that prompt with nobody to answer. The governor now refuses such a command first, naming the
+  guarded form (`"${W:?}/${n:?}/…"`) the client accepts, and Forge and Forge-junior are told to
+  write removals that way.
+
 ## [1.2.38] — 2026-10-31 — the evaluator can only get stricter; a dashboard for the team
 
 ### Added

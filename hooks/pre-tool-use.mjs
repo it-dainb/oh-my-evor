@@ -264,6 +264,25 @@ try {
   const filePath = String(ti?.file_path ?? '');
   const cmd = String(ti?.command ?? '');
 
+  // An rm on a path built from an unguarded variable stops the client for a
+  // person to confirm, even when permissions are bypassed, and an autonomous
+  // mission then waits indefinitely. Refuse it here, before that prompt, with
+  // the rewrite the client accepts.
+  if (tool === 'Bash') {
+    for (const seg of cmd.split(/;|&&|\|\||\n/)) {
+      const rm = seg.match(/(?:^\s*|[|(`{]\s*|\b(?:do|then|else|sudo|xargs|nohup|command)\s+(?:-\S+\s+)*|-exec\s+)rm\s+(.*)$/);
+      if (!rm) continue;
+      const bare = rm[1].match(/\$(?!\{\w+:\?)\{?(\w+)/);
+      if (bare) {
+        deny(
+          `[EVOR GUARD] rm on a path built from $${bare[1]} needs a guard: write it as ` +
+            `"\${${bare[1]}:?}" (for example "\${W:?}/\${n:?}/build") so an empty variable cannot ` +
+            `widen the delete. Unguarded, the command stops for a person to confirm.`
+        );
+      }
+    }
+  }
+
   // Specialist-action detectors --------------------------------------------------
   // A .py file OR a per-role sub-agent artifact path == authored specialist output.
   const isCodeOrArtifactWrite =

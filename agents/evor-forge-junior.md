@@ -222,7 +222,9 @@ skills: [oh-my-evor:evor-mcp]
       read the log and report to Forge. Do not poll evor_wait(pid): on a 12-hour run that is about
       80 calls, each re-sending your context. Do not arm a Monitor and stop: its final notice can
       sit queued long after the trainer exits. Never `sleep` to wait; the shell refuses it, and
-      the watcher already wakes you. Report to Forge only once training
+      the watcher already wakes you. In any removal, guard every variable as `${VAR:?}`
+      (e.g. `"${W:?}/${n:?}/build"`); an unguarded variable path stops the shell for a person
+      to confirm. Report to Forge only once training
       has ended; a report sent mid-training reads as "finished".
     - **A change to a check is recorded in the run's decision log.** When you repair a faulty
       check — a false negative, a resolution bug, a stub reinstated — append what you
