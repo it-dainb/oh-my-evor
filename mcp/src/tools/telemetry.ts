@@ -104,7 +104,7 @@ export function registerTelemetryTools(server: McpServer): void {
       let records = given;
       let skipped = 0;
       if (!records && source_path) {
-        if (/[/\\]\.evor[/\\]runs[/\\]/.test(source_path)) return fail("source_path is inside the run's own state; give the trainer's file");
+        if (/[/\\]\.evor[/\\]runs[/\\]/.test(source_path)) return fail("source_path is inside the run's own state: that file is the node's ingested stream already, so there is nothing to ingest from it. To ingest what a trainer wrote, give that file, e.g. <worktree>/telemetry.jsonl");
         if (!existsSync(source_path)) return fail(`no file at ${source_path}`);
         records = [];
         for (const line of readFileSync(source_path, "utf8").split("\n")) {

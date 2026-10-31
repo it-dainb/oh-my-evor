@@ -1008,6 +1008,8 @@ class StrategyState(BaseEvorModel):
     """True when an agent has requested a meta-evolve cycle; cleared by orchestrator at tick-start."""
     meta_evolve_reason: Optional[Literal["plateau", "regression", "lock"]] = None
     """Why the meta-evolve was requested; None when meta_evolve_requested is False."""
+    dream_k: Optional[int] = None
+    """Proposals Mutagen generates per tick; None means the default max(concurrency*2, 5)."""
 
 
 # ────────────────────────────────────────────────────────────────────────────

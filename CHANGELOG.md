@@ -2,6 +2,17 @@
 
 All notable changes to Evor. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.2.44] — 2026-10-31 — one strategy, two readers
+
+### Fixed
+
+- **Setting `dream_k` broke every tree load.** The MCP writer accepts `strategy.dream_k`
+  (proposals per tick) and Mutagen reads it, but the Python `StrategyState` forbade the field,
+  so the first tick that set it made `evor_check_stop` and every tree read fail. The field is now
+  on both sides, and a test fails whenever the two field sets drift apart.
+- **The telemetry-ingest refusal now says why.** A path inside the run's state is the node's
+  ingested stream already; the message says so and names the worktree file to give instead.
+
 ## [1.2.43] — 2026-10-31 — review is not optional
 
 ### Fixed
