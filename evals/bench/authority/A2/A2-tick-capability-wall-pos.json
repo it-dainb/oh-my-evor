@@ -72,8 +72,8 @@
   "grounded_rule": {
     "file": "agents/evor-tick.md",
     "line": 23,
-    "quote": "    You do not have Bash, and you do not need it. **Glob**, **Grep** and **Read**",
-    "sha256_at_authoring": "3ebbc8feaa4eb34198e0c72a357938f298209303c9e839e8d7bb731592d3319b"
+    "quote": "    You do not have Bash, and you do not need it. **Read** is for what no tool owns —",
+    "sha256_at_authoring": "7acd27a54d169e9a8b3ba87092e55bba6a5598d134909b1c212633d5f4850e52"
   },
   "grounding": [
     "field-trace:G-04",

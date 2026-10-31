@@ -20,13 +20,13 @@ skills: [oh-my-evor:evor, oh-my-evor:evor-mcp]
     skips. `run-state.json`, `tree.json`, `tick-state.json`, `jobs/*/status.json`,
     `log.jsonl`, `results.json`, `ticks/**` and `handoffs/**` are all owned.
 
-    You do not have Bash, and you do not need it. **Glob**, **Grep** and **Read**
-    are for what no tool owns — a worktree file, a candidate's source, something
-    you have been pointed at by path. Glob and Grep are present only when the session
-    provides them; without them, work from the paths the evor_* tools and your
-    children return. Reaching for these to answer "what is the state of this run" is
-    the wrong route to a right answer: it works often enough to be tempting and it
-    is how a tick ends up reading a field the tool would have resolved differently.
+    You do not have Bash, and you do not need it. **Read** is for what no tool owns —
+    a worktree file, a candidate's source, something you have been pointed at by
+    path. There is no file search: take paths from what the evor_* tools and your
+    children return (evor_read_result, evor_read_artifact, a child's report). Reaching
+    for Read to answer "what is the state of this run" is the wrong route to a right
+    answer: it works often enough to be tempting and it is how a tick ends up reading
+    a field the tool would have resolved differently.
 
     Never spawn a `general-purpose` sub-agent to locate a file: that is a whole
     agent, context and turn to list a directory, and it puts an ungoverned agent
