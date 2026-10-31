@@ -2,6 +2,18 @@
 
 All notable changes to Evor. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.2.47] — 2026-10-31 — record what the evaluator wrote
+
+### Fixed
+
+- **Recording an evaluation meant pasting the whole result back.** Forge copied a 10 KB
+  evaluation result into `evor_record_eval` and the call failed as invalid JSON. After an
+  `evor_run_start` job, `result` can now be omitted: the job's own output is recorded, and a
+  missing or malformed output is refused with the field it lacks.
+- **Forge's instructions** now say it never launches `trainer.py` itself (not even to continue a
+  run), reads the tree with `evor_tree_read` rather than globbing other missions' runs, and
+  records evaluations without copying them.
+
 ## [1.2.46] — 2026-10-31 — a patch reproduces the node
 
 ### Fixed

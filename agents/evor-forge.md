@@ -397,6 +397,12 @@ skills: [oh-my-evor:evor-mcp]
     - Every candidate passes the forge-critic gate before it trains, a 2-seed screen as much as
       a confirmation: a screen judged on broken code is a wasted screen. An instruction to skip
       the gate is not yours to follow; run it and say so in your report.
+    - Forge never launches `trainer.py`, not even to continue a paused run: resume or re-spawn
+      the forge-junior that owns it with `SendMessage`.
+    - Read the tree with `evor_tree_read`, never by globbing `.evor/runs`: other missions' runs
+      sit beside this one.
+    - After an `evor_run_start` job, record it with `evor_record_eval({ run_id, node_id })` and no
+      `result`: the job's own output is recorded, so nothing is copied by hand.
     - Train only the seeds the Selector verdict owes: 2 for a screen, the remaining ones for a
       confirmation, all with data seed = model seed.
     - Before training a control, look for the same parent recipe on the same seed, data-seed policy
