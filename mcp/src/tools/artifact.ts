@@ -289,6 +289,7 @@ export function registerArtifactTools(server: McpServer): void {
       "The destination is derived automatically from the agent and tick.",
       "Payload is validated against the contract for that agent kind where one exists;",
       "unknown/loose agents pass through as plain JSON.",
+      "A large payload can be written to a JSON file first and passed as payload_path.",
     ].join(" "),
     {
       // Optional with an active-run fallback. Required-with-no-default is what
@@ -313,15 +314,30 @@ export function registerArtifactTools(server: McpServer): void {
         ),
       payload: z
         .record(z.unknown())
+        .optional()
         .describe("Artifact payload object to write"),
+      payload_path: z.string().optional().describe(
+        "Absolute path of a JSON file holding the payload, for one too large to send inline",
+      ),
       partial: z
         .boolean()
         .optional()
         .describe("If true, write as an in-progress (partial) artifact"),
     },
-    async ({ run_id: run_id_in, tick, agent, kind, payload, partial }) => {
+    async ({ run_id: run_id_in, tick, agent, kind, payload: given, payload_path, partial }) => {
       const run_id = resolveRunId(run_id_in);
       if (!run_id) return err("no run_id given and no active run found — start a run or pass run_id explicitly");
+      let payload = given;
+      if (!payload && payload_path) {
+        if (/[/\\]\.evor[/\\]runs[/\\]/.test(payload_path)) return err("payload_path is inside the run's own state; write the payload file elsewhere");
+        if (!existsSync(payload_path)) return err(`no file at ${payload_path}`);
+        try {
+          payload = JSON.parse(readFileSync(payload_path, "utf8"));
+        } catch (e) {
+          return err(`payload_path does not hold valid JSON: ${(e as Error).message}`);
+        }
+      }
+      if (!payload || typeof payload !== "object" || Array.isArray(payload)) return err("give payload, or payload_path to a JSON object");
       const missionId = process.env.EVOR_MISSION_ID;
       const result = writeArtifact(run_id, tick, agent, payload, kind, partial, missionId);
       if (!result.ok) {

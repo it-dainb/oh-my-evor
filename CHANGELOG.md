@@ -2,6 +2,15 @@
 
 All notable changes to Evor. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.2.37] — 2026-10-31 — a large artifact goes by file
+
+### Fixed
+
+- **Probe could not write a large findings artifact.** Payloads of 16–20 KB sent inline failed the
+  client's JSON parsing three times running. `evor_write_artifact` now also takes `payload_path`:
+  a JSON file the agent writes first (in its scratchpad, never inside the run's own state),
+  validated exactly as an inline payload.
+
 ## [1.2.36] — 2026-10-31 — scratch tooling is not candidate code
 
 ### Fixed
