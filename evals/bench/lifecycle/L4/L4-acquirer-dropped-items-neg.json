@@ -109,7 +109,7 @@
       },
       {
         "path": "hooks/stop.mjs",
-        "sha256": "4a5d2e24199f83cc4720c283667ea2c75cb1aba6f4da56ac12627540e5680dc2"
+        "sha256": "15aec63912474dff71a0d3ddfb14cbd90605b3dc903ebbc8b33b19c9a319e955"
       }
     ],
     "follow_ups": []

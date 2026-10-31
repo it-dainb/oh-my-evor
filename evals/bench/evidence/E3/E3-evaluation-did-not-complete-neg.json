@@ -53,7 +53,7 @@
   "grounded_rule": {
     "file": "agents/evor-probe.md",
     "quote": "\"inconclusive\" is only valid when the data is genuinely missing, the run failed, or telemetry_sane=false. If the data is present AND sane, commit to confirmed or refuted",
-    "sha256_at_authoring": "912d2155cecf2d62339938b8b8d771b120bead434467d8d10babc0dcc9e34e4c"
+    "sha256_at_authoring": "a5bc224e1f6cb057c71936280e8b0fcda2ac6fcc8420b76f810bc0b052e70e86"
   },
   "grounding": [
     "field-trace:M-01",

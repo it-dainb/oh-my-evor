@@ -15,7 +15,7 @@
  * runs and returns a definite answer. On a timeout the caller calls it again.
  */
 
-import { existsSync, readdirSync, statSync, readFileSync } from "fs";
+import { existsSync, readdirSync, statSync, readFileSync, writeFileSync, rmSync } from "fs";
 import { join } from "path";
 import { homedir } from "os";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -103,12 +103,16 @@ export function pidAlive(pid: number): boolean {
  * the run's state and artifacts, its jobs and node telemetry, and the trainers'
  * logs in the worktrees beside it. Bounded depth keeps one scan cheap.
  */
+/** Present while a heartbeat wait runs; the stop hook reads it to see one is armed. */
+export const HEARTBEAT_FILE = "heartbeat.json";
+
 export function lastActivity(runDir: string): number {
   let newest = 0;
   const visit = (dir: string, depth: number) => {
     let entries: string[];
     try { entries = readdirSync(dir); } catch { return; }
     for (const e of entries) {
+      if (e === HEARTBEAT_FILE) continue;
       const p = join(dir, e);
       let st;
       try { st = statSync(p); } catch { continue; }
@@ -194,10 +198,17 @@ export function registerWaitTools(server: McpServer): void {
         }
         const quietMs = (quiet_s ?? 600) * 1000;
         let last = lastActivity(hbRunDir);
-        const r = await waitFor(() => {
-          last = lastActivity(hbRunDir);
-          return { done: Date.now() - last > quietMs };
-        }, waitS, 15_000);
+        const marker = join(hbRunDir, HEARTBEAT_FILE);
+        try { writeFileSync(marker, JSON.stringify({ armed_at: Date.now(), until: Date.now() + waitS * 1000, pid: process.pid })); } catch { /* the wait works without it */ }
+        let r;
+        try {
+          r = await waitFor(() => {
+            last = lastActivity(hbRunDir);
+            return { done: Date.now() - last > quietMs };
+          }, waitS, 15_000);
+        } finally {
+          try { rmSync(marker, { force: true }); } catch { /* already gone */ }
+        }
         const ageS = Math.round((Date.now() - last) / 1000);
         return ok({
           condition: "heartbeat",

@@ -23110,7 +23110,11 @@ function registerWikiTools(server) {
     ].join(" "),
     {
       run_id: external_exports.string().describe("Active run identifier"),
-      entry: LessonEntrySchema.describe("LessonEntry to persist")
+      // A null on an optional field means "absent"; models send it for fields they leave empty.
+      entry: external_exports.preprocess(
+        (v) => v && typeof v === "object" && !Array.isArray(v) ? Object.fromEntries(Object.entries(v).filter(([, x]) => x !== null)) : v,
+        LessonEntrySchema
+      ).describe("LessonEntry to persist")
     },
     async ({ run_id, entry }) => {
       const missionId = process.env.EVOR_MISSION_ID;
@@ -26842,6 +26846,7 @@ function pidAlive(pid) {
     return e.code === "EPERM";
   }
 }
+var HEARTBEAT_FILE = "heartbeat.json";
 function lastActivity(runDir) {
   let newest = 0;
   const visit = (dir, depth) => {
@@ -26852,6 +26857,7 @@ function lastActivity(runDir) {
       return;
     }
     for (const e of entries) {
+      if (e === HEARTBEAT_FILE) continue;
       const p = (0, import_path22.join)(dir, e);
       let st;
       try {
@@ -26923,10 +26929,23 @@ function registerWaitTools(server) {
         }
         const quietMs = (quiet_s ?? 600) * 1e3;
         let last = lastActivity(hbRunDir);
-        const r2 = await waitFor(() => {
-          last = lastActivity(hbRunDir);
-          return { done: Date.now() - last > quietMs };
-        }, waitS, 15e3);
+        const marker = (0, import_path22.join)(hbRunDir, HEARTBEAT_FILE);
+        try {
+          (0, import_fs21.writeFileSync)(marker, JSON.stringify({ armed_at: Date.now(), until: Date.now() + waitS * 1e3, pid: process.pid }));
+        } catch {
+        }
+        let r2;
+        try {
+          r2 = await waitFor(() => {
+            last = lastActivity(hbRunDir);
+            return { done: Date.now() - last > quietMs };
+          }, waitS, 15e3);
+        } finally {
+          try {
+            (0, import_fs21.rmSync)(marker, { force: true });
+          } catch {
+          }
+        }
         const ageS = Math.round((Date.now() - last) / 1e3);
         return ok({
           condition: "heartbeat",

@@ -305,6 +305,10 @@ disallowedTools: Write, Edit
     **Final artifact (mandatory):**
     `evor_write_artifact(run_id=run_id, tick=tick, agent="probe", kind="findings", payload=eda_output_payload)`
 
+    For a payload of more than a few kilobytes, write it with Python (`json.dump(payload, f)` to a
+    file in a `mktemp -d` directory) and pass `payload_path=<that file>` instead of `payload`: a
+    long inline payload often fails to parse before it reaches the tool.
+
     **The same holds for signals.** `evor_signal_emit` is how a signal reaches the bus and gets
     deduplicated by signature; appending a line to `signals.jsonl` with Bash puts text in a file
     that no query will return. "Recorded a class-confusion signal to run-live-01/signals.jsonl"

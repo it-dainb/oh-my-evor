@@ -242,3 +242,14 @@ describe("main's heartbeat", () => {
     expect(d.permissionDecision).not.toBe("deny");
   });
 });
+
+describe("helper scripts in a temp directory", () => {
+  it("Forge running a helper script under /tmp is not candidate code", () => {
+    const d = decide({ tool_name: "Bash", agent_type: "oh-my-evor:evor-forge", tool_input: { command: "/opt/conda/bin/python /tmp/claude-1006/gen.py --seeds 3" } });
+    expect(d.permissionDecision).not.toBe("deny");
+  });
+  it("writing a helper .py under a mktemp directory is not authoring candidate code", () => {
+    const d = decide({ tool_name: "Write", agent_type: "oh-my-evor:evor-forge", tool_input: { file_path: "/tmp/tmp.Ab12/gen.py", content: "x" } });
+    expect(d.permissionDecision).not.toBe("deny");
+  });
+});
