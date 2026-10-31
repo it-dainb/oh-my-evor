@@ -492,3 +492,29 @@ describe("makeNode server-owned defaults (Class 7)", () => {
     expect(written.metrics).toEqual({ accuracy: 0.91 });
   });
 });
+
+// ── The evaluation job's output is the record ───────────────────────────────
+
+describe("recordEval keeps the evaluator's own values", () => {
+  it("a transcribed score that differs from the job's output does not replace it", () => {
+    const runId = "run-ev-keep-001";
+    ensureRunDirs(runId, "test-mission");
+    const nodeDir = join(tmpRoot, "runs", "test-mission", runId, "nodes", "node-ev");
+    mkdirSync(nodeDir, { recursive: true });
+    const job = { status: "regression", fitness_value: 0.0408, metrics: { min_domain_ocr_faithful: 0.0408 }, per_domain: { a: { S: 50 } } };
+    writeFileSync(join(nodeDir, "results.evaluator.json"), JSON.stringify(job));
+    const r = recordEval(runId, "node-ev", { status: "regression", fitness_value: 0.05, metrics: { min_domain_ocr_faithful: 0.05 }, per_domain: { a: { S: 51 } }, note: "agent" }, "test-mission");
+    const written = JSON.parse(readFileSync(join(nodeDir, "results.json"), "utf8"));
+    expect(written.fitness_value).toBe(0.0408);
+    expect(written.per_domain).toEqual({ a: { S: 50 } });
+    expect(written.note).toBe("agent");
+    expect(r.evaluatorValuesKept).toEqual(expect.arrayContaining(["fitness_value", "metrics", "per_domain"]));
+  });
+
+  it("without an evaluator copy, records what it is given", () => {
+    const runId = "run-ev-keep-002";
+    ensureRunDirs(runId, "test-mission");
+    const r = recordEval(runId, "node-ev2", { status: "ok", fitness_value: 0.1, metrics: {} }, "test-mission");
+    expect(r.evaluatorValuesKept).toEqual([]);
+  });
+});

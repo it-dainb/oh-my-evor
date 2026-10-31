@@ -516,6 +516,9 @@ def _cmd_run(args: argparse.Namespace) -> int:
         results_dir = run_dir / "nodes" / args.node_id
         results_dir.mkdir(parents=True, exist_ok=True)
         (results_dir / "results.json").write_text(result.model_dump_json(indent=2))
+        # The evaluator's own output, never rewritten: evor_record_eval keeps these
+        # values over any the recording agent sends.
+        (results_dir / "results.evaluator.json").write_text(result.model_dump_json(indent=2))
 
     # Report
     print(json.dumps({

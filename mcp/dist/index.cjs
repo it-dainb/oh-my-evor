@@ -22237,11 +22237,28 @@ function updateBestScore(runId, nodeId, result, integrityVerdict, missionId) {
   } catch {
   }
 }
+var EVALUATOR_FIELDS = ["fitness_value", "metrics", "per_domain", "status", "benchmark_raw", "eval_version"];
 function recordEval(runId, nodeId, result, missionId) {
   const paths = resolveRunPaths(runId, missionId);
   const nodeDir = (0, import_path6.join)(paths.nodesDir, nodeId);
   if (!(0, import_fs5.existsSync)(nodeDir)) {
     (0, import_fs5.mkdirSync)(nodeDir, { recursive: true });
+  }
+  const evaluatorKept = [];
+  const evaluatorPath = (0, import_path6.join)(nodeDir, "results.evaluator.json");
+  if ((0, import_fs5.existsSync)(evaluatorPath) && result && typeof result === "object") {
+    try {
+      const ev = JSON.parse((0, import_fs5.readFileSync)(evaluatorPath, "utf8"));
+      const given = result;
+      const merged = { ...given };
+      for (const k of EVALUATOR_FIELDS) {
+        if (!(k in ev)) continue;
+        if (k in given && JSON.stringify(given[k]) !== JSON.stringify(ev[k])) evaluatorKept.push(k);
+        merged[k] = ev[k];
+      }
+      result = merged;
+    } catch {
+    }
   }
   const resultsPath = (0, import_path6.join)(nodeDir, "results.json");
   (0, import_fs5.writeFileSync)(resultsPath, JSON.stringify(result, null, 2), "utf8");
@@ -22276,7 +22293,7 @@ function recordEval(runId, nodeId, result, missionId) {
   } catch {
   }
   updateBestScore(runId, nodeId, result, integrityVerdict, missionId);
-  return { resultsPath, integrityVerdict, integrityError, integrityReport };
+  return { resultsPath, integrityVerdict, integrityError, integrityReport, evaluatorValuesKept: evaluatorKept };
 }
 function readResult(runId, nodeId, missionId) {
   const paths = resolveRunPaths(runId, missionId);
@@ -22372,7 +22389,7 @@ function registerRecordTools(server) {
           filledResult.eval_version = "v1";
         }
       }
-      const { integrityVerdict, integrityError, integrityReport } = recordEval(run_id, resolvedId, filledResult, missionId);
+      const { integrityVerdict, integrityError, integrityReport, evaluatorValuesKept } = recordEval(run_id, resolvedId, filledResult, missionId);
       return {
         content: [
           {
@@ -22387,7 +22404,11 @@ function registerRecordTools(server) {
               status: result.status,
               integrity_verdict: integrityVerdict,
               integrity_error: integrityError,
-              integrity_report: integrityReport
+              integrity_report: integrityReport,
+              ...evaluatorValuesKept.length ? {
+                evaluator_values_kept: evaluatorValuesKept,
+                note: "these fields differed from the evaluation job's own output; its values were recorded"
+              } : {}
             })
           }
         ]
