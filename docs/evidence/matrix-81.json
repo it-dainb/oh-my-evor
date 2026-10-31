@@ -4007,7 +4007,7 @@
       },
       "stale": {
         "since": "2026-10-30",
-        "agent_sha256_now": "35af3efce7df41f4",
+        "agent_sha256_now": "1a3346fb14b9208d",
         "reason": "The agent file changed after the 8.1 run: it now states that applicable_families is a closed set and where a loss function belongs, after the role repeatedly wrote an invented family the validator refuses. The tier comparison in \u00a73 was measured against the previous text and no longer describes what ships.",
         "action": "re-measure this role before citing its \u00a73 row"
       },
