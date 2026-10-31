@@ -2,6 +2,23 @@
 
 All notable changes to Evor. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.2.35] — 2026-10-31 — an unknown node says what to do
+
+### Fixed
+
+- **Telemetry logged to the wrong place had no repair route.** A trainer that wrote
+  `telemetry.jsonl` into its worktree instead of the node's `telemetry_path` left the node with no
+  telemetry, and `.evor/runs/` is closed to hand copies. `evor_telemetry_ingest` now also takes
+  `source_path`, reads that JSONL file and ingests its valid records into the node's directory,
+  reporting any lines it skipped.
+- **A scratchpad script named through a variable counted as training.** `S=<scratchpad>; python
+  -I $S/scan.py …` was judged before `$S` was expanded, so the scratchpad exemption never saw the
+  path. Variables set in the command are now expanded first.
+- **An unrecorded node's error pointed at the wrong remedy.** Launching, patching or scoring a
+  candidate before `evor_record_node` failed with "check the name with evor_tree_read" and an
+  account of how identities split. It now says a new candidate is recorded first and an
+  existing one is named as `evor_record_node` returned it.
+
 ## [1.2.34] — 2026-10-31 — papers download
 
 ### Fixed

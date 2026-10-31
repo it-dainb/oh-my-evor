@@ -209,3 +209,12 @@ describe("main does not block on what an agent will deliver", () => {
     expect(decide({ agent_type: "oh-my-evor:evor-tick", ...wait({ artifact: { tick: 7, agent: "forge" } }) }).permissionDecision).not.toBe("deny");
   });
 });
+
+describe("a scratchpad script named through a variable", () => {
+  it("is still the agent's own tooling", () => {
+    const S = "/tmp/claude-1006/-home-u-proj/0000-sess/scratchpad";
+    const d = decide({ tool_name: "Bash", agent_type: "oh-my-evor:evor-forge", tool_input: {
+      command: `S=${S}; cd .evor/worktrees; /opt/conda/bin/python -I $S/scan.py c1/telemetry.jsonl` } });
+    expect(d.permissionDecision).not.toBe("deny");
+  });
+});

@@ -3,7 +3,7 @@
  * evor_telemetry_ingest — validate + append TelemetryRecord[] to nodes/<id>/telemetry.jsonl
  */
 
-import { appendFileSync, existsSync, mkdirSync } from "fs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync } from "fs";
 import { join } from "path";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
@@ -83,23 +83,46 @@ export function telemetryIngest(
 export function registerTelemetryTools(server: McpServer): void {
   server.tool(
     "evor_telemetry_ingest",
-    "Validate each TelemetryRecord and append it to the node's telemetry stream. Identify the node by name.",
+    "Validate each TelemetryRecord and append it to the node's telemetry stream. Identify the node by name. " +
+      "Give `records`, or `source_path`: a JSONL telemetry file a trainer wrote somewhere other than the " +
+      "node's telemetry_path (e.g. inside its worktree), which is read and ingested whole.",
     {
       run_id: z.string().describe("Active run identifier"),
       node_id: z.string().describe("Node emitting telemetry"),
       records: z
         .array(TelemetryRecordSchema)
         .min(1)
+        .optional()
         .describe("Batch of TelemetryRecord objects to ingest"),
+      source_path: z.string().optional().describe(
+        "Absolute path of a JSONL telemetry file to ingest instead of `records`",
+      ),
     },
-    async ({ run_id, node_id, records }) => {
+    async ({ run_id, node_id, records: given, source_path }) => {
       const missionId = process.env.EVOR_MISSION_ID;
+      const fail = (error: string) => ({ content: [{ type: "text" as const, text: JSON.stringify({ ok: false, error }) }] });
+      let records = given;
+      let skipped = 0;
+      if (!records && source_path) {
+        if (/[/\\]\.evor[/\\]runs[/\\]/.test(source_path)) return fail("source_path is inside the run's own state; give the trainer's file");
+        if (!existsSync(source_path)) return fail(`no file at ${source_path}`);
+        records = [];
+        for (const line of readFileSync(source_path, "utf8").split("\n")) {
+          if (!line.trim()) continue;
+          try {
+            const parsed = TelemetryRecordSchema.safeParse(JSON.parse(line));
+            if (parsed.success) records.push(parsed.data); else skipped++;
+          } catch { skipped++; }
+        }
+        if (!records.length) return fail(`no valid telemetry records in ${source_path} (${skipped} skipped)`);
+      }
+      if (!records?.length) return fail("give records or source_path");
       const { count } = telemetryIngest(run_id, node_id, records, missionId);
       return {
         content: [
           {
             type: "text" as const,
-            text: JSON.stringify({ ok: true, count, run_id, node_id }),
+            text: JSON.stringify({ ok: true, count, run_id, node_id, ...(skipped ? { skipped_lines: skipped } : {}) }),
           },
         ],
       };

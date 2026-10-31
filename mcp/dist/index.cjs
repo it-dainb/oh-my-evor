@@ -21965,7 +21965,7 @@ function resolveNodeRef(runId, ref, missionId) {
   }
   if (Object.keys(nodes).length === 0) return ref;
   throw new Error(
-    `node '${ref}' is not in this run's tree. Check the name with evor_tree_read. The tree lists ${Object.keys(nodes).length} node(s) and none of them claims this reference; resolving it to itself would mint a second identity for a node that already has one, which is how a node's telemetry becomes invisible to the gate that scores it.`
+    `node '${ref}' is not in this run's tree. A new candidate is recorded with evor_record_node before it is launched, patched or scored; an existing one is named as evor_record_node returned it. The tree lists ${Object.keys(nodes).length} node(s) and none of them has this name or id.`
   );
 }
 function nameForId(runId, id, missionId) {
@@ -23837,20 +23837,43 @@ function telemetryIngest(runId, nodeId, records, missionId) {
 function registerTelemetryTools(server) {
   server.tool(
     "evor_telemetry_ingest",
-    "Validate each TelemetryRecord and append it to the node's telemetry stream. Identify the node by name.",
+    "Validate each TelemetryRecord and append it to the node's telemetry stream. Identify the node by name. Give `records`, or `source_path`: a JSONL telemetry file a trainer wrote somewhere other than the node's telemetry_path (e.g. inside its worktree), which is read and ingested whole.",
     {
       run_id: external_exports.string().describe("Active run identifier"),
       node_id: external_exports.string().describe("Node emitting telemetry"),
-      records: external_exports.array(TelemetryRecordSchema).min(1).describe("Batch of TelemetryRecord objects to ingest")
+      records: external_exports.array(TelemetryRecordSchema).min(1).optional().describe("Batch of TelemetryRecord objects to ingest"),
+      source_path: external_exports.string().optional().describe(
+        "Absolute path of a JSONL telemetry file to ingest instead of `records`"
+      )
     },
-    async ({ run_id, node_id, records }) => {
+    async ({ run_id, node_id, records: given, source_path }) => {
       const missionId = process.env.EVOR_MISSION_ID;
+      const fail = (error2) => ({ content: [{ type: "text", text: JSON.stringify({ ok: false, error: error2 }) }] });
+      let records = given;
+      let skipped = 0;
+      if (!records && source_path) {
+        if (/[/\\]\.evor[/\\]runs[/\\]/.test(source_path)) return fail("source_path is inside the run's own state; give the trainer's file");
+        if (!(0, import_fs11.existsSync)(source_path)) return fail(`no file at ${source_path}`);
+        records = [];
+        for (const line of (0, import_fs11.readFileSync)(source_path, "utf8").split("\n")) {
+          if (!line.trim()) continue;
+          try {
+            const parsed = TelemetryRecordSchema.safeParse(JSON.parse(line));
+            if (parsed.success) records.push(parsed.data);
+            else skipped++;
+          } catch {
+            skipped++;
+          }
+        }
+        if (!records.length) return fail(`no valid telemetry records in ${source_path} (${skipped} skipped)`);
+      }
+      if (!records?.length) return fail("give records or source_path");
       const { count } = telemetryIngest(run_id, node_id, records, missionId);
       return {
         content: [
           {
             type: "text",
-            text: JSON.stringify({ ok: true, count, run_id, node_id })
+            text: JSON.stringify({ ok: true, count, run_id, node_id, ...skipped ? { skipped_lines: skipped } : {} })
           }
         ]
       };
