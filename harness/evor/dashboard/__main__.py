@@ -10,6 +10,9 @@ Examples::
 
     # Via environment variable:
     EVOR_ROOT=.evor python -m evor.dashboard
+
+    # Write a self-contained static snapshot of one run (no server):
+    python -m evor.dashboard --run-dir .evor/runs/<mission>/<run-id> --export snapshot.html
 """
 
 from __future__ import annotations
@@ -76,7 +79,35 @@ def main() -> None:
         action="store_true",
         help="Do not open a browser window on startup",
     )
+    parser.add_argument(
+        "--no-steer",
+        action="store_true",
+        help="Disable the steer box (the only endpoint that writes: one line to signals-inbox.jsonl)",
+    )
+    parser.add_argument(
+        "--steer-token",
+        default=None,
+        metavar="TOKEN",
+        help="Token required to post steer notes (default: random, printed once at startup)",
+    )
+    parser.add_argument(
+        "--export",
+        metavar="OUT.html",
+        help="Write a self-contained static HTML snapshot of the run and exit (requires a specific run dir)",
+    )
     args = parser.parse_args()
+
+    run_path = Path(args.run_dir).resolve()
+    is_run = (run_path / "tree.json").exists()
+
+    if args.export:
+        if not is_run:
+            parser.error("--export needs a specific run directory (one containing tree.json)")
+        from evor.dashboard.export import export_snapshot
+
+        out = export_snapshot(run_path, Path(args.export), evor_root=run_path.parent.parent.parent)
+        print(f"[evor] Snapshot written to {out} ({out.stat().st_size / 1024:.0f} KB)")
+        return
 
     from evor.dashboard.server import serve
 
@@ -86,6 +117,9 @@ def main() -> None:
         host=args.host,
         port=args.port,
         open_browser=not args.no_browser,
+        default_run_dir=run_path if is_run else None,
+        allow_steer=not args.no_steer,
+        steer_token=args.steer_token,
     )
 
 
