@@ -50,9 +50,10 @@ const venvDir = join(cacheBase(), pkg);
 const venvPy = isWin ? join(venvDir, "Scripts", "python.exe") : join(venvDir, "bin", "python");
 const marker = join(venvDir, ".script");
 // Optional extras a server needs to do its whole job: arxiv's read_paper converts
-// PDFs only with [pdf], and pymupdf4llm 2.0 is an empty placeholder, so it is pinned
-// below it. Heavy extras (arxiv [pro]: sentence-transformers) stay out.
-const REQUIREMENTS = { "arxiv-mcp-server": ["arxiv-mcp-server[pdf]", "pymupdf4llm<2"] };
+// PDFs only with [pdf]; pymupdf4llm 2.0 is an empty placeholder, and the arxiv
+// library dropped Result.download_pdf in 3.0, which the PDF route calls, so both are
+// pinned below those. Heavy extras (arxiv [pro]: sentence-transformers) stay out.
+const REQUIREMENTS = { "arxiv-mcp-server": ["arxiv-mcp-server[pdf]", "pymupdf4llm<2", "arxiv>=2.1,<3"] };
 const reqs = REQUIREMENTS[pkg] ?? [pkg];
 const spec = reqs.join(" ");
 const specMarker = join(venvDir, ".spec");

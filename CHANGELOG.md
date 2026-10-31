@@ -2,6 +2,15 @@
 
 All notable changes to Evor. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.2.34] — 2026-10-31 — papers download
+
+### Fixed
+
+- **arxiv `download_paper` failed on every paper fetched as PDF.** The research server's PDF
+  route calls `Result.download_pdf`, which the `arxiv` library removed in 3.0, and the server
+  only requires `arxiv>=2.1`, so it resolved to 4.0. The launcher now pins `arxiv` below 3; an
+  existing environment is upgraded once.
+
 ## [1.2.33] — 2026-10-31 — the tick reads what it is pointed at
 
 ### Fixed
