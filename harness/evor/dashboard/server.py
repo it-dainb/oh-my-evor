@@ -1,6 +1,9 @@
 """FastAPI dashboard server for Evor.
 
-Reads only from the on-disk ``.evor/`` run store; never writes.
+Reads the on-disk ``.evor/`` run store. The one write is ``POST .../steer``,
+which appends a single ``human-steer`` line to the run's ``signals-inbox.jsonl``
+(the inbox the tick loop drains); it can be switched off with
+``allow_steer=False``.
 
 Usage::
 
@@ -22,15 +25,17 @@ from __future__ import annotations
 
 import asyncio
 import json
+import secrets
 import threading
 from pathlib import Path
 from typing import Any
 
 from ..run_status import read_run_status
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import FileResponse, StreamingResponse
 
+from evor.dashboard.insights import SIGNAL_AXES, RunInsights, append_steer
 from evor.dashboard.store import RunStore
 
 _STATIC_DIR = Path(__file__).parent / "static"
@@ -40,8 +45,10 @@ _STATIC_DIR = Path(__file__).parent / "static"
 
 
 def _get_store(evor_root: Path, mission_id: str, run_id: str) -> RunStore:
-    run_dir = evor_root / "runs" / mission_id / run_id
-    if not run_dir.exists():
+    runs = (evor_root / "runs").resolve()
+    run_dir = (runs / mission_id / run_id).resolve()
+    # Both segments must name a directory exactly two levels under runs/.
+    if run_dir.parent.parent != runs or not run_dir.is_dir():
         raise HTTPException(
             status_code=404, detail=f"Run not found: {mission_id}/{run_id}"
         )
@@ -51,13 +58,27 @@ def _get_store(evor_root: Path, mission_id: str, run_id: str) -> RunStore:
 # ── App factory ───────────────────────────────────────────────────────────────
 
 
-def create_app(evor_root: str | Path) -> FastAPI:
+def create_app(
+    evor_root: str | Path,
+    default_run_dir: str | Path | None = None,
+    allow_steer: bool = True,
+    steer_token: str | None = None,
+) -> FastAPI:
     """Build the FastAPI application serving all runs under *evor_root*.
 
     *evor_root* is the ``.evor/`` directory; run directories are discovered at
-    ``<evor_root>/runs/<mission_id>/<run_id>/``.
+    ``<evor_root>/runs/<mission_id>/<run_id>/``. *default_run_dir* marks the run
+    the page opens on; *allow_steer* enables the steer inbox endpoint, which
+    accepts a post only with *steer_token* (generated when not given; read it
+    back from ``app.state.steer_token``).
     """
     root = Path(evor_root).resolve()
+    default_run = Path(default_run_dir).resolve() if default_run_dir else None
+    token = steer_token or secrets.token_urlsafe(18)
+
+    def _insights(mission_id: str, run_id: str) -> RunInsights:
+        store = _get_store(root, mission_id, run_id)
+        return RunInsights(store.run_dir, evor_root=root)
 
     app = FastAPI(
         title="Evor Dashboard",
@@ -69,6 +90,7 @@ def create_app(evor_root: str | Path) -> FastAPI:
         docs_url="/api/docs",
         openapi_url="/api/openapi.json",
     )
+    app.state.steer_token = token if allow_steer else None
 
     # ── List all runs ──────────────────────────────────────────────────────────
 
@@ -82,7 +104,8 @@ def create_app(evor_root: str | Path) -> FastAPI:
             if not mission_dir.is_dir():
                 continue
             for run_dir in sorted(mission_dir.iterdir()):
-                if not run_dir.is_dir():
+                # Skip sibling folders that are not runs (e.g. jobs/).
+                if not run_dir.is_dir() or not ((run_dir / "run-state.json").exists() or (run_dir / "tree.json").exists()):
                     continue
                 store = RunStore(run_dir)
                 state = store.run_state()
@@ -100,9 +123,107 @@ def create_app(evor_root: str | Path) -> FastAPI:
                         "current_eval_version": state.get("current_eval_version"),
                         "mission_type": gc.get("mission_type") if gc else None,
                         "fitness_mode": gc.get("fitness_mode") if gc else None,
+                        "default": default_run is not None and run_dir.resolve() == default_run,
                     }
                 )
         return result
+
+    # ── Researcher views: progress, recipes, alerts, timeline, learnings ──────
+
+    @app.get(
+        "/api/runs/{mission_id}/{run_id}/bundle",
+        summary="Everything the main view needs in one payload",
+    )
+    def get_bundle(mission_id: str, run_id: str) -> dict[str, Any]:
+        b = _insights(mission_id, run_id).bundle()
+        b["steer_enabled"] = allow_steer
+        return b
+
+    @app.get("/api/runs/{mission_id}/{run_id}/overview", summary="'Right path?' verdict, robust best, best node")
+    def get_overview(mission_id: str, run_id: str) -> dict[str, Any]:
+        ins = _insights(mission_id, run_id)
+        return {"overview": ins.overview(), "progress": ins.progress()}
+
+    @app.get("/api/runs/{mission_id}/{run_id}/points", summary="One figure point per evaluated node, with lineage")
+    def get_points(mission_id: str, run_id: str) -> dict[str, Any]:
+        ins = _insights(mission_id, run_id)
+        return {"metrics": ins.metric_specs(), "baseline": ins.primary_metric()["baseline"], "points": ins.points()}
+
+    @app.get("/api/runs/{mission_id}/{run_id}/recipes", summary="Seed siblings grouped into recipes with median, spread and verdict")
+    def get_recipes(mission_id: str, run_id: str) -> list[dict[str, Any]]:
+        return _insights(mission_id, run_id).recipes()
+
+    @app.get("/api/runs/{mission_id}/{run_id}/alerts", summary="Health alerts: gaming, seed spread, integrity, plateau, stall")
+    def get_alerts(mission_id: str, run_id: str) -> list[dict[str, Any]]:
+        return _insights(mission_id, run_id).alerts()
+
+    @app.get("/api/runs/{mission_id}/{run_id}/timeline", summary="Per-tick plain-language account of every artifact")
+    def get_timeline(mission_id: str, run_id: str) -> list[dict[str, Any]]:
+        return _insights(mission_id, run_id).timeline()
+
+    @app.get("/api/runs/{mission_id}/{run_id}/learnings", summary="What the run has learned: lessons, artefacts, gotchas, decisions")
+    def get_learnings(mission_id: str, run_id: str) -> dict[str, Any]:
+        return _insights(mission_id, run_id).learnings()
+
+    @app.get("/api/runs/{mission_id}/{run_id}/nodes/{node_id}/evidence", summary="Node drill-down: makeup, per-domain vs parent, telemetry, samples")
+    def get_evidence(mission_id: str, run_id: str, node_id: str) -> dict[str, Any]:
+        ev = _insights(mission_id, run_id).node_evidence(node_id)
+        if ev is None:
+            raise HTTPException(status_code=404, detail=f"Node not found: {node_id}")
+        return ev
+
+    @app.get("/api/runs/{mission_id}/{run_id}/nodes/{node_id}/samples/{name:path}", summary="A sample image stored with the node")
+    def get_sample(mission_id: str, run_id: str, node_id: str, name: str) -> FileResponse:
+        p = _insights(mission_id, run_id).sample_path(node_id, name)
+        if p is None:
+            raise HTTPException(status_code=404, detail="Sample not found")
+        return FileResponse(p)
+
+    # ── Steer inbox ────────────────────────────────────────────────────────────
+
+    @app.get("/api/runs/{mission_id}/{run_id}/steer", summary="Human steer notes and whether a tick has drained them")
+    def get_steer(mission_id: str, run_id: str) -> dict[str, Any]:
+        ins = _insights(mission_id, run_id)
+        return {"enabled": allow_steer, "token_required": True, "axes": list(SIGNAL_AXES), "notes": ins.steer_notes()}
+
+    @app.post("/api/runs/{mission_id}/{run_id}/steer", summary="Append a human-steer note to the run's signals inbox", status_code=201)
+    async def post_steer(mission_id: str, run_id: str, request: Request) -> dict[str, Any]:
+        """Body: JSON or form with ``note``, ``author``, optional ``axis`` and
+        ``token``; the token may instead come in the ``X-Evor-Steer-Token`` header."""
+        if not allow_steer:
+            raise HTTPException(status_code=403, detail="Steering is disabled on this dashboard")
+        ctype = request.headers.get("content-type", "")
+        try:
+            if ctype.startswith(("application/x-www-form-urlencoded", "multipart/form-data")):
+                payload = dict(await request.form())
+            else:
+                payload = await request.json()
+        except Exception as exc:
+            raise HTTPException(status_code=422, detail="Body must be JSON or a form") from exc
+        if not isinstance(payload, dict):
+            raise HTTPException(status_code=422, detail="Body must be an object")
+        given = request.headers.get("x-evor-steer-token") or str(payload.get("token") or "")
+        if not given or not secrets.compare_digest(given.encode(), token.encode()):
+            raise HTTPException(status_code=401, detail="Steer token missing or wrong")
+        # Cross-site guard: a page on another origin must not be able to post
+        # notes into the run's inbox through a researcher's browser.
+        origin = request.headers.get("origin")
+        if origin:
+            from urllib.parse import urlparse
+
+            if urlparse(origin).netloc != request.headers.get("host", ""):
+                raise HTTPException(status_code=403, detail="Cross-origin steer rejected")
+        store = _get_store(root, mission_id, run_id)
+        try:
+            line = append_steer(
+                store.run_dir,
+                note=str(payload.get("note") or ""),
+                author=str(payload.get("author") or ""),
+                axis=str(payload.get("axis") or "accuracy"),
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        return {"ok": True, "line": line}
 
     # ── Tree ──────────────────────────────────────────────────────────────────
 
@@ -377,11 +498,15 @@ def serve(
     host: str = "0.0.0.0",
     port: int = 8756,
     open_browser: bool = True,
+    default_run_dir: str | Path | None = None,
+    allow_steer: bool = True,
+    steer_token: str | None = None,
 ) -> None:
     """Run the dashboard server in the foreground (blocks)."""
     import uvicorn
 
-    app = create_app(evor_root)
+    app = create_app(evor_root, default_run_dir=default_run_dir, allow_steer=allow_steer, steer_token=steer_token)
+    _announce_token(app)
     display_host = "localhost" if host in ("0.0.0.0", "::") else host
     url = f"http://{display_host}:{port}"
     print(f"[evor] Dashboard serving {Path(evor_root).resolve()} at {url}")
@@ -430,3 +555,52 @@ def _open_browser_after(url: str, delay: float = 1.5) -> None:
     import webbrowser
 
     threading.Timer(delay, lambda: webbrowser.open(url)).start()
+
+
+# ── ``uvicorn evor.dashboard.server:app`` ─────────────────────────────────────
+
+
+def _app_from_env() -> FastAPI:
+    """Build the app from ``EVOR_RUN_DIR`` (a run dir) or ``EVOR_ROOT`` (a .evor root).
+
+    ``EVOR_DASHBOARD_NO_STEER=1`` disables the steer endpoint. The steer token
+    is generated and printed at startup; credentials are not read from the
+    environment (see tests/test_wave1_environment_secrets.py).
+    """
+    import os
+
+    run_dir = os.environ.get("EVOR_RUN_DIR")
+    root = os.environ.get("EVOR_ROOT")
+    default_run = None
+    if run_dir:
+        p = Path(run_dir).resolve()
+        if (p / "tree.json").exists() or (p / "run-state.json").exists():
+            default_run = p
+            root = root or str(p.parent.parent.parent)
+        else:
+            root = root or str(p)
+    built = create_app(
+        root or ".evor",
+        default_run_dir=default_run,
+        allow_steer=os.environ.get("EVOR_DASHBOARD_NO_STEER", "") not in ("1", "true", "yes"),
+    )
+    _announce_token(built)
+    return built
+
+
+def _announce_token(app: FastAPI) -> None:
+    """Print the steer token once, to the server's stdout only."""
+    tok = getattr(app.state, "steer_token", None)
+    if tok:
+        print(f"[evor] Steer token (paste into the steer box to post notes): {tok}", flush=True)
+    else:
+        print("[evor] Steering disabled", flush=True)
+
+
+def __getattr__(name: str) -> Any:
+    # Built lazily on first access so importing this module stays side-effect free.
+    if name == "app":
+        global app
+        app = _app_from_env()
+        return app
+    raise AttributeError(name)

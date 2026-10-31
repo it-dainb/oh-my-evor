@@ -62,7 +62,6 @@ export const RunStatePatchSchema = z.object({
     .optional()
     .describe("Run lifecycle status"),
   tick_count: z.number().int().min(0).optional().describe("Number of completed ticks"),
-  best_score: z.number().optional().describe("Best primary metric value achieved so far"),
   frontier_ids: z.array(z.string()).optional().describe("Node IDs currently on the frontier"),
   current_eval_version: z.string().optional().describe("Active EvalSuite version"),
   pending_node_ids: z
@@ -468,6 +467,18 @@ export function stateWrite(
     ...statePatch
   } = patch;
 
+  // best_score / best_node_id are DERIVED from recorded evaluations
+  // (evor_record_eval), per eval version. A direct write would let an agent set
+  // the number the stop conditions read.
+  for (const k of ["best_score", "best_node_id"]) {
+    if (k in (statePatch as Record<string, unknown>)) {
+      throw new Error(
+        `${k} is derived from recorded evaluations (evor_record_eval) and cannot be written ` +
+        `directly; record the node's evaluation instead.`,
+      );
+    }
+  }
+
   // Merge remaining patch into run-state.json (field-level replace).
   const current = readRunState(paths.runStatePath, runId);
   const updated: Record<string, unknown> = { ...current };
@@ -504,6 +515,16 @@ export function stateWrite(
       if (r && typeof r.tick === "number") byTick.set(r.tick, r);
     }
     const record: Record<string, unknown> = { tick: tickRecord.tick, outcome: tickRecord.outcome };
+    // Stamped with the version in force: a score is comparable only with scores
+    // under the same eval version, so the history the stop checks read is the
+    // in-force version's alone (a hardening would otherwise read as a regression).
+    let inForce: string | undefined;
+    try {
+      const v = JSON.parse(readFileSync(join(paths.runDir, "goal-contract.json"), "utf8")).eval_version;
+      if (typeof v === "string") inForce = v;
+    } catch { /* no contract: unstamped, as before */ }
+    inForce ??= typeof current.current_eval_version === "string" ? current.current_eval_version : undefined;
+    if (inForce) record.eval_version = inForce;
     if (tickRecord.score !== undefined) record.score = tickRecord.score;
     if (tickRecord.failure_kind !== undefined) record.failure_kind = tickRecord.failure_kind;
     if (tickRecord.error !== undefined) record.error = tickRecord.error;
@@ -516,6 +537,7 @@ export function stateWrite(
     updated.tick_records = records;
     // Derived, never written directly: the type-specific checks keep reading it.
     updated.tick_history_scores = records
+      .filter((r) => !inForce || (r.eval_version ?? inForce) === inForce)
       .map((r) => r.score)
       .filter((v): v is number => typeof v === "number");
   }
@@ -920,7 +942,17 @@ export function registerStateTools(server: McpServer): void {
     },
     async ({ run_id, patch }) => {
       const missionId = process.env.EVOR_MISSION_ID;
-      const updated = stateWrite(run_id, patch, missionId);
+      let updated: Record<string, unknown>;
+      try {
+        updated = stateWrite(run_id, patch, missionId);
+      } catch (e) {
+        return {
+          content: [{
+            type: "text" as const,
+            text: JSON.stringify({ ok: false, error: e instanceof Error ? e.message : String(e) }),
+          }],
+        };
+      }
       return {
         content: [
           {

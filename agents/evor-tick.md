@@ -169,6 +169,19 @@ If a selected candidate genuinely cannot be run, emit a signal naming it and ret
 `"failed"` with that reason. Do NOT park it for later in a key such as `carry_forward`: no
 skill, agent file or contract defines one, nothing reads it, and the candidate is lost.
 
+## A metric hardening is yours to apply
+
+When Probe's artifact carries a `benchmark_upgrade_proposal` of kind `metric_hardening`, run
+the procedure's Step 7b in this tick: Forge (with its critic) writes the stricter evaluator
+into a worktree, you call `evor_harden_eval` with that worktree, the proposal's verbatim
+`contract_grounding` and its `evidence`, then re-score every node it returns with
+`evor_run_start(eval_version=<new version>)`, `evor_wait` and `evor_record_eval`. You are the
+only agent that may call `evor_harden_eval`; the mission orchestrator never does. The
+re-scored nodes are owed like selected candidates: a node whose re-score fails
+`not_softer_than_parent` is a finding about the hardened evaluator, so emit a signal naming it
+and do not promote the node. Put the hardening in your return line as a pointer to Probe's
+artifact.
+
 ## Waiting is not failing
 
 **`yielding` is a last resort, not the normal path.** Foreground spawns return when the child is

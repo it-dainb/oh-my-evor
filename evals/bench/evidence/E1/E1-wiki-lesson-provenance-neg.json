@@ -77,7 +77,7 @@
   "grounded_rule": {
     "file": "agents/evor-sage-junior.md",
     "quote": "A citation that cannot be verified does not exist.",
-    "sha256_at_authoring": "35af3efce7df41f487c3cec472db7f344b6aca5c1840ffea4e0ab79b26d61565"
+    "sha256_at_authoring": "1a3346fb14b9208d7537657a9fcfd12ededccd7bd6363b0d5cc85a5a8ca69ecf"
   },
   "grounding": [
     "field-trace:N-02",

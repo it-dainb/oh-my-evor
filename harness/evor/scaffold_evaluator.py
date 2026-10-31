@@ -346,16 +346,43 @@ def scaffold_evaluator(
         contract=contract, frozen_split=frozen_split, eval_version=eval_version
     )
     harness_path = target_dir / f"{eval_version}.py"
-    harness_path.write_text(source)
-
     plugin_path = target_dir / SCORE_PLUGIN_FILENAME
-    plugin_written = False
-    if overwrite_plugin or not plugin_path.exists():
-        plugin_path.write_text(
-            _PLUGIN_TEMPLATE.format(
-                label_semantics=contract.get("label_semantics", "unspecified")
-            )
+    plugin_source = _PLUGIN_TEMPLATE.format(
+        label_semantics=contract.get("label_semantics", "unspecified")
+    )
+    write_plugin = overwrite_plugin or not plugin_path.exists()
+
+    # Sealed files are not regenerated over. A version's seal receipt pins its
+    # harness, and every receipt pins the plugin all versions share: rewriting
+    # either would rescore sealed versions with bytes they were never sealed with.
+    sha = lambda text: hashlib.sha256(text.encode()).hexdigest()  # noqa: E731
+    for receipt_path in sorted(target_dir.glob("*.sealed.json")):
+        try:
+            receipt = json.loads(receipt_path.read_text())
+        except (OSError, ValueError):
+            continue
+        files = receipt.get("files") or {}
+        sealed_version = receipt_path.name[: -len(".sealed.json")]
+        sealed_harness = files.get(harness_path.name) or (
+            receipt.get("hash") if sealed_version == eval_version else None
         )
+        if sealed_version == eval_version and sealed_harness and sealed_harness != sha(source):
+            return {"error": (
+                f"{eval_version} is sealed; regenerating its harness would replace the sealed "
+                "evaluator. A stricter evaluator is a new eval_version applied with "
+                "evor_harden_eval."
+            )}
+        sealed_plugin = files.get(SCORE_PLUGIN_FILENAME) or receipt.get("plugin_hash")
+        if write_plugin and sealed_plugin and sealed_plugin != sha(plugin_source):
+            return {"error": (
+                f"score_plugin.py is sealed into {sealed_version}; overwriting it would change "
+                "the metric of every version sealed with it."
+            )}
+
+    harness_path.write_text(source)
+    plugin_written = False
+    if write_plugin:
+        plugin_path.write_text(plugin_source)
         plugin_written = True
 
     return {

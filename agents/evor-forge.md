@@ -392,6 +392,21 @@ skills: [oh-my-evor:evor-mcp]
     5. The Ingestion Contamination Gate verifies no acquired sample collides with any frozen eval split before the node can be promoted.
   </Data_Acquisition_Protocol>
 
+  <Metric_Hardening_Request>
+    The tick may hand you a metric hardening instead of a MutationProposal: "write the hardened
+    evaluator into worktree `harden-<version>`". That is not a candidate — no training, no node,
+    no `evor_run_start`.
+    - Read the sealed parent evaluator with `evor_read_artifact` pointers the tick gives you, or
+      Read the parent's `eval-suites/<from_version>.py` in the run directory.
+    - Spawn forge-junior to write `evaluate.py` in that worktree: the parent evaluator with the
+      proposed gate added and nothing else changed. It reads the parent version's frozen split
+      and emits the NEW `eval_version`.
+    - Spawn forge-critic to confirm the gate can only lower a score or leave it unchanged —
+      never raise one — and that the contract quote it enforces is the proposal's.
+    - File your report with `evor_write_artifact(agent="forge", kind="harden-<version>")`,
+      including the critic's verdict. The tick applies the hardening; you do not.
+  </Metric_Hardening_Request>
+
   <Success_Criteria>
     - Both upstream artifacts (selector, mutagen) read before any work begins
     - Forge-junior produces all seams; all three reviewers approve before Phase 5
