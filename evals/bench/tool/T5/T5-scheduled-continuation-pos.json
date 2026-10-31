@@ -13,7 +13,7 @@
   "grounded_rule": {
     "file": "skills/evor-schedule/SKILL.md",
     "quote": "Call `evor_schedule({ run_id, mode: \"scheduled\" })`.",
-    "sha256_at_authoring": "15bd57b58e2e4bca1155ed6973bc654bc081e0b1456e9d5681e0fd31ca41a42a"
+    "sha256_at_authoring": "daf04e434d8e2c3555ee1011929c4c2bc9f32f2c7f9c5f67471aa1cf506ba81d"
   },
   "grounding": [
     "field-trace:L-09",

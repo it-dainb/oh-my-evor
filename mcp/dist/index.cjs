@@ -26797,7 +26797,7 @@ var import_fs21 = require("fs");
 var import_path22 = require("path");
 var import_os5 = require("os");
 var MAX_WAIT_S = 540;
-var HEARTBEAT_MAX_S = 6 * 3600;
+var HEARTBEAT_MAX_S = 25 * 60;
 var DEFAULT_WAIT_S = 300;
 var POLL_MS = 5e3;
 var STOPPED_QUIET_MS = 15e3;
@@ -26894,7 +26894,7 @@ async function waitFor(probe, waitS, pollMs = POLL_MS, signal) {
     });
   }
 }
-var armedHere = /* @__PURE__ */ new Set();
+var armedHere = /* @__PURE__ */ new Map();
 function pidAliveAny(pid) {
   try {
     process.kill(pid, 0);
@@ -26906,7 +26906,7 @@ function pidAliveAny(pid) {
 function registerWaitTools(server) {
   server.tool(
     "evor_wait",
-    "Wait for a condition: an evor job finishes (job_id), a process exits (pid), a tick artifact is written (artifact), an agent stops (agent_id), or the whole run stalls (heartbeat). Returns {done:true,...} as soon as it holds, or {done:false} after wait_s (default 300, max 540; a heartbeat waits up to six hours). Use it only for what nothing will report: an agent you spawned, and a background task you started, wake you when they finish. Give exactly one of job_id, pid, artifact, agent_id, heartbeat.",
+    "Wait for a condition: an evor job finishes (job_id), a process exits (pid), a tick artifact is written (artifact), an agent stops (agent_id), or the whole run stalls (heartbeat). Returns {done:true,...} as soon as it holds, or {done:false} after wait_s (default 300, max 540; a heartbeat waits up to 25 minutes). Use it only for what nothing will report: an agent you spawned, and a background task you started, wake you when they finish. Give exactly one of job_id, pid, artifact, agent_id, heartbeat.",
     {
       run_id: external_exports.string().optional().describe("Active run identifier; resolved from the active run when omitted"),
       job_id: external_exports.string().optional().describe("Wait for this evor_run_start job to leave state 'running'"),
@@ -26923,7 +26923,7 @@ function registerWaitTools(server) {
         "With artifact: the agentId of the child that owes it (from the spawn result). If that child stops without writing it, the wait returns at once with producer_stopped:true instead of running out the clock."
       ),
       heartbeat: external_exports.boolean().optional().describe(
-        "Watch the whole run instead of one condition. It runs in the background and returns stalled:true only when nothing in the run (tick state, artifacts, jobs, node telemetry, trainer logs) has changed for quiet_s; otherwise it keeps waiting, up to wait_s (default six hours). One heartbeat at a time: while one runs, a second call returns at once with already_armed:true. For the orchestrator, after a tick yields: a lost completion notice then still leads back to the tick."
+        "Watch the whole run instead of one condition. It runs in the background and returns stalled:true only when nothing in the run (tick state, artifacts, jobs, node telemetry, trainer logs) has changed for quiet_s; otherwise it keeps waiting, up to wait_s (default and max 25 minutes), then returns stalled:false: arm it again. A new heartbeat replaces one still running. For the orchestrator, after a tick yields: a lost completion notice then still leads back to the tick."
       ),
       quiet_s: external_exports.number().int().min(60).max(3600).optional().describe(
         "With heartbeat: seconds without any change that count as stalled (default 600)"
@@ -26953,14 +26953,17 @@ function registerWaitTools(server) {
           armedElsewhere = Number(hb.until) > Date.now() && Number(hb.pid) !== process.pid && pidAliveAny(Number(hb.pid));
         } catch {
         }
-        if (armedHere.has(hbRunDir) || armedElsewhere) {
+        if (armedElsewhere) {
           return ok({
             condition: "heartbeat",
             already_armed: true,
             next: "a heartbeat is already running and wakes you on a stall: end your turn"
           });
         }
-        armedHere.add(hbRunDir);
+        armedHere.get(hbRunDir)?.abort();
+        const mine = new AbortController();
+        armedHere.set(hbRunDir, mine);
+        extra?.signal?.addEventListener("abort", () => mine.abort(), { once: true });
         try {
           (0, import_fs21.writeFileSync)(marker, JSON.stringify({ armed_at: Date.now(), until: Date.now() + waitS * 1e3, pid: process.pid }));
         } catch {
@@ -26970,13 +26973,18 @@ function registerWaitTools(server) {
           r2 = await waitFor(() => {
             last = lastActivity(hbRunDir);
             return { done: Date.now() - last > quietMs };
-          }, waitS, 15e3, extra?.signal);
+          }, waitS, 15e3, mine.signal);
         } finally {
-          armedHere.delete(hbRunDir);
-          try {
-            if (Number(JSON.parse((0, import_fs21.readFileSync)(marker, "utf8")).pid) === process.pid) (0, import_fs21.rmSync)(marker, { force: true });
-          } catch {
+          if (armedHere.get(hbRunDir) === mine) {
+            armedHere.delete(hbRunDir);
+            try {
+              if (Number(JSON.parse((0, import_fs21.readFileSync)(marker, "utf8")).pid) === process.pid) (0, import_fs21.rmSync)(marker, { force: true });
+            } catch {
+            }
           }
+        }
+        if (mine.signal.aborted && armedHere.get(hbRunDir) !== mine && armedHere.has(hbRunDir)) {
+          return ok({ condition: "heartbeat", replaced: true, next: "a newer heartbeat is running: end your turn" });
         }
         const ageS = Math.round((Date.now() - last) / 1e3);
         return ok({

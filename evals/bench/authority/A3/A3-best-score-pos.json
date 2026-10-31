@@ -108,7 +108,7 @@
     "file": "skills/evor/SKILL.md",
     "line": 291,
     "quote": "2. If the integrity check fails, the node is rejected and its integrity_status is set to \"failed\" — skip promotion. Log failure_reason via `evor_state_write`.",
-    "sha256_at_authoring": "5de09fbfe092b82dbc1aa064c524371bc6e33d729ad45d1647268181bd47589d"
+    "sha256_at_authoring": "c4b4e547758f889bbe7b11018c4f6384deec0e9837c7a46f36b38005b408eed5"
   },
   "grounding": [
     "field-trace:H-04",
