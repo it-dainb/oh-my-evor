@@ -2,6 +2,18 @@
 
 All notable changes to Evor. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.2.40] — 2026-10-31 — a lost notice is found by a heartbeat
+
+### Fixed
+
+- **A mission waited four hours on a notice that never came.** When Forge's trainers finished,
+  every agent of the tick had already ended its turn, the completion notice reached no one, and
+  main was never woken: the stall check runs only when main stops, and main had stopped already.
+  `evor_wait` now takes `heartbeat: true`: it watches the whole run (tick state, artifacts, jobs,
+  node telemetry, trainer logs) and reports `stalled: true` once nothing has changed for
+  `quiet_s` (default ten minutes), otherwise it returns at `wait_s` with `stalled: false`. The loop
+  skill has main arm one after every yield and, on a stall with nothing running, resume the tick.
+
 ## [1.2.39] — 2026-10-31 — no removal waits for a person
 
 ### Fixed

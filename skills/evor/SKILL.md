@@ -653,6 +653,11 @@ before acting — the restore block is a navigation aid, not the authoritative s
   `SendMessage`, verbatim. If nothing is running and the tick's wait is unmet, resume the tick
   with `SendMessage`. Main is denied `Monitor`. There is no `job_complete` or
   `self_heal_event` signal; nothing emits them.
+- A completion notice can be lost. Each time the tick yields, call
+  `evor_wait({ heartbeat: true, wait_s: 540 })` and end your turn. It reports back with
+  `stalled: true` when nothing in the run has changed for ten minutes: then, if no agent of the
+  tick is running, resume the tick with `SendMessage` and tell it to check its children. With
+  `stalled: false`, the run is active: arm one more heartbeat and end your turn again.
 - Do not run more Forge agents AT ONCE than `resource_plan.concurrency`; queue the rest.
 - Respect budget.max_wall_clock_hours and budget.max_gpu_hours if set.
 - Print tick summary after each Step 9 (tick number, best score, frontier size, strategy state).
