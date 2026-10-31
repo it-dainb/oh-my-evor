@@ -463,6 +463,8 @@ try {
     process.exit(0);
   }
 
+  // Forge's reports live under forge/<candidate>/; their presence was checked above.
+  if (agentRole === 'forge') process.exit(0);
   const size = statSync(artifactPath).size;
   if (size < MIN_ARTIFACT_BYTES) {
     process.stdout.write(

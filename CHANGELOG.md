@@ -2,6 +2,17 @@
 
 All notable changes to Evor. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.2.33] — 2026-10-31 — the tick reads what it is pointed at
+
+### Fixed
+
+- **The tick reached for Glob every tick.** Its instructions offered Glob and Grep, which this
+  CLI disables, so each tick spent a call learning that. They now name Read only, and say where
+  paths come from: the evor_* tools and the children's reports.
+- **The SubagentStop size check stat'ed Forge's legacy path.** Forge's reports live under
+  `forge/<candidate>/`; the size check now skips Forge, whose report presence is checked
+  separately, instead of logging a missing file.
+
 ## [1.2.32] — 2026-10-31 — the evaluator's numbers are the record
 
 ### Fixed
