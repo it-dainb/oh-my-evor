@@ -62,7 +62,9 @@ export function shellVars(command) {
 export function expandVars(token, vars) {
   let out = token;
   for (let i = 0; i < 3; i++) {
-    const next = out.replace(/\$\{([A-Za-z_][A-Za-z0-9_]*)\}|\$([A-Za-z_][A-Za-z0-9_]*)/g, (whole, a, b) => {
+    // `${NAME:?}`, `${NAME:-x}`, `${NAME=x}` … name the same path as `$NAME` when it is set:
+    // the guarded form an rm is rewritten to must resolve exactly like the bare one.
+    const next = out.replace(/\$\{([A-Za-z_][A-Za-z0-9_]*)(?::?[-=?+][^}]*)?\}|\$([A-Za-z_][A-Za-z0-9_]*)/g, (whole, a, b) => {
       const name = a ?? b;
       return vars.has(name) ? vars.get(name) : whole;
     });

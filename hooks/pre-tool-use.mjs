@@ -28,7 +28,7 @@
  *   { hookSpecificOutput: { hookEventName:"PreToolUse", permissionDecision:"deny", permissionDecisionReason: "…" } }
  */
 
-import { readFileSync } from 'fs';
+import { readFileSync, writeSync } from 'fs';
 import { resolveActiveRun, resolveRunDir } from './lib/active-run.mjs';
 import { isMissionLive, isTickFinished } from './lib/run-status.mjs';
 import { currentTickAgent } from './lib/waiting.mjs';
@@ -128,6 +128,23 @@ function mainTickRoute(capital = true) {
   catch (err) { logError('tick-route', err); r = 'spawn Task(subagent_type="oh-my-evor:evor-tick")'; }
   return capital ? r.charAt(0).toUpperCase() + r.slice(1) : r;
 }
+
+/** The input with every rm path variable guarded, emitted on exit unless something decided. */
+let pendingRmRewrite = null;
+let decided = false;
+const _write = process.stdout.write.bind(process.stdout);
+process.stdout.write = (chunk, ...rest) => { decided = true; return _write(chunk, ...rest); };
+process.on('exit', () => {
+  if (!pendingRmRewrite || decided) return;
+  try {
+    writeSync(1, JSON.stringify({
+      hookSpecificOutput: { hookEventName: 'PreToolUse', updatedInput: pendingRmRewrite },
+    }) + '\n');
+  } catch (err) {
+    // The guarded form is advisory: a failed write leaves the original command, recorded.
+    logError('rm-rewrite', err);
+  }
+});
 
 function deny(reason, meta = {}) {
   logDecision({ verdict: 'deny', reason, ...meta });
@@ -284,7 +301,26 @@ try {
   // mission then waits indefinitely. Refuse it here, before that prompt, with
   // the rewrite the client accepts.
   if (tool === 'Bash') {
+    // The guarded form is mechanical, so write it rather than refuse: every later
+    // rule judges the rewritten command, and it reaches the client as updatedInput
+    // only if nothing refuses it. Inside single quotes `$` is literal, so a rewrite
+    // there would change the command; those are still refused with the rewrite named.
+    let rewritten = cmd;
+    let unrewritable = null;
     for (const seg of cmd.split(/;|&&|\|\||\n/)) {
+      const rm = seg.match(/(?:^\s*|[|(`{]\s*|\b(?:do|then|else|sudo|xargs|nohup|command)\s+(?:-\S+\s+)*|-exec\s+)rm\s+(.*)$/);
+      if (!rm) continue;
+      const bare = rm[1].match(/\$(?!\{\w+:\?)\{?(\w+)/);
+      if (!bare) continue;
+      if (rm[1].includes("'")) { unrewritable = unrewritable ?? bare; continue; }
+      const args = rm[1].replace(/\$\{(\w+)\}|\$(\w+)/g, (_m, a, b) => `\${${a ?? b}:?}`);
+      rewritten = rewritten.replace(rm[1], args);
+    }
+    if (rewritten !== cmd && !unrewritable) {
+      input.tool_input = { ...ti, command: rewritten };
+      pendingRmRewrite = input.tool_input;
+    }
+    for (const seg of unrewritable ? cmd.split(/;|&&|\|\||\n/) : []) {
       const rm = seg.match(/(?:^\s*|[|(`{]\s*|\b(?:do|then|else|sudo|xargs|nohup|command)\s+(?:-\S+\s+)*|-exec\s+)rm\s+(.*)$/);
       if (!rm) continue;
       const bare = rm[1].match(/\$(?!\{\w+:\?)\{?(\w+)/);
