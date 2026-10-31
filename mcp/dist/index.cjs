@@ -21012,6 +21012,29 @@ var StdioServerTransport = class {
 
 // src/tools/record.ts
 var import_fs5 = require("fs");
+
+// src/tool-result.ts
+function wrap(payload, isError = false) {
+  const result = { content: [{ type: "text", text: JSON.stringify(payload) }] };
+  if (isError) result.isError = true;
+  return result;
+}
+function ok(data) {
+  if (data === void 0 || data === null) return wrap({ ok: true });
+  if (typeof data === "object" && !Array.isArray(data)) {
+    const payload = data;
+    if (payload.ok === false) {
+      return wrap(payload, true);
+    }
+    return wrap({ ok: true, ...payload });
+  }
+  return wrap({ ok: true, data });
+}
+function err(message) {
+  return wrap({ ok: false, error: message }, true);
+}
+
+// src/tools/record.ts
 var import_path6 = require("path");
 var import_crypto = require("crypto");
 
@@ -22496,17 +22519,29 @@ function registerRecordTools(server) {
   );
   server.tool(
     "evor_record_eval",
-    "Record a node's EvaluationResult and auto-trigger the integrity check. Identify the node by the `name` you gave evor_record_node. Always call evor_record_node first. Returns {ok, name, status, integrity_verdict, integrity_report}.",
+    "Record a node's EvaluationResult and auto-trigger the integrity check. Identify the node by the `name` you gave evor_record_node. Always call evor_record_node first. After an evor_run_start job, omit `result`: the evaluation job's own output is recorded. Returns {ok, name, status, integrity_verdict, integrity_report}.",
     {
       run_id: external_exports.string().describe("Active run identifier"),
       node_id: external_exports.string().describe(
         "The node's name (e.g. 'immune-memory-02'), as returned by evor_record_node"
       ),
-      result: EvaluationResultSchema.describe("The evaluation result to record")
+      result: EvaluationResultSchema.optional().describe(
+        "The evaluation result to record. Omit it after an evor_run_start job: the job's own output is read"
+      )
     },
-    async ({ run_id, node_id, result }) => {
+    async ({ run_id, node_id, result: given }) => {
       const missionId = process.env.EVOR_MISSION_ID;
       const resolvedId = resolveNodeRef(run_id, node_id, missionId);
+      let result = given;
+      if (!result) {
+        const evPath = (0, import_path6.join)(resolveRunPaths(run_id, missionId).nodesDir, resolvedId, "results.evaluator.json");
+        if (!(0, import_fs5.existsSync)(evPath)) {
+          return err(`no evaluation output for '${node_id}' yet: run evor_run_start and wait for its job, or pass result`);
+        }
+        const parsed = EvaluationResultSchema.safeParse(JSON.parse((0, import_fs5.readFileSync)(evPath, "utf8")));
+        if (!parsed.success) return err(`the evaluation output for '${node_id}' is not a valid result: ${parsed.error.issues.slice(0, 3).map((i) => `${i.path.join(".") || "(root)"}: ${i.message}`).join("; ")}`);
+        result = parsed.data;
+      }
       const filledResult = { ...result };
       if (!filledResult.node_id) filledResult.node_id = resolvedId;
       if (!filledResult.run_id) filledResult.run_id = run_id;
@@ -22822,29 +22857,6 @@ function registerScheduleTools(server) {
 // src/tools/wiki.ts
 var import_fs6 = require("fs");
 var import_path7 = require("path");
-
-// src/tool-result.ts
-function wrap(payload, isError = false) {
-  const result = { content: [{ type: "text", text: JSON.stringify(payload) }] };
-  if (isError) result.isError = true;
-  return result;
-}
-function ok(data) {
-  if (data === void 0 || data === null) return wrap({ ok: true });
-  if (typeof data === "object" && !Array.isArray(data)) {
-    const payload = data;
-    if (payload.ok === false) {
-      return wrap(payload, true);
-    }
-    return wrap({ ok: true, ...payload });
-  }
-  return wrap({ ok: true, data });
-}
-function err(message) {
-  return wrap({ ok: false, error: message }, true);
-}
-
-// src/tools/wiki.ts
 function renderLesson(entry) {
   const lines = [
     `# Lesson: ${entry.lesson_id}`,

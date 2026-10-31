@@ -5,6 +5,7 @@
  */
 
 import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from "fs";
+import { err } from "../tool-result.js";
 import { dirname, join } from "path";
 import { randomUUID } from "crypto";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -598,17 +599,30 @@ export function registerRecordTools(server: McpServer): void {
     "evor_record_eval",
     "Record a node's EvaluationResult and auto-trigger the integrity check. Identify the "
     + "node by the `name` you gave evor_record_node. Always call evor_record_node first. "
+    + "After an evor_run_start job, omit `result`: the evaluation job's own output is recorded. "
     + "Returns {ok, name, status, integrity_verdict, integrity_report}.",
     {
       run_id: z.string().describe("Active run identifier"),
       node_id: z.string().describe(
         "The node's name (e.g. 'immune-memory-02'), as returned by evor_record_node",
       ),
-      result: EvaluationResultSchema.describe("The evaluation result to record"),
+      result: EvaluationResultSchema.optional().describe(
+        "The evaluation result to record. Omit it after an evor_run_start job: the job's own output is read",
+      ),
     },
-    async ({ run_id, node_id, result }) => {
+    async ({ run_id, node_id, result: given }) => {
       const missionId = process.env.EVOR_MISSION_ID;
       const resolvedId = resolveNodeRef(run_id, node_id, missionId);
+      let result = given;
+      if (!result) {
+        const evPath = join(resolveRunPaths(run_id, missionId).nodesDir, resolvedId, "results.evaluator.json");
+        if (!existsSync(evPath)) {
+          return err(`no evaluation output for '${node_id}' yet: run evor_run_start and wait for its job, or pass result`);
+        }
+        const parsed = EvaluationResultSchema.safeParse(JSON.parse(readFileSync(evPath, "utf8")));
+        if (!parsed.success) return err(`the evaluation output for '${node_id}' is not a valid result: ${parsed.error.issues.slice(0, 3).map((i) => `${i.path.join(".") || "(root)"}: ${i.message}`).join("; ")}`);
+        result = parsed.data;
+      }
       // Server-owned bookkeeping: fill node_id, run_id, eval_version, timestamp
       // so the agent never fabricates or carries these values.
       const filledResult = { ...result } as Record<string, unknown>;
