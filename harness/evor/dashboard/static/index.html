@@ -3,746 +3,904 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Evor Dashboard</title>
-<script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+<title>Evor Mission Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"></script>
+<!--EVOR_SNAPSHOT-->
 <style>
-  :root {
-    --bg: #0f1117; --surface: #1a1d27; --border: #2d3148;
-    --text: #e2e8f0; --muted: #8892a4; --accent: #6366f1;
-    --green: #22c55e; --red: #ef4444; --yellow: #f59e0b; --blue: #3b82f6;
-    --orange: #f97316; --purple: #a855f7; --cyan: #06b6d4;
-    --family-arch: #6366f1; --family-training: #22c55e;
-    --family-data-curation: #f59e0b; --family-data-augmentation: #f97316;
-    --family-data-acquisition: #06b6d4; --family-algo: #a855f7; --family-other: #8892a4;
-  }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { background: var(--bg); color: var(--text); font-family: 'Inter', system-ui, sans-serif; font-size: 14px; }
-  header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 12px 20px; display: flex; align-items: center; gap: 16px; }
-  header h1 { font-size: 18px; font-weight: 700; color: var(--accent); }
-  header .run-select { background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 6px 10px; border-radius: 6px; font-size: 13px; flex: 1; max-width: 400px; }
-  header .status-badge { font-size: 12px; padding: 3px 8px; border-radius: 4px; background: var(--surface); border: 1px solid var(--border); }
-  header .status-badge.running { border-color: var(--green); color: var(--green); }
-  .tabs { display: flex; gap: 2px; background: var(--surface); border-bottom: 1px solid var(--border); padding: 0 20px; }
-  .tab { padding: 10px 16px; cursor: pointer; border-bottom: 2px solid transparent; font-size: 13px; color: var(--muted); transition: all 0.15s; }
-  .tab.active { color: var(--text); border-bottom-color: var(--accent); }
-  .tab:hover { color: var(--text); }
-  .panel { display: none; padding: 20px; height: calc(100vh - 100px); overflow: auto; }
-  .panel.active { display: flex; flex-direction: column; gap: 16px; }
-  /* Tree panel */
-  #tree-svg { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; width: 100%; flex: 1; min-height: 500px; }
-  .node circle { stroke-width: 2; cursor: pointer; }
-  .node text { font-size: 11px; fill: var(--text); pointer-events: none; }
-  .node.frontier circle { stroke: var(--green); stroke-width: 3; }
-  .node.pruned circle { opacity: 0.4; }
-  .node.running circle { stroke: var(--yellow); stroke-dasharray: 4 2; }
-  .link { fill: none; stroke: var(--border); stroke-width: 1.5; }
-  .eval-badge { font-size: 9px; fill: var(--muted); }
-  /* Sidebar */
-  .split { display: flex; gap: 16px; flex: 1; }
-  .sidebar { width: 320px; flex-shrink: 0; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px; overflow-y: auto; }
-  .sidebar h3 { font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 12px; }
-  .kv-table { width: 100%; border-collapse: collapse; font-size: 12px; }
-  .kv-table td { padding: 4px 0; vertical-align: top; }
-  .kv-table td:first-child { color: var(--muted); width: 120px; }
-  .family-badge { display: inline-block; padding: 2px 6px; border-radius: 3px; font-size: 11px; font-weight: 600; }
-  .tier-badge { display: inline-block; padding: 2px 6px; border-radius: 3px; font-size: 11px; background: var(--border); }
-  .version-badge { display: inline-block; padding: 2px 6px; border-radius: 3px; font-size: 10px; background: var(--blue); color: #fff; }
-  .domain-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 8px; }
-  .domain-table th { text-align: left; color: var(--muted); font-weight: 600; padding: 4px 6px; border-bottom: 1px solid var(--border); }
-  .domain-table td { padding: 4px 6px; border-bottom: 1px solid var(--border); }
-  /* Frontier */
-  .data-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  .data-table th { text-align: left; padding: 10px 12px; background: var(--surface); color: var(--muted); font-weight: 600; font-size: 12px; border-bottom: 1px solid var(--border); position: sticky; top: 0; }
-  .data-table td { padding: 10px 12px; border-bottom: 1px solid var(--border); }
-  .data-table tr:hover td { background: var(--surface); cursor: pointer; }
-  .rank { font-weight: 700; color: var(--accent); }
-  .delta-pos { color: var(--green); }
-  .delta-neg { color: var(--red); }
-  .integrity-pass { color: var(--green); }
-  .integrity-fail { color: var(--red); }
-  /* Telemetry */
-  .chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-  .chart-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px; }
-  .chart-card h4 { font-size: 12px; color: var(--muted); margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.05em; }
-  .chart-card canvas { max-height: 200px; }
-  .node-picker { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; flex-wrap: wrap; }
-  .node-chip { padding: 4px 10px; border-radius: 20px; font-size: 12px; cursor: pointer; background: var(--surface); border: 1px solid var(--border); color: var(--muted); }
-  .node-chip.active { background: var(--accent); border-color: var(--accent); color: #fff; }
-  /* Domain leaderboard */
-  .filter-bar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-  .filter-bar label { font-size: 12px; color: var(--muted); }
-  .filter-bar input, .filter-bar select { background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 6px 10px; border-radius: 6px; font-size: 13px; }
-  .filter-bar button { background: var(--accent); border: none; color: #fff; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; }
-  .perf-bar { display: inline-block; height: 8px; background: var(--green); border-radius: 2px; vertical-align: middle; }
-  .sota-line { display: inline-block; width: 2px; height: 8px; background: var(--red); border-radius: 1px; vertical-align: middle; margin-left: 2px; }
-  .cross-version-warn { background: #2d1a00; border: 1px solid var(--yellow); color: var(--yellow); padding: 8px 12px; border-radius: 6px; font-size: 12px; }
-  /* Coverage */
-  .coverage-layout { display: grid; grid-template-columns: 280px 1fr; gap: 20px; }
-  .gauge-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 20px; text-align: center; }
-  .gauge-ring { position: relative; width: 160px; height: 160px; margin: 0 auto 16px; }
-  .gauge-ring svg { width: 160px; height: 160px; transform: rotate(-90deg); }
-  .gauge-bg { fill: none; stroke: var(--border); stroke-width: 16; }
-  .gauge-fill { fill: none; stroke: var(--green); stroke-width: 16; stroke-linecap: round; transition: stroke-dashoffset 0.8s ease; }
-  .gauge-center { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; }
-  .gauge-pct { font-size: 28px; font-weight: 700; }
-  .gauge-label { font-size: 11px; color: var(--muted); }
-  .angle-bars { display: flex; flex-direction: column; gap: 8px; }
-  .angle-row { display: flex; align-items: center; gap: 10px; font-size: 12px; }
-  .angle-name { width: 120px; color: var(--muted); }
-  .angle-bar-wrap { flex: 1; background: var(--bg); border-radius: 4px; height: 20px; position: relative; overflow: hidden; }
-  .angle-bar-fill { height: 100%; border-radius: 4px; transition: width 0.5s ease; }
-  .angle-bar-sota { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--red); opacity: 0.8; }
-  .angle-val { width: 60px; text-align: right; font-weight: 600; }
-  .angle-above { color: var(--green); }
-  .angle-below { color: var(--red); }
-  .risk-badge { font-size: 10px; padding: 1px 5px; border-radius: 3px; }
-  .risk-low { background: #14532d; color: var(--green); }
-  .risk-medium { background: #713f12; color: var(--yellow); }
-  .risk-high { background: #7f1d1d; color: var(--red); }
-  .risk-unknown { background: var(--border); color: var(--muted); }
-  .not-available { color: var(--muted); font-style: italic; padding: 40px; text-align: center; }
-  /* Timeline */
-  .timeline { display: flex; flex-direction: column; gap: 24px; padding: 8px 0; }
-  .timeline-item { display: flex; gap: 16px; align-items: flex-start; }
-  .timeline-dot { width: 36px; height: 36px; border-radius: 50%; background: var(--accent); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 12px; flex-shrink: 0; margin-top: 4px; }
-  .timeline-content { flex: 1; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; }
-  .timeline-header { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
-  .timeline-version { font-weight: 700; }
-  .timeline-date { font-size: 12px; color: var(--muted); }
-  .consent-badge { font-size: 11px; padding: 2px 6px; border-radius: 3px; background: var(--border); }
-  .domain-pills { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
-  .domain-pill { font-size: 11px; padding: 2px 8px; border-radius: 12px; background: var(--bg); border: 1px solid var(--border); }
-  .rescore-badge { font-size: 11px; padding: 2px 6px; border-radius: 3px; }
-  .rescore-complete { background: #14532d; color: var(--green); }
-  .rescore-pending { background: #1e3a5f; color: var(--blue); }
-  .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite; }
-  @keyframes spin { to { transform: rotate(360deg); } }
-  .empty { color: var(--muted); text-align: center; padding: 40px; }
+:root {
+  --bg: #0B0D10; --panel: #12151A; --panel-2: #181C22; --line: #232830; --line-2: #2E3440;
+  --ink: #E7EAEE; --ink-2: #A5ADB8; --ink-3: #6B7380;
+  --best: #4DE1FF; --best-ink: #031A20; --robust: #A99BFF; --base: #E7EAEE;
+  --ok: #34D399; --bad: #F87171; --art: #FBBF24; --pend: #8B95A3; --inc: #9CA3AF;
+  --warn-bg: #2A2110; --bad-bg: #2A1414; --ok-bg: #0F2A20; --info-bg: #141E2A;
+  --focus: #4DE1FF;
+  --shadow: 0 10px 30px rgba(0,0,0,.35);
+  --sans: "IBM Plex Sans", ui-sans-serif, "Segoe UI", "Helvetica Neue", sans-serif;
+  --cond: "IBM Plex Sans Condensed", "IBM Plex Sans", ui-sans-serif, "Arial Narrow", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) {
+  --bg: #F3F4F6; --panel: #FFFFFF; --panel-2: #F7F8FA; --line: #E2E5EA; --line-2: #CDD2DA;
+  --ink: #0F1720; --ink-2: #4A5563; --ink-3: #848D9B;
+  --best: #0089B0; --best-ink: #FFFFFF; --robust: #6B5BD6; --base: #0F1720;
+  --ok: #0F9F6E; --bad: #D9433B; --art: #C88A04; --pend: #7B8594; --inc: #8A94A3;
+  --warn-bg: #FFF6E0; --bad-bg: #FDECEA; --ok-bg: #E6F6EF; --info-bg: #EAF2FB; --focus: #0089B0;
+  --shadow: 0 10px 30px rgba(15,23,32,.12); color-scheme: light;
+} }
+:root[data-theme="light"] {
+  --bg: #F3F4F6; --panel: #FFFFFF; --panel-2: #F7F8FA; --line: #E2E5EA; --line-2: #CDD2DA;
+  --ink: #0F1720; --ink-2: #4A5563; --ink-3: #848D9B;
+  --best: #0089B0; --best-ink: #FFFFFF; --robust: #6B5BD6; --base: #0F1720;
+  --ok: #0F9F6E; --bad: #D9433B; --art: #C88A04; --pend: #7B8594; --inc: #8A94A3;
+  --warn-bg: #FFF6E0; --bad-bg: #FDECEA; --ok-bg: #E6F6EF; --info-bg: #EAF2FB; --focus: #0089B0;
+  --shadow: 0 10px 30px rgba(15,23,32,.12); color-scheme: light;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--ink); font: 14px/1.5 var(--sans); -webkit-font-smoothing: antialiased; }
+button, select, input, textarea { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.mono { font-family: var(--mono); font-feature-settings: "zero" 1; }
+.muted { color: var(--ink-2); } .faint { color: var(--ink-3); }
+a { color: var(--best); }
+
+/* ── top bar ─────────────────────────────────────────────── */
+.top { position: sticky; top: 0; z-index: 30; display: flex; align-items: center; gap: 14px; padding: 10px 20px;
+  background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(8px); border-bottom: 1px solid var(--line); }
+.mark { font: 600 15px/1 var(--mono); letter-spacing: .02em; display: flex; align-items: center; gap: 8px; }
+.mark i { width: 10px; height: 10px; background: var(--best); display: inline-block; transform: rotate(45deg); }
+.ids { min-width: 0; flex: 1; display: flex; flex-direction: column; }
+.ids b { font: 600 14px/1.2 var(--cond); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ids span { font: 11px/1.3 var(--mono); color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 9px; border: 1px solid var(--line-2); border-radius: 999px; font: 12px/1.4 var(--mono); color: var(--ink-2); white-space: nowrap; }
+.live-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 0 0 var(--ok); animation: pulse 2s infinite; }
+@keyframes pulse { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--ok) 60%, transparent); } 70% { box-shadow: 0 0 0 7px transparent; } 100% { box-shadow: 0 0 0 0 transparent; } }
+.iconbtn { background: transparent; border: 1px solid var(--line-2); border-radius: 8px; padding: 4px 9px; cursor: pointer; color: var(--ink-2); }
+.iconbtn:hover { color: var(--ink); border-color: var(--ink-3); }
+select.run-pick { background: var(--panel); border: 1px solid var(--line-2); border-radius: 8px; padding: 4px 8px; max-width: 280px; }
+
+/* ── layout ──────────────────────────────────────────────── */
+.layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0; }
+main { padding: 18px 20px 60px; display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+@media (min-width: 1380px) { body.has-detail .layout { grid-template-columns: minmax(0, 1fr) 620px; } body.has-detail .drawer { position: sticky; top: 53px; height: calc(100vh - 53px); transform: none; box-shadow: none; } }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; min-width: 0; }
+.card-h { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 12px 16px; border-bottom: 1px solid var(--line); }
+.card-h h2 { margin: 0; font: 600 13px/1.2 var(--cond); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-2); }
+.card-h .sp { flex: 1; }
+.card-b { padding: 14px 16px; }
+.eyebrow { font: 600 11px/1.2 var(--cond); letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); }
+
+/* ── verdict strip ───────────────────────────────────────── */
+.verdict { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 2fr); gap: 0; overflow: hidden; }
+.v-main { padding: 18px 20px; border-left: 6px solid var(--pend); display: flex; flex-direction: column; gap: 8px; }
+.v-main[data-s="on-track"] { border-color: var(--ok); } .v-main[data-s="watch"] { border-color: var(--art); } .v-main[data-s="off-track"] { border-color: var(--bad); }
+.v-word { font: 700 26px/1.1 var(--cond); letter-spacing: -.005em; }
+.v-main[data-s="on-track"] .v-word { color: var(--ok); } .v-main[data-s="watch"] .v-word { color: var(--art); } .v-main[data-s="off-track"] .v-word { color: var(--bad); }
+.v-why { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 4px; color: var(--ink-2); }
+.v-why li::before { content: "—"; color: var(--ink-3); margin-right: 8px; }
+.kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-left: 1px solid var(--line); }
+.kpi { padding: 16px 18px; border-right: 1px solid var(--line); display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.kpi:last-child { border-right: 0; }
+.kpi .val { font: 600 28px/1.05 var(--mono); letter-spacing: -.02em; }
+.kpi .sub { font-size: 12px; color: var(--ink-2); }
+.kpi .sub b { color: var(--ink); font-weight: 600; }
+.kpi button.link { all: unset; cursor: pointer; color: var(--ink); border-bottom: 1px dotted var(--ink-3); }
+.kpi button.link:hover { color: var(--best); }
+@media (max-width: 1000px) { .verdict { grid-template-columns: 1fr; } .kpis { border-left: 0; border-top: 1px solid var(--line); } }
+@media (max-width: 620px) { .kpis { grid-template-columns: 1fr; } .kpi { border-right: 0; border-bottom: 1px solid var(--line); } }
+
+/* ── figure ──────────────────────────────────────────────── */
+.legend { display: flex; flex-wrap: wrap; gap: 12px; font-size: 12px; color: var(--ink-2); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.sw { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+.sw.best { background: var(--best); } .sw.other { background: var(--ink-3); opacity: .55; width: 7px; height: 7px; }
+.sw.hollow { border: 2px solid var(--art); background: transparent; } .sw.x { border-radius: 0; background: none; position: relative; }
+.sw.x::before, .sw.x::after { content: ""; position: absolute; left: 4px; top: -1px; width: 2px; height: 12px; background: var(--bad); transform: rotate(45deg); }
+.sw.x::after { transform: rotate(-45deg); }
+.ln { width: 18px; height: 0; border-top: 2px solid var(--best); display: inline-block; }
+.ln.dash { border-top: 1.5px dashed var(--base); opacity: .6; } .ln.rob { border-top: 2px dotted var(--robust); } .ln.med { width: 10px; border-top: 2px solid var(--ink-2); }
+.ctrl { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--ink-2); }
+.ctrl select { background: var(--panel-2); border: 1px solid var(--line-2); border-radius: 6px; padding: 3px 6px; color: var(--ink); max-width: 240px; }
+.seg { display: inline-flex; border: 1px solid var(--line-2); border-radius: 7px; overflow: hidden; }
+.seg button { background: transparent; border: 0; padding: 3px 9px; font: 12px var(--mono); color: var(--ink-2); cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--panel-2); color: var(--ink); box-shadow: inset 0 -2px 0 var(--best); }
+#fig { width: 100%; height: 420px; display: block; }
+.fig-wrap { position: relative; }
+.axis text { fill: var(--ink-3); font: 11px var(--mono); } .axis path, .axis line { stroke: var(--line-2); }
+.grid line { stroke: var(--line); stroke-dasharray: 2 4; } .grid path { display: none; }
+.pt { cursor: pointer; transition: r .12s; }
+.pt.other { fill: var(--ink-3); fill-opacity: .45; }
+.pt.best { fill: var(--best); stroke: var(--bg); stroke-width: 2; }
+.pt.artefact { fill: none !important; stroke: var(--art) !important; stroke-width: 1.8; fill-opacity: 1; }
+.pt.dim { opacity: .25; }
+.pt.sel { stroke: var(--ink) !important; stroke-width: 2.5 !important; }
+.pt.parent-hl { stroke: var(--robust) !important; stroke-width: 3 !important; }
+.pt.sib-hl { fill-opacity: .95; fill: var(--ink-2); }
+.xmark line { stroke: var(--bad); stroke-width: 1.8; }
+.stair { fill: none; stroke: var(--best); stroke-width: 2.2; }
+.robust { fill: none; stroke: var(--robust); stroke-width: 1.8; stroke-dasharray: 2 4; stroke-linecap: round; }
+.base-line { stroke: var(--base); stroke-opacity: .55; stroke-dasharray: 6 5; }
+.base-lbl { fill: var(--ink-2); font: 11px var(--mono); }
+.med-mark { stroke: var(--ink-2); stroke-width: 2; }
+.lineage { fill: none; stroke: var(--robust); stroke-width: 1.6; }
+.lineage-lbl { fill: var(--robust); font: 11px var(--mono); }
+.tip { position: absolute; pointer-events: none; z-index: 5; max-width: 320px; background: var(--panel-2); border: 1px solid var(--line-2); border-radius: 10px; padding: 10px 12px; box-shadow: var(--shadow); font-size: 12px; opacity: 0; transition: opacity .1s; }
+.tip b { font: 600 13px var(--cond); } .tip .row { display: flex; justify-content: space-between; gap: 12px; } .tip .idea { color: var(--ink-2); margin-top: 6px; }
+.fallback { padding: 20px; color: var(--ink-2); }
+
+/* ── badges / verdicts ───────────────────────────────────── */
+.vb { display: inline-flex; align-items: center; gap: 5px; padding: 1px 8px; border-radius: 999px; font: 600 11px/1.6 var(--cond); letter-spacing: .06em; text-transform: uppercase; border: 1px solid currentColor; white-space: nowrap; }
+.vb.confirmed { color: var(--ok); } .vb.refuted { color: var(--bad); } .vb.artefact { color: var(--art); } .vb.pending { color: var(--pend); } .vb.inconclusive { color: var(--inc); border-style: dashed; }
+.bd { display: inline-flex; align-items: center; gap: 4px; padding: 0 6px; border-radius: 5px; font: 11px/1.7 var(--mono); background: var(--panel-2); border: 1px solid var(--line-2); color: var(--ink-2); white-space: nowrap; }
+.bd.lucky-seed { color: var(--art); } .bd.integrity-failed { color: var(--bad); } .bd.pruned { text-decoration: line-through; } .bd.artefact-suspect { color: var(--art); } .bd.seed-spread { color: var(--robust); }
+.tk { all: unset; cursor: pointer; font: 600 11px/1.6 var(--mono); padding: 0 6px; border-radius: 5px; background: var(--panel-2); border: 1px solid var(--line-2); color: var(--ink-2); }
+.tk:hover { color: var(--best); border-color: var(--best); }
+.nl { all: unset; cursor: pointer; font-family: var(--mono); font-size: 12px; color: var(--ink); border-bottom: 1px dotted var(--ink-3); }
+.nl:hover { color: var(--best); }
+
+/* ── tree ────────────────────────────────────────────────── */
+#tree { width: 100%; height: 520px; display: block; cursor: grab; }
+.tlink { fill: none; stroke: var(--line-2); stroke-width: 1.4; }
+.tlink.hl { stroke: var(--best); stroke-width: 2.2; }
+.tnode { cursor: pointer; }
+.tnode .disc { stroke: var(--bg); stroke-width: 2; }
+.tnode.sel .ring { stroke: var(--best); stroke-width: 2.5; fill: none; }
+.tnode text { fill: var(--ink); font: 600 12.5px var(--cond); }
+.tnode text.meta { fill: var(--ink-2); font: 11px var(--mono); font-weight: 400; }
+.tnode text.glyphs { fill: var(--art); font: 11px var(--mono); }
+.tnode.dimmed { opacity: .35; }
+.tlist { margin: 0; padding-left: 18px; } .tlist li { margin: 3px 0; }
+
+/* ── drawer (details) ────────────────────────────────────── */
+.drawer { position: fixed; top: 0; right: 0; bottom: 0; width: min(620px, 100vw); z-index: 40; background: var(--panel); border-left: 1px solid var(--line); box-shadow: var(--shadow);
+  transform: translateX(105%); transition: transform .22s cubic-bezier(.2,.8,.2,1); display: flex; flex-direction: column; }
+body.has-detail .drawer { transform: none; }
+.d-h { padding: 14px 18px 12px; border-bottom: 1px solid var(--line); display: flex; gap: 12px; align-items: flex-start; }
+.d-h h3 { margin: 0; font: 700 20px/1.15 var(--cond); word-break: break-word; }
+.d-h .meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.d-b { overflow-y: auto; padding: 4px 18px 40px; flex: 1; }
+.sec { padding: 14px 0; border-bottom: 1px solid var(--line); }
+.sec:last-child { border-bottom: 0; }
+.sec > h4 { margin: 0 0 8px; font: 600 11px/1.2 var(--cond); letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); }
+.prose { margin: 0 0 6px; color: var(--ink); } .prose.dim { color: var(--ink-2); }
+.kv { display: grid; grid-template-columns: 130px minmax(0, 1fr); gap: 4px 12px; font-size: 13px; }
+.kv dt { color: var(--ink-3); } .kv dd { margin: 0; word-break: break-word; }
+.stat-row { display: flex; gap: 18px; flex-wrap: wrap; }
+.stat { display: flex; flex-direction: column; } .stat .v { font: 600 20px/1.1 var(--mono); } .stat .l { font-size: 11px; color: var(--ink-3); }
+.delta-up { color: var(--ok); } .delta-dn { color: var(--bad); }
+table.dt { width: 100%; border-collapse: collapse; font-size: 12px; }
+table.dt th { text-align: right; font: 600 11px var(--cond); letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); padding: 6px 6px; border-bottom: 1px solid var(--line-2); position: sticky; top: 0; background: var(--panel); }
+table.dt th:first-child, table.dt td:first-child { text-align: left; }
+table.dt td { padding: 5px 6px; border-bottom: 1px solid var(--line); text-align: right; font-family: var(--mono); white-space: nowrap; }
+table.dt td:first-child { font-family: var(--sans); white-space: normal; }
+table.dt tr.floor td { background: color-mix(in srgb, var(--bad) 9%, transparent); }
+table.dt tr.gamed td { background: color-mix(in srgb, var(--art) 12%, transparent); }
+.cell-d { display: block; font-size: 10.5px; }
+.sbar { display: inline-block; height: 4px; background: var(--best); border-radius: 2px; vertical-align: middle; margin-right: 6px; opacity: .8; }
+.tag { font: 10px var(--mono); padding: 0 5px; border-radius: 4px; background: var(--panel-2); color: var(--ink-2); border: 1px solid var(--line-2); margin-left: 6px; }
+.charts { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.mini { background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
+.mini h5 { margin: 0 0 4px; font: 11px var(--mono); color: var(--ink-2); font-weight: 500; }
+.mini svg { width: 100%; height: 110px; display: block; }
+.mini path.l { fill: none; stroke: var(--best); stroke-width: 1.6; } .mini path.p { fill: none; stroke: var(--ink-3); stroke-width: 1.2; stroke-dasharray: 3 3; }
+.mini circle { fill: var(--best); }
+pre.code { background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; font: 11.5px/1.5 var(--mono); overflow: auto; max-height: 360px; white-space: pre-wrap; }
+details > summary { cursor: pointer; color: var(--ink-2); font-size: 12px; }
+.samples { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
+.samples figure { margin: 0; } .samples img { width: 100%; border-radius: 6px; border: 1px solid var(--line); background: #fff; }
+.samples figcaption { font: 10.5px var(--mono); color: var(--ink-3); word-break: break-all; }
+.gates { display: flex; flex-wrap: wrap; gap: 4px; }
+.gate { font: 10.5px var(--mono); padding: 0 6px; border-radius: 4px; border: 1px solid var(--line-2); }
+.gate.pass { color: var(--ok); } .gate.fail { color: var(--bad); border-color: var(--bad); }
+
+/* ── learnings + side ────────────────────────────────────── */
+.lower { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 18px; align-items: start; }
+@media (max-width: 1100px) { .lower { grid-template-columns: 1fr; } }
+.side { display: flex; flex-direction: column; gap: 18px; }
+.learn-sum { font: 500 15px/1.5 var(--sans); color: var(--ink); margin: 0 0 4px; }
+.lgrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+@media (max-width: 760px) { .lgrid { grid-template-columns: 1fr; } }
+.lcol { border: 1px solid var(--line); border-radius: 10px; background: var(--panel-2); min-width: 0; }
+.lcol > h3 { margin: 0; padding: 10px 12px; font: 600 13px var(--cond); letter-spacing: .04em; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--line); }
+.lcol > h3 .n { font: 12px var(--mono); color: var(--ink-3); margin-left: auto; }
+.lcol > h3::before { content: ""; width: 8px; height: 8px; border-radius: 2px; background: var(--c, var(--pend)); }
+.lcol ul { list-style: none; margin: 0; padding: 4px 0; max-height: 420px; overflow: auto; }
+.lcol li { padding: 8px 12px; border-bottom: 1px solid var(--line); }
+.lcol li:last-child { border-bottom: 0; }
+.li-h { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 2px; }
+.li-h b { font: 600 13px var(--cond); }
+.clamp { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; color: var(--ink-2); font-size: 12.5px; cursor: pointer; }
+.clamp.open { -webkit-line-clamp: unset; display: block; }
+.empty { padding: 10px 12px; color: var(--ink-3); font-size: 12.5px; font-style: italic; }
+.alert { border: 1px solid var(--line); border-left: 4px solid var(--art); border-radius: 8px; padding: 10px 12px; background: var(--warn-bg); }
+.alert.high, .alert.critical { border-left-color: var(--bad); background: var(--bad-bg); }
+.alert.low { border-left-color: var(--pend); background: var(--info-bg); }
+.alert b { display: block; font: 600 13.5px/1.3 var(--cond); margin-bottom: 3px; }
+.alert p { margin: 0; font-size: 12.5px; color: var(--ink-2); }
+.alert .acts { margin-top: 6px; display: flex; flex-wrap: wrap; gap: 6px; }
+.alerts { display: flex; flex-direction: column; gap: 10px; }
+.steer textarea { width: 100%; min-height: 92px; resize: vertical; background: var(--panel-2); border: 1px solid var(--line-2); border-radius: 8px; padding: 9px 10px; }
+.steer .row { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+.steer input, .steer select { background: var(--panel-2); border: 1px solid var(--line-2); border-radius: 8px; padding: 6px 9px; min-width: 0; }
+.steer input { flex: 1; }
+.btn { background: var(--best); color: var(--best-ink); border: 0; border-radius: 8px; padding: 7px 14px; font-weight: 600; cursor: pointer; }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+.steer-list { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.steer-list li { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font-size: 12.5px; }
+.st { font: 600 10.5px/1.6 var(--mono); padding: 0 6px; border-radius: 4px; }
+.st.queued { color: var(--art); border: 1px solid var(--art); } .st.drained { color: var(--ok); border: 1px solid var(--ok); }
+.msg { font-size: 12px; margin-top: 6px; min-height: 1em; }
+
+/* ── timeline ────────────────────────────────────────────── */
+.strip { display: flex; gap: 6px; overflow-x: auto; padding: 4px 2px 10px; }
+.tchip { all: unset; cursor: pointer; flex: 0 0 auto; min-width: 74px; border: 1px solid var(--line); border-radius: 10px; padding: 7px 9px; background: var(--panel-2); display: flex; flex-direction: column; gap: 3px; }
+.tchip:hover { border-color: var(--ink-3); }
+.tchip[aria-pressed="true"] { border-color: var(--best); box-shadow: inset 0 -3px 0 var(--best); }
+.tchip .n { font: 600 12px var(--mono); } .tchip .s { font: 11px var(--mono); color: var(--ink-2); }
+.tchip .dots { display: flex; gap: 3px; height: 8px; }
+.tchip .dots i { width: 8px; height: 8px; border-radius: 50%; background: var(--pend); }
+.tchip .dots i.confirmed { background: var(--ok); } .tchip .dots i.refuted { background: var(--bad); } .tchip .dots i.artefact { background: var(--art); } .tchip .dots i.inconclusive { background: var(--inc); }
+.tchip.live .n::after { content: " ●"; color: var(--ok); }
+.tick-h { font: 600 15px var(--cond); margin: 6px 0 12px; }
+.flow { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+.step { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; background: var(--panel-2); min-width: 0; }
+.step > h4 { margin: 0 0 8px; font: 600 11px var(--cond); letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); display: flex; gap: 6px; align-items: center; }
+.step > h4 .who { color: var(--ink-2); letter-spacing: .02em; text-transform: none; font-family: var(--mono); font-weight: 400; }
+.item { padding: 6px 0; border-top: 1px dashed var(--line); font-size: 12.5px; }
+.item:first-of-type { border-top: 0; padding-top: 0; }
+.item .h { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-bottom: 2px; }
+.sel-y { color: var(--ok); font: 600 11px var(--mono); } .sel-n { color: var(--bad); font: 600 11px var(--mono); }
+
+.banner { padding: 8px 20px; background: var(--info-bg); border-bottom: 1px solid var(--line); font-size: 12.5px; color: var(--ink-2); }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+@media (max-width: 700px) { main { padding: 14px 12px 40px; } .top { padding: 8px 12px; } #fig { height: 340px; } #tree { height: 420px; } .charts { grid-template-columns: 1fr; } .kv { grid-template-columns: 1fr; } }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
 </style>
 </head>
 <body>
-
-<header>
-  <h1>⚡ Evor</h1>
-  <select class="run-select" id="runSelect">
-    <option value="">Loading runs…</option>
-  </select>
-  <span class="status-badge" id="statusBadge">—</span>
-  <span style="color:var(--muted);font-size:12px" id="headerMeta"></span>
+<header class="top">
+  <div class="mark" aria-label="Evor"><i></i>evor</div>
+  <div class="ids"><b id="mission">Loading mission…</b><span id="runid"></span></div>
+  <select class="run-pick" id="runPick" aria-label="Choose run" hidden></select>
+  <span class="chip" id="tickChip" hidden></span>
+  <span class="chip" id="modeChip"></span>
+  <button class="iconbtn" id="themeBtn" aria-label="Toggle light or dark theme">◐</button>
 </header>
+<div class="banner" id="banner" hidden></div>
+<div class="layout">
+<main id="main">
+  <section class="card verdict" aria-labelledby="vword">
+    <div class="v-main" id="vmain"><div class="eyebrow">Is it on the right path?</div><div class="v-word" id="vword">—</div><ul class="v-why" id="vwhy"></ul></div>
+    <div class="kpis" id="kpis"></div>
+  </section>
 
-<div class="tabs">
-  <div class="tab active" data-tab="tree">Tree</div>
-  <div class="tab" data-tab="frontier">Frontier</div>
-  <div class="tab" data-tab="telemetry">Telemetry</div>
-  <div class="tab" data-tab="domains">Domain Leaderboard</div>
-  <div class="tab" data-tab="coverage">Coverage</div>
-  <div class="tab" data-tab="timeline">Benchmark Timeline</div>
-</div>
+  <section class="card" aria-labelledby="figTitle">
+    <div class="card-h">
+      <h2 id="figTitle">Best so far</h2>
+      <span class="ctrl"><label for="metricSel">metric</label><select id="metricSel"></select></span>
+      <span class="ctrl">y <span class="seg" role="group" aria-label="Y scale"><button id="yLin" aria-pressed="true">lin</button><button id="yLog" aria-pressed="false">log</button></span></span>
+      <span class="sp"></span>
+      <div class="legend" aria-hidden="true">
+        <span><i class="sw best"></i>best so far</span><span><i class="ln"></i>staircase</span>
+        <span><i class="sw other"></i>other nodes</span><span><i class="ln med"></i>recipe median</span>
+        <span id="lgRobust"><i class="ln rob"></i>robust best (median of seeds)</span>
+        <span><i class="ln dash"></i>baseline</span><span><i class="sw hollow"></i>artefact</span><span><i class="sw x"></i>failed integrity</span>
+      </div>
+    </div>
+    <div class="fig-wrap"><svg id="fig" role="img" aria-label="Best-so-far staircase of the primary metric over ticks"></svg><div class="tip" id="tip" role="tooltip"></div></div>
+    <div class="card-b faint" style="padding-top:0;font-size:12px" id="figNote">Hover a point to see its lineage; click to open its details. Integrity-failed and artefact nodes never set the best.</div>
+  </section>
 
-<!-- TREE PANEL -->
-<div class="panel active" id="panel-tree">
-  <div class="split" style="flex:1;overflow:hidden">
-    <svg id="tree-svg"></svg>
-    <div class="sidebar" id="node-sidebar">
-      <h3>Select a node</h3>
-      <p style="color:var(--muted);font-size:12px">Click any node in the tree to inspect its details, metrics, and per-domain breakdown.</p>
+  <section class="card" aria-labelledby="treeTitle">
+    <div class="card-h"><h2 id="treeTitle">Recipe tree</h2><span class="faint" style="font-size:12px">seed siblings folded into one recipe · colour = verdict · ★ lucky seed · ⨯ integrity · ✂ pruned · ⚠ artefact suspect</span><span class="sp"></span><button class="iconbtn" id="treeFit">fit</button></div>
+    <svg id="tree" role="img" aria-label="Lineage tree of recipes"></svg>
+  </section>
+
+  <div class="lower">
+    <section class="card" aria-labelledby="learnTitle">
+      <div class="card-h"><h2 id="learnTitle">What we have learned</h2></div>
+      <div class="card-b"><p class="learn-sum" id="learnSum"></p><div class="lgrid" id="learn"></div></div>
+    </section>
+    <div class="side">
+      <section class="card" aria-labelledby="alTitle"><div class="card-h"><h2 id="alTitle">Health alerts</h2></div><div class="card-b alerts" id="alerts"></div></section>
+      <section class="card steer" id="steerCard" aria-labelledby="stTitle">
+        <div class="card-h"><h2 id="stTitle">Steer the mission</h2></div>
+        <div class="card-b">
+          <form id="steerForm">
+            <label class="sr" for="steerNote">Steer note</label>
+            <textarea id="steerNote" maxlength="4000" placeholder="e.g. Stop tuning checkpoint selection; test a recall floor inside the loss with 3 seeds." required></textarea>
+            <div class="row">
+              <label class="sr" for="steerAuthor">Your name</label><input id="steerAuthor" maxlength="80" placeholder="your name" required>
+              <label class="sr" for="steerAxis">Axis</label><select id="steerAxis"></select>
+              <button class="btn" id="steerBtn" type="submit">Send</button>
+            </div>
+            <div class="msg muted" id="steerMsg">The note is queued in the run's signals inbox and read when the next tick drains it.</div>
+          </form>
+          <ul class="steer-list" id="steerList"></ul>
+        </div>
+      </section>
     </div>
   </div>
-</div>
 
-<!-- FRONTIER PANEL -->
-<div class="panel" id="panel-frontier">
-  <div style="color:var(--muted);font-size:12px" id="frontierMeta"></div>
-  <div style="overflow:auto;flex:1">
-    <table class="data-table" id="frontierTable">
-      <thead><tr>
-        <th>#</th><th>Node</th><th>Family</th><th>Fitness</th><th>Delta vs Baseline</th>
-        <th>Eval Version</th><th>Integrity</th><th>Tier</th>
-      </tr></thead>
-      <tbody id="frontierBody"></tbody>
-    </table>
-  </div>
-  <div id="frontierDomain" style="margin-top:16px"></div>
-</div>
-
-<!-- TELEMETRY PANEL -->
-<div class="panel" id="panel-telemetry">
-  <div class="node-picker" id="telNodePicker"></div>
-  <div class="chart-grid">
-    <div class="chart-card"><h4>Training Loss</h4><canvas id="chartLoss"></canvas></div>
-    <div class="chart-card"><h4>Validation Metric</h4><canvas id="chartVal"></canvas></div>
-    <div class="chart-card"><h4>Gradient Norm</h4><canvas id="chartGrad"></canvas></div>
-    <div class="chart-card"><h4>Throughput (samples/s)</h4><canvas id="chartThroughput"></canvas></div>
-  </div>
-</div>
-
-<!-- DOMAIN LEADERBOARD PANEL -->
-<div class="panel" id="panel-domains">
-  <div class="filter-bar">
-    <label>Domain</label>
-    <input type="text" id="domainInput" placeholder="scanned" style="width:140px">
-    <label>Metric</label>
-    <input type="text" id="metricInput" placeholder="accuracy" style="width:120px">
-    <label>Eval version</label>
-    <select id="evalVersionSelect"><option value="">current</option></select>
-    <button onclick="loadDomainPivot()">Search</button>
-  </div>
-  <div id="crossVersionWarn" style="display:none" class="cross-version-warn">
-    ⚠ Showing results across multiple eval versions — direct comparison may be misleading.
-  </div>
-  <div style="overflow:auto;flex:1;margin-top:8px">
-    <table class="data-table" id="pivotTable">
-      <thead><tr>
-        <th>#</th><th>Node</th><th>Family</th><th>Value</th><th>Performance</th>
-        <th>Eval Version</th><th>Integrity</th>
-      </tr></thead>
-      <tbody id="pivotBody"></tbody>
-    </table>
-  </div>
-</div>
-
-<!-- COVERAGE PANEL -->
-<div class="panel" id="panel-coverage">
-  <div id="coverageContent"><p class="empty"><span class="spinner"></span></p></div>
-</div>
-
-<!-- BENCHMARK TIMELINE PANEL -->
-<div class="panel" id="panel-timeline">
-  <div id="timelineContent"><p class="empty"><span class="spinner"></span></p></div>
+  <section class="card" aria-labelledby="tlTitle">
+    <div class="card-h"><h2 id="tlTitle">Tick by tick</h2><span class="faint" style="font-size:12px">why it made each decision</span></div>
+    <div class="card-b"><div class="strip" id="strip" role="group" aria-label="Ticks"></div><div id="tickBody"></div></div>
+  </section>
+</main>
+<aside class="drawer" id="drawer" aria-label="Node details" aria-hidden="true">
+  <div class="d-h"><div style="flex:1;min-width:0"><div class="eyebrow" id="dEyebrow">node</div><h3 id="dTitle">—</h3><div class="meta" id="dMeta"></div></div><button class="iconbtn" id="dClose" aria-label="Close details">✕</button></div>
+  <div class="d-b" id="dBody"></div>
+</aside>
 </div>
 
 <script>
-// ── State ─────────────────────────────────────────────────────────────────────
-let currentMission = null, currentRun = null;
-let allNodes = [], frontierNodes = [];
-let charts = {}, telSource = null;
-const BASE = '';
+(() => {
+"use strict";
+// ── state ───────────────────────────────────────────────────────────────────
+const snapEl = document.getElementById("evor-snapshot");
+const SNAP = snapEl ? JSON.parse(snapEl.textContent) : null;
+const HAS_D3 = typeof window.d3 !== "undefined";
+const S = { bundle: null, run: null, metric: null, ylog: false, sel: null, hover: null, tick: null, evidence: {}, treeZoom: null };
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const VCOL = { confirmed: "var(--ok)", refuted: "var(--bad)", artefact: "var(--art)", pending: "var(--pend)", inconclusive: "var(--inc)" };
+const GLYPH = { "lucky-seed": "★", "integrity-failed": "⨯", "pruned": "✂", "artefact-suspect": "⚠", "seed-spread": "↕" };
+const BLABEL = { "lucky-seed": "lucky seed", "integrity-failed": "integrity failed", "pruned": "pruned", "artefact-suspect": "artefact suspect", "seed-spread": "seed spread" };
 
-const FAMILY_COLORS = {
-  'arch': '#6366f1', 'training': '#22c55e', 'data-curation': '#f59e0b',
-  'data-augmentation': '#f97316', 'data-acquisition': '#06b6d4',
-  'algo': '#a855f7', 'other': '#8892a4',
+function fmt(v) {
+  if (v === null || v === undefined || Number.isNaN(v)) return "—";
+  if (v === 0) return "0";
+  const a = Math.abs(v);
+  if (a >= 100) return v.toFixed(1);
+  if (a >= 1) return String(+v.toPrecision(3));
+  if (a >= 1e-3) return String(+v.toFixed(4));
+  return v.toExponential(2);
+}
+const ago = (iso) => { if (!iso) return ""; const m = (Date.now() - Date.parse(iso)) / 60000; return m < 1 ? "just now" : m < 90 ? `${Math.round(m)} min ago` : m < 2880 ? `${(m / 60).toFixed(1)} h ago` : `${Math.round(m / 1440)} d ago`; };
+const vbadge = (v) => `<span class="vb ${esc(v || "pending")}">${esc(v === "pending" || !v ? "awaiting probe" : v)}</span>`;
+const badges = (bs) => (bs || []).map((b) => `<span class="bd ${esc(b)}" title="${esc(BLABEL[b] || b)}">${GLYPH[b] || ""} ${esc(BLABEL[b] || b)}</span>`).join(" ");
+const tickBtn = (t) => (t === null || t === undefined) ? "" : `<button class="tk" data-tick="${t}" aria-label="Open tick ${t}">t${t}</button>`;
+const nodeBtn = (id, name) => id ? `<button class="nl" data-node="${esc(id)}">${esc(name || id.slice(0, 8))}</button>` : esc(name || "");
+const prettyId = (s) => String(s || "").replace(/^lesson-/, "").replace(/[-_]/g, " ");
+
+// ── theme ───────────────────────────────────────────────────────────────────
+try { const t = localStorage.getItem("evor-theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
+$("themeBtn").onclick = () => {
+  const cur = document.documentElement.dataset.theme || (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
+  const next = cur === "light" ? "dark" : "light";
+  document.documentElement.dataset.theme = next;
+  try { localStorage.setItem("evor-theme", next); } catch (e) {}
+  renderFigure(); renderTree();
 };
 
-// ── API helpers ───────────────────────────────────────────────────────────────
-async function api(path) {
-  const r = await fetch(BASE + path);
-  if (!r.ok) throw new Error(`${r.status} ${path}`);
+// ── data loading ────────────────────────────────────────────────────────────
+async function api(path, opts) {
+  const r = await fetch(path, opts);
+  if (!r.ok) { let d = r.statusText; try { d = (await r.json()).detail || d; } catch (e) {} throw new Error(d); }
   return r.json();
 }
-async function apiMaybe(path) {
-  const r = await fetch(BASE + path);
-  if (r.status === 404) return null;
-  if (!r.ok) throw new Error(`${r.status} ${path}`);
-  return r.json();
-}
-const runBase = () => `/api/runs/${currentMission}/${currentRun}`;
+const runBase = () => `/api/runs/${encodeURIComponent(S.run.mission_id)}/${encodeURIComponent(S.run.run_id)}`;
 
-// ── Init ──────────────────────────────────────────────────────────────────────
-async function init() {
-  const runs = await api('/api/runs');
-  const sel = document.getElementById('runSelect');
-  sel.innerHTML = '';
-  if (!runs.length) {
-    sel.innerHTML = '<option>No runs found</option>';
+async function boot() {
+  if (SNAP) {
+    S.bundle = SNAP; S.evidence = SNAP.evidence || {};
+    $("modeChip").innerHTML = `snapshot · ${esc((SNAP.generated_at || "").slice(0, 16).replace("T", " "))}Z`;
+    $("banner").hidden = false;
+    $("banner").textContent = `Static snapshot taken ${(SNAP.generated_at || "").replace("T", " ").slice(0, 19)} UTC. Data is frozen; steering is disabled.`;
+    $("steerCard").hidden = true;
+    renderAll();
     return;
   }
-  runs.forEach(r => {
-    const opt = document.createElement('option');
-    opt.value = `${r.mission_id}|${r.run_id}`;
-    opt.text = `${r.mission_id} / ${r.run_id}  [tick ${r.tick_count}, best=${r.best_score?.toFixed(4) ?? '—'}]`;
-    sel.appendChild(opt);
-  });
-  sel.onchange = () => selectRun(sel.value);
-  sel.dispatchEvent(new Event('change'));
-}
-
-async function selectRun(val) {
-  if (!val) return;
-  [currentMission, currentRun] = val.split('|');
-  await loadCurrentRun();
-}
-
-async function loadCurrentRun() {
-  const [runs] = await Promise.all([api('/api/runs')]);
-  const run = runs.find(r => r.mission_id === currentMission && r.run_id === currentRun);
-  if (run) {
-    const badge = document.getElementById('statusBadge');
-    badge.textContent = run.status ?? '—';
-    badge.className = 'status-badge' + (run.status === 'running' ? ' running' : '');
-    document.getElementById('headerMeta').textContent =
-      `tick ${run.tick_count}  best=${run.best_score?.toFixed(4) ?? '—'}  frontier=${run.frontier_size}  ${run.current_eval_version ?? ''}`;
+  $("modeChip").innerHTML = `<i class="live-dot"></i>live`;
+  let runs = [];
+  try { runs = await api("/api/runs"); } catch (e) { $("mission").textContent = "Cannot reach the dashboard API"; return; }
+  if (!runs.length) { $("mission").textContent = "No runs found under this .evor root"; return; }
+  const want = decodeURIComponent(location.hash.slice(1));
+  S.run = runs.find((r) => `${r.mission_id}/${r.run_id}` === want) || runs.find((r) => r.default) || runs[runs.length - 1];
+  if (runs.length > 1) {
+    const pick = $("runPick"); pick.hidden = false;
+    pick.innerHTML = runs.map((r, i) => `<option value="${i}" ${r === S.run ? "selected" : ""}>${esc(r.mission_id)} / ${esc(r.run_id)}</option>`).join("");
+    pick.onchange = () => { S.run = runs[+pick.value]; location.hash = `${S.run.mission_id}/${S.run.run_id}`; S.sel = null; S.evidence = {}; closeDrawer(); refresh(); };
   }
-
-  const activeTab = document.querySelector('.tab.active')?.dataset.tab ?? 'tree';
-  await loadTab(activeTab);
-
-  // Auto-refresh every 10s
-  clearInterval(window._refreshTimer);
-  window._refreshTimer = setInterval(() => loadCurrentRun(), 10000);
+  await refresh();
+  setInterval(() => { if (document.visibilityState === "visible") refresh(true); }, 20000);
 }
 
-// ── Tabs ──────────────────────────────────────────────────────────────────────
-document.querySelectorAll('.tab').forEach(tab => {
-  tab.onclick = () => {
-    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
-    tab.classList.add('active');
-    document.getElementById(`panel-${tab.dataset.tab}`).classList.add('active');
-    loadTab(tab.dataset.tab);
-  };
+async function refresh(quiet) {
+  try { S.bundle = await api(`${runBase()}/bundle`); }
+  catch (e) { if (!quiet) $("mission").textContent = `Failed to load run: ${e.message}`; return; }
+  renderAll();
+}
+
+function renderAll() {
+  const b = S.bundle;
+  $("mission").textContent = b.mission_id || "mission";
+  $("runid").textContent = b.run_id || "";
+  document.title = `${b.overview.headline} · ${b.mission_id} · Evor`;
+  renderTopChips(); renderVerdict(); renderMetricSel(); renderFigure(); renderTree(); renderLearnings(); renderAlerts(); renderSteer(); renderTimeline();
+}
+
+// ── header chips ────────────────────────────────────────────────────────────
+function renderTopChips() {
+  const o = S.bundle.overview, st = o.stall || {};
+  const c = $("tickChip"); c.hidden = !st.tick;
+  const blocked = st.blocked && st.blocked.on ? ` · waiting on ${st.blocked.on}` : "";
+  const status = st.mission_status && st.mission_status !== "running" ? ` · ${st.mission_status}` : "";
+  c.innerHTML = `tick ${esc(st.tick)} · step ${esc(st.step)} ${esc(st.step_name || "")} · ${esc(st.step_status || "")}${esc(status)}${esc(blocked)}${st.updated_at && !SNAP ? ` · ${esc(ago(st.updated_at))}` : ""}`;
+  c.style.borderColor = st.level === "critical" ? "var(--bad)" : st.level === "warn" ? "var(--art)" : "";
+}
+
+// ── verdict strip ───────────────────────────────────────────────────────────
+function renderVerdict() {
+  const o = S.bundle.overview, m = o.metric || {};
+  $("vmain").dataset.s = o.status;
+  $("vword").textContent = o.headline;
+  $("vwhy").innerHTML = (o.why || []).map((w) => `<li>${esc(w)}</li>`).join("");
+  const rb = o.robust_best, rr = o.robust_recipe, bn = o.best_node;
+  const x = (v) => (m.baseline && v !== null && v !== undefined && m.baseline > 0) ? `${(v / m.baseline).toFixed(1)}× baseline` : "";
+  const bestRecipeMember = rr ? (S.bundle.recipes.find((r) => r.id === rr.id) || {}).members || [] : [];
+  const topMember = bestRecipeMember.filter((mm) => mm.fitness !== null && !mm.integrity_failed).sort((a, b) => b.fitness - a.fitness)[0];
+  $("kpis").innerHTML = `
+    <div class="kpi"><div class="eyebrow">Robust best · median of seeds</div>
+      <div class="val" style="color:var(--robust)">${fmt(rb && rb.median)}</div>
+      <div class="sub">${rb ? `<button class="link" data-node="${esc(topMember ? topMember.id : "")}">${esc(rb.label)}</button> · ${rb.n} seeds · ${esc(x(rb.median))}` : "needs ≥ 2 credible seeds"}</div>
+      <div class="sub">${rr ? `${vbadge(rr.verdict)} <span class="faint mono">range ${fmt(rr.min)} – ${fmt(rr.max)}</span>` : ""}</div></div>
+    <div class="kpi"><div class="eyebrow">Single best node</div>
+      <div class="val" style="color:var(--best)">${fmt(bn && bn.fitness)}</div>
+      <div class="sub">${bn ? `${nodeBtn(bn.id, bn.name)} · tick ${esc(bn.tick)} · ${esc(x(bn.fitness))}` : "no scored node"}</div>
+      <div class="sub">${bn ? badges(bn.badges) || `<span class="faint">recipe median ${fmt(bn.recipe_median)}</span>` : ""}</div></div>
+    <div class="kpi"><div class="eyebrow">Contract baseline</div>
+      <div class="val">${fmt(m.baseline)}</div>
+      <div class="sub"><b class="mono">${esc(m.name)}</b> · ${esc(m.direction)} is better</div>
+      <div class="sub faint">${o.n_nodes} nodes · ${o.n_recipes} recipes · ${esc(o.tick_count ?? "?")} ticks scored</div></div>`;
+}
+
+// ── metric selector ─────────────────────────────────────────────────────────
+function renderMetricSel() {
+  const ms = S.bundle.metrics || [];
+  if (!S.metric || !ms.find((m) => m.name === S.metric)) S.metric = (ms[0] || {}).name;
+  const sel = $("metricSel");
+  sel.innerHTML = ms.map((m) => `<option value="${esc(m.name)}" ${m.name === S.metric ? "selected" : ""}>${esc(m.name)}${m.primary ? " (primary)" : ""}</option>`).join("");
+  sel.onchange = () => { S.metric = sel.value; renderFigure(); };
+}
+$("yLin").onclick = () => { S.ylog = false; $("yLin").setAttribute("aria-pressed", "true"); $("yLog").setAttribute("aria-pressed", "false"); renderFigure(); };
+$("yLog").onclick = () => { S.ylog = true; $("yLog").setAttribute("aria-pressed", "true"); $("yLin").setAttribute("aria-pressed", "false"); renderFigure(); };
+
+// ── figure: best-so-far staircase ───────────────────────────────────────────
+function figureModel() {
+  const b = S.bundle, metric = S.metric;
+  const spec = (b.metrics || []).find((m) => m.name === metric) || { direction: "higher", primary: true };
+  const higher = spec.direction !== "lower";
+  const pts = (b.points || []).filter((p) => p.tick !== null && p.tick !== undefined && p.values[metric] !== null && p.values[metric] !== undefined)
+    .map((p) => ({ ...p, v: p.values[metric] }));
+  // x offsets: recipes side by side within a tick, seeds tight within a recipe.
+  const byTick = d3.group(pts, (p) => p.tick);
+  for (const [, arr] of byTick) {
+    const recs = [...new Set(arr.map((p) => p.recipe || p.id))];
+    const w = Math.min(0.24, 0.62 / Math.max(recs.length, 1));
+    recs.forEach((rid, ri) => {
+      const sibs = arr.filter((p) => (p.recipe || p.id) === rid);
+      sibs.forEach((p, si) => { p.x = p.tick + (ri - (recs.length - 1) / 2) * w + (si - (sibs.length - 1) / 2) * Math.min(0.05, w / Math.max(sibs.length, 1)); });
+    });
+  }
+  // staircase over eligible points, in build order
+  const order = pts.slice().sort((a, b2) => a.tick - b2.tick || a.x - b2.x);
+  let best = null; const bests = [];
+  for (const p of order) {
+    if (p.integrity_failed || p.artefact) continue;
+    if (best === null || (higher ? p.v > best.v : p.v < best.v)) { best = p; bests.push(p); }
+  }
+  const bestIds = new Set(bests.map((p) => p.id));
+  // recipe medians, drawn at the recipe's latest cluster
+  const meds = [];
+  for (const [rid, arr] of d3.group(pts.filter((p) => p.recipe && !p.integrity_failed), (p) => p.recipe)) {
+    if (arr.length < 2) continue;
+    const last = d3.max(arr, (p) => p.tick);
+    const cl = arr.filter((p) => p.tick === last);
+    meds.push({ rid, v: d3.median(arr, (p) => p.v), x0: d3.min(cl, (p) => p.x) - 0.06, x1: d3.max(cl, (p) => p.x) + 0.06 });
+  }
+  const ticks = (b.progress || []).map((p) => p.tick);
+  const maxTick = Math.max(d3.max(pts, (p) => p.tick) || 1, d3.max(ticks) || 1);
+  const minTick = Math.min(d3.min(pts, (p) => p.tick) || 1, d3.min(ticks) || 1);
+  const robust = spec.primary ? (b.progress || []).filter((p) => p.robust_best).map((p) => ({ tick: p.tick, v: p.robust_best.median })) : [];
+  return { pts, bests, bestIds, meds, higher, spec, minTick, maxTick, robust, baseline: spec.primary ? b.overview.metric.baseline : null };
+}
+
+function renderFigure() {
+  const svgEl = $("fig");
+  if (!S.bundle) return;
+  if (!HAS_D3) { figureFallback(); return; }
+  const M = figureModel();
+  const spec = M.spec;
+  $("figTitle").textContent = `Best so far — ${S.metric} (${spec.direction} is better)`;
+  $("lgRobust").style.display = M.robust.length ? "" : "none";
+  const W = svgEl.clientWidth || 900, H = svgEl.clientHeight || 420;
+  const m = { t: 18, r: 22, b: 34, l: 64 };
+  const svg = d3.select(svgEl); svg.selectAll("*").remove();
+  svg.attr("viewBox", `0 0 ${W} ${H}`);
+  if (!M.pts.length) { svg.append("text").attr("x", W / 2).attr("y", H / 2).attr("text-anchor", "middle").attr("class", "base-lbl").text("No evaluated node reports this metric yet."); return; }
+  const x = d3.scaleLinear().domain([M.minTick - 0.6, M.maxTick + 0.6]).range([m.l, W - m.r]);
+  const vals = M.pts.map((p) => p.v).concat(M.baseline !== null && M.baseline !== undefined ? [M.baseline] : []);
+  let y, clampLow = null;
+  if (S.ylog) {
+    const pos = vals.filter((v) => v > 0);
+    const lo = (d3.min(pos) || 1e-6) / 3, hi = (d3.max(pos) || 1) * 1.6;
+    clampLow = lo;
+    y = d3.scaleLog().domain([lo, hi]).range([H - m.b, m.t]).clamp(true);
+  } else {
+    const [lo, hi] = d3.extent(vals); const pad = (hi - lo) * 0.08 || Math.abs(hi) * 0.1 || 1;
+    y = d3.scaleLinear().domain([Math.min(lo, 0) === 0 && lo >= 0 ? 0 : lo - pad, hi + pad]).nice().range([H - m.b, m.t]);
+  }
+  const Y = (v) => S.ylog ? y(v > 0 ? v : clampLow) : y(v);
+  const g = svg.append("g");
+  g.append("g").attr("class", "grid").attr("transform", `translate(${m.l},0)`).call(d3.axisLeft(y).ticks(6, S.ylog ? "~e" : "~g").tickSize(-(W - m.l - m.r)).tickFormat(""));
+  g.append("g").attr("class", "axis").attr("transform", `translate(0,${H - m.b})`).call(d3.axisBottom(x).ticks(Math.min(M.maxTick - M.minTick + 1, 20)).tickFormat((d) => Number.isInteger(d) ? d : ""));
+  g.append("g").attr("class", "axis").attr("transform", `translate(${m.l},0)`).call(d3.axisLeft(y).ticks(6, S.ylog ? "~e" : "~g"));
+  g.append("text").attr("class", "base-lbl").attr("x", W - m.r).attr("y", H - 6).attr("text-anchor", "end").text("tick →");
+  // baseline
+  if (M.baseline !== null && M.baseline !== undefined) {
+    g.append("line").attr("class", "base-line").attr("x1", m.l).attr("x2", W - m.r).attr("y1", Y(M.baseline)).attr("y2", Y(M.baseline));
+    g.append("text").attr("class", "base-lbl").attr("x", m.l + 6).attr("y", Y(M.baseline) - 5).text(`baseline ${fmt(M.baseline)}`);
+  }
+  // robust best (median of seeds) step line
+  if (M.robust.length) {
+    let d = "";
+    M.robust.forEach((p, i) => { d += i ? `H${x(p.tick)}V${Y(p.v)}` : `M${x(p.tick)},${Y(p.v)}`; });
+    d += `H${x(M.maxTick + 0.45)}`;
+    g.append("path").attr("class", "robust").attr("d", d);
+  }
+  // recipe medians
+  g.append("g").selectAll("line").data(M.meds).join("line").attr("class", "med-mark")
+    .attr("x1", (d) => x(d.x0)).attr("x2", (d) => x(d.x1)).attr("y1", (d) => Y(d.v)).attr("y2", (d) => Y(d.v))
+    .append("title").text((d) => `recipe median ${fmt(d.v)}`);
+  // staircase
+  if (M.bests.length) {
+    let d = `M${x(M.bests[0].x)},${Y(M.bests[0].v)}`;
+    for (let i = 1; i < M.bests.length; i++) d += `H${x(M.bests[i].x)}V${Y(M.bests[i].v)}`;
+    d += `H${x(M.maxTick + 0.45)}`;
+    g.append("path").attr("class", "stair").attr("d", d);
+  }
+  const lin = g.append("g").attr("class", "lineage-layer");
+  // points: others first (underneath), then bests
+  const sorted = M.pts.slice().sort((a, b) => (M.bestIds.has(a.id) ? 1 : 0) - (M.bestIds.has(b.id) ? 1 : 0));
+  const R = (p) => M.bestIds.has(p.id) ? 6.5 : 4;
+  const nodes = g.append("g").selectAll("g").data(sorted, (p) => p.id).join("g").attr("transform", (p) => `translate(${x(p.x)},${Y(p.v)})`);
+  nodes.filter((p) => p.integrity_failed).append("g").attr("class", "xmark").call((s) => { s.append("line").attr("x1", -5).attr("y1", -5).attr("x2", 5).attr("y2", 5); s.append("line").attr("x1", -5).attr("y1", 5).attr("x2", 5).attr("y2", -5); });
+  nodes.append("circle").attr("r", (p) => p.integrity_failed ? 7 : R(p))
+    .attr("class", (p) => ["pt", M.bestIds.has(p.id) ? "best" : "other", p.artefact ? "artefact" : "", p.integrity_failed ? "artefact" : "", S.sel === p.id ? "sel" : ""].join(" "))
+    .style("stroke", (p) => p.integrity_failed ? "var(--bad)" : null).style("fill-opacity", (p) => p.integrity_failed ? 0 : null)
+    .attr("tabindex", 0).attr("role", "button").attr("aria-label", (p) => `${p.name}, tick ${p.tick}, ${fmt(p.v)}`)
+    .on("mouseenter focus", (ev, p) => { S.hover = p.id; drawLineage(); showTip(ev, p); })
+    .on("mousemove", (ev, p) => showTip(ev, p))
+    .on("mouseleave blur", () => { S.hover = null; drawLineage(); hideTip(); })
+    .on("click", (ev, p) => selectNode(p.id))
+    .on("keydown", (ev, p) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); selectNode(p.id); } });
+  if (M.pts.some((p) => S.ylog && p.v <= 0)) g.append("text").attr("class", "base-lbl").attr("x", m.l + 4).attr("y", H - m.b - 6).text("≤ 0 shown on the floor");
+  S._fig = { x, Y, M, nodes, lin, g };
+  drawLineage();
+}
+
+function drawLineage() {
+  const F = S._fig; if (!F || !HAS_D3) return;
+  const { x, Y, M, nodes, lin } = F;
+  lin.selectAll("*").remove();
+  const byId = new Map(M.pts.map((p) => [p.id, p]));
+  const focus = [S.hover, S.sel].filter(Boolean);
+  const parentIds = new Set(), sibRecipe = new Set();
+  for (const fid of focus) {
+    const p = byId.get(fid); if (!p) continue;
+    if (p.recipe) sibRecipe.add(p.recipe);
+    for (const par of p.parents || []) {
+      const pp = par.id ? byId.get(par.id) : null;
+      const x1 = x(p.x), y1 = Y(p.v);
+      let x2, y2, label = null;
+      if (pp) { x2 = x(pp.x); y2 = Y(pp.v); parentIds.add(pp.id); }
+      else { x2 = x(M.minTick - 0.6) + 2; y2 = M.baseline !== null && M.baseline !== undefined ? Y(M.baseline) : y1; label = par.name || "root"; }
+      const mx = (x1 + x2) / 2, my = Math.min(y1, y2) - Math.max(24, Math.abs(x1 - x2) * 0.18);
+      lin.append("path").attr("class", "lineage").attr("d", `M${x1},${y1}Q${mx},${my} ${x2},${y2}`).attr("stroke-opacity", fid === S.sel ? 1 : 0.8);
+      if (label) lin.append("text").attr("class", "lineage-lbl").attr("x", x2 + 4).attr("y", y2 - 6).text(label);
+    }
+  }
+  nodes.select("circle").classed("parent-hl", (p) => parentIds.has(p.id)).classed("sel", (p) => p.id === S.sel)
+    .classed("sib-hl", (p) => !M.bestIds.has(p.id) && sibRecipe.has(p.recipe) && !focus.includes(p.id));
+}
+
+function showTip(ev, p) {
+  const tip = $("tip"), wrap = tip.parentElement.getBoundingClientRect();
+  const par = (p.parents || []).map((x) => x.name).join(" + ") || "—";
+  tip.innerHTML = `<b>${esc(p.name)}</b>
+    <div class="row"><span class="faint">tick</span><span class="mono">${esc(p.tick)}</span></div>
+    <div class="row"><span class="faint">${esc(S.metric)}</span><span class="mono">${fmt(p.v)}</span></div>
+    <div class="row"><span class="faint">parent${(p.parents || []).length > 1 ? "s" : ""}</span><span class="mono">${esc(par)}</span></div>
+    ${p.recipe_label ? `<div class="row"><span class="faint">recipe</span><span class="mono">${esc(p.recipe_label)}${p.seed ? ` · seed ${esc(p.seed)}` : ""}</span></div>` : ""}
+    <div style="margin-top:6px">${vbadge(p.verdict)} ${badges(p.badges)}</div>
+    ${p.idea ? `<div class="idea">${esc(p.idea)}</div>` : ""}`;
+  const r = ev.target.getBoundingClientRect ? ev.target.getBoundingClientRect() : { left: ev.clientX, top: ev.clientY, width: 0 };
+  let left = r.left - wrap.left + 14, top = r.top - wrap.top - 10;
+  tip.style.opacity = 1;
+  const tw = tip.offsetWidth, th = tip.offsetHeight;
+  if (left + tw > wrap.width - 8) left = r.left - wrap.left - tw - 10;
+  if (top + th > wrap.height) top = wrap.height - th - 4;
+  tip.style.left = `${Math.max(4, left)}px`; tip.style.top = `${Math.max(4, top)}px`;
+}
+function hideTip() { $("tip").style.opacity = 0; }
+
+function figureFallback() {
+  const pts = (S.bundle.points || []).filter((p) => p.values[S.metric] !== null && p.values[S.metric] !== undefined).sort((a, b) => a.tick - b.tick);
+  const svg = $("fig"); svg.style.display = "none";
+  let el = document.getElementById("figFallback");
+  if (!el) { el = document.createElement("div"); el.id = "figFallback"; el.className = "fallback"; svg.after(el); }
+  let best = null; const rows = [];
+  for (const p of pts) { if (p.integrity_failed || p.artefact) continue; if (best === null || p.values[S.metric] > best) { best = p.values[S.metric]; rows.push(p); } }
+  el.innerHTML = `<p>The chart library could not load (offline?). Best-so-far nodes:</p><table class="dt"><tr><th>node</th><th>tick</th><th>${esc(S.metric)}</th></tr>${rows.map((p) => `<tr><td>${nodeBtn(p.id, p.name)}</td><td>${p.tick}</td><td>${fmt(p.values[S.metric])}</td></tr>`).join("")}</table>`;
+}
+
+// ── tree ────────────────────────────────────────────────────────────────────
+function renderTree() {
+  const svgEl = $("tree"); if (!S.bundle) return;
+  const recipes = S.bundle.recipes || [];
+  if (!HAS_D3) { treeFallback(recipes); return; }
+  const base = S.bundle.overview.metric.baseline;
+  const ids = new Set(recipes.map((r) => r.id));
+  const data = [{ id: "__root", label: "baseline", root: true, median: base }].concat(recipes.map((r) => ({ ...r, pid: r.parent_recipe && ids.has(r.parent_recipe) ? r.parent_recipe : "__root" })));
+  let root;
+  try { root = d3.stratify().id((d) => d.id).parentId((d) => d.root ? null : d.pid)(data); } catch (e) { treeFallback(recipes); return; }
+  const W = svgEl.clientWidth || 900, H = svgEl.clientHeight || 520;
+  const dx = 50, dy = 230;
+  d3.tree().nodeSize([dx, dy])(root);
+  const svg = d3.select(svgEl); svg.selectAll("*").remove(); svg.attr("viewBox", `0 0 ${W} ${H}`);
+  const defs = svg.append("defs");
+  const pat = defs.append("pattern").attr("id", "hatch").attr("patternUnits", "userSpaceOnUse").attr("width", 5).attr("height", 5).attr("patternTransform", "rotate(45)");
+  pat.append("rect").attr("width", 5).attr("height", 5).attr("fill", "var(--art)").attr("fill-opacity", .35);
+  pat.append("line").attr("x1", 0).attr("y1", 0).attr("x2", 0).attr("y2", 5).attr("stroke", "var(--art)").attr("stroke-width", 3);
+  const g = svg.append("g");
+  const zoom = d3.zoom().scaleExtent([0.25, 2.5]).on("zoom", (ev) => { g.attr("transform", ev.transform); if (ev.sourceEvent) S.treeT = ev.transform; });
+  svg.call(zoom); S.treeZoom = { zoom, svg, root, W, H };
+  const selRecipe = selectedRecipe();
+  const pathIds = new Set(); if (selRecipe) { let n = root.descendants().find((d) => d.id === selRecipe); while (n) { pathIds.add(n.id); n = n.parent; } }
+  g.append("g").selectAll("path").data(root.links()).join("path").attr("class", (l) => `tlink ${pathIds.has(l.target.id) && pathIds.has(l.source.id) ? "hl" : ""}`)
+    .attr("d", d3.linkHorizontal().x((d) => d.y).y((d) => d.x));
+  const rr = (d) => d.data.root ? 7 : 5 + Math.min(d.data.n || 1, 6) * 1.6;
+  const node = g.append("g").selectAll("g").data(root.descendants()).join("g")
+    .attr("class", (d) => `tnode ${d.id === selRecipe ? "sel" : ""}`).attr("transform", (d) => `translate(${d.y},${d.x})`)
+    .attr("tabindex", 0).attr("role", "button").attr("aria-label", (d) => d.data.root ? "baseline" : `recipe ${d.data.label}, ${d.data.verdict}`)
+    .on("click", (ev, d) => { if (!d.data.root) selectRecipe(d.data); })
+    .on("keydown", (ev, d) => { if ((ev.key === "Enter" || ev.key === " ") && !d.data.root) { ev.preventDefault(); selectRecipe(d.data); } });
+  node.append("circle").attr("class", "ring").attr("r", (d) => rr(d) + 4);
+  node.append("circle").attr("class", "disc").attr("r", rr)
+    .attr("fill", (d) => d.data.root ? "var(--base)" : d.data.verdict === "artefact" ? "url(#hatch)" : VCOL[d.data.verdict] || VCOL.pending)
+    .attr("fill-opacity", (d) => d.data.credible === false && d.data.verdict !== "artefact" ? 0.45 : 1);
+  node.append("title").text((d) => d.data.root ? "contract baseline" : `${d.data.label} — ${d.data.verdict}${d.data.verdict_evidence ? "\n" + d.data.verdict_evidence : ""}`);
+  node.append("text").attr("x", (d) => rr(d) + 8).attr("y", -3).text((d) => d.data.root ? `baseline ${fmt(base)}` : d.data.label);
+  node.filter((d) => !d.data.root).append("text").attr("class", "meta").attr("x", (d) => rr(d) + 8).attr("y", 12)
+    .text((d) => { const r = d.data; const sp = r.spread_unbounded ? "∞×" : r.spread ? `${r.spread < 10 ? r.spread.toFixed(1) : Math.round(r.spread)}×` : ""; return `t${r.tick ?? "?"} · ${r.n > 1 ? `med ${fmt(r.median)} · ${r.n} seeds${sp ? " · " + sp : ""}` : fmt(r.median)}`; });
+  node.filter((d) => !d.data.root && (d.data.badges || []).some((b) => GLYPH[b])).append("text").attr("class", "glyphs").attr("x", (d) => -rr(d) - 4).attr("y", 4).attr("text-anchor", "end")
+    .text((d) => d.data.badges.map((b) => GLYPH[b] || "").join(""));
+  // Keep the researcher's pan/zoom across live refreshes and selections.
+  if (S.treeT) svg.call(zoom.transform, S.treeT); else fitTree(false);
+}
+function fitTree(animate) {
+  const T = S.treeZoom; if (!T) return;
+  const ns = T.root.descendants();
+  const x0 = d3.min(ns, (d) => d.x) - 30, x1 = d3.max(ns, (d) => d.x) + 30, y0 = d3.min(ns, (d) => d.y) - 30, y1 = d3.max(ns, (d) => d.y) + 260;
+  const k = Math.min(1.1, T.W / (y1 - y0), T.H / (x1 - x0));
+  const t = d3.zoomIdentity.translate((T.W - (y1 - y0) * k) / 2 - y0 * k, (T.H - (x1 - x0) * k) / 2 - x0 * k).scale(k);
+  (animate ? T.svg.transition().duration(300) : T.svg).call(T.zoom.transform, t);
+}
+$("treeFit").onclick = () => { S.treeT = null; fitTree(true); };
+function treeFallback(recipes) {
+  const svg = $("tree"); svg.style.display = "none";
+  let el = document.getElementById("treeFallback");
+  if (!el) { el = document.createElement("div"); el.id = "treeFallback"; el.className = "fallback"; svg.after(el); }
+  const kids = d3safeGroup(recipes);
+  const li = (r) => `<li>${vbadge(r.verdict)} <button class="nl" data-recipe="${esc(r.id)}">${esc(r.label)}</button> <span class="faint mono">t${r.tick ?? "?"} · med ${fmt(r.median)} · ${r.n} seed(s)</span> ${badges(r.badges)}${(kids[r.id] || []).length ? `<ul class="tlist">${kids[r.id].map(li).join("")}</ul>` : ""}</li>`;
+  el.innerHTML = `<ul class="tlist">${(kids.__root || []).map(li).join("")}</ul>`;
+}
+function d3safeGroup(recipes) { const ids = new Set(recipes.map((r) => r.id)); const out = {}; for (const r of recipes) { const p = r.parent_recipe && ids.has(r.parent_recipe) ? r.parent_recipe : "__root"; (out[p] = out[p] || []).push(r); } return out; }
+
+function selectedRecipe() { if (!S.sel) return null; const p = (S.bundle.points || []).find((x) => x.id === S.sel); if (p && p.recipe) return p.recipe; const r = (S.bundle.recipes || []).find((rr) => rr.members.some((m) => m.id === S.sel)); return r ? r.id : null; }
+function selectRecipe(r) {
+  const ok = r.members.filter((m) => m.fitness !== null && !m.integrity_failed).sort((a, b) => b.fitness - a.fitness);
+  selectNode((ok[0] || r.members[0]).id);
+}
+
+// ── details drawer ──────────────────────────────────────────────────────────
+async function selectNode(id) {
+  if (!id) return;
+  S.sel = id;
+  document.body.classList.add("has-detail"); $("drawer").setAttribute("aria-hidden", "false");
+  drawLineage(); renderTree();
+  const pt = (S.bundle.points || []).find((p) => p.id === id);
+  $("dTitle").textContent = pt ? pt.name : id; $("dBody").innerHTML = `<div class="sec faint">Loading evidence…</div>`;
+  let ev = S.evidence[id];
+  if (!ev && !SNAP) { try { ev = await api(`${runBase()}/nodes/${encodeURIComponent(id)}/evidence`); S.evidence[id] = ev; } catch (e) { $("dBody").innerHTML = `<div class="sec">Could not load evidence: ${esc(e.message)}</div>`; return; } }
+  if (S.sel !== id) return;
+  if (!ev) { $("dBody").innerHTML = `<div class="sec faint">No evidence recorded for this node.</div>`; return; }
+  renderDrawer(ev);
+  setTimeout(() => { renderFigure(); }, 240);
+}
+function closeDrawer() { S.sel = null; document.body.classList.remove("has-detail"); $("drawer").setAttribute("aria-hidden", "true"); drawLineage(); renderTree(); setTimeout(renderFigure, 240); }
+$("dClose").onclick = closeDrawer;
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && S.sel) closeDrawer(); });
+
+function renderDrawer(ev) {
+  const n = ev.node, mk = ev.makeup || {}, rec = ev.recipe, base = S.bundle.overview.metric.baseline;
+  $("dEyebrow").textContent = `node · tick ${ev.tick ?? "?"}${rec ? ` · recipe ${rec.label}` : ""}`;
+  $("dTitle").textContent = n.name || n.id;
+  $("dMeta").innerHTML = `${vbadge(rec ? rec.verdict : (ev.probe || {}).verdict)} ${badges(ev.badges)} <span class="bd">${esc(n.approach_family || "?")}</span> <span class="bd">${esc(n.mutation_tier || "?")}</span> ${tickBtn(ev.tick)}`;
+  const pf = ev.parent ? ev.parent.fitness : null;
+  const d = (a, b) => (a !== null && b !== null && a !== undefined && b !== undefined) ? a - b : null;
+  const dl = (x, digits) => x === null ? "" : `<span class="${x >= 0 ? "delta-up" : "delta-dn"}">${x >= 0 ? "▲" : "▼"} ${fmt(Math.abs(x))}</span>`;
+  const H = [];
+  // headline numbers
+  H.push(`<div class="sec"><div class="stat-row">
+    <div class="stat"><span class="v" style="color:var(--best)">${fmt(ev.fitness)}</span><span class="l">fitness</span></div>
+    <div class="stat"><span class="v">${fmt(pf)}</span><span class="l">parent ${ev.parent ? nodeBtn(ev.parent.id, ev.parent.name) : "—"}</span></div>
+    <div class="stat"><span class="v">${dl(d(ev.fitness, pf)) || "—"}</span><span class="l">vs parent</span></div>
+    ${rec && rec.n_valid > 1 ? `<div class="stat"><span class="v" style="color:var(--robust)">${fmt(rec.median)}</span><span class="l">recipe median · ${rec.n_valid} seeds</span></div>` : ""}
+    <div class="stat"><span class="v">${base ? (ev.fitness / base).toFixed(2) + "×" : "—"}</span><span class="l">of baseline</span></div></div>
+    ${(ev.gaming || []).map((g) => `<div class="alert high" style="margin-top:10px"><b>Possible metric gaming on ${esc(g.domain)}</b><p>Fitness rose vs ${esc(g.parent_name)} while ${g.drops.map((x) => `${esc(x.metric)} fell ${fmt(x.parent)} → ${fmt(x.node)}`).join(", ")} (${esc(g.floor_metric)} ${fmt(g.floor_metric_parent)} → ${fmt(g.floor_metric_node)}).</p></div>`).join("")}
+    ${ev.integrity && ev.integrity.verdict === "failed" ? `<div class="alert high" style="margin-top:10px"><b>Integrity failed</b><p>${esc(ev.integrity.failure_reason || "")}</p></div>` : ""}
+  </div>`);
+  // made from
+  H.push(`<div class="sec"><h4>Idea &amp; hypothesis</h4>
+    ${mk.idea ? `<p class="prose">${esc(mk.idea)}</p>` : `<p class="prose dim">No Mutagen proposal linked to this node.</p>`}
+    ${mk.hypothesis ? `<p class="prose dim"><b>Hypothesis.</b> ${esc(mk.hypothesis)}</p>` : ""}
+    ${mk.prediction ? `<p class="prose dim"><b>Prediction.</b> ${esc(mk.prediction)}</p>` : ""}
+    ${mk.technique_tags && mk.technique_tags.length ? `<div class="gates">${mk.technique_tags.map((t) => `<span class="gate">${esc(t)}</span>`).join("")}</div>` : ""}</div>`);
+  const locus = mk.mutation_locus ? Object.entries(mk.mutation_locus).map(([k, v]) => `${k}: ${v}`).join(" · ") : "—";
+  H.push(`<div class="sec"><h4>What changed vs the parent</h4><dl class="kv">
+    <dt>parent${(mk.parents || []).length > 1 ? "s (crossover)" : ""}</dt><dd>${(mk.parents || []).map((p) => nodeBtn(p.id, p.name)).join(" + ") || "—"}</dd>
+    <dt>family</dt><dd>${esc(mk.family || "—")}</dd><dt>mutation tier</dt><dd>${esc(mk.mutation_tier || "—")}</dd>
+    <dt>locus</dt><dd class="mono" style="font-size:12px">${esc(locus)}</dd><dt>data</dt><dd class="mono" style="font-size:12px">${esc(mk.data_version || "—")}</dd>
+    ${(mk.config_changes || []).length ? `<dt>config</dt><dd>${mk.config_changes.map((c) => `<div class="mono" style="font-size:12px">${esc(c.key)}: <span class="faint">${esc(JSON.stringify(c.parent ?? null))}</span> → ${esc(JSON.stringify(c.node))}</div>`).join("")}</dd>` : ""}
+    </dl>${mk.genome ? `<details style="margin-top:8px"><summary>genome — model, loss, optimiser, schedule</summary><pre class="code">${esc(mk.genome)}</pre></details>` : ""}</div>`);
+  // decisions
+  const sel = mk.selector;
+  H.push(`<div class="sec"><h4>Selector</h4>${sel ? `<p class="prose">${sel.selected ? '<span class="sel-y">SELECTED</span>' : '<span class="sel-n">NOT SELECTED</span>'} · ${esc(sel.verdict || "")}${sel.rejection_reason ? ` — ${esc(sel.rejection_reason)}` : ""}</p>
+    <div class="gates">${Object.entries(sel.gates || {}).map(([k, v]) => `<span class="gate ${String(v).toLowerCase().startsWith("pass") ? "pass" : "fail"}" title="${esc(k)}">${esc(k.replace(/^h\d+_/, ""))}</span>`).join("")}</div>
+    ${sel.note ? `<p class="prose dim" style="margin-top:6px">${esc(sel.note)}</p>` : ""}` : `<p class="prose dim">No Selector review found.</p>`}</div>`);
+  const fg = mk.forge;
+  H.push(`<div class="sec"><h4>Forge${fg ? ` · tick ${fg.tick}` : ""}</h4>${fg ? `<dl class="kv">${Object.entries(fg.fields).filter(([k]) => !["report"].includes(k)).slice(0, 14).map(([k, v]) => `<dt>${esc(k)}</dt><dd class="mono" style="font-size:12px">${esc(typeof v === "string" ? v : JSON.stringify(v))}</dd>`).join("")}</dl>
+    ${fg.fields.report ? `<details style="margin-top:8px"><summary>full Forge report</summary><pre class="code">${esc(fg.fields.report)}</pre></details>` : ""}` : `<p class="prose dim">No Forge report found.</p>`}</div>`);
+  const pr = ev.probe || {};
+  H.push(`<div class="sec"><h4>Probe verdict</h4>${pr.verdict || pr.artefact_suspect ? `<p class="prose">${vbadge(pr.verdict || "artefact")} ${pr.tick ? tickBtn(pr.tick) : ""} ${pr.artefact_suspect ? '<span class="bd artefact-suspect">⚠ artefact suspect</span>' : ""}</p>${pr.evidence ? `<p class="prose dim">${esc(pr.evidence)}</p>` : ""}` : `<p class="prose dim">Probe has not issued a verdict for this node.</p>`}</div>`);
+  // per-domain
+  if ((ev.per_domain || []).length) {
+    const cols = ev.columns, fm = ev.floor_metric;
+    const fmax = d3safeMax(ev.per_domain.map((r) => r.values[fm]));
+    const gamed = new Set((ev.gaming || []).map((g) => g.domain));
+    H.push(`<div class="sec"><h4>Per-domain · worst first${ev.parent ? " · Δ vs parent" : ""}</h4><div style="overflow-x:auto;max-height:440px"><table class="dt"><thead><tr><th>domain</th>${cols.map((c) => `<th>${esc(c === "stroke_width_ratio" ? "stroke w." : c === "fmeasure" ? "F" : c)}</th>`).join("")}</tr></thead><tbody>
+      ${ev.per_domain.map((r) => `<tr class="${r.is_floor ? "floor" : ""} ${gamed.has(r.domain) ? "gamed" : ""}"><td>${esc(r.domain)}${r.is_floor ? '<span class="tag">floor</span>' : ""}${r.is_parent_floor && !r.is_floor ? '<span class="tag">parent floor</span>' : ""}</td>
+      ${cols.map((c) => { const v = r.values[c], pv = r.parent ? r.parent[c] : null; const dd = d(v, pv); const bar = c === fm && fmax ? `<span class="sbar" style="width:${Math.max(2, 40 * (v || 0) / fmax)}px"></span>` : ""; return `<td>${bar}${fmt(v)}${dd !== null ? `<span class="cell-d">${dl(dd)}</span>` : ""}</td>`; }).join("")}</tr>`).join("")}
+      </tbody></table></div></div>`);
+  }
+  // telemetry
+  const tel = ev.telemetry || {}, ptel = ev.parent_telemetry || {};
+  const keys = ["train_loss", "val_loss", "val_metric", "lr", "grad_norm"].filter((k) => (tel[k] || []).length);
+  H.push(`<div class="sec"><h4>Telemetry${Object.keys(ptel).length ? ' · dashed = parent' : ""}</h4>${keys.length ? `<div class="charts">${keys.map((k) => `<div class="mini"><h5>${esc(k)} <span class="faint">(${tel[k].length} pts)</span></h5><svg data-k="${k}"></svg></div>`).join("")}</div>` : `<p class="prose dim">No telemetry recorded.</p>`}</div>`);
+  // samples
+  if ((ev.samples || []).length) {
+    H.push(`<div class="sec"><h4>Sample outputs</h4><div class="samples">${ev.samples.map((s) => { const src = s.data_uri || (SNAP ? null : `${runBase()}/nodes/${encodeURIComponent(n.id)}/samples/${s.name.split("/").map(encodeURIComponent).join("/")}`); return src ? `<figure><img loading="lazy" src="${esc(src)}" alt="${esc(s.name)}"><figcaption>${esc(s.name)}</figcaption></figure>` : `<figure><figcaption>${esc(s.name)} (too large to inline)</figcaption></figure>`; }).join("")}</div></div>`);
+  }
+  $("dBody").innerHTML = H.join("");
+  if (HAS_D3) keys.forEach((k) => miniChart($("dBody").querySelector(`svg[data-k="${k}"]`), tel[k], ptel[k]));
+}
+function d3safeMax(a) { let m = null; for (const v of a) if (v !== null && v !== undefined && (m === null || v > m)) m = v; return m; }
+function miniChart(el, pts, ppts) {
+  const W = el.clientWidth || 260, H = 110, m = { t: 6, r: 6, b: 18, l: 40 };
+  const svg = d3.select(el).attr("viewBox", `0 0 ${W} ${H}`);
+  const all = pts.concat(ppts || []);
+  const x = d3.scaleLinear().domain(d3.extent(all, (p) => p[0])).range([m.l, W - m.r]);
+  const y = d3.scaleLinear().domain(d3.extent(all, (p) => p[1])).nice().range([H - m.b, m.t]);
+  svg.append("g").attr("class", "axis").attr("transform", `translate(0,${H - m.b})`).call(d3.axisBottom(x).ticks(4, "~s"));
+  svg.append("g").attr("class", "axis").attr("transform", `translate(${m.l},0)`).call(d3.axisLeft(y).ticks(3, "~g"));
+  const line = d3.line().x((p) => x(p[0])).y((p) => y(p[1]));
+  if (ppts && ppts.length) svg.append("path").attr("class", "p").attr("d", line(ppts));
+  svg.append("path").attr("class", "l").attr("d", line(pts));
+  if (pts.length < 8) svg.selectAll("circle").data(pts).join("circle").attr("r", 2.5).attr("cx", (p) => x(p[0])).attr("cy", (p) => y(p[1]));
+}
+
+// ── learnings ───────────────────────────────────────────────────────────────
+function renderLearnings() {
+  const L = S.bundle.learnings || {};
+  const nC = (L.recipes_confirmed || []).length, nR = (L.recipes_refuted || []).length, nA = (L.recipes_artefact || []).length;
+  $("learnSum").innerHTML = `${nC} recipe${nC === 1 ? "" : "s"} confirmed, ${nR} refuted, ${nA} called a metric artefact; ${(L.suspicious || []).length} suspicious gain${(L.suspicious || []).length === 1 ? "" : "s"} flagged and ${(L.gotchas || []).length} new gotcha${(L.gotchas || []).length === 1 ? "" : "s"}.`;
+  const recipeLi = (r) => `<li><div class="li-h">${vbadge(r.verdict)}<b>${esc(r.label)}</b>${tickBtn(r.tick)}<span class="faint mono" style="font-size:11px">med ${fmt(r.median)} · ${r.n} seed${r.n === 1 ? "" : "s"}</span><button class="nl" data-recipe="${esc(r.recipe)}">open</button></div>${r.evidence ? `<div class="clamp">${esc(r.evidence)}</div>` : ""}</li>`;
+  const lessonLi = (l) => `<li><div class="li-h"><b>${esc(prettyId(l.lesson_id))}</b>${tickBtn(l.tick)}${l.node_id ? nodeBtn(l.node_id, l.node) : l.node ? `<span class="faint mono">${esc(l.node)}</span>` : ""}</div><div class="clamp">${esc(l.lesson || l.observation || "")}</div></li>`;
+  const col = (title, c, items, empty) => `<div class="lcol" style="--c:${c}"><h3>${esc(title)}<span class="n">${items.length}</span></h3>${items.length ? `<ul>${items.join("")}</ul>` : `<div class="empty">${esc(empty)}</div>`}</div>`;
+  const susp = (L.suspicious || []).map((s) => `<li><div class="li-h"><span class="bd ${esc(s.kind)}">${GLYPH[s.kind] || "!"} ${esc(s.kind.replace(/-/g, " "))}</span>${nodeBtn(s.node_id, s.name)}${tickBtn(s.tick)}</div><div class="clamp">${esc(s.text)}</div></li>`);
+  const gotchas = (L.gotchas || []).map((g) => `<li><div class="li-h"><b>${esc(g.signature || g.kind)}</b>${tickBtn(g.tick)}<span class="faint mono" style="font-size:11px">${esc(g.scope)} · ×${esc(g.occurrences ?? 1)}</span></div><div class="clamp">${esc(g.avoidance)}</div></li>`);
+  const decisions = (L.decisions || []).map((d) => `<li><div class="li-h">${tickBtn(d.tick)}<span class="faint mono" style="font-size:11px">${esc((d.at || "").replace("T", " ").slice(0, 16))}</span></div><div class="clamp">${esc(d.text)}</div></li>`);
+  $("learn").innerHTML = [
+    col("What worked", "var(--ok)", (L.recipes_confirmed || []).map(recipeLi).concat((L.worked || []).map(lessonLi)), "No recipe or lesson confirmed yet."),
+    col("What did not", "var(--bad)", (L.recipes_refuted || []).map(recipeLi).concat((L.failed || []).map(lessonLi)), "Nothing refuted yet."),
+    col("Metric artefacts & suspicious gains", "var(--art)", (L.recipes_artefact || []).map(recipeLi).concat((L.artefacts || []).map(lessonLi), susp), "No artefact or suspicious gain flagged."),
+    col("Pitfalls, gotchas & open questions", "var(--pend)", gotchas.concat((L.unclear || []).map(lessonLi)), "No gotcha recorded during this run."),
+    `<div style="grid-column:1/-1">${col("Recent decisions", "var(--robust)", decisions, "No decision-log entries.")}</div>`,
+  ].join("");
+}
+
+// ── alerts ──────────────────────────────────────────────────────────────────
+function renderAlerts() {
+  const A = S.bundle.alerts || [];
+  const recipeById = new Map((S.bundle.recipes || []).map((r) => [r.id, r]));
+  const name = (id) => ((S.bundle.points || []).find((p) => p.id === id) || {}).name;
+  $("alerts").innerHTML = A.length ? A.map((a) => `<div class="alert ${esc(a.severity)}"><b>${esc(a.title)}</b><p>${esc(a.detail)}</p>
+    ${(a.nodes || []).length || (a.recipes || []).length ? `<div class="acts">${(a.recipes || []).slice(0, 6).map((r) => recipeById.get(r) ? `<button class="nl" data-recipe="${esc(r)}">${esc(recipeById.get(r).label)}</button>` : "").join("")}${(a.nodes || []).slice(0, 6).map((n) => nodeBtn(n, name(n))).join("")}</div>` : ""}</div>`).join("")
+    : `<div class="alert low"><b>No health alerts</b><p>No gaming signature, seed blow-up, integrity failure, plateau or stall detected.</p></div>`;
+}
+
+// ── steer ───────────────────────────────────────────────────────────────────
+function renderSteer() {
+  if (SNAP) return;
+  const card = $("steerCard"), enabled = S.bundle.steer_enabled !== false;
+  card.hidden = false;
+  const axSel = $("steerAxis");
+  if (!axSel.options.length) axSel.innerHTML = ["accuracy", "generalization", "data", "stability", "compute", "memory", "cost"].map((a) => `<option>${a}</option>`).join("");
+  try { const a = localStorage.getItem("evor-author"); if (a && !$("steerAuthor").value) $("steerAuthor").value = a; } catch (e) {}
+  $("steerBtn").disabled = !enabled;
+  if (!enabled) $("steerMsg").textContent = "Steering is disabled on this dashboard (--no-steer).";
+  const ts = S.bundle.overview.stall || {};
+  $("steerList").innerHTML = (S.bundle.steers || []).slice(0, 12).map((s) => `<li><div class="li-h"><span class="st ${esc(s.status)}">${s.status === "queued" ? "QUEUED" : "DRAINED"}</span><b class="mono" style="font-size:12px">${esc(s.author || "anonymous")}</b><span class="faint mono" style="font-size:11px">${esc((s.created_at || "").replace("T", " ").slice(0, 16))}</span>${s.picked_up_tick ? tickBtn(s.picked_up_tick) : ""}</div>
+    <div>${esc(s.note)}</div><div class="faint" style="font-size:11.5px;margin-top:3px">${s.status === "queued" ? `Waiting for the next tick's inbox drain (tick ${esc(ts.tick ?? "?")} is at step ${esc(ts.step ?? "?")}).` : `On the signal bus since ${esc((s.drained_at || "").replace("T", " ").slice(0, 16))}${s.picked_up_tick ? ` — drained during tick ${s.picked_up_tick}` : ""}.`}</div></li>`).join("");
+}
+$("steerForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const note = $("steerNote").value.trim(), author = $("steerAuthor").value.trim(), axis = $("steerAxis").value;
+  if (!note || !author) return;
+  $("steerBtn").disabled = true; $("steerMsg").textContent = "Sending…";
+  try {
+    await api(`${runBase()}/steer`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ note, author, axis }) });
+    try { localStorage.setItem("evor-author", author); } catch (er) {}
+    $("steerNote").value = ""; $("steerMsg").textContent = "Queued in signals-inbox.jsonl. The next tick drains it onto the signal bus.";
+    await refresh(true);
+  } catch (er) { $("steerMsg").textContent = `Not sent: ${er.message}`; }
+  finally { $("steerBtn").disabled = S.bundle.steer_enabled === false; }
 });
 
-async function loadTab(name) {
-  if (!currentMission) return;
-  switch (name) {
-    case 'tree':      await loadTree(); break;
-    case 'frontier':  await loadFrontier(); break;
-    case 'telemetry': await loadTelemetryPicker(); break;
-    case 'domains':   await loadDomainSetup(); break;
-    case 'coverage':  await loadCoverage(); break;
-    case 'timeline':  await loadTimeline(); break;
-  }
+// ── timeline ────────────────────────────────────────────────────────────────
+function renderTimeline() {
+  const T = S.bundle.timeline || [];
+  if (!T.length) { $("strip").innerHTML = ""; $("tickBody").innerHTML = `<p class="faint">No ticks yet.</p>`; return; }
+  if (S.tick === null || !T.find((t) => t.tick === S.tick)) { const done = T.filter((t) => !t.in_progress); S.tick = (done[done.length - 1] || T[T.length - 1]).tick; }
+  $("strip").innerHTML = T.map((t) => `<button class="tchip ${t.in_progress ? "live" : ""}" aria-pressed="${t.tick === S.tick}" data-tickchip="${t.tick}" title="${esc(t.headline)}">
+    <span class="n">t${t.tick}</span><span class="s">${t.score !== null ? fmt(t.score) : "—"}</span><span class="dots">${t.probe.filter((p) => !p.audit).map((p) => `<i class="${esc(p.verdict || "")}"></i>`).join("") || (t.in_progress ? "" : "<i></i>")}</span></button>`).join("");
+  const t = T.find((x) => x.tick === S.tick);
+  const recipeById = new Map((S.bundle.recipes || []).map((r) => [r.id, r]));
+  const prop = t.proposals.map((p) => `<div class="item"><div class="h"><span class="bd">${esc(p.family || "?")}</span>${p.parents.length ? `<span class="faint mono" style="font-size:11px">from ${esc(p.parents.join(" + "))}</span>` : ""}</div><div class="clamp">${esc(p.idea_short || p.idea)}</div>${p.prediction ? `<div class="faint" style="font-size:11.5px">predicts: ${esc(p.prediction.slice(0, 220))}${p.prediction.length > 220 ? "…" : ""}</div>` : ""}</div>`).join("");
+  const sel = t.proposals.map((p) => `<div class="item"><div class="h">${p.selected ? `<span class="sel-y">SELECTED${p.winner ? " · WINNER" : ""}</span>` : `<span class="sel-n">${esc((p.review || "rejected").toUpperCase())}</span>`}<span class="faint mono" style="font-size:11px">${esc(p.proposal_id)}</span></div>${p.rejection_reason ? `<div>${esc(p.rejection_reason)}</div>` : ""}${p.failed_gates.length ? `<div class="gates">${p.failed_gates.map((g) => `<span class="gate fail">${esc(g)}</span>`).join("")}</div>` : ""}${p.note ? `<div class="clamp">${esc(p.note)}</div>` : ""}</div>`).join("");
+  const forge = t.forge.map((f) => `<div class="item"><div class="h">${nodeBtn(f.node_id, f.name)}<span class="mono">${fmt(f.fitness)}</span>${f.status ? `<span class="faint mono" style="font-size:11px">${esc(f.status)}</span>` : ""}${f.integrity_failed ? '<span class="bd integrity-failed">⨯ integrity</span>' : ""}</div>${f.note ? `<div class="clamp">${esc(f.note)}</div>` : ""}</div>`).join("");
+  const probe = t.probe.map((p) => `<div class="item"><div class="h">${p.audit ? `<span class="bd">audit</span><span class="mono" style="font-size:12px">${esc(p.raw || "")}</span>` : vbadge(p.verdict)}<span class="faint mono" style="font-size:11px">${esc(p.targets.slice(0, 4).join(", "))}${p.targets.length > 4 ? "…" : ""}</span></div>${p.evidence && !p.audit ? `<div class="clamp">${esc(p.evidence)}</div>` : ""}</div>`).join("") + (t.probe_summary ? `<div class="item"><div class="clamp">${esc(t.probe_summary)}</div></div>` : "");
+  const learned = t.lessons.map((l) => `<div class="item"><div class="h"><b style="font:600 12.5px var(--cond)">${esc(prettyId(l.lesson_id))}</b>${l.artefact ? '<span class="vb artefact">artefact</span>' : l.verdict ? vbadge(l.verdict) : ""}</div><div class="clamp">${esc(l.lesson || l.observation)}</div></div>`).join("")
+    + t.gotchas.map((g) => `<div class="item"><div class="h"><span class="bd">gotcha</span><b class="mono" style="font-size:12px">${esc(g.signature)}</b></div><div class="clamp">${esc(g.avoidance)}</div></div>`).join("")
+    + (t.sage.n ? `<div class="item"><div class="h"><span class="bd">sage</span><span class="faint">${t.sage.n} literature finding${t.sage.n === 1 ? "" : "s"}</span></div><div class="clamp">${esc(t.sage.titles.join(" · "))}</div></div>` : "");
+  const sig = t.signals.map((s) => `<div class="item"><div class="h"><span class="bd" style="${s.severity === "high" || s.severity === "critical" ? "color:var(--bad)" : ""}">${esc(s.severity)}</span><b class="mono" style="font-size:12px">${esc(s.kind)}</b><span class="faint mono" style="font-size:11px">${esc(s.source || "")}</span></div><div class="clamp">${esc(s.summary)}</div></div>`).join("");
+  const dec = t.decisions.map((d) => `<div class="item"><span class="faint mono" style="font-size:11px">${esc((d.at || "").slice(11, 16))}</span> ${esc(d.text)}</div>`).join("");
+  const steps = [["Proposed", "Mutagen", prop], ["Critiqued", "Selector", sel], ["Built & scored", "Forge", forge], ["Verdict", "Probe", probe], ["Learned", "wiki · gotchas · Sage", learned], ["Signals", "bus", sig], ["Decision log", "", dec]];
+  $("tickBody").innerHTML = `<div class="tick-h">Tick ${t.tick}${t.in_progress ? ' <span class="chip">in progress</span>' : ""} — <span class="muted" style="font-weight:500">${esc(t.headline)}</span></div>
+    ${t.recipes.length ? `<div style="margin:-4px 0 10px;display:flex;gap:6px;flex-wrap:wrap">${t.recipes.map((rid) => recipeById.get(rid)).filter(Boolean).map((r) => `<button class="nl" data-recipe="${esc(r.id)}">${esc(r.label)}</button> ${vbadge(r.verdict)}`).join(" ")}</div>` : ""}
+    <div class="flow">${steps.filter((s) => s[2]).map(([h, who, body]) => `<div class="step"><h4>${esc(h)} <span class="who">${esc(who)}</span></h4>${body}</div>`).join("")}</div>`;
 }
 
-// ── Tree panel ────────────────────────────────────────────────────────────────
-async function loadTree() {
-  allNodes = await api(`${runBase()}/tree`);
-  frontierNodes = await api(`${runBase()}/frontier`);
-  renderTree(allNodes, frontierNodes);
-}
+// ── delegated clicks ────────────────────────────────────────────────────────
+document.addEventListener("click", (e) => {
+  const el = e.target.closest("[data-node],[data-recipe],[data-tick],[data-tickchip],.clamp");
+  if (!el) return;
+  if (el.classList.contains("clamp")) { el.classList.toggle("open"); return; }
+  if (el.dataset.node) { selectNode(el.dataset.node); return; }
+  if (el.dataset.recipe) { const r = (S.bundle.recipes || []).find((x) => x.id === el.dataset.recipe); if (r) selectRecipe(r); return; }
+  const t = el.dataset.tick || el.dataset.tickchip;
+  if (t) { S.tick = +t; renderTimeline(); if (el.dataset.tick) document.getElementById("tlTitle").scrollIntoView({ behavior: "smooth", block: "start" }); }
+});
+let rz; window.addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(() => { renderFigure(); renderTree(); }, 150); });
 
-function renderTree(nodes, frontier) {
-  const frontierIds = new Set(frontier.map(n => n.id));
-  const svg = d3.select('#tree-svg');
-  svg.selectAll('*').remove();
-  const container = document.getElementById('tree-svg');
-  const W = container.clientWidth || 800, H = container.clientHeight || 500;
-
-  // Build hierarchy from parent_ids (use first parent only for layout)
-  const byId = Object.fromEntries(nodes.map(n => [n.id, n]));
-  const roots = nodes.filter(n => !n.parent_ids.length);
-  if (!roots.length) {
-    svg.append('text').attr('x', W/2).attr('y', H/2)
-       .attr('text-anchor','middle').attr('fill','#8892a4').text('No nodes yet');
-    return;
-  }
-
-  // Build d3 stratify data
-  const data = nodes.map(n => ({
-    id: n.id,
-    parentId: n.parent_ids[0] ?? null,
-    _node: n,
-  }));
-
-  let root;
-  try {
-    root = d3.stratify().id(d => d.id).parentId(d => d.parentId)(data);
-  } catch { return; }
-
-  const margin = { top: 30, right: 80, bottom: 20, left: 80 };
-  const innerW = W - margin.left - margin.right;
-  const innerH = H - margin.top - margin.bottom;
-
-  const treeLayout = d3.tree().size([innerH, innerW]);
-  treeLayout(root);
-
-  const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
-
-  // Links
-  g.selectAll('.link').data(root.links()).enter().append('path').attr('class', 'link')
-   .attr('d', d3.linkHorizontal().x(d => d.y).y(d => d.x));
-
-  // Nodes
-  const nodeG = g.selectAll('.node').data(root.descendants()).enter()
-    .append('g').attr('class', d => {
-      const n = d.data._node;
-      let cls = 'node';
-      if (frontierIds.has(n.id)) cls += ' frontier';
-      if (n.status === 'pruned') cls += ' pruned';
-      if (n.status === 'running') cls += ' running';
-      return cls;
-    })
-    .attr('transform', d => `translate(${d.y},${d.x})`)
-    .style('cursor', 'pointer')
-    .on('click', (ev, d) => showNodeSidebar(d.data._node));
-
-  nodeG.append('circle')
-    .attr('r', d => 6 + Math.min((d.data._node.visit_count || 1) * 1.5, 8))
-    .attr('fill', d => FAMILY_COLORS[d.data._node.approach_family] ?? '#8892a4')
-    .attr('stroke', d => frontierIds.has(d.data._node.id) ? '#22c55e' : 'var(--surface)');
-
-  // Eval version badge
-  nodeG.append('text').attr('class', 'eval-badge')
-    .attr('dx', 0).attr('dy', -14).attr('text-anchor', 'middle')
-    .text(d => d.data._node.eval_version ?? '');
-
-  // Hatch pruned / old-version nodes
-  const currentVersion = frontierNodes[0]?.eval_version ?? null;
-  const defs = svg.append('defs');
-  defs.append('pattern').attr('id','hatch').attr('patternUnits','userSpaceOnUse')
-    .attr('width',4).attr('height',4)
-    .append('path').attr('d','M-1,1 l2,-2 M0,4 l4,-4 M3,5 l2,-2')
-    .attr('stroke','#8892a4').attr('stroke-width',0.8);
-
-  nodeG.filter(d => currentVersion && d.data._node.eval_version !== currentVersion)
-    .append('circle')
-    .attr('r', d => 6 + Math.min((d.data._node.visit_count||1)*1.5, 8))
-    .attr('fill', 'url(#hatch)').attr('opacity', 0.4).attr('pointer-events','none');
-
-  // Add zoom
-  svg.call(d3.zoom().scaleExtent([0.3, 3]).on('zoom', ev => g.attr('transform', ev.transform)));
-}
-
-async function showNodeSidebar(node) {
-  const sidebar = document.getElementById('node-sidebar');
-  sidebar.innerHTML = '<h3>Loading…</h3>';
-  try {
-    const detail = await api(`${runBase()}/nodes/${node.id}`);
-    const n = detail.node, r = detail.result, integ = detail.integrity;
-    const color = FAMILY_COLORS[n.approach_family] ?? '#8892a4';
-
-    let perDomainHtml = '';
-    if (r?.per_domain) {
-      const domains = Object.keys(r.per_domain);
-      perDomainHtml = `
-        <h3 style="margin-top:16px">Per-Domain Breakdown <span class="version-badge">${r.eval_version}</span></h3>
-        <table class="domain-table"><thead><tr><th>Domain</th>${
-          Object.keys(Object.values(r.per_domain)[0]||{}).map(m=>`<th>${m}</th>`).join('')
-        }</tr></thead><tbody>
-        ${domains.map(d => `<tr><td>${d}</td>${
-          Object.values(r.per_domain[d]).map(v => `<td>${v.toFixed(4)}</td>`).join('')
-        }</tr>`).join('')}
-        </tbody></table>`;
-    }
-
-    sidebar.innerHTML = `
-      <h3>Node <code style="font-size:11px">${n.id.slice(0,8)}…</code></h3>
-      <table class="kv-table">
-        <tr><td>Family</td><td><span class="family-badge" style="background:${color}22;color:${color};border:1px solid ${color}44">${n.approach_family}</span></td></tr>
-        <tr><td>Tier</td><td><span class="tier-badge">${n.mutation_tier ?? '—'}</span></td></tr>
-        <tr><td>Status</td><td>${n.status}</td></tr>
-        <tr><td>Depth</td><td>${n.depth}</td></tr>
-        <tr><td>Visits</td><td>${n.visit_count}</td></tr>
-        <tr><td>Eval version</td><td><span class="version-badge">${n.eval_version}</span></td></tr>
-        <tr><td>Integrity</td><td class="${integ?.verdict === 'passed' ? 'integrity-pass' : 'integrity-fail'}">${integ?.verdict ?? '—'}</td></tr>
-        <tr><td>Fitness</td><td><strong>${r?.fitness_value?.toFixed(4) ?? '—'}</strong></td></tr>
-        ${Object.entries(n.metrics||{}).map(([k,v]) => `<tr><td>${k}</td><td>${v.toFixed(4)}</td></tr>`).join('')}
-        <tr><td>Citations</td><td>${n.citations?.length ?? 0}</td></tr>
-        <tr><td>Lessons</td><td>${n.lesson_ids?.length ?? 0}</td></tr>
-      </table>
-      ${perDomainHtml}
-      <div style="margin-top:12px">
-        <button onclick="selectNodeTelemetry('${n.id}')" style="background:var(--accent);border:none;color:#fff;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:12px">
-          View Telemetry
-        </button>
-      </div>`;
-  } catch (e) {
-    sidebar.innerHTML = `<p style="color:var(--red)">Error: ${e.message}</p>`;
-  }
-}
-
-function selectNodeTelemetry(nodeId) {
-  document.querySelector('[data-tab="telemetry"]').click();
-  setTimeout(() => activateTelemetryNode(nodeId), 100);
-}
-
-// ── Frontier panel ────────────────────────────────────────────────────────────
-async function loadFrontier() {
-  const [frontier, runs] = await Promise.all([
-    api(`${runBase()}/frontier`),
-    api('/api/runs'),
-  ]);
-  const run = runs.find(r => r.mission_id === currentMission && r.run_id === currentRun);
-  const baseline = run?.baseline_value ?? 0;
-
-  document.getElementById('frontierMeta').textContent =
-    `${frontier.length} frontier node(s) — baseline: ${baseline}`;
-
-  const tbody = document.getElementById('frontierBody');
-  tbody.innerHTML = '';
-  frontier.forEach((n, i) => {
-    const delta = ((n.fitness_value ?? 0) - baseline);
-    const deltaStr = (delta >= 0 ? '+' : '') + delta.toFixed(4);
-    const deltaClass = delta >= 0 ? 'delta-pos' : 'delta-neg';
-    const color = FAMILY_COLORS[n.approach_family] ?? '#8892a4';
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td class="rank">${i + 1}</td>
-      <td><code>${n.id.slice(0,12)}…</code></td>
-      <td><span class="family-badge" style="background:${color}22;color:${color}">${n.approach_family}</span></td>
-      <td><strong>${n.fitness_value?.toFixed(4) ?? '—'}</strong></td>
-      <td class="${deltaClass}">${deltaStr}</td>
-      <td><span class="version-badge">${n.eval_version}</span></td>
-      <td class="${n.integrity_status === 'passed' ? 'integrity-pass' : 'integrity-fail'}">${n.integrity_status}</td>
-      <td>${n.mutation_tier ?? '—'}</td>`;
-    tr.onclick = () => {
-      document.querySelector('[data-tab="tree"]').click();
-      setTimeout(() => showNodeSidebar(n), 200);
-    };
-    tbody.appendChild(tr);
-  });
-
-  if (!frontier.length) tbody.innerHTML = '<tr><td colspan="8" class="empty">No frontier nodes yet</td></tr>';
-
-  // Per-domain of best frontier node
-  const domDiv = document.getElementById('frontierDomain');
-  if (frontier.length) {
-    try {
-      const pd = await api(`${runBase()}/nodes/${frontier[0].id}/per-domain`);
-      const domains = Object.keys(pd.per_domain);
-      const metrics = domains.length ? Object.keys(pd.per_domain[domains[0]]) : [];
-      domDiv.innerHTML = `
-        <h4 style="font-size:12px;color:var(--muted);margin-bottom:8px">Best node per-domain breakdown <span class="version-badge">${pd.eval_version}</span></h4>
-        <table class="domain-table"><thead><tr><th>Domain</th>${metrics.map(m=>`<th>${m}</th>`).join('')}</tr></thead>
-        <tbody>${domains.map(d => `<tr><td>${d}</td>${metrics.map(m=>`<td>${pd.per_domain[d][m]?.toFixed(4)??'—'}</td>`).join('')}</tr>`).join('')}
-        </tbody></table>`;
-    } catch { domDiv.innerHTML = ''; }
-  }
-}
-
-// ── Telemetry panel ───────────────────────────────────────────────────────────
-async function loadTelemetryPicker() {
-  allNodes = allNodes.length ? allNodes : await api(`${runBase()}/tree`);
-  const picker = document.getElementById('telNodePicker');
-  picker.innerHTML = '<span style="color:var(--muted);font-size:12px">Select node: </span>';
-  const done = allNodes.filter(n => n.status === 'done' || n.status === 'running');
-  done.slice(0, 12).forEach(n => {
-    const chip = document.createElement('span');
-    chip.className = 'node-chip';
-    chip.textContent = n.id.slice(0, 10);
-    chip.title = `${n.approach_family} — fitness ${n.fitness_value?.toFixed(4)??'—'}`;
-    chip.onclick = () => activateTelemetryNode(n.id);
-    picker.appendChild(chip);
-  });
-  if (done.length) activateTelemetryNode(done[0].id);
-}
-
-const chartConfigs = [
-  { id: 'chartLoss',       field: 'train_loss',  label: 'Loss',        color: '#ef4444' },
-  { id: 'chartVal',        field: 'val_metric',   label: 'Val Metric',  color: '#22c55e' },
-  { id: 'chartGrad',       field: 'grad_norm',    label: 'Grad Norm',   color: '#f59e0b' },
-  { id: 'chartThroughput', field: 'throughput',   label: 'Samples/s',   color: '#6366f1' },
-];
-
-function ensureCharts() {
-  if (charts._ready) return;
-  chartConfigs.forEach(cfg => {
-    const ctx = document.getElementById(cfg.id).getContext('2d');
-    charts[cfg.id] = new Chart(ctx, {
-      type: 'line',
-      data: { labels: [], datasets: [{ label: cfg.label, data: [], borderColor: cfg.color, backgroundColor: cfg.color + '22', borderWidth: 1.5, pointRadius: 0, tension: 0.3, fill: true }] },
-      options: { animation: false, responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { display: false } },
-        scales: {
-          x: { ticks: { color: '#8892a4', maxTicksLimit: 6 }, grid: { color: '#2d3148' } },
-          y: { ticks: { color: '#8892a4' }, grid: { color: '#2d3148' } }
-        }
-      }
-    });
-  });
-  charts._ready = true;
-}
-
-function updateCharts(records) {
-  if (!records.length) return;
-  chartConfigs.forEach(cfg => {
-    const ch = charts[cfg.id];
-    if (!ch) return;
-    ch.data.labels = records.map(r => r.step);
-    ch.data.datasets[0].data = records.map(r => r[cfg.field] ?? null);
-    ch.update('none');
-  });
-}
-
-function activateTelemetryNode(nodeId) {
-  ensureCharts();
-  // Highlight chip
-  document.querySelectorAll('.node-chip').forEach(c => {
-    c.classList.toggle('active', c.textContent === nodeId.slice(0, 10));
-  });
-
-  if (telSource) { telSource.close(); telSource = null; }
-
-  const records = [];
-  const url = `${BASE}/api/telemetry/${currentMission}/${currentRun}/${nodeId}`;
-  telSource = new EventSource(url);
-  telSource.onmessage = ev => {
-    try {
-      const rec = JSON.parse(ev.data);
-      if (!rec.error) {
-        records.push(rec);
-        updateCharts(records);
-      }
-    } catch {}
-  };
-}
-
-// ── Domain leaderboard ────────────────────────────────────────────────────────
-async function loadDomainSetup() {
-  // Populate eval version dropdown from eval-versions endpoint
-  try {
-    const suites = await api(`${runBase()}/eval-versions`);
-    const sel = document.getElementById('evalVersionSelect');
-    sel.innerHTML = '<option value="">current (default)</option>';
-    suites.forEach(s => {
-      const opt = document.createElement('option');
-      opt.value = s.eval_version;
-      opt.text = s.eval_version + (s.domains?.length ? ` (${s.domains.length} domains)` : '');
-      sel.appendChild(opt);
-    });
-    // Default domain/metric from first suite
-    if (suites.length && suites[0].domains?.length) {
-      document.getElementById('domainInput').value = suites[0].domains[0].domain_id;
-      if (suites[0].domains[0].metric_specs?.length) {
-        document.getElementById('metricInput').value = suites[0].domains[0].metric_specs[0].metric_name;
-      }
-    }
-  } catch {}
-  await loadDomainPivot();
-}
-
-async function loadDomainPivot() {
-  const domain = document.getElementById('domainInput').value.trim() || 'scanned';
-  const metric = document.getElementById('metricInput').value.trim() || 'accuracy';
-  const evalVersion = document.getElementById('evalVersionSelect').value;
-
-  const warnEl = document.getElementById('crossVersionWarn');
-  warnEl.style.display = 'none';
-
-  let rows = [];
-  try {
-    const params = new URLSearchParams({ metric, domain });
-    if (evalVersion) params.set('eval_version', evalVersion);
-    rows = await api(`${runBase()}/domain-pivot?${params}`);
-  } catch (e) {
-    document.getElementById('pivotBody').innerHTML = `<tr><td colspan="7" class="empty">No data: ${e.message}</td></tr>`;
-    return;
-  }
-
-  // Check cross-version
-  const versions = [...new Set(rows.map(r => r.eval_version))];
-  if (versions.length > 1) warnEl.style.display = 'block';
-
-  const maxVal = rows.length ? Math.max(...rows.map(r => r.value)) : 1;
-  const tbody = document.getElementById('pivotBody');
-  tbody.innerHTML = '';
-  rows.forEach((row, i) => {
-    const color = FAMILY_COLORS[row.approach_family] ?? '#8892a4';
-    const pct = maxVal > 0 ? (row.value / maxVal * 100).toFixed(1) : 0;
-    tbody.innerHTML += `
-      <tr>
-        <td class="rank">${i+1}</td>
-        <td><code>${row.node_id.slice(0,12)}…</code></td>
-        <td><span class="family-badge" style="background:${color}22;color:${color}">${row.approach_family}</span></td>
-        <td><strong>${row.value.toFixed(4)}</strong></td>
-        <td><span class="perf-bar" style="width:${pct}px;max-width:120px"></span></td>
-        <td><span class="version-badge">${row.eval_version}</span></td>
-        <td class="${row.integrity_status==='passed'?'integrity-pass':'integrity-fail'}">${row.integrity_status??'—'}</td>
-      </tr>`;
-  });
-  if (!rows.length) tbody.innerHTML = `<tr><td colspan="7" class="empty">No nodes with ${domain}/${metric} data</td></tr>`;
-}
-
-// ── Coverage panel ────────────────────────────────────────────────────────────
-async function loadCoverage() {
-  const el = document.getElementById('coverageContent');
-  try {
-    const cov = await apiMaybe(`${runBase()}/coverage`);
-    if (!cov) {
-      el.innerHTML = '<p class="not-available">Coverage gauge is only available for <strong>open_ended</strong> missions. This is a fixed mission.</p>';
-      return;
-    }
-    const pct = (cov.current_coverage * 100).toFixed(1);
-    const targetPct = (cov.coverage_target * 100).toFixed(0);
-    const circ = 2 * Math.PI * 54;
-    const offset = circ * (1 - cov.current_coverage);
-    const maxVal = Math.max(...(cov.per_angle.map(a => Math.max(a.value, a.sota_bar))), 1);
-
-    el.innerHTML = `
-      <div class="coverage-layout">
-        <div class="gauge-card">
-          <h3 style="font-size:13px;color:var(--muted);margin-bottom:16px">SOTA Coverage</h3>
-          <div class="gauge-ring">
-            <svg viewBox="0 0 120 120">
-              <circle class="gauge-bg" cx="60" cy="60" r="54"/>
-              <circle class="gauge-fill" cx="60" cy="60" r="54"
-                stroke-dasharray="${circ}"
-                stroke-dashoffset="${offset}"
-                stroke="${cov.current_coverage >= cov.coverage_target ? '#22c55e' : '#6366f1'}"/>
-            </svg>
-            <div class="gauge-center">
-              <div class="gauge-pct" style="color:${cov.current_coverage >= cov.coverage_target ? '#22c55e' : '#e2e8f0'}">${pct}%</div>
-              <div class="gauge-label">target ${targetPct}%</div>
-            </div>
-          </div>
-          ${cov.worst_angle_id ? `<p style="font-size:12px;color:var(--muted)">Worst angle: <strong>${cov.worst_angle_id}</strong></p>` : ''}
-        </div>
-        <div>
-          <h3 style="font-size:13px;color:var(--muted);margin-bottom:16px">Per-Angle vs SOTA</h3>
-          <div class="angle-bars">
-            ${cov.per_angle.map(a => {
-              const barW = Math.min((a.value / maxVal * 100), 100).toFixed(1);
-              const sotaPos = Math.min((a.sota_bar / maxVal * 100), 100).toFixed(1);
-              const cls = a.above_sota ? 'angle-above' : 'angle-below';
-              return `<div class="angle-row">
-                <span class="angle-name">${a.angle_id}</span>
-                <div class="angle-bar-wrap">
-                  <div class="angle-bar-fill" style="width:${barW}%;background:${a.above_sota?'#22c55e':'#6366f1'}"></div>
-                  <div class="angle-bar-sota" style="left:${sotaPos}%"></div>
-                </div>
-                <span class="angle-val ${cls}">${a.value.toFixed(3)}</span>
-                <span style="font-size:10px;color:var(--muted)">SOTA ${a.sota_bar.toFixed(3)}</span>
-              </div>`;
-            }).join('')}
-          </div>
-        </div>
-      </div>`;
-  } catch (e) {
-    el.innerHTML = `<p style="color:var(--red)">Error loading coverage: ${e.message}</p>`;
-  }
-}
-
-// ── Benchmark timeline ────────────────────────────────────────────────────────
-async function loadTimeline() {
-  const el = document.getElementById('timelineContent');
-  try {
-    const suites = await api(`${runBase()}/eval-versions`);
-    if (!suites.length) {
-      el.innerHTML = '<p class="empty">No eval-version history yet</p>';
-      return;
-    }
-    el.innerHTML = `<div class="timeline">${suites.map((s, i) => {
-      const newDomains = i === 0
-        ? s.domains.map(d => d.domain_id)
-        : s.domains.filter(d => d.added_at_eval_version === s.eval_version).map(d => d.domain_id);
-      const totalDomains = s.domains.length;
-      return `
-        <div class="timeline-item">
-          <div class="timeline-dot">${s.eval_version}</div>
-          <div class="timeline-content">
-            <div class="timeline-header">
-              <span class="timeline-version">${s.eval_version}</span>
-              <span class="consent-badge">created_by: ${s.created_by}</span>
-              <span class="timeline-date">${s.created_at?.slice(0,10) ?? ''}</span>
-              ${s.parent_eval_version ? `<span style="font-size:11px;color:var(--muted)">⊇ ${s.parent_eval_version}</span>` : ''}
-            </div>
-            <div style="font-size:12px;color:var(--muted)">
-              ${totalDomains} domain(s) total${newDomains.length ? ` — ${newDomains.length} added this version` : ''}
-            </div>
-            ${newDomains.length ? `<div class="domain-pills">${newDomains.map(d => `<span class="domain-pill">+ ${d}</span>`).join('')}</div>` : ''}
-          </div>
-        </div>`;
-    }).join('')}</div>`;
-  } catch (e) {
-    el.innerHTML = `<p style="color:var(--red)">Error: ${e.message}</p>`;
-  }
-}
-
-// ── Bootstrap ─────────────────────────────────────────────────────────────────
-init();
+boot();
+})();
 </script>
 </body>
 </html>
