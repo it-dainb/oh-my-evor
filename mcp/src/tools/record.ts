@@ -236,6 +236,11 @@ export function updateBestScore(
 
     const runStatePath = join(paths.runDir, "run-state.json");
     const state = readRunState(runStatePath, runId);
+    // best_score is per eval version: a score under a version that is not in
+    // force (the parent of a hardening, say) must not set the best of this one.
+    const scoredUnder = (result as Record<string, unknown> | null)?.eval_version;
+    const inForce = state.current_eval_version ?? contract?.eval_version;
+    if (typeof scoredUnder === "string" && typeof inForce === "string" && scoredUnder !== inForce) return;
     const current = state.best_score;
     const lowerIsBetter = primary.direction === "lower";
 
@@ -261,16 +266,25 @@ const EVALUATOR_FIELDS = [
   "fitness_value", "metrics", "per_domain", "status", "benchmark_raw", "eval_version",
   // The parent evaluator's score under a metric hardening is measured by the
   // runner; a recording agent's copy must not be able to raise it.
-  "parent_eval_version", "parent_fitness_value",
+  "parent_eval_version", "parent_fitness_value", "parent_metrics", "parent_inputs_match",
 ];
 
+/** The only shape an eval version takes where it builds a path. */
+const VERSION_RE = /^v\d+$/;
+
 /**
- * Re-score bookkeeping for a metric hardening: once every node the hardening
- * marked has a result under the new version, the upgrade record says so.
+ * Re-score bookkeeping for a metric hardening. A node counts as re-scored only
+ * when it evaluated AND passed integrity; one that did not is listed as failed,
+ * and the record is "complete" only when every marked node succeeded. When the
+ * last one lands, the frontier order under the new version is logged beside the
+ * order under the parent — a stricter metric may reorder the frontier.
  * Best-effort — the record is evidence for a reader, not a gate.
  */
-function markRescored(runDir: string, nodeId: string, evalVersion: unknown): void {
-  if (typeof evalVersion !== "string") return;
+function markRescored(
+  runId: string, runDir: string, nodeId: string, evalVersion: string | undefined,
+  succeeded: boolean, missionId?: string,
+): void {
+  if (!evalVersion) return;
   const dir = join(runDir, "benchmark-upgrades");
   if (!existsSync(dir)) return;
   try {
@@ -280,12 +294,28 @@ function markRescored(runDir: string, nodeId: string, evalVersion: unknown): voi
       const ids = Array.isArray(up.rescore_node_ids) ? (up.rescore_node_ids as string[]) : [];
       if (up.to_eval_version !== evalVersion || !ids.includes(nodeId)) continue;
       const done = new Set(Array.isArray(up.rescored_node_ids) ? (up.rescored_node_ids as string[]) : []);
-      done.add(nodeId);
+      const failed = new Set(Array.isArray(up.rescore_failed_node_ids) ? (up.rescore_failed_node_ids as string[]) : []);
+      if (succeeded) { done.add(nodeId); failed.delete(nodeId); } else { failed.add(nodeId); done.delete(nodeId); }
       up.rescored_node_ids = [...done];
+      up.rescore_failed_node_ids = [...failed];
+      const wasComplete = up.rescore_status === "complete";
       up.rescore_status = ids.every((i) => done.has(i)) ? "complete" : "partial";
       const tmp = `${path}.tmp`;
       writeFileSync(tmp, JSON.stringify(up, null, 2), "utf8");
       renameSync(tmp, path);
+      if (!wasComplete && ids.every((i) => done.has(i) || failed.has(i))) {
+        const tree = readTree(runId, missionId);
+        const order = ids
+          .filter((i) => done.has(i) && typeof tree[i]?.scores_by_version?.[evalVersion] === "number")
+          .sort((x, y) => tree[y]!.scores_by_version![evalVersion]! - tree[x]!.scores_by_version![evalVersion]!)
+          .map((i) => tree[i]?.name ?? i);
+        appendFileSync(
+          join(runDir, "decision-log.md"),
+          `- \`${new Date().toISOString()}\` **re-score under ${evalVersion} finished** — ` +
+          `frontier order under ${evalVersion}: ${order.join(", ") || "(none)"}` +
+          (failed.size ? `; failed: ${[...failed].map((i) => tree[i]?.name ?? i).join(", ")}` : "") + "\n",
+        );
+      }
     }
   } catch { /* best-effort by design */ }
 }
@@ -328,53 +358,42 @@ export function recordEval(
   }
 
   const resultsPath = join(nodeDir, "results.json");
-  const scoredUnder = (result as Record<string, unknown> | null)?.eval_version;
+  // A version builds a file name here, so only v<N> is ever used as one.
+  const rawVersion = (result as Record<string, unknown> | null)?.eval_version;
+  const scoredUnder = typeof rawVersion === "string" && VERSION_RE.test(rawVersion) ? rawVersion : undefined;
+  const r = result as Record<string, unknown> | null;
+  const evaluated = r?.status === "success" || r?.status === "regression";
 
   // Evidence, not override: results.json is the CURRENT version's result, and a
   // result under any other version survives as results.<version>.json. A run
   // whose earlier results predate per-version files gets its copy made here,
   // before the re-score replaces results.json.
-  if (typeof scoredUnder === "string") {
+  if (scoredUnder) {
     try {
       const prior = JSON.parse(readFileSync(resultsPath, "utf8")) as Record<string, unknown>;
       const priorVersion = prior.eval_version;
-      const kept = join(nodeDir, `results.${String(priorVersion)}.json`);
-      if (typeof priorVersion === "string" && priorVersion !== scoredUnder && !existsSync(kept)) {
-        writeFileSync(kept, JSON.stringify(prior, null, 2), "utf8");
+      if (typeof priorVersion === "string" && VERSION_RE.test(priorVersion) && priorVersion !== scoredUnder) {
+        const kept = join(nodeDir, `results.${priorVersion}.json`);
+        if (!existsSync(kept)) writeFileSync(kept, JSON.stringify(prior, null, 2), "utf8");
       }
     } catch { /* no prior result */ }
   }
   writeFileSync(resultsPath, JSON.stringify(result, null, 2), "utf8");
-  if (typeof scoredUnder === "string" && /^[A-Za-z0-9._-]+$/.test(scoredUnder)) {
+  if (scoredUnder) {
     writeFileSync(join(nodeDir, `results.${scoredUnder}.json`), JSON.stringify(result, null, 2), "utf8");
-  }
-
-  // The node is now scored under the result's eval_version, and check 10
-  // (eval_version_consistent) reads the TREE node — so a re-score under a new
-  // version has to reach the tree before the integrity check runs, or a node
-  // re-scored under the current version still fails as stale. The score it had
-  // under the previous version stays in scores_by_version.
-  if (typeof scoredUnder === "string") {
-    try {
-      const node = readTree(runId, missionId)[nodeId];
-      if (node && node.eval_version !== scoredUnder) {
-        const scores = { ...(node.scores_by_version ?? {}) };
-        if (typeof node.fitness_value === "number" && !(node.eval_version in scores)) {
-          scores[node.eval_version] = node.fitness_value;
-        }
-        upsertNode(runId, { ...node, eval_version: scoredUnder, scores_by_version: scores }, missionId);
-      }
-    } catch { /* the integrity check reports a stale version if this did not land */ }
   }
 
   // P1-1: atomic integrity check — same call path as evor_integrity_check tool.
   // Resolves eval-script/split-path via P1-11 and seeds P2-2 cache on first call.
   // Failures are non-fatal (best-effort); orchestrator can re-check explicitly.
+  //
+  // Check 10 judges the node as scored under THIS result's version; the tree
+  // node moves to it only once the verdict passes (below).
   let integrityVerdict: string | null = null;
   let integrityError: string | null = null;
   let integrityReport: unknown | null = null;
 
-  const integrityResult = integrityCheck(runId, nodeId, missionId);
+  const integrityResult = integrityCheck(runId, nodeId, missionId, scoredUnder);
   if (integrityResult.ok && integrityResult.report != null) {
     const report = integrityResult.report as Record<string, unknown>;
     integrityVerdict = typeof report.verdict === "string" ? report.verdict : null;
@@ -395,6 +414,10 @@ export function recordEval(
   // scoreboard lived only in nodes/<id>/results.json — tree.json kept whatever
   // (usually empty) metrics the node had at evor_record_node time, so evor_tree_read
   // (what evor-mutagen calls to pick a parent) returned a frontier with no fitness.
+  //
+  // A re-score under a NEW version replaces the node's record only when it
+  // passed: a failed re-score leaves the node as it was under its old version
+  // (marked failed), and its old score stays in scores_by_version either way.
   try {
     const nodes = readTree(runId, missionId);
     const node = nodes[nodeId];
@@ -403,16 +426,23 @@ export function recordEval(
       if (integrityVerdict === "passed" || integrityVerdict === "failed") {
         updates.integrity_status = integrityVerdict as "passed" | "failed";
       }
-      const r = result as Record<string, unknown> | null;
-      if (r && typeof r.metrics === "object" && r.metrics !== null) {
-        updates.metrics = r.metrics as Record<string, number>;
-      }
-      if (typeof r?.fitness_value === "number") {
-        updates.fitness_value = r.fitness_value;
-        if (typeof scoredUnder === "string") {
-          updates.scores_by_version = { ...(node.scores_by_version ?? {}), [scoredUnder]: r.fitness_value };
+      const moves = !!scoredUnder && node.eval_version !== scoredUnder;
+      if (!moves || integrityVerdict === "passed") {
+        if (r && typeof r.metrics === "object" && r.metrics !== null) {
+          updates.metrics = r.metrics as Record<string, number>;
         }
+        if (typeof r?.fitness_value === "number") updates.fitness_value = r.fitness_value;
+        if (moves) updates.eval_version = scoredUnder;
       }
+      const scores = { ...(node.scores_by_version ?? {}) };
+      if (moves && typeof node.fitness_value === "number" && !(node.eval_version in scores)) {
+        scores[node.eval_version] = node.fitness_value;
+      }
+      // Only a completed evaluation is a score; an errored run is not a 0.
+      if (scoredUnder && evaluated && typeof r?.fitness_value === "number") {
+        scores[scoredUnder] = r.fitness_value;
+      }
+      if (Object.keys(scores).length) updates.scores_by_version = scores;
       upsertNode(runId, { ...node, ...updates }, missionId);
     }
   } catch {
@@ -422,7 +452,7 @@ export function recordEval(
 
   // Stage 1.7: propagate fitness so the score-based stop conditions can fire.
   updateBestScore(runId, nodeId, result, integrityVerdict, missionId);
-  markRescored(paths.runDir, nodeId, scoredUnder);
+  markRescored(runId, paths.runDir, nodeId, scoredUnder, evaluated && integrityVerdict === "passed", missionId);
 
   return { resultsPath, integrityVerdict, integrityError, integrityReport, evaluatorValuesKept: evaluatorKept };
 }
@@ -439,7 +469,7 @@ export function readResult(
   evalVersion?: string,
 ): { ok: boolean; data?: unknown; error?: string } {
   const paths = resolveRunPaths(runId, missionId);
-  if (evalVersion !== undefined && !/^[A-Za-z0-9._-]+$/.test(evalVersion)) {
+  if (evalVersion !== undefined && !VERSION_RE.test(evalVersion)) {
     return { ok: false, error: "eval_version must be a version name such as v1." };
   }
   const resultPath = join(paths.nodesDir, nodeId, evalVersion ? `results.${evalVersion}.json` : "results.json");

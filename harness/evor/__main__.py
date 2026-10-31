@@ -532,11 +532,13 @@ def _cmd_run(args: argparse.Namespace) -> int:
     # hardened evaluator about itself — and the integrity gate's
     # not_softer_than_parent check compares the two.
     if run_dir is not None and result.status in ("success", "regression"):
-        from evor.benchmark import hardening_parent, sealed_script
+        from evor.benchmark import hardening_parent, sealed_script, split_version
 
         parent_version = hardening_parent(run_dir, goal.eval_version)
         if parent_version:
             parent_fitness = None
+            parent_metrics = None
+            inputs_match = None
             parent_script = sealed_script(run_dir, parent_version)
             if parent_script is None:
                 print(
@@ -555,11 +557,21 @@ def _cmd_run(args: argparse.Namespace) -> int:
                     )
                     if parent_result.status in ("success", "regression"):
                         parent_fitness = parent_result.fitness_value
+                        parent_metrics = dict(parent_result.metrics)
+                        # Same inputs, or the comparison means nothing: one frozen
+                        # split under both versions and the same domain set scored.
+                        inputs_match = (
+                            split_version(run_dir, goal.eval_version)
+                            == split_version(run_dir, parent_version)
+                            and set(result.per_domain) == set(parent_result.per_domain)
+                        )
                 except Exception as exc:
                     print(f"[evor run] WARNING: parent evaluator raised: {exc}", file=sys.stderr)
             result = result.model_copy(update={
                 "parent_eval_version": parent_version,
                 "parent_fitness_value": parent_fitness,
+                "parent_metrics": parent_metrics,
+                "parent_inputs_match": inputs_match,
             })
 
     # ── Write EvaluationResult ─────────────────────────────────────────
@@ -569,22 +581,28 @@ def _cmd_run(args: argparse.Namespace) -> int:
         # Evidence, not override: a result under another eval_version is kept as
         # results.<version>.json before the current one replaces results.json, so
         # a re-score under a hardened version never erases the parent's score.
+        from evor.benchmark import valid_version
+
         for name in ("results.json", "results.evaluator.json"):
             prior = results_dir / name
             try:
                 prior_version = json.loads(prior.read_text()).get("eval_version")
             except (OSError, ValueError, AttributeError):
                 prior_version = None
+            # A version read back from a file builds a path: v<N> only.
+            if not valid_version(prior_version) or prior_version == result.eval_version:
+                continue
             kept = results_dir / f"{prior.stem}.{prior_version}.json"
-            if prior_version and prior_version != result.eval_version and not kept.exists():
+            if not kept.exists():
                 kept.write_text(prior.read_text())
         payload = result.model_dump_json(indent=2)
         (results_dir / "results.json").write_text(payload)
-        (results_dir / f"results.{result.eval_version}.json").write_text(payload)
         # The evaluator's own output, never rewritten: evor_record_eval keeps these
         # values over any the recording agent sends.
         (results_dir / "results.evaluator.json").write_text(payload)
-        (results_dir / f"results.evaluator.{result.eval_version}.json").write_text(payload)
+        if valid_version(result.eval_version):
+            (results_dir / f"results.{result.eval_version}.json").write_text(payload)
+            (results_dir / f"results.evaluator.{result.eval_version}.json").write_text(payload)
 
     # Report
     print(json.dumps({

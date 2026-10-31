@@ -848,6 +848,12 @@ class EvaluationResult(BaseEvorModel):
     # integrity gate's not_softer_than_parent check compares the two.
     parent_eval_version: Optional[str] = None
     parent_fitness_value: Optional[float] = None
+    parent_metrics: Optional[dict[str, float]] = None
+    """The parent evaluator's metrics for the same node — the primary metric is
+    bounded too, not only fitness, since best_score is the raw primary metric."""
+    parent_inputs_match: Optional[bool] = None
+    """Did the parent and the hardened evaluator score the same inputs (same
+    frozen split, same domain set)? False fails not_softer_than_parent."""
 
 
 # ────────────────────────────────────────────────────────────────────────────
@@ -1285,7 +1291,9 @@ class BenchmarkUpgrade(BaseEvorModel):
     rescore_node_ids: list[str] = Field(default_factory=list)
     """Frontier nodes marked for re-score under to_eval_version."""
     rescored_node_ids: list[str] = Field(default_factory=list)
-    """Marked nodes already re-scored; rescore_status is complete when it covers all."""
+    """Marked nodes re-scored successfully; rescore_status is complete when it covers all."""
+    rescore_failed_node_ids: list[str] = Field(default_factory=list)
+    """Marked nodes whose re-score errored or failed integrity."""
 
 
 # ────────────────────────────────────────────────────────────────────────────

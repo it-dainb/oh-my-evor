@@ -22,6 +22,7 @@ hand-written column actually got wrong in the field:
 from __future__ import annotations
 
 import ast
+import hashlib
 import json
 import sys
 from pathlib import Path
@@ -122,6 +123,28 @@ def write(
     dest_dir.mkdir(parents=True, exist_ok=True)
     name = SCORE_PLUGIN_FILENAME if target == "score_plugin" else f"{eval_version}.py"
     dest = dest_dir / name
+
+    # The plugin is the metric every version in the run shares. Once any
+    # version has been sealed with it, replacing it would rescore that version
+    # with bytes it was never sealed with.
+    if target == "score_plugin":
+        new_sha = hashlib.sha256(source.encode()).hexdigest()
+        for receipt_path in sorted(dest_dir.glob("*.sealed.json")):
+            try:
+                receipt = json.loads(receipt_path.read_text())
+            except (OSError, ValueError):
+                continue
+            sealed = (receipt.get("files") or {}).get(SCORE_PLUGIN_FILENAME) or receipt.get("plugin_hash")
+            if sealed and sealed != new_sha:
+                return {
+                    "ok": False,
+                    "error": (
+                        f"score_plugin.py is sealed into {receipt_path.name.split('.')[0]}; "
+                        "replacing it would change the metric of every version sealed with "
+                        "it. A stricter metric is a new evaluator under a new eval_version, "
+                        "applied with evor_harden_eval."
+                    ),
+                }
 
     # Atomic, and never through an existing hardlink: all three field runs'
     # `v1.py` were ONE inode with nlink 5, so a write through an unprotected

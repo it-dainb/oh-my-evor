@@ -20,7 +20,7 @@
  * evor_gotchas_list    — list accumulated gotchas (wraps `evor gotchas`)
  */
 
-import { appendFileSync, chmodSync, existsSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from "fs";
+import { appendFileSync, chmodSync, existsSync, readdirSync, readFileSync, renameSync, statSync, writeFileSync } from "fs";
 import { createHash } from "crypto";
 import { basename, join } from "path";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -425,6 +425,7 @@ export function relockForRescore(
   evalVersion: string,
   missionId?: string,
 ): { ok: true; replaced: boolean } | { ok: false; error: string } {
+  if (!/^v\d+$/.test(evalVersion)) return { ok: false, error: `'${evalVersion}' is not an eval version (expected v<N>).` };
   const { runDir } = resolveRunPaths(runId, missionId);
   let contract: Record<string, unknown>;
   try {
@@ -449,7 +450,12 @@ export function relockForRescore(
     sealedHash = receipt.files?.[`${evalVersion}.py`] ?? receipt.hash;
     canonicalBytes = readFileSync(canonical);
   } catch {
-    return { ok: false, error: `the ${evalVersion} evaluator is not sealed; seal it before re-scoring under it.` };
+    return {
+      ok: false,
+      error: `the ${evalVersion} evaluator has no seal receipt. Verify eval-suites/${evalVersion}.py ` +
+        `against the contract's eval_script_hash first (evor_integrity_check reports a mismatch as ` +
+        `no_eval_shift); seal it only if it matches, since a seal records whatever is on disk.`,
+    };
   }
   const sha = (b: Buffer) => createHash("sha256").update(b).digest("hex");
   const hash = sha(canonicalBytes);
@@ -640,12 +646,41 @@ function digestEvaluator(runDir: string, evalVersion: string): {
  * evor_seal_eval_script, shared with evor_harden_eval so a hardened evaluator
  * is sealed by exactly the path every other evaluator is.
  */
+/**
+ * During a mission, a NEW eval version is introduced only by evor_harden_eval,
+ * which carries the reviewed source, the rationale and the evidence. Writing or
+ * sealing an evaluator for a version that is not in force — or replacing the
+ * shared score_plugin.py — through the general tools would stage an unreviewed
+ * evaluator for adoption. Setup (before the mission runs) is not affected.
+ */
+function evaluatorWriteRefusal(runDir: string, evalVersion: string, target: "evaluator" | "score_plugin"): string | null {
+  if (!/^v\d+$/.test(evalVersion)) return `'${evalVersion}' is not an eval version (expected v<N>).`;
+  let status = "";
+  let inForce: unknown;
+  try { status = String(JSON.parse(readFileSync(join(runDir, "mission-state.json"), "utf8")).status ?? ""); } catch { /* setup */ }
+  try { inForce = JSON.parse(readFileSync(join(runDir, "goal-contract.json"), "utf8")).eval_version; } catch { /* setup */ }
+  if (status !== "running" && status !== "paused") return null;
+  if (target === "score_plugin") {
+    return "score_plugin.py is the metric every eval version of this mission shares; it is not " +
+      "replaced while the mission runs. A stricter metric is a new evaluator applied with " +
+      "evor_harden_eval.";
+  }
+  if (typeof inForce === "string" && inForce !== evalVersion) {
+    return `${evalVersion} is not the eval version in force (${inForce}). A new eval version is ` +
+      `introduced during a mission only by evor_harden_eval, which takes the reviewed evaluator ` +
+      `with its rationale and evidence and writes and seals it itself.`;
+  }
+  return null;
+}
+
 export function sealEvalScript(
   runDir: string,
   eval_version: string,
 ): { ok: true; eval_version: string; hash: string; plugin_hash?: string; files: Record<string, string> }
   | { ok: false; error: string } {
   const fail = (error: string) => ({ ok: false as const, error });
+  const refusal = evaluatorWriteRefusal(runDir, eval_version, "evaluator");
+  if (refusal) return fail(refusal);
   const evalScriptPath = `${runDir}/eval-suites/${eval_version}.py`;
   if (!existsSync(evalScriptPath)) {
     return fail(
@@ -711,6 +746,26 @@ export function sealEvalScript(
   // instead of being refused as a tamper over bytes that never changed.
   const sealedMain = receipt?.files?.[`${eval_version}.py`] ?? receipt?.hash;
   const sealedPlugin = receipt?.files?.["score_plugin.py"] ?? receipt?.plugin_hash;
+
+  // The plugin is shared by every version: sealing this one with a plugin that
+  // differs from the one another version was sealed with would re-anchor the
+  // metric under that version too.
+  try {
+    for (const f of readdirSync(join(runDir, "eval-suites")).filter((n) => n.endsWith(".sealed.json"))) {
+      if (f === `${eval_version}.sealed.json`) continue;
+      const other = JSON.parse(readFileSync(join(runDir, "eval-suites", f), "utf8")) as {
+        files?: Record<string, string>; plugin_hash?: string;
+      };
+      const theirs = other.files?.["score_plugin.py"] ?? other.plugin_hash;
+      if (theirs && theirs !== pluginHash) {
+        return fail(
+          `refusing to seal ${eval_version}: score_plugin.py differs from the one ` +
+          `${f.split(".")[0]} was sealed with. The plugin is shared by every version, so ` +
+          `sealing it would change that version's metric too.`,
+        );
+      }
+    }
+  } catch { /* no other receipts */ }
   if (sealedPlugin && pluginHash && sealedPlugin !== pluginHash) {
     return fail(
       `refusing to re-seal ${eval_version}: score_plugin.py changed after it was sealed ` +
@@ -1285,6 +1340,8 @@ export function registerComputeTools(server: McpServer): void {
     async ({ run_id, eval_version, source, target, mission_id }) => {
       const resolvedMission = mission_id ?? process.env.EVOR_MISSION_ID;
       const { runDir } = resolveRunPaths(run_id, resolvedMission);
+      const refusal = evaluatorWriteRefusal(runDir, eval_version, target === "score_plugin" ? "score_plugin" : "evaluator");
+      if (refusal) return err(refusal);
       const dir = join(runDir, "eval-suites");
       const name = target === "score_plugin" ? "score_plugin.py" : `${eval_version}.py`;
       const dest = join(dir, name);
@@ -1319,31 +1376,34 @@ export function registerComputeTools(server: McpServer): void {
   // and the seal both refuse), and BenchmarkManager.apply_upgrade only adds
   // domains, so a mission that found its metric gameable had no move at all.
   //
-  // Write → harden → seal, in that order: the harness refuses before anything
-  // changes state when the preconditions fail, and the written file is removed
-  // again so a corrected retry starts clean.
+  // One harness call does all of it — validate, write, seal, record, adopt — as
+  // a single transaction (BenchmarkManager.apply_hardening): a failure anywhere
+  // leaves the run on the parent version with every prior file intact. Splitting
+  // it across a TS seal and a Python record left half-adopted states in between.
+  // The receipt it writes has the shape evor_seal_eval_script writes.
   server.tool(
     "evor_harden_eval",
     "Replace the run's evaluator with a STRICTER one under a new eval_version, mid-mission. "
     + "Use when the metric is gameable: fitness rises while the contract's stated intent "
-    + "regresses. Validates and writes eval-suites/<to_version>.py, records EvalSuite "
-    + "<to_version> (same domains, same frozen split, parent <from_version>), moves the "
-    + "contract and run state to <to_version>, logs the decision, seals the new evaluator, "
-    + "and returns the frontier nodes to re-score. No consent step: making evaluation harder "
-    + "is pre-authorized. Only stricter is accepted — every node scored under <to_version> "
-    + "is also scored by the sealed parent, and integrity fails it when the hardened score "
-    + "is higher. The new evaluator reads the parent's frozen split "
+    + "regresses. Takes the reviewed evaluator (source or source_worktree), validates it, and "
+    + "in one all-or-nothing step writes and seals eval-suites/<to_version>.py, records "
+    + "EvalSuite <to_version> (same domains, same frozen split, parent <from_version>), moves "
+    + "the contract and run state to it (best_score restarts under the new version), logs "
+    + "the decision, and returns the frontier nodes to re-score. No consent step: making "
+    + "evaluation harder is pre-authorized. Only stricter is accepted — every node scored "
+    + "under <to_version> is also scored by the sealed parent, and integrity fails it when "
+    + "the hardened fitness or primary metric is better. A stricter metric may reorder the "
+    + "frontier. The new evaluator reads the parent's frozen split "
     + "(frozen-splits/<from_version>-test) and must emit eval_version=<to_version>. Then "
     + "re-score each returned node with evor_run_start(eval_version=<to_version>) and "
     + "record it with evor_record_eval.",
     {
       run_id: z.string().describe("Active run identifier"),
-      from_version: z.string().describe("The eval_version in force (e.g. v1)"),
-      to_version: z.string().describe("The new, stricter eval_version (e.g. v2)"),
+      from_version: z.string().regex(/^v\d+$/).describe("The eval_version in force (e.g. v1)"),
+      to_version: z.string().regex(/^v\d+$/).describe("The new, stricter eval_version (e.g. v2)"),
       source: z.string().min(1).optional().describe(
-        "Complete Python source of the hardened evaluator. Give at most one of source and "
-        + "source_worktree; give neither to adopt an eval-suites/<to_version>.py that is "
-        + "already written AND sealed.",
+        "Complete Python source of the reviewed hardened evaluator. Give exactly one of "
+        + "source and source_worktree.",
       ),
       source_worktree: z.string().optional().describe(
         "Name of the worktree whose evaluate.py holds the hardened evaluator (as written "
@@ -1363,129 +1423,71 @@ export function registerComputeTools(server: McpServer): void {
       proposed_by: z.enum(["probe", "sage", "policy"]).default("probe").describe(
         "Who proposed the hardening",
       ),
+      rescore_deadline_ticks: z.number().int().min(0).default(3).describe(
+        "Ticks within which the frontier is to be re-scored under the new version",
+      ),
       tick: z.number().int().min(0).optional().describe("The tick applying it"),
       mission_id: z.string().optional().describe("Mission id; resolved from the active run when omitted"),
     },
     async ({
       run_id, from_version, to_version, source, source_worktree, rationale,
-      contract_grounding, evidence, proposed_by, tick, mission_id,
+      contract_grounding, evidence, proposed_by, rescore_deadline_ticks, tick, mission_id,
     }) => {
       const resolvedMission = mission_id ?? process.env.EVOR_MISSION_ID;
       const { runDir } = resolveRunPaths(run_id, resolvedMission);
-
-      if (source !== undefined && source_worktree !== undefined) {
-        return err("give at most one of source or source_worktree.");
+      for (const v of [from_version, to_version]) {
+        if (!/^v\d+$/.test(String(v))) return err(`'${String(v)}' is not an eval version (expected v<N>).`);
       }
-      let code: string | undefined = source;
+      if (proposed_by !== undefined && !["probe", "sage", "policy"].includes(proposed_by)) {
+        return err(`proposed_by '${String(proposed_by)}' is not one of probe, sage, policy.`);
+      }
+      if ((source === undefined) === (source_worktree === undefined)) {
+        return err(
+          "give exactly one of source or source_worktree: the reviewed evaluator. A file " +
+          "already on disk for the new version is never adopted on its own say-so.",
+        );
+      }
+      let code = source ?? "";
       if (source_worktree !== undefined) {
         if (!/^[A-Za-z0-9._-]+$/.test(source_worktree)) {
           return err("source_worktree must be a worktree name, not a path.");
         }
-        const path = join(getEvorRoot(), "worktrees", source_worktree, "evaluate.py");
         try {
-          code = readFileSync(path, "utf8");
+          code = readFileSync(join(getEvorRoot(), "worktrees", source_worktree, "evaluate.py"), "utf8");
         } catch {
           return err(`worktree '${source_worktree}' has no evaluate.py to harden with.`);
         }
-      }
-
-      const suites = join(runDir, "eval-suites");
-      if (existsSync(join(suites, `${to_version}.json`))) {
-        return err(`${to_version} already exists in this run; a hardening creates a NEW eval_version.`);
-      }
-
-      // ── An evaluator for <to_version> may already be on disk ──────────────
-      // (written with evor_write_eval_script, perhaps sealed, never adopted).
-      // A SEALED one is adopted only as those exact bytes; an unsealed one is
-      // never adopted as-is — it is replaced only by source this call
-      // validates and seals itself.
-      const existingPath = join(suites, `${to_version}.py`);
-      const receiptPath = join(suites, `${to_version}.sealed.json`);
-      const fileSha = (b: Buffer | string) => createHash("sha256").update(b).digest("hex");
-      let writeSource = true;
-      if (existsSync(receiptPath)) {
-        let sealedHash: string | undefined;
-        try {
-          const r = JSON.parse(readFileSync(receiptPath, "utf8")) as { hash?: string; files?: Record<string, string> };
-          sealedHash = r.files?.[`${to_version}.py`] ?? r.hash;
-        } catch { /* unreadable receipt: treated as a mismatch below */ }
-        const onDisk = existsSync(existingPath) ? fileSha(readFileSync(existingPath)) : "";
-        if (!sealedHash || sealedHash !== onDisk) {
-          return err(
-            `${to_version} has a seal receipt that does not match eval-suites/${to_version}.py — ` +
-            `it changed after it was sealed, so it cannot be adopted. Harden into a NEW ` +
-            `eval_version instead (e.g. the next number), passing the evaluator as source.`,
-          );
-        }
-        if (code !== undefined && fileSha(code) !== onDisk) {
-          return err(
-            `${to_version} is already sealed with different bytes than the source given. Call ` +
-            `again without source to adopt the sealed ${to_version} as it is, or harden into a ` +
-            `NEW eval_version with this source.`,
-          );
-        }
-        writeSource = false;
-      } else if (code === undefined) {
-        return err(
-          existsSync(existingPath)
-            ? `eval-suites/${to_version}.py is written but not sealed, so it is not adopted as it ` +
-              `is. Finish it either way: call evor_harden_eval again passing that evaluator as ` +
-              `source (or source_worktree) — it is validated and sealed here — or seal it first ` +
-              `with evor_seal_eval_script(eval_version="${to_version}") and call again with no source.`
-            : `no evaluator for ${to_version}: pass source or source_worktree.`,
-        );
-      }
-
-      // An unsealed draft this call replaces is restored if the hardening is refused.
-      const draft = writeSource && existsSync(existingPath) ? readFileSync(existingPath) : null;
-      if (writeSource) {
-        const written = callPythonModule("evor.eval_contract_writer", [
-          "write", "--run-dir", runDir, "--eval-version", to_version,
-          "--target", "evaluator", "--stdin-source",
-        ], { stdin: code });
-        if (!written.ok) return err(written.error ?? "hardened evaluator source rejected");
       }
 
       const hardened = callPythonModule("evor.benchmark", [
         "harden", "--run-dir", runDir,
         "--from-version", from_version, "--to-version", to_version,
         "--rationale", rationale, "--contract-grounding", contract_grounding,
-        "--proposed-by", proposed_by,
+        "--proposed-by", proposed_by ?? "probe",
+        "--rescore-deadline-ticks", String(rescore_deadline_ticks ?? 3),
         ...evidence.flatMap((e) => ["--evidence", e]),
         ...(tick !== undefined ? ["--tick", String(tick)] : []),
-      ]);
-      if (!hardened.ok) {
-        // Undo only what this call wrote; an adopted, sealed evaluator stays.
-        if (writeSource) {
-          try {
-            if (draft) writeFileSync(existingPath, draft);
-            else unlinkSync(existingPath);
-          } catch { /* nothing to undo */ }
-        }
-        return err(hardened.error ?? "evor_harden_eval failed");
-      }
+        "--stdin-source",
+      ], { stdin: code });
+      if (!hardened.ok) return err(hardened.error ?? "evor_harden_eval failed");
 
-      const sealed = sealEvalScript(runDir, to_version);
-      if (!sealed.ok) {
-        return err(
-          `${to_version} was recorded as the version in force but could not be sealed: ` +
-          `${sealed.error} Seal it with evor_seal_eval_script before re-scoring.`,
-        );
-      }
       // The integrity tool caches the contract's eval_version per run; the
       // version just moved, so the next check must read it again.
       evalVersionCache.delete(run_id);
 
-      const data = hardened.data as { rescore?: string[]; upgrade_id?: string } | null;
+      const data = hardened.data as {
+        rescore?: string[]; upgrade_id?: string; frontier_order_before?: string[];
+      } | null;
       return ok({
         ok: true,
         from_version,
         to_version,
         upgrade_id: data?.upgrade_id,
         rescore: data?.rescore ?? [],
+        frontier_order_before: data?.frontier_order_before ?? [],
         next: `re-score each node in rescore with evor_run_start(eval_version="${to_version}"), ` +
-          `then evor_record_eval; integrity passes it only when its ${to_version} fitness does ` +
-          `not exceed its ${from_version} fitness.`,
+          `then evor_record_eval; integrity passes it only when its ${to_version} scores are ` +
+          `no better than its ${from_version} scores.`,
       });
     },
   );

@@ -85,7 +85,9 @@ export function resolveIntegrityPaths(runDir: string, contract: Pick<GoalContrac
 export function integrityCheck(
   runId: string,
   nodeId: string,
-  missionId?: string
+  missionId?: string,
+  /** The version the result being recorded was scored under (check 10 judges it). */
+  scoredEvalVersion?: string,
 ): { ok: boolean; report?: unknown; error?: string; stderr?: string } {
   const paths = resolveRunPaths(runId, missionId);
 
@@ -93,6 +95,8 @@ export function integrityCheck(
     "--run-id", runId,
     "--node-id", nodeId,
     "--run-dir", paths.runDir,
+    ...(scoredEvalVersion && /^v\d+$/.test(scoredEvalVersion)
+      ? ["--scored-eval-version", scoredEvalVersion] : []),
   ];
 
   // P2-2: check BOTH caches at the TOP — skip the contract file read entirely on cache hit.

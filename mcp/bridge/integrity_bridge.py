@@ -71,6 +71,12 @@ def main() -> int:
         help="Path to the frozen test split JSON; tried before the default "
              "candidate list",
     )
+    parser.add_argument(
+        "--scored-eval-version", default=None,
+        help="The eval_version the result being recorded was scored under. Check 10 "
+             "judges the node as scored under it; the tree moves to it only after the "
+             "verdict passes.",
+    )
     args = parser.parse_args()
 
     # ── Resolve run_dir ───────────────────────────────────────────────────────
@@ -98,6 +104,9 @@ def main() -> int:
                 node = TreeNode.model_validate(raw_node)
         except Exception as exc:
             print(f"[integrity_bridge] WARNING: could not load node: {exc}", file=sys.stderr)
+
+    if node is not None and args.scored_eval_version:
+        node = node.model_copy(update={"eval_version": args.scored_eval_version})
 
     if node is None:
         print(json.dumps({

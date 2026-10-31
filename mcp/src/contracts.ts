@@ -349,6 +349,9 @@ export const EvaluationResultSchema = z.object({
   // scored by the sealed parent evaluator. Evaluator-owned, like fitness_value.
   parent_eval_version: z.string().optional(),
   parent_fitness_value: z.number().optional(),
+  parent_metrics: z.record(z.string(), z.number()).optional(),
+  /** false = parent and hardened evaluators scored different inputs */
+  parent_inputs_match: z.boolean().optional(),
 });
 export type EvaluationResult = z.infer<typeof EvaluationResultSchema>;
 
@@ -680,6 +683,8 @@ export const BenchmarkUpgradeSchema = z.object({
   rescore_node_ids: z.array(z.string()).default([]),
   /** marked nodes already re-scored; rescore_status is complete when it covers all */
   rescored_node_ids: z.array(z.string()).default([]),
+  /** marked nodes whose re-score errored or failed integrity */
+  rescore_failed_node_ids: z.array(z.string()).default([]),
 });
 export type BenchmarkUpgrade = z.infer<typeof BenchmarkUpgradeSchema>;
 

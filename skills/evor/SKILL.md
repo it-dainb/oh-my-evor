@@ -397,15 +397,20 @@ Run this when Probe's artifact carries a `benchmark_upgrade_proposal` with
                       contract_grounding: <the proposal's verbatim contract quote>,
                       evidence: [<lesson id>, "probe@tick<n>"], tick: n })
    ```
-   It validates, records and seals `<to_version>` and moves the contract to it. If it refuses,
-   its error says what to fix; an `eval-suites/<to_version>.py` already on disk is adopted only
-   when it is sealed, and otherwise is finished by passing the source here.
+   In one all-or-nothing step it validates, writes, seals and records `<to_version>` and moves
+   the contract to it; `best_score` restarts under the new version. If it refuses, its error
+   says what to fix, and the run is still entirely on `<from_version>`. Always pass the reviewed
+   source: a file already on disk for `<to_version>` is adopted only when it is sealed with
+   exactly those bytes. During the mission, `evor_write_eval_script` and `evor_seal_eval_script`
+   touch only the version in force and never `score_plugin.py`.
 3. **Re-score the frontier.** For each name in the result's `rescore`: `evor_run_start({ node_id,
    worktree, eval_version: <to_version> })` (it installs the sealed hardened evaluator into the
    worktree first), `evor_wait({ job_id })`, then `evor_record_eval`. Integrity passes a
    re-scored node only when `not_softer_than_parent` holds and `eval_version_consistent` passes.
    The node's `<from_version>` result stays readable with `evor_read_result({ node_id,
    eval_version: <from_version> })`, and the tree node keeps both in `scores_by_version`.
+   A stricter metric caps each node's score; it may reorder the frontier, and the decision log
+   records the order under both versions.
 4. **Record** it in Step 8 like any other result. The decision log already holds the
    `harden-eval` entry naming the parent version, the rationale and the evidence.
 

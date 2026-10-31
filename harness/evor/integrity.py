@@ -360,28 +360,7 @@ class IntegrityGate:
         # node did not evaluate at all.
         not_softer_than_parent: bool | None = None
         if run_dir is not None and result.status in ("success", "regression"):
-            from .benchmark import HARDENING_EPSILON, hardening_parent
-
-            parent_version = hardening_parent(run_dir, result.eval_version)
-            if parent_version is not None:
-                pf = result.parent_fitness_value
-                if result.parent_eval_version != parent_version or pf is None:
-                    not_softer_than_parent = False
-                    failures.append(
-                        f"not_softer_than_parent: {result.eval_version!r} hardens "
-                        f"{parent_version!r}, but the result carries no {parent_version!r} "
-                        "score for this node — re-score it with evor_run_start so the parent "
-                        "evaluator runs beside the hardened one"
-                    )
-                elif result.fitness_value > pf + HARDENING_EPSILON * max(1.0, abs(pf)):
-                    not_softer_than_parent = False
-                    failures.append(
-                        f"not_softer_than_parent: fitness {result.fitness_value!r} under "
-                        f"{result.eval_version!r} exceeds {pf!r} under its parent "
-                        f"{parent_version!r} — a hardened evaluator may only be stricter"
-                    )
-                else:
-                    not_softer_than_parent = True
+            not_softer_than_parent = self._check_not_softer(result, goal, run_dir, failures)
 
         # ── Checks 11–13: Ingestion Contamination Gate ────────────────────
         acquisition_contamination_clear: bool | None = None
@@ -499,6 +478,82 @@ class IntegrityGate:
     # ------------------------------------------------------------------
     # Private check helpers
     # ------------------------------------------------------------------
+
+    def _check_not_softer(
+        self,
+        result: EvaluationResult,
+        goal: GoalContract,
+        run_dir: Path,
+        failures: list[str],
+    ) -> bool | None:
+        """Check 15. None when the result's version is not a hardening.
+
+        Fails closed: a version whose suite record is missing or unreadable in a
+        run that keeps suite records cannot be shown NOT to be a hardening.
+        Direction comes from the contract — "stricter" means a worse score, and
+        for a lower-is-better primary metric worse is higher. Fitness and every
+        primary metric are bounded, since best_score is the raw primary metric.
+        """
+        from .benchmark import HARDENING_EPSILON, fitness_lower_is_better, run_has_suites, suite_status
+
+        status, parent_version = suite_status(run_dir, result.eval_version)
+        if status == "plain":
+            return None
+        if status == "missing":
+            if not (run_has_suites(run_dir) or result.parent_eval_version):
+                return None  # a legacy run with no suite records at all
+            failures.append(
+                f"not_softer_than_parent: the suite record for {result.eval_version!r} is "
+                "missing or unreadable, so whether it hardens a parent cannot be verified"
+            )
+            return False
+
+        def softer(value: float, parent: float, lower_is_better: bool) -> bool:
+            tol = HARDENING_EPSILON * max(1.0, abs(parent))
+            return value < parent - tol if lower_is_better else value > parent + tol
+
+        pf = result.parent_fitness_value
+        if result.parent_eval_version != parent_version or pf is None or result.parent_metrics is None:
+            failures.append(
+                f"not_softer_than_parent: {result.eval_version!r} hardens "
+                f"{parent_version!r}, but the result carries no {parent_version!r} "
+                "score for this node — re-score it with evor_run_start so the parent "
+                "evaluator runs beside the hardened one"
+            )
+            return False
+        if result.parent_inputs_match is not True:
+            failures.append(
+                f"not_softer_than_parent: the {parent_version!r} and {result.eval_version!r} "
+                "evaluators did not score the same inputs (frozen split or domain set "
+                "differ), so the two scores are not comparable"
+            )
+            return False
+        ok = True
+        if softer(result.fitness_value, pf, fitness_lower_is_better(goal)):
+            ok = False
+            failures.append(
+                f"not_softer_than_parent: fitness {result.fitness_value!r} under "
+                f"{result.eval_version!r} is better than {pf!r} under its parent "
+                f"{parent_version!r} — a hardened evaluator may only be stricter"
+            )
+        for spec in goal.metric_specs:
+            if spec.role != "primary_fitness":
+                continue
+            v = result.metrics.get(spec.metric_name)
+            pv = result.parent_metrics.get(spec.metric_name)
+            if v is None or pv is None:
+                ok = False
+                failures.append(
+                    f"not_softer_than_parent: primary metric {spec.metric_name!r} is missing "
+                    f"under {'the hardened' if v is None else 'the parent'} evaluator"
+                )
+            elif softer(float(v), float(pv), spec.direction == "lower"):
+                ok = False
+                failures.append(
+                    f"not_softer_than_parent: {spec.metric_name} {v!r} under "
+                    f"{result.eval_version!r} is better than {pv!r} under {parent_version!r}"
+                )
+        return ok
 
     def _check_no_test_leakage(self, frozen_test: FrozenSplit) -> bool:
         """Check 2: sample ≤200 test indices; verify no train collision.

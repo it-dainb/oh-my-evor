@@ -31,13 +31,37 @@ All notable changes to Evor. Format follows [Keep a Changelog](https://keepachan
 - Probe `Metric_Artefact_Protocol`, Forge `Metric_Hardening_Request`, skill Step 7b, and an
   evor-tick section describe the flow.
 
+- **Review hardening of the path.**
+  - The parent is scored only with its sealed bytes: a seal receipt is verified over every file
+    it records, `score_plugin.py` included, and the plugin can no longer be replaced once any
+    version is sealed with it — nor sealed differently under another version.
+  - `best_score` is per eval version: adoption clears it (the parent's best is logged) and only
+    scores under the version in force set it. Check 15 bounds every primary metric as well as
+    fitness, follows the contract's direction (lower-is-better included), fails closed on a
+    missing or unreadable suite record, and fails when the parent and hardened evaluators did
+    not score the same inputs (`parent_inputs_match`).
+  - Adoption is one transaction in `BenchmarkManager.apply_hardening` (write, seal, record,
+    move): any failure puts every file back. The tool always takes the reviewed source; a file
+    already on disk is adopted only when sealed with exactly those bytes. During a mission,
+    `evor_write_eval_script` / `evor_seal_eval_script` touch only the version in force and never
+    the plugin (server-side and in the governor). A mission that is not running is refused.
+  - Version strings that build paths must be `v<N>`. Only completed evaluations enter
+    `scores_by_version`; failed re-scores are listed and keep the upgrade `partial`. The tree
+    node moves to the new version only after integrity passes (check 10 judges the scored
+    version). Receipt-less versions are told to verify against the contract anchor before
+    sealing. `rescore_deadline_ticks` is a parameter; an unknown proposer is refused.
+  - A stricter metric caps each node's score and may reorder the frontier: the decision log
+    records the order under the parent at adoption and under the new version when the re-score
+    finishes.
+
 ### Fixed
 
 - `evor_run_start` with `eval_version` passed `--eval-version` to `python -m evor run`, which
   did not accept it, so every such job exited 2. It is accepted now and must equal the
   contract's current version.
 - Sealing a version that is not the contract's `eval_version` moved the contract anchor and
-  failed `no_eval_shift` for every node of the version in force; it now writes the receipt only.
+  failed `no_eval_shift` for every node of the version in force; outside a mission it now
+  writes the receipt only, and during one it is refused.
 - The integrity tool cached the contract's eval_version per run and never saw it change; a
   hardening invalidates it. The integrity bridge resolves a hardened version's frozen split
   through its parent.

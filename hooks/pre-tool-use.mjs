@@ -953,6 +953,28 @@ try {
       );
     }
   }
+  // During a live mission the general evaluator tools may only touch the
+  // version in force: staging a new version's evaluator, or replacing the shared
+  // score_plugin.py, outside evor_harden_eval would put an unreviewed metric one
+  // call away from adoption.
+  if (_missionLive && /(^|_)evor_(write|seal)_eval_script$/.test(toolNameH)) {
+    const tiH = input?.tool_input ?? {};
+    const rd = resolveRunDir();
+    const inForce = rd && _exists(_join(rd, 'goal-contract.json'))
+      ? String(JSON.parse(readFileSync(_join(rd, 'goal-contract.json'), 'utf8'))?.eval_version ?? '')
+      : '';
+    const wantsPlugin = tiH?.target === 'score_plugin';
+    if (wantsPlugin || (inForce && String(tiH?.eval_version ?? '') !== inForce)) {
+      deny(
+        `[EVOR GOVERNOR] While the mission runs, ${toolNameH.replace(/^mcp__plugin_oh-my-evor_evor__/, '')} ` +
+          `touches only the eval version in force${inForce ? ` (${inForce})` : ''}` +
+          (wantsPlugin ? ' and never score_plugin.py, the metric every version shares' : '') +
+          '. A stricter evaluator under a new version is applied by evor-tick with evor_harden_eval, ' +
+          'which takes the reviewed source with its rationale and evidence.',
+        { rule: 'eval-script-version-in-force', tool: toolNameH },
+      );
+    }
+  }
 } catch (err) {
   logError('harden-eval-role', err);  // fail-open, but recorded
 }

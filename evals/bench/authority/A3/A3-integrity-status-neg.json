@@ -90,7 +90,7 @@
     "file": "skills/evor/SKILL.md",
     "line": 290,
     "quote": "1. Call `evor_record_eval(run_id, node_id, result)` — this auto-triggers the integrity check.",
-    "sha256_at_authoring": "db9c338e90c8729b1b579756c5532da85283d056f1bfaae8ccbf42023fffc2aa"
+    "sha256_at_authoring": "7f029aea0b19132b1c09801cc854832c23ef1716677a33b01cf8d2f75b81fedd"
   },
   "grounding": [
     "field-trace:G-01",

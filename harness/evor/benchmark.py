@@ -23,6 +23,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Literal
@@ -34,6 +35,7 @@ from evor.contracts import (
     EvalSuite,
     StrategyState,
 )
+from evor.eval_contract import SCORE_PLUGIN_FILENAME as SCORE_PLUGIN
 from evor.freeze import FrozenSplitManager
 
 
@@ -45,6 +47,44 @@ class IntegrityError(Exception):
 #: softening — float noise between two runs of deterministic evaluators, no more.
 HARDENING_EPSILON = 1e-6
 
+#: The only shape an eval version takes where it builds a path. A version read
+#: back from a result file or a tool argument is data, and `../x` is not a version.
+VERSION_RE = re.compile(r"^v\d+$")
+
+#: Who may propose a hardening. Anything else is refused, not relabelled.
+HARDENING_PROPOSERS = ("user", "probe", "sage", "policy")
+
+
+def valid_version(eval_version: object) -> bool:
+    return isinstance(eval_version, str) and bool(VERSION_RE.match(eval_version))
+
+
+def suite_status(run_dir: Path, eval_version: str | None) -> tuple[str, str | None]:
+    """How ``eval_version`` relates to its parent, from its suite record.
+
+    ``("hardening", parent)``, ``("plain", None)``, or ``("missing", None)`` when
+    the record is absent or unreadable — which readers that guard a hardening
+    must treat as a failure, not as "not a hardening".
+    """
+    if not valid_version(eval_version):
+        return ("missing", None)
+    try:
+        suite = json.loads((Path(run_dir) / "eval-suites" / f"{eval_version}.json").read_text())
+    except (OSError, ValueError):
+        return ("missing", None)
+    if not isinstance(suite, dict):
+        return ("missing", None)
+    parent = suite.get("parent_eval_version")
+    if suite.get("kind") == "metric_hardening":
+        return ("hardening", str(parent)) if valid_version(parent) else ("missing", None)
+    return ("plain", None)
+
+
+def run_has_suites(run_dir: Path) -> bool:
+    """Does this run keep suite records at all? (Legacy runs may not.)"""
+    base = Path(run_dir) / "eval-suites"
+    return base.is_dir() and any(valid_version(p.stem) for p in base.glob("*.json"))
+
 
 def hardening_parent(run_dir: Path, eval_version: str | None) -> str | None:
     """The parent version when ``eval_version`` is a metric hardening, else None.
@@ -53,14 +93,8 @@ def hardening_parent(run_dir: Path, eval_version: str | None) -> str | None:
     whether to score the parent too, and the integrity gate to decide whether
     not_softer_than_parent applies.
     """
-    if not eval_version:
-        return None
-    try:
-        suite = json.loads((Path(run_dir) / "eval-suites" / f"{eval_version}.json").read_text())
-    except (OSError, ValueError):
-        return None
-    parent = suite.get("parent_eval_version")
-    return str(parent) if suite.get("kind") == "metric_hardening" and parent else None
+    status, parent = suite_status(run_dir, eval_version)
+    return parent if status == "hardening" else None
 
 
 def split_version(run_dir: Path, eval_version: str) -> str:
@@ -78,17 +112,63 @@ def split_version(run_dir: Path, eval_version: str) -> str:
     return eval_version
 
 
-def sealed_script(run_dir: Path, eval_version: str) -> Path | None:
-    """``eval-suites/<v>.py`` when its bytes still match the seal receipt, else None."""
+def _sha256(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def receipt_files(run_dir: Path, eval_version: str) -> dict[str, str] | None:
+    """The per-file manifest the seal recorded for a version, or None."""
+    if not valid_version(eval_version):
+        return None
     base = Path(run_dir) / "eval-suites"
-    script = base / f"{eval_version}.py"
     try:
         receipt = json.loads((base / f"{eval_version}.sealed.json").read_text())
-        sealed = (receipt.get("files") or {}).get(script.name) or receipt.get("hash")
-        actual = hashlib.sha256(script.read_bytes()).hexdigest()
     except (OSError, ValueError):
         return None
-    return script if sealed and sealed == actual else None
+    files = dict(receipt.get("files") or {})
+    if f"{eval_version}.py" not in files and receipt.get("hash"):
+        files[f"{eval_version}.py"] = receipt["hash"]
+    if SCORE_PLUGIN not in files and receipt.get("plugin_hash"):
+        files[SCORE_PLUGIN] = receipt["plugin_hash"]
+    return files
+
+
+def sealed_script(run_dir: Path, eval_version: str) -> Path | None:
+    """``eval-suites/<v>.py`` when EVERY file its seal receipt records still matches.
+
+    The receipt covers the harness and, when there is one, ``score_plugin.py`` —
+    the metric, which every version in the run shares. Checking the harness alone
+    let a swapped plugin score the "parent" with bytes the parent never sealed.
+    """
+    files = receipt_files(run_dir, eval_version)
+    base = Path(run_dir) / "eval-suites"
+    script = base / f"{eval_version}.py"
+    if not files or script.name not in files:
+        return None
+    try:
+        for name, digest in files.items():
+            if _sha256(base / name) != digest:
+                return None
+    except OSError:
+        return None
+    return script
+
+
+def fitness_lower_is_better(goal: dict | object) -> bool:
+    """Is a LOWER fitness_value better under this contract?
+
+    Fitness is the primary metric's raw value whenever no baseline→target
+    normalisation applies (worst-domain/weighted always; aggregate or a formula
+    without a target), so a lower-is-better primary makes fitness lower-is-better
+    too. With a target, aggregate fitness is normalised and higher is better.
+    """
+    g = goal if isinstance(goal, dict) else goal.model_dump()  # type: ignore[union-attr]
+    spec = next((m for m in g.get("metric_specs") or [] if m.get("role") == "primary_fitness"), None)
+    if not spec or spec.get("direction") != "lower":
+        return False
+    if g.get("fitness_mode") in ("worst-domain", "weighted") and not spec.get("fitness_formula"):
+        return True
+    return g.get("target_value") is None
 
 
 def _contract_strings(value: object) -> list[str]:
@@ -106,10 +186,57 @@ def _normalise(text: str) -> str:
     return " ".join(text.split()).casefold()
 
 
-def _atomic_write_json(path: Path, data: object) -> None:
+def _atomic_write_bytes(path: Path, data: bytes) -> None:
     tmp = path.with_suffix(path.suffix + ".tmp")
-    tmp.write_text(json.dumps(data, indent=2))
+    tmp.write_bytes(data)
     os.replace(tmp, path)
+
+
+def _atomic_write_json(path: Path, data: object) -> None:
+    _atomic_write_bytes(path, json.dumps(data, indent=2).encode())
+
+
+def _write_contract(tx: "_Transaction", path: Path, contract: dict) -> None:
+    tx.write(path, json.dumps(contract, indent=2).encode())
+
+
+class _Transaction:
+    """All-or-nothing file writes: every write is recorded, and rollback() puts
+    back the bytes of each file that existed and removes each file that did not."""
+
+    def __init__(self) -> None:
+        self._before: dict[Path, bytes | None] = {}
+        self._appended: dict[Path, int] = {}
+
+    def write(self, path: Path, data: bytes) -> None:
+        if path not in self._before:
+            self._before[path] = path.read_bytes() if path.exists() else None
+        _atomic_write_bytes(path, data)
+
+    def append(self, path: Path, text: str) -> None:
+        if path not in self._appended:
+            self._appended[path] = path.stat().st_size if path.exists() else -1
+        with open(path, "a") as fh:
+            fh.write(text)
+
+    def rollback(self) -> None:
+        for path, before in self._before.items():
+            try:
+                if before is None:
+                    path.unlink(missing_ok=True)
+                else:
+                    _atomic_write_bytes(path, before)
+            except OSError:
+                pass
+        for path, size in self._appended.items():
+            try:
+                if size < 0:
+                    path.unlink(missing_ok=True)
+                else:
+                    with open(path, "r+b") as fh:
+                        fh.truncate(size)
+            except OSError:
+                pass
 
 
 class BenchmarkManager:
@@ -281,28 +408,64 @@ class BenchmarkManager:
         rationale: str,
         contract_grounding: str,
         evidence: list[str],
+        source: str | None,
         proposed_by: str = "probe",
         tick: int | None = None,
+        rescore_deadline_ticks: int = 3,
     ) -> dict:
         """Make ``to_eval_version`` a metric hardening of ``from_eval_version``.
 
-        Preconditions (each an IntegrityError):
-          - ``from`` is the contract's current eval_version and its evaluator is sealed;
-          - ``to`` has an evaluator written (``eval-suites/<to>.py``) and no suite yet;
-          - ``contract_grounding`` is text the goal contract actually contains: a
-            hardening reconciles the metric to the contract's stated intent, so the
-            intent it enforces must be quotable from the contract.
+        ``source`` is the reviewed, stricter evaluator. It is validated against
+        the evaluator contract and written, sealed and adopted here, in one
+        transaction: on any failure every file is put back, so the run stays on
+        the parent version with nothing that existed before deleted.
 
-        Effects: EvalSuite ``to`` (same domains and split, kind=metric_hardening);
-        a BenchmarkUpgrade record listing the frontier nodes to re-score;
-        GoalContract.eval_version and RunState.current_eval_version set to ``to``;
-        a ``harden-eval`` DecisionLogEntry. The new evaluator's seal (the contract's
-        eval_script_hash) is written by the caller's seal step, afterwards.
+        Preconditions (each an IntegrityError):
+          - the mission is running; ``from`` is the contract's eval_version and
+            every file of its seal still matches;
+          - ``to`` has no suite yet; an ``eval-suites/<to>.py`` already on disk is
+            either an unsealed draft (replaced, restored on failure) or sealed with
+            exactly ``source``'s bytes (adopted); anything else is refused;
+          - ``contract_grounding`` is text the goal contract actually contains, and
+            ``evidence`` names what found the artefact.
+
+        Effects: ``eval-suites/<to>.py`` and its seal receipt; EvalSuite ``to``
+        (same domains and split, kind=metric_hardening); a BenchmarkUpgrade record
+        listing the frontier to re-score; the contract's eval_version and
+        eval_script_hash; RunState.current_eval_version, with best_score and
+        best_node_id cleared (the best under the parent is not a score under
+        ``to``); a ``harden-eval`` DecisionLogEntry naming the parent, the
+        rationale, the evidence and the frontier order under the parent.
 
         No consent: the Monotonic-Honesty Invariant pre-authorizes a harder
         evaluation. A softer one is caught per node by not_softer_than_parent.
+        A stricter metric may REORDER the frontier — it caps each node's score,
+        it does not preserve rank — so the order before is logged here and the
+        order after when the re-score completes.
         """
+        from evor.eval_contract_writer import validate
+
         run_dir = self._run_dir
+        base = run_dir / "eval-suites"
+        for v in (from_eval_version, to_eval_version):
+            if not valid_version(v):
+                raise IntegrityError(f"{v!r} is not an eval version (expected v<N>).")
+        if proposed_by not in HARDENING_PROPOSERS:
+            raise IntegrityError(
+                f"proposed_by {proposed_by!r} is not one of {list(HARDENING_PROPOSERS)}."
+            )
+        if rescore_deadline_ticks < 0:
+            raise IntegrityError("rescore_deadline_ticks must be >= 0.")
+        try:
+            mission = json.loads((run_dir / "mission-state.json").read_text())
+        except (OSError, ValueError):
+            mission = {}
+        if mission.get("status") != "running":
+            raise IntegrityError(
+                f"the mission is {mission.get('status') or 'not started'!s}, not running; a "
+                "hardening is applied by a running mission's tick."
+            )
+
         contract_path = run_dir / "goal-contract.json"
         try:
             contract = json.loads(contract_path.read_text())
@@ -322,12 +485,18 @@ class BenchmarkManager:
                 f"EvalSuite {to_eval_version!r} already exists; a version is created once."
             )
         if sealed_script(run_dir, from_eval_version) is None:
+            if receipt_files(run_dir, from_eval_version) is None:
+                raise IntegrityError(
+                    f"the {from_eval_version!r} evaluator has no seal receipt. Verify "
+                    f"eval-suites/{from_eval_version}.py against the contract's eval_script_hash "
+                    "first (evor_integrity_check reports a mismatch as no_eval_shift); seal it "
+                    "only if it matches — a seal records whatever bytes are on disk."
+                )
             raise IntegrityError(
-                f"the {from_eval_version!r} evaluator is not sealed (or changed since its "
-                "seal); a hardening is checked against the sealed parent, so seal it first."
+                f"the {from_eval_version!r} evaluator, or the score_plugin.py it was sealed "
+                "with, changed after its seal; the parent is scored only with its sealed "
+                "bytes, so it cannot be hardened."
             )
-        if not (run_dir / "eval-suites" / f"{to_eval_version}.py").exists():
-            raise IntegrityError(f"no evaluator written for {to_eval_version!r}.")
         if not rationale.strip():
             raise IntegrityError("a hardening needs a rationale: the gate it adds and why.")
         evidence = [e.strip() for e in evidence or [] if e and e.strip()]
@@ -344,6 +513,43 @@ class BenchmarkManager:
                 "contract_grounding must quote the goal contract's own text (at least 12 "
                 "characters) — the stated intent the current metric fails to enforce. "
                 "A gate the contract does not ask for is a new objective, not a hardening."
+            )
+        if not source or not source.strip():
+            raise IntegrityError("pass the reviewed hardened evaluator as source.")
+        problems = validate(source, target="evaluator")
+        if problems:
+            raise IntegrityError(
+                "hardened evaluator does not conform to the evaluator contract: "
+                + "; ".join(problems)
+            )
+
+        # ── What is already on disk for <to> ──────────────────────────────
+        script = base / f"{to_eval_version}.py"
+        source_bytes = source.encode()
+        source_sha = hashlib.sha256(source_bytes).hexdigest()
+        to_receipt = receipt_files(run_dir, to_eval_version)
+        adopt = False
+        if to_receipt is not None:
+            if sealed_script(run_dir, to_eval_version) is None:
+                raise IntegrityError(
+                    f"{to_eval_version!r} has a seal receipt that no longer matches its files; "
+                    "it cannot be adopted. Harden into a NEW eval_version with this source."
+                )
+            if to_receipt.get(script.name) != source_sha:
+                raise IntegrityError(
+                    f"{to_eval_version!r} is already sealed with different bytes than the "
+                    "reviewed source. Harden into a NEW eval_version with this source."
+                )
+            adopt = True
+
+        # The metric is shared: <to> is sealed with the plugin its parent was.
+        plugin = base / SCORE_PLUGIN
+        plugin_sha = _sha256(plugin) if plugin.exists() else None
+        parent_files = receipt_files(run_dir, from_eval_version) or {}
+        if parent_files.get(SCORE_PLUGIN) != plugin_sha:
+            raise IntegrityError(
+                "score_plugin.py differs from the one the parent was sealed with; a "
+                "hardening changes the evaluator, never the shared metric under the parent."
             )
 
         from_suite = self.get_eval_suite(from_eval_version, run_dir)
@@ -368,6 +574,12 @@ class BenchmarkManager:
                 i for i, n in nodes.items()
                 if n.get("status") == "done" and n.get("integrity_status") == "passed"
             ]
+        lower = fitness_lower_is_better(contract)
+        name_of = lambda i: str(nodes.get(i, {}).get("name") or i)  # noqa: E731
+        scored = [i for i in frontier if isinstance(nodes.get(i, {}).get("fitness_value"), (int, float))]
+        order_before = [
+            name_of(i) for i in sorted(scored, key=lambda i: nodes[i]["fitness_value"], reverse=not lower)
+        ]
 
         suite = EvalSuite(
             eval_version=to_eval_version,
@@ -386,19 +598,20 @@ class BenchmarkManager:
             mission_id=from_suite.mission_id,
             from_eval_version=from_eval_version,
             to_eval_version=to_eval_version,
-            proposed_by=proposed_by if proposed_by in ("user", "probe", "sage", "policy") else "policy",  # type: ignore[arg-type]
+            proposed_by=proposed_by,  # type: ignore[arg-type]
             proposal_citations=list(evidence),
             consent_granted=True,
             consent_at=now,
             new_domains_added=[],
             domains_removed=[],
             rescore_status="pending" if frontier else "complete",
-            rescore_deadline_ticks=3,
+            rescore_deadline_ticks=rescore_deadline_ticks,
             decision_log_ref="decision-log.md",
             created_at=now,
             kind="metric_hardening",
             rescore_node_ids=frontier,
         )
+        parent_best = (state or {}).get("best_score")
         entry = DecisionLogEntry(
             timestamp=now,
             tick=int(tick if tick is not None else (state or {}).get("tick_count", 0) or 0),
@@ -411,41 +624,66 @@ class BenchmarkManager:
             evidence=evidence,
         )
 
-        suite_path = self._suite_path(to_eval_version)
-        tmp = suite_path.with_suffix(".json.tmp")
-        tmp.write_text(suite.model_dump_json(indent=2))
-        os.replace(tmp, suite_path)
+        files = {script.name: source_sha, **({SCORE_PLUGIN: plugin_sha} if plugin_sha else {})}
+        receipt = {
+            "eval_version": to_eval_version,
+            "hash": source_sha,
+            **({"plugin_hash": plugin_sha} if plugin_sha else {}),
+            "files": files,
+            "sealed_at": now,
+            "sealed_by": "evor_harden_eval",
+        }
+        new_contract = dict(contract)
+        new_contract["eval_version"] = to_eval_version
+        new_contract["eval_script_hash"] = source_sha
+        if plugin_sha:
+            new_contract["eval_plugin_hash"] = plugin_sha
 
-        upgrades_dir = run_dir / "benchmark-upgrades"
-        upgrades_dir.mkdir(parents=True, exist_ok=True)
-        _atomic_write_json(upgrades_dir / f"{upgrade_id}.json", json.loads(upgrade.model_dump_json()))
-
-        contract["eval_version"] = to_eval_version
-        _atomic_write_json(contract_path, contract)
-        if state is not None:
-            state["current_eval_version"] = to_eval_version
-            _atomic_write_json(state_path, state)
-
-        self._append_decision_log(
+        log_text = (
             f"\n## Metric hardening {upgrade_id}\n"
             f"- applied_at: {now}\n"
             f"- parent: {from_eval_version} (stays sealed; its scores are kept)\n"
             f"- from: {from_eval_version} → to: {to_eval_version} (same domains, same split)\n"
-            f"- evidence: {', '.join(evidence)}\n"
             f"- gate: {rationale}\n"
             f"- contract intent: \"{contract_grounding.strip()}\"\n"
+            f"- evidence: {', '.join(evidence)}\n"
             f"- consent: pre-authorized by the Monotonic-Honesty Invariant\n"
+            f"- best_score under {from_eval_version}: {parent_best} (cleared; recomputed from re-scores)\n"
+            f"- frontier order under {from_eval_version}: {', '.join(order_before) or '(none)'}\n"
             f"- rescore: {len(frontier)} frontier node(s) pending\n"
             f"- entry: {entry.model_dump_json()}\n"
         )
 
-        names = [str(nodes.get(i, {}).get("name") or i) for i in frontier]
+        tx = _Transaction()
+        try:
+            if not adopt:
+                tx.write(script, source_bytes)
+                tx.write(base / f"{to_eval_version}.sealed.json", json.dumps(receipt, indent=2).encode())
+            tx.write(self._suite_path(to_eval_version), suite.model_dump_json(indent=2).encode())
+            upgrades_dir = run_dir / "benchmark-upgrades"
+            upgrades_dir.mkdir(parents=True, exist_ok=True)
+            tx.write(upgrades_dir / f"{upgrade_id}.json", upgrade.model_dump_json(indent=2).encode())
+            if state is not None:
+                new_state = dict(state)
+                new_state["current_eval_version"] = to_eval_version
+                new_state.pop("best_score", None)
+                new_state.pop("best_node_id", None)
+                tx.write(state_path, json.dumps(new_state, indent=2).encode())
+            tx.append(self._decision_log_path(), log_text)
+            # The contract moves last: until it does, the run is on the parent.
+            _write_contract(tx, contract_path, new_contract)
+        except BaseException:
+            tx.rollback()
+            raise
+
         return {
             "ok": True,
             "upgrade_id": upgrade_id,
             "from_eval_version": from_eval_version,
             "to_eval_version": to_eval_version,
-            "rescore": names,
+            "adopted_sealed": adopt,
+            "rescore": [name_of(i) for i in frontier],
+            "frontier_order_before": order_before,
         }
 
     def _eval_seed_model(
@@ -596,10 +834,10 @@ def _cli() -> None:
                 --run-dir .evor/runs/<mission>/<run-id>/
 
     harden
-        Make ``--to-version`` (its evaluator already written) a metric hardening of
-        the contract's current ``--from-version``; see apply_hardening(). Called by
-        the evor_harden_eval MCP tool, which validates the source first and seals
-        it afterwards.
+        Make ``--to-version`` a metric hardening of the contract's current
+        ``--from-version``, with the reviewed evaluator on stdin
+        (``--stdin-source``); see apply_hardening(). Called by the
+        evor_harden_eval MCP tool.
     """
     import argparse
     import sys as _sys
@@ -628,6 +866,9 @@ def _cli() -> None:
     hd.add_argument("--proposed-by", default="probe")
     hd.add_argument("--evidence", action="append", default=[])
     hd.add_argument("--tick", type=int, default=None)
+    hd.add_argument("--rescore-deadline-ticks", type=int, default=3)
+    hd.add_argument("--stdin-source", action="store_true",
+                    help="read the hardened evaluator's source from stdin")
 
     args = parser.parse_args()
 
@@ -639,10 +880,12 @@ def _cli() -> None:
                 rationale=args.rationale,
                 contract_grounding=args.contract_grounding,
                 evidence=args.evidence,
+                source=_sys.stdin.read() if args.stdin_source else None,
                 proposed_by=args.proposed_by,
                 tick=args.tick,
+                rescore_deadline_ticks=args.rescore_deadline_ticks,
             )
-        except (IntegrityError, FileNotFoundError) as exc:
+        except (IntegrityError, OSError) as exc:
             print(json.dumps({"ok": False, "error": str(exc)}))
             _sys.exit(1)
         print(json.dumps(out))

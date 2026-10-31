@@ -21258,7 +21258,10 @@ var EvaluationResultSchema = external_exports.object({
   // Set by the runner under a metric-hardening eval version: the same node
   // scored by the sealed parent evaluator. Evaluator-owned, like fitness_value.
   parent_eval_version: external_exports.string().optional(),
-  parent_fitness_value: external_exports.number().optional()
+  parent_fitness_value: external_exports.number().optional(),
+  parent_metrics: external_exports.record(external_exports.string(), external_exports.number()).optional(),
+  /** false = parent and hardened evaluators scored different inputs */
+  parent_inputs_match: external_exports.boolean().optional()
 });
 var IntegrityReportSchema = external_exports.object({
   node_id: external_exports.string(),
@@ -21506,7 +21509,9 @@ var BenchmarkUpgradeSchema = external_exports.object({
   /** frontier nodes marked for re-score under to_eval_version */
   rescore_node_ids: external_exports.array(external_exports.string()).default([]),
   /** marked nodes already re-scored; rescore_status is complete when it covers all */
-  rescored_node_ids: external_exports.array(external_exports.string()).default([])
+  rescored_node_ids: external_exports.array(external_exports.string()).default([]),
+  /** marked nodes whose re-score errored or failed integrity */
+  rescore_failed_node_ids: external_exports.array(external_exports.string()).default([])
 });
 var BenchmarkUpgradeProposalSchema = external_exports.object({
   proposed_by: external_exports.enum(["probe", "sage"]),
@@ -22084,7 +22089,7 @@ function resolveIntegrityPaths(runDir, contract) {
     splitPath: (0, import_path5.join)(runDir, "frozen-splits", `${contract.eval_version}.json`)
   };
 }
-function integrityCheck(runId, nodeId, missionId) {
+function integrityCheck(runId, nodeId, missionId, scoredEvalVersion) {
   const paths = resolveRunPaths(runId, missionId);
   const bridgeArgs = [
     "--run-id",
@@ -22092,7 +22097,8 @@ function integrityCheck(runId, nodeId, missionId) {
     "--node-id",
     nodeId,
     "--run-dir",
-    paths.runDir
+    paths.runDir,
+    ...scoredEvalVersion && /^v\d+$/.test(scoredEvalVersion) ? ["--scored-eval-version", scoredEvalVersion] : []
   ];
   const cachedEvalVersion = evalVersionCache.get(runId);
   const cachedHash = frozenSplitHashCache.get(runId);
@@ -22254,6 +22260,9 @@ function updateBestScore(runId, nodeId, result, integrityVerdict, missionId) {
     if (typeof value !== "number" || Number.isNaN(value)) return;
     const runStatePath = (0, import_path6.join)(paths.runDir, "run-state.json");
     const state = readRunState(runStatePath, runId);
+    const scoredUnder = result?.eval_version;
+    const inForce = state.current_eval_version ?? contract?.eval_version;
+    if (typeof scoredUnder === "string" && typeof inForce === "string" && scoredUnder !== inForce) return;
     const current = state.best_score;
     const lowerIsBetter = primary.direction === "lower";
     const improves = typeof current !== "number" ? true : lowerIsBetter ? value < current : value > current;
@@ -22274,10 +22283,13 @@ var EVALUATOR_FIELDS = [
   // The parent evaluator's score under a metric hardening is measured by the
   // runner; a recording agent's copy must not be able to raise it.
   "parent_eval_version",
-  "parent_fitness_value"
+  "parent_fitness_value",
+  "parent_metrics",
+  "parent_inputs_match"
 ];
-function markRescored(runDir, nodeId, evalVersion) {
-  if (typeof evalVersion !== "string") return;
+var VERSION_RE = /^v\d+$/;
+function markRescored(runId, runDir, nodeId, evalVersion, succeeded, missionId) {
+  if (!evalVersion) return;
   const dir = (0, import_path6.join)(runDir, "benchmark-upgrades");
   if (!(0, import_fs5.existsSync)(dir)) return;
   try {
@@ -22287,12 +22299,29 @@ function markRescored(runDir, nodeId, evalVersion) {
       const ids = Array.isArray(up.rescore_node_ids) ? up.rescore_node_ids : [];
       if (up.to_eval_version !== evalVersion || !ids.includes(nodeId)) continue;
       const done = new Set(Array.isArray(up.rescored_node_ids) ? up.rescored_node_ids : []);
-      done.add(nodeId);
+      const failed = new Set(Array.isArray(up.rescore_failed_node_ids) ? up.rescore_failed_node_ids : []);
+      if (succeeded) {
+        done.add(nodeId);
+        failed.delete(nodeId);
+      } else {
+        failed.add(nodeId);
+        done.delete(nodeId);
+      }
       up.rescored_node_ids = [...done];
+      up.rescore_failed_node_ids = [...failed];
+      const wasComplete = up.rescore_status === "complete";
       up.rescore_status = ids.every((i) => done.has(i)) ? "complete" : "partial";
       const tmp = `${path}.tmp`;
       (0, import_fs5.writeFileSync)(tmp, JSON.stringify(up, null, 2), "utf8");
       (0, import_fs5.renameSync)(tmp, path);
+      if (!wasComplete && ids.every((i) => done.has(i) || failed.has(i))) {
+        const tree = readTree(runId, missionId);
+        const order = ids.filter((i) => done.has(i) && typeof tree[i]?.scores_by_version?.[evalVersion] === "number").sort((x, y) => tree[y].scores_by_version[evalVersion] - tree[x].scores_by_version[evalVersion]).map((i) => tree[i]?.name ?? i);
+        (0, import_fs5.appendFileSync)(
+          (0, import_path6.join)(runDir, "decision-log.md"),
+          `- \`${(/* @__PURE__ */ new Date()).toISOString()}\` **re-score under ${evalVersion} finished** \u2014 frontier order under ${evalVersion}: ${order.join(", ") || "(none)"}` + (failed.size ? `; failed: ${[...failed].map((i) => tree[i]?.name ?? i).join(", ")}` : "") + "\n"
+        );
+      }
     }
   } catch {
   }
@@ -22320,39 +22349,29 @@ function recordEval(runId, nodeId, result, missionId) {
     }
   }
   const resultsPath = (0, import_path6.join)(nodeDir, "results.json");
-  const scoredUnder = result?.eval_version;
-  if (typeof scoredUnder === "string") {
+  const rawVersion = result?.eval_version;
+  const scoredUnder = typeof rawVersion === "string" && VERSION_RE.test(rawVersion) ? rawVersion : void 0;
+  const r = result;
+  const evaluated = r?.status === "success" || r?.status === "regression";
+  if (scoredUnder) {
     try {
       const prior = JSON.parse((0, import_fs5.readFileSync)(resultsPath, "utf8"));
       const priorVersion = prior.eval_version;
-      const kept = (0, import_path6.join)(nodeDir, `results.${String(priorVersion)}.json`);
-      if (typeof priorVersion === "string" && priorVersion !== scoredUnder && !(0, import_fs5.existsSync)(kept)) {
-        (0, import_fs5.writeFileSync)(kept, JSON.stringify(prior, null, 2), "utf8");
+      if (typeof priorVersion === "string" && VERSION_RE.test(priorVersion) && priorVersion !== scoredUnder) {
+        const kept = (0, import_path6.join)(nodeDir, `results.${priorVersion}.json`);
+        if (!(0, import_fs5.existsSync)(kept)) (0, import_fs5.writeFileSync)(kept, JSON.stringify(prior, null, 2), "utf8");
       }
     } catch {
     }
   }
   (0, import_fs5.writeFileSync)(resultsPath, JSON.stringify(result, null, 2), "utf8");
-  if (typeof scoredUnder === "string" && /^[A-Za-z0-9._-]+$/.test(scoredUnder)) {
+  if (scoredUnder) {
     (0, import_fs5.writeFileSync)((0, import_path6.join)(nodeDir, `results.${scoredUnder}.json`), JSON.stringify(result, null, 2), "utf8");
-  }
-  if (typeof scoredUnder === "string") {
-    try {
-      const node = readTree(runId, missionId)[nodeId];
-      if (node && node.eval_version !== scoredUnder) {
-        const scores = { ...node.scores_by_version ?? {} };
-        if (typeof node.fitness_value === "number" && !(node.eval_version in scores)) {
-          scores[node.eval_version] = node.fitness_value;
-        }
-        upsertNode(runId, { ...node, eval_version: scoredUnder, scores_by_version: scores }, missionId);
-      }
-    } catch {
-    }
   }
   let integrityVerdict = null;
   let integrityError = null;
   let integrityReport = null;
-  const integrityResult = integrityCheck(runId, nodeId, missionId);
+  const integrityResult = integrityCheck(runId, nodeId, missionId, scoredUnder);
   if (integrityResult.ok && integrityResult.report != null) {
     const report = integrityResult.report;
     integrityVerdict = typeof report.verdict === "string" ? report.verdict : null;
@@ -22368,27 +22387,33 @@ function recordEval(runId, nodeId, result, missionId) {
       if (integrityVerdict === "passed" || integrityVerdict === "failed") {
         updates.integrity_status = integrityVerdict;
       }
-      const r = result;
-      if (r && typeof r.metrics === "object" && r.metrics !== null) {
-        updates.metrics = r.metrics;
-      }
-      if (typeof r?.fitness_value === "number") {
-        updates.fitness_value = r.fitness_value;
-        if (typeof scoredUnder === "string") {
-          updates.scores_by_version = { ...node.scores_by_version ?? {}, [scoredUnder]: r.fitness_value };
+      const moves = !!scoredUnder && node.eval_version !== scoredUnder;
+      if (!moves || integrityVerdict === "passed") {
+        if (r && typeof r.metrics === "object" && r.metrics !== null) {
+          updates.metrics = r.metrics;
         }
+        if (typeof r?.fitness_value === "number") updates.fitness_value = r.fitness_value;
+        if (moves) updates.eval_version = scoredUnder;
       }
+      const scores = { ...node.scores_by_version ?? {} };
+      if (moves && typeof node.fitness_value === "number" && !(node.eval_version in scores)) {
+        scores[node.eval_version] = node.fitness_value;
+      }
+      if (scoredUnder && evaluated && typeof r?.fitness_value === "number") {
+        scores[scoredUnder] = r.fitness_value;
+      }
+      if (Object.keys(scores).length) updates.scores_by_version = scores;
       upsertNode(runId, { ...node, ...updates }, missionId);
     }
   } catch {
   }
   updateBestScore(runId, nodeId, result, integrityVerdict, missionId);
-  markRescored(paths.runDir, nodeId, scoredUnder);
+  markRescored(runId, paths.runDir, nodeId, scoredUnder, evaluated && integrityVerdict === "passed", missionId);
   return { resultsPath, integrityVerdict, integrityError, integrityReport, evaluatorValuesKept: evaluatorKept };
 }
 function readResult(runId, nodeId, missionId, evalVersion) {
   const paths = resolveRunPaths(runId, missionId);
-  if (evalVersion !== void 0 && !/^[A-Za-z0-9._-]+$/.test(evalVersion)) {
+  if (evalVersion !== void 0 && !VERSION_RE.test(evalVersion)) {
     return { ok: false, error: "eval_version must be a version name such as v1." };
   }
   const resultPath = (0, import_path6.join)(paths.nodesDir, nodeId, evalVersion ? `results.${evalVersion}.json` : "results.json");
@@ -25217,6 +25242,7 @@ function lockEvaluate(runId, nodeRef, missionId) {
   }
 }
 function relockForRescore(runId, worktree, evalVersion, missionId) {
+  if (!/^v\d+$/.test(evalVersion)) return { ok: false, error: `'${evalVersion}' is not an eval version (expected v<N>).` };
   const { runDir } = resolveRunPaths(runId, missionId);
   let contract;
   try {
@@ -25238,7 +25264,10 @@ function relockForRescore(runId, worktree, evalVersion, missionId) {
     sealedHash = receipt.files?.[`${evalVersion}.py`] ?? receipt.hash;
     canonicalBytes = (0, import_fs18.readFileSync)(canonical);
   } catch {
-    return { ok: false, error: `the ${evalVersion} evaluator is not sealed; seal it before re-scoring under it.` };
+    return {
+      ok: false,
+      error: `the ${evalVersion} evaluator has no seal receipt. Verify eval-suites/${evalVersion}.py against the contract's eval_script_hash first (evor_integrity_check reports a mismatch as no_eval_shift); seal it only if it matches, since a seal records whatever is on disk.`
+    };
   }
   const sha = (b) => (0, import_crypto4.createHash)("sha256").update(b).digest("hex");
   const hash = sha(canonicalBytes);
@@ -25342,8 +25371,31 @@ function digestEvaluator(runDir, evalVersion) {
   }
   return { hash: acc.digest("hex"), files };
 }
+function evaluatorWriteRefusal(runDir, evalVersion, target) {
+  if (!/^v\d+$/.test(evalVersion)) return `'${evalVersion}' is not an eval version (expected v<N>).`;
+  let status = "";
+  let inForce;
+  try {
+    status = String(JSON.parse((0, import_fs18.readFileSync)((0, import_path19.join)(runDir, "mission-state.json"), "utf8")).status ?? "");
+  } catch {
+  }
+  try {
+    inForce = JSON.parse((0, import_fs18.readFileSync)((0, import_path19.join)(runDir, "goal-contract.json"), "utf8")).eval_version;
+  } catch {
+  }
+  if (status !== "running" && status !== "paused") return null;
+  if (target === "score_plugin") {
+    return "score_plugin.py is the metric every eval version of this mission shares; it is not replaced while the mission runs. A stricter metric is a new evaluator applied with evor_harden_eval.";
+  }
+  if (typeof inForce === "string" && inForce !== evalVersion) {
+    return `${evalVersion} is not the eval version in force (${inForce}). A new eval version is introduced during a mission only by evor_harden_eval, which takes the reviewed evaluator with its rationale and evidence and writes and seals it itself.`;
+  }
+  return null;
+}
 function sealEvalScript(runDir, eval_version) {
   const fail = (error2) => ({ ok: false, error: error2 });
+  const refusal = evaluatorWriteRefusal(runDir, eval_version, "evaluator");
+  if (refusal) return fail(refusal);
   const evalScriptPath = `${runDir}/eval-suites/${eval_version}.py`;
   if (!(0, import_fs18.existsSync)(evalScriptPath)) {
     return fail(
@@ -25365,6 +25417,19 @@ function sealEvalScript(runDir, eval_version) {
   }
   const sealedMain = receipt?.files?.[`${eval_version}.py`] ?? receipt?.hash;
   const sealedPlugin = receipt?.files?.["score_plugin.py"] ?? receipt?.plugin_hash;
+  try {
+    for (const f of (0, import_fs18.readdirSync)((0, import_path19.join)(runDir, "eval-suites")).filter((n) => n.endsWith(".sealed.json"))) {
+      if (f === `${eval_version}.sealed.json`) continue;
+      const other = JSON.parse((0, import_fs18.readFileSync)((0, import_path19.join)(runDir, "eval-suites", f), "utf8"));
+      const theirs = other.files?.["score_plugin.py"] ?? other.plugin_hash;
+      if (theirs && theirs !== pluginHash) {
+        return fail(
+          `refusing to seal ${eval_version}: score_plugin.py differs from the one ${f.split(".")[0]} was sealed with. The plugin is shared by every version, so sealing it would change that version's metric too.`
+        );
+      }
+    }
+  } catch {
+  }
   if (sealedPlugin && pluginHash && sealedPlugin !== pluginHash) {
     return fail(
       `refusing to re-seal ${eval_version}: score_plugin.py changed after it was sealed (${sealedPlugin.slice(0, 12)}\u2026 \u2192 ${pluginHash.slice(0, 12)}\u2026). The plugin is the metric; replacing it under the same anchor would revalidate every score already recorded. Seal the new metric under a NEW eval_version.`
@@ -25746,6 +25811,8 @@ function registerComputeTools(server) {
     async ({ run_id, eval_version, source, target, mission_id }) => {
       const resolvedMission = mission_id ?? process.env.EVOR_MISSION_ID;
       const { runDir } = resolveRunPaths(run_id, resolvedMission);
+      const refusal = evaluatorWriteRefusal(runDir, eval_version, target === "score_plugin" ? "score_plugin" : "evaluator");
+      if (refusal) return err2(refusal);
       const dir = (0, import_path19.join)(runDir, "eval-suites");
       const name = target === "score_plugin" ? "score_plugin.py" : `${eval_version}.py`;
       const dest = (0, import_path19.join)(dir, name);
@@ -25771,13 +25838,13 @@ function registerComputeTools(server) {
   );
   server.tool(
     "evor_harden_eval",
-    "Replace the run's evaluator with a STRICTER one under a new eval_version, mid-mission. Use when the metric is gameable: fitness rises while the contract's stated intent regresses. Validates and writes eval-suites/<to_version>.py, records EvalSuite <to_version> (same domains, same frozen split, parent <from_version>), moves the contract and run state to <to_version>, logs the decision, seals the new evaluator, and returns the frontier nodes to re-score. No consent step: making evaluation harder is pre-authorized. Only stricter is accepted \u2014 every node scored under <to_version> is also scored by the sealed parent, and integrity fails it when the hardened score is higher. The new evaluator reads the parent's frozen split (frozen-splits/<from_version>-test) and must emit eval_version=<to_version>. Then re-score each returned node with evor_run_start(eval_version=<to_version>) and record it with evor_record_eval.",
+    "Replace the run's evaluator with a STRICTER one under a new eval_version, mid-mission. Use when the metric is gameable: fitness rises while the contract's stated intent regresses. Takes the reviewed evaluator (source or source_worktree), validates it, and in one all-or-nothing step writes and seals eval-suites/<to_version>.py, records EvalSuite <to_version> (same domains, same frozen split, parent <from_version>), moves the contract and run state to it (best_score restarts under the new version), logs the decision, and returns the frontier nodes to re-score. No consent step: making evaluation harder is pre-authorized. Only stricter is accepted \u2014 every node scored under <to_version> is also scored by the sealed parent, and integrity fails it when the hardened fitness or primary metric is better. A stricter metric may reorder the frontier. The new evaluator reads the parent's frozen split (frozen-splits/<from_version>-test) and must emit eval_version=<to_version>. Then re-score each returned node with evor_run_start(eval_version=<to_version>) and record it with evor_record_eval.",
     {
       run_id: external_exports.string().describe("Active run identifier"),
-      from_version: external_exports.string().describe("The eval_version in force (e.g. v1)"),
-      to_version: external_exports.string().describe("The new, stricter eval_version (e.g. v2)"),
+      from_version: external_exports.string().regex(/^v\d+$/).describe("The eval_version in force (e.g. v1)"),
+      to_version: external_exports.string().regex(/^v\d+$/).describe("The new, stricter eval_version (e.g. v2)"),
       source: external_exports.string().min(1).optional().describe(
-        "Complete Python source of the hardened evaluator. Give at most one of source and source_worktree; give neither to adopt an eval-suites/<to_version>.py that is already written AND sealed."
+        "Complete Python source of the reviewed hardened evaluator. Give exactly one of source and source_worktree."
       ),
       source_worktree: external_exports.string().optional().describe(
         "Name of the worktree whose evaluate.py holds the hardened evaluator (as written by forge-junior and reviewed by forge-critic)."
@@ -25794,6 +25861,9 @@ function registerComputeTools(server) {
       proposed_by: external_exports.enum(["probe", "sage", "policy"]).default("probe").describe(
         "Who proposed the hardening"
       ),
+      rescore_deadline_ticks: external_exports.number().int().min(0).default(3).describe(
+        "Ticks within which the frontier is to be re-scored under the new version"
+      ),
       tick: external_exports.number().int().min(0).optional().describe("The tick applying it"),
       mission_id: external_exports.string().optional().describe("Mission id; resolved from the active run when omitted")
     },
@@ -25807,71 +25877,33 @@ function registerComputeTools(server) {
       contract_grounding,
       evidence,
       proposed_by,
+      rescore_deadline_ticks,
       tick,
       mission_id
     }) => {
       const resolvedMission = mission_id ?? process.env.EVOR_MISSION_ID;
       const { runDir } = resolveRunPaths(run_id, resolvedMission);
-      if (source !== void 0 && source_worktree !== void 0) {
-        return err2("give at most one of source or source_worktree.");
+      for (const v of [from_version, to_version]) {
+        if (!/^v\d+$/.test(String(v))) return err2(`'${String(v)}' is not an eval version (expected v<N>).`);
       }
-      let code = source;
+      if (proposed_by !== void 0 && !["probe", "sage", "policy"].includes(proposed_by)) {
+        return err2(`proposed_by '${String(proposed_by)}' is not one of probe, sage, policy.`);
+      }
+      if (source === void 0 === (source_worktree === void 0)) {
+        return err2(
+          "give exactly one of source or source_worktree: the reviewed evaluator. A file already on disk for the new version is never adopted on its own say-so."
+        );
+      }
+      let code = source ?? "";
       if (source_worktree !== void 0) {
         if (!/^[A-Za-z0-9._-]+$/.test(source_worktree)) {
           return err2("source_worktree must be a worktree name, not a path.");
         }
-        const path = (0, import_path19.join)(getEvorRoot(), "worktrees", source_worktree, "evaluate.py");
         try {
-          code = (0, import_fs18.readFileSync)(path, "utf8");
+          code = (0, import_fs18.readFileSync)((0, import_path19.join)(getEvorRoot(), "worktrees", source_worktree, "evaluate.py"), "utf8");
         } catch {
           return err2(`worktree '${source_worktree}' has no evaluate.py to harden with.`);
         }
-      }
-      const suites = (0, import_path19.join)(runDir, "eval-suites");
-      if ((0, import_fs18.existsSync)((0, import_path19.join)(suites, `${to_version}.json`))) {
-        return err2(`${to_version} already exists in this run; a hardening creates a NEW eval_version.`);
-      }
-      const existingPath = (0, import_path19.join)(suites, `${to_version}.py`);
-      const receiptPath = (0, import_path19.join)(suites, `${to_version}.sealed.json`);
-      const fileSha = (b) => (0, import_crypto4.createHash)("sha256").update(b).digest("hex");
-      let writeSource = true;
-      if ((0, import_fs18.existsSync)(receiptPath)) {
-        let sealedHash;
-        try {
-          const r = JSON.parse((0, import_fs18.readFileSync)(receiptPath, "utf8"));
-          sealedHash = r.files?.[`${to_version}.py`] ?? r.hash;
-        } catch {
-        }
-        const onDisk = (0, import_fs18.existsSync)(existingPath) ? fileSha((0, import_fs18.readFileSync)(existingPath)) : "";
-        if (!sealedHash || sealedHash !== onDisk) {
-          return err2(
-            `${to_version} has a seal receipt that does not match eval-suites/${to_version}.py \u2014 it changed after it was sealed, so it cannot be adopted. Harden into a NEW eval_version instead (e.g. the next number), passing the evaluator as source.`
-          );
-        }
-        if (code !== void 0 && fileSha(code) !== onDisk) {
-          return err2(
-            `${to_version} is already sealed with different bytes than the source given. Call again without source to adopt the sealed ${to_version} as it is, or harden into a NEW eval_version with this source.`
-          );
-        }
-        writeSource = false;
-      } else if (code === void 0) {
-        return err2(
-          (0, import_fs18.existsSync)(existingPath) ? `eval-suites/${to_version}.py is written but not sealed, so it is not adopted as it is. Finish it either way: call evor_harden_eval again passing that evaluator as source (or source_worktree) \u2014 it is validated and sealed here \u2014 or seal it first with evor_seal_eval_script(eval_version="${to_version}") and call again with no source.` : `no evaluator for ${to_version}: pass source or source_worktree.`
-        );
-      }
-      const draft = writeSource && (0, import_fs18.existsSync)(existingPath) ? (0, import_fs18.readFileSync)(existingPath) : null;
-      if (writeSource) {
-        const written = callPythonModule("evor.eval_contract_writer", [
-          "write",
-          "--run-dir",
-          runDir,
-          "--eval-version",
-          to_version,
-          "--target",
-          "evaluator",
-          "--stdin-source"
-        ], { stdin: code });
-        if (!written.ok) return err2(written.error ?? "hardened evaluator source rejected");
       }
       const hardened = callPythonModule("evor.benchmark", [
         "harden",
@@ -25886,26 +25918,14 @@ function registerComputeTools(server) {
         "--contract-grounding",
         contract_grounding,
         "--proposed-by",
-        proposed_by,
+        proposed_by ?? "probe",
+        "--rescore-deadline-ticks",
+        String(rescore_deadline_ticks ?? 3),
         ...evidence.flatMap((e) => ["--evidence", e]),
-        ...tick !== void 0 ? ["--tick", String(tick)] : []
-      ]);
-      if (!hardened.ok) {
-        if (writeSource) {
-          try {
-            if (draft) (0, import_fs18.writeFileSync)(existingPath, draft);
-            else (0, import_fs18.unlinkSync)(existingPath);
-          } catch {
-          }
-        }
-        return err2(hardened.error ?? "evor_harden_eval failed");
-      }
-      const sealed = sealEvalScript(runDir, to_version);
-      if (!sealed.ok) {
-        return err2(
-          `${to_version} was recorded as the version in force but could not be sealed: ${sealed.error} Seal it with evor_seal_eval_script before re-scoring.`
-        );
-      }
+        ...tick !== void 0 ? ["--tick", String(tick)] : [],
+        "--stdin-source"
+      ], { stdin: code });
+      if (!hardened.ok) return err2(hardened.error ?? "evor_harden_eval failed");
       evalVersionCache.delete(run_id);
       const data = hardened.data;
       return ok2({
@@ -25914,7 +25934,8 @@ function registerComputeTools(server) {
         to_version,
         upgrade_id: data?.upgrade_id,
         rescore: data?.rescore ?? [],
-        next: `re-score each node in rescore with evor_run_start(eval_version="${to_version}"), then evor_record_eval; integrity passes it only when its ${to_version} fitness does not exceed its ${from_version} fitness.`
+        frontier_order_before: data?.frontier_order_before ?? [],
+        next: `re-score each node in rescore with evor_run_start(eval_version="${to_version}"), then evor_record_eval; integrity passes it only when its ${to_version} scores are no better than its ${from_version} scores.`
       });
     }
   );
