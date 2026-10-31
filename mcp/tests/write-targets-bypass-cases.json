@@ -1,0 +1,102 @@
+[
+ [
+  "pathopen+lit",
+  "python3 - <<'EOF'\nopen(\"/tmp/log.txt\",\"w\").write(\"x\")\nfrom pathlib import Path\nPath(\"evaluate.py\").open(\"w\").write(\"evil\")\nEOF"
+ ],
+ [
+  "pathopen alone",
+  "python3 - <<'EOF'\nfrom pathlib import Path\nPath(\"evaluate.py\").open(\"w\").write(\"evil\")\nEOF"
+ ],
+ [
+  "os.rename+lit",
+  "python3 - <<'EOF'\nopen(\"/tmp/a.txt\",\"w\").write(\"x\")\nimport os; os.rename(\"/tmp/a.txt\",\"evaluate.py\")\nEOF"
+ ],
+ [
+  "os.replace alone",
+  "python3 - <<'EOF'\nimport os; os.replace(\"/tmp/a.txt\",\"evaluate.py\")\nEOF"
+ ],
+ [
+  "shutil.move src",
+  "python3 - <<'EOF'\nimport shutil; shutil.move(\"evaluate.py\",\"/tmp/x\")\nEOF"
+ ],
+ [
+  "fstring dir runstate",
+  "python3 - <<'EOF'\nrun = \".evor/runs/r1\"\nopen(f\"{run}/mission-state.json\",\"w\").write(\"{}\")\nEOF"
+ ],
+ [
+  "fstring dir py abs",
+  "python3 - <<'EOF'\nd = \"/proj/eval-suites\"\nopen(f\"{d}/v1.py\",\"w\").write(\"x\")\nEOF"
+ ],
+ [
+  "chdir runstate",
+  "python3 - <<'EOF'\nimport os; os.chdir(\"/proj/.evor/runs/r1\")\nopen(\"mission-state.json\",\"w\").write(\"{}\")\nEOF"
+ ],
+ [
+  "ternary path greedy",
+  "python3 - <<'EOF'\nopen(\"/tmp/a\" if 0 else \"evaluate.py\", \"w\").write(\"x\")\nEOF"
+ ],
+ [
+  "Path multi-arg",
+  "python3 - <<'EOF'\nfrom pathlib import Path\nPath(\"/tmp\", \"../proj/evaluate.py\").write_text(\"x\")\nEOF"
+ ],
+ [
+  "mode var",
+  "python3 - <<'EOF'\nm = \"w\"\nopen(\"evaluate.py\", m).write(\"x\")\nEOF"
+ ],
+ [
+  "mode var +lit",
+  "python3 - <<'EOF'\nopen(\"/tmp/l\",\"w\")\nm = \"w\"\nopen(\"evaluate.py\", m).write(\"x\")\nEOF"
+ ],
+ [
+  "os.open",
+  "python3 - <<'EOF'\nimport os; fd=os.open(\"evaluate.py\", os.O_WRONLY|os.O_CREAT); os.write(fd,b\"x\")\nEOF"
+ ],
+ [
+  "subprocess+lit",
+  "python3 - <<'EOF'\nopen(\"/tmp/l\",\"w\")\nimport subprocess; subprocess.run([\"cp\",\"/tmp/l\",\"evaluate.py\"])\nEOF"
+ ],
+ [
+  "os.system+lit",
+  "python3 - <<'EOF'\nopen(\"/tmp/l\",\"w\")\nimport os; os.system(\"cp /tmp/l evaluate.py\")\nEOF"
+ ],
+ [
+  "escape splitter+lit",
+  "python3 - <<'EOF'\nopen(\"/tmp/l\",\"w\")\nopen(\"evaluate.py\", encoding=\"utf-8\" if \"\\\\\" else \"x\", mode=\"w\").write(\"x\")\nEOF"
+ ],
+ [
+  "tmp dotdot",
+  "python3 - <<'EOF'\nopen(\"/tmp/../proj/evaluate.py\",\"w\").write(\"x\")\nEOF"
+ ],
+ [
+  "argv",
+  "python3 - \"/proj/evaluate.py\" <<'EOF'\nimport sys\nopen(sys.argv[1],\"w\").write(\"x\")\nEOF"
+ ],
+ [
+  "write-then-run heredoc",
+  "cd /proj/W && python3 - <<'EOF'\nopen(\"evaluate.py\",\"w\").write(\"print(1)\")\nEOF\npython3 evaluate.py"
+ ],
+ [
+  "write-then-run -c",
+  "cd /proj/W && python3 -c \"open('evaluate.py','w').write('x')\" && python3 evaluate.py"
+ ],
+ [
+  "cat redirect then run",
+  "cd /proj/W; cat > x.py <<'EOF'\nprint(1)\nEOF\npython3 x.py"
+ ],
+ [
+  "kw file",
+  "python3 - <<'EOF'\nopen(file=\"evaluate.py\", mode=\"w\")\nEOF"
+ ],
+ [
+  "read then write",
+  "python3 - <<'EOF'\ns=open(\"a.txt\").read()\nopen(\"evaluate.py\",\"w\").write(s)\nEOF"
+ ],
+ [
+  "r+ mode",
+  "python3 - <<'EOF'\nopen(\"evaluate.py\",\"r+\").write(\"x\")\nEOF"
+ ],
+ [
+  "json.dump+lit",
+  "python3 - <<'EOF'\nimport json\nwith open(\"/tmp/a\",\"w\") as f: pass\nwith open(\".evor/runs/r/state.json\",\"w\") as g: json.dump({},g)\nEOF"
+ ]
+]
