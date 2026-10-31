@@ -86,3 +86,11 @@ describe("the tick defaults to the one in progress", () => {
     expect(r.error).toMatch(/run_id/);
   });
 });
+
+describe("an empty proposal list", () => {
+  it("validates every Mutagen proposal for the tick", async () => {
+    const r = await call({ run_id: "r1", tick: 1, proposals: [] });
+    expect(r.ok).toBe(true);
+    expect(r.results).toHaveLength(1);
+  });
+});

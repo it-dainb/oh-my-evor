@@ -314,8 +314,9 @@ export function registerProposalTools(server: McpServer): void {
       ),
     },
     async ({ proposals: given, strategy = {}, run_id, tick }) => {
-      let proposals = given as z.infer<typeof ProposalInputSchema>[] | undefined;
-      const needsLookup = !given || given.some((p) => !("approach_family" in p));
+      const listed = given?.length ? given : undefined; // an empty list means "all of them"
+      let proposals = listed as z.infer<typeof ProposalInputSchema>[] | undefined;
+      const needsLookup = !listed || listed.some((p) => !("approach_family" in p));
       if (needsLookup) {
         // The tick in progress, when the caller did not name one.
         let atTick = tick;
@@ -344,15 +345,15 @@ export function registerProposalTools(server: McpServer): void {
           }) }] };
         }
         const byId = new Map(all.map((p) => [p.proposal_id, p]));
-        const missing = (given ?? []).filter((p) => !("approach_family" in p) && !byId.has(p.proposal_id));
+        const missing = (listed ?? []).filter((p) => !("approach_family" in p) && !byId.has(p.proposal_id));
         if (missing.length) {
           return { content: [{ type: "text" as const, text: JSON.stringify({
             ok: false,
             error: `no Mutagen proposal for tick ${tick_} has proposal_id ${missing.map((p) => p.proposal_id).join(", ")}`,
           }) }] };
         }
-        proposals = given
-          ? given.map((p) => ("approach_family" in p ? p : byId.get(p.proposal_id)!) as z.infer<typeof ProposalInputSchema>)
+        proposals = listed
+          ? listed.map((p) => ("approach_family" in p ? p : byId.get(p.proposal_id)!) as z.infer<typeof ProposalInputSchema>)
           : all;
       }
       if (!proposals?.length) {
