@@ -52,8 +52,8 @@ Each scheduled firing runs ONE step, then reschedules:
 ## Cadence guidance
 Match the check interval to how long a run actually takes. For a run expected to finish in minutes, poll
 often enough to advance promptly; for a multi-hour run, check back on a coarse cadence so the session isn't
-woken needlessly. Watching a status file for completion (via the run-watcher / FileChanged) is preferable to
-tight polling when available.
+woken needlessly. Between check-ins the orchestrator keeps one `evor_wait({ heartbeat: true })` armed: it
+wakes the session only when the run stalls, so tight polling is never needed.
 
 ## Stop / cancel
 Tell the user how to stop unattended operation: cancel the schedule (`CronDelete` the recurring task, or stop

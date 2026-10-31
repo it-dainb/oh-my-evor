@@ -15,8 +15,9 @@
  *    best_node_id, pending_node_ids, last_decision, trigger, flushed_at}.
  * 3. Emits stdout JSON:
  *    { continue: true, systemMessage: "<evor-restore>...</evor-restore>" }
- *    The systemMessage is ≤500 chars and is injected into the compacted context
- *    so a resumed Evor session can reconstruct working state from disk.
+ *    The systemMessage is ≤500 chars and is shown to the USER only: the CLI
+ *    never puts systemMessage in the model's context. The model-visible
+ *    restore comes from session-start.mjs on SessionStart source "compact".
  *
  * Trigger type:
  *   Reads CLAUDE_HOOK_INPUT for { trigger: "auto" | "manual" }.
@@ -176,7 +177,6 @@ const restoreLines = [
   `Tick ${currentTick} step ${currentStep} | Best: ${scoreStr}`,
   `Last: ${decisionSnippet}`,
   ...(pendingStr ? [pendingStr] : []),
-  `Call evor_state_read to check position.`,
 ];
 const restoreBody = restoreLines.join('\n');
 

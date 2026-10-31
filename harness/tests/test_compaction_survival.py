@@ -44,6 +44,39 @@ def run_hook(script: str, env: dict[str, str], timeout: int = 10) -> subprocess.
     )
 
 
+def run_session_start(evor_root: Path, payload: dict | None = None) -> tuple[subprocess.CompletedProcess, str, dict[str, str]]:
+    """Run session-start; return (result, model context, exported env).
+
+    The model context is hookSpecificOutput.additionalContext, the only
+    SessionStart field the CLI puts in the model's context. The env is what the
+    hook exports through CLAUDE_ENV_FILE; a top-level `env` in stdout is dropped
+    by the CLI.
+    """
+    env_file = evor_root / "session-env.sh"
+    clean_env = {
+        "PATH": os.environ.get("PATH", "/usr/bin:/bin"),
+        "EVOR_ROOT": str(evor_root),
+        "CLAUDE_ENV_FILE": str(env_file),
+    }
+    result = subprocess.run(
+        [NODE_BIN, SESSION_START],
+        input=json.dumps(payload or {}),
+        capture_output=True,
+        text=True,
+        timeout=10,
+        env=clean_env,
+    )
+    exported: dict[str, str] = {}
+    if env_file.exists():
+        for line in env_file.read_text().splitlines():
+            if line.startswith("export ") and "=" in line:
+                key, _, value = line[len("export "):].partition("=")
+                exported[key] = value.strip("'")
+    out = json.loads(result.stdout.strip() or "{}")
+    context = (out.get("hookSpecificOutput") or {}).get("additionalContext", "")
+    return result, context, exported
+
+
 # ── pre-compact checkpoint payload ────────────────────────────────────────────
 
 class TestPreCompactCheckpoint:
@@ -225,8 +258,9 @@ class TestEvorRestorePayload:
         assert "Tick 7" in msg, "restore must mention current tick"
         # Name-only surface: anchor on the mission objective, never a raw run_id
         assert "test objective" in msg, "restore must reference the mission objective"
-        # Recovery hint is tool-based, never an internal .evor/ path
-        assert "evor_state_read" in msg, "restore must direct to evor_state_read"
+        # Main may not read state while a mission runs; the next step comes from post-compact
+        assert "evor_state_read" not in msg, "restore must not prescribe a call main is refused"
+        assert ".evor/" not in msg, "restore never names an internal .evor/ path"
 
     def test_no_active_run_exits_0_silently(self, tmp_path: Path) -> None:
         result = run_hook(PRE_COMPACT, {"EVOR_ROOT": str(tmp_path)})
@@ -415,19 +449,16 @@ class TestNestedLayoutCompactionSurvival:
             json.dumps({"objective": "nested rehydration test", "status": "running"})
         )
 
-        result = run_hook(SESSION_START, {"EVOR_ROOT": str(tmp_path)})
+        result, message, env = run_session_start(tmp_path)
         assert result.returncode == 0
 
-        output = json.loads(result.stdout.strip())
-        env = output.get("env", {})
         assert env["EVOR_ACTIVE_RUN_ID"] == run_id
         assert env["EVOR_MISSION_ID"] == mission_id
         # EVOR_RUN_DIR must contain both mission and run segments
         assert mission_id in env["EVOR_RUN_DIR"]
         assert run_id in env["EVOR_RUN_DIR"]
 
-        # <evor-restore> block must be present in the emitted message
-        message = output.get("message", "")
+        # <evor-restore> block must be present in the emitted context
         assert "<evor-restore>" in message, (
             "session-start must emit <evor-restore> for nested layout"
         )
@@ -478,11 +509,13 @@ class TestNestedLayoutCompactionSurvival:
         assert cp["best_score"] == pytest.approx(0.88)
         assert "node-pending-1" in cp["pending_node_ids"]
 
-        # Step 2 — session-start re-hydration (simulates a resumed session)
-        session_result = run_hook(SESSION_START, {"EVOR_ROOT": str(tmp_path)})
+        # Step 2 — session-start re-hydration: SessionStart fires with source
+        # "compact" right after compaction, and that is the model-visible restore.
+        session_result, session_context, session_env = run_session_start(
+            tmp_path, {"hook_event_name": "SessionStart", "source": "compact"}
+        )
         assert session_result.returncode == 0
-        session_out = json.loads(session_result.stdout.strip())
-        assert session_out["env"]["EVOR_MISSION_ID"] == mission_id
-        assert "<evor-restore>" in session_out.get("message", ""), (
+        assert session_env["EVOR_MISSION_ID"] == mission_id
+        assert "<evor-restore>" in session_context, (
             "re-hydrated session must carry <evor-restore> for nested layout"
         )

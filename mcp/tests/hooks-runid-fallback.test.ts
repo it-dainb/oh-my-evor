@@ -49,19 +49,6 @@ const AFFECTED_HOOKS: Array<{ file: string; stdin: (c: Ctx) => string }> = [
     stdin: () => JSON.stringify({ tool_name: "Bash", tool_input: { command: "ls" } }),
   },
   {
-    // Only acts on a forge reviewer artifact batch; anything else exits silently.
-    file: "post-tool-batch.mjs",
-    stdin: () =>
-      JSON.stringify({
-        tool_results: [
-          {
-            tool_name: "mcp__plugin_oh-my-evor_evor__write_artifact",
-            tool_input: { agent: "forge-critic", payload: { verdict: "reject", reason: "channel mismatch" } },
-          },
-        ],
-      }),
-  },
-  {
     file: "pre-tool-use.mjs",
     stdin: () => JSON.stringify({ tool_name: "Bash", tool_input: { command: "python train.py" } }),
   },
@@ -83,11 +70,6 @@ const AFFECTED_HOOKS: Array<{ file: string; stdin: (c: Ctx) => string }> = [
     // Intent regexes are strict and anchored — "resume" alone does not match.
     file: "user-prompt-submit.mjs",
     stdin: () => JSON.stringify({ prompt: "resume the evor run" }),
-  },
-  {
-    // Reads the status.json named in its payload; terminal state → wake message.
-    file: "job-status-watcher.mjs",
-    stdin: (c) => JSON.stringify({ file_path: join(c.runDir, "status.json") }),
   },
   // These two were omitted from the original table, and both still gated on the
   // raw env var with no file fallback — i.e. exactly the defect this suite exists
@@ -141,11 +123,6 @@ function seedRun(root: string, opts: { pendingNodes?: boolean } = {}) {
   );
   // subagent-stop resolves the tick from here when EVOR_CURRENT_TICK is unset.
   writeFileSync(join(runDir, "tick-state.json"), JSON.stringify({ tick: 1 }));
-  // job-status-watcher reads the status.json named in its payload.
-  writeFileSync(
-    join(runDir, "status.json"),
-    JSON.stringify({ state: "failed", job_id: "job-1", node_id: "node-1", error: "CUDA OOM" }),
-  );
   return { evorRoot, runDir };
 }
 
@@ -309,13 +286,9 @@ describe("hook run-id fallback — file path is equivalent to the env var", () =
       const rootC = mk("c");
       const seedC = seedRun(rootC);
 
-      // job-status-watcher dedups terminal notifications in a shared temp dir
-      // keyed by run id. Without isolation, whichever scenario runs first takes
-      // the lock and silences the others.
-      const base = (name: string) => ({
+      const base = (_name: string) => ({
         CLAUDE_SESSION_ID: "eqtest",
         CLAUDE_PLUGIN_ROOT: "/nonexistent-plugin-root",
-        EVOR_DEDUP_DIR: join(tmpDir, `dedup-${name}`),
       });
 
       const a = runHook(

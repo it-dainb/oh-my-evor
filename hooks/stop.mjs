@@ -41,6 +41,7 @@ import { resolveActiveRun, resolveEvorRoot } from './lib/active-run.mjs';
 import { isMissionLive, isTickFinished } from './lib/run-status.mjs';
 import { isYieldingStop, recordedWait, liveSubagents } from './lib/waiting.mjs';
 import { resolveNodeArtifact } from './lib/node-identity.mjs';
+import { tickRoute, HEARTBEAT_CALL } from './lib/next-step.mjs';
 
 // ── Kill switches ─────────────────────────────────────────────────────────────
 // DISABLE_EVOR: truthy value disables the entire evor hook layer.
@@ -80,6 +81,18 @@ const runDir = missionId
   : join(evorRoot, 'runs', activeRunId);
 
 const runStatePath = join(runDir, 'run-state.json');
+
+/** A sub-agent's stop (it carries agent_type/agent_id); main's carries neither. */
+const isSubagentStop = Boolean(payloadForContinuation?.agent_type ?? payloadForContinuation?.agent_id);
+/**
+ * How main hands a debt to the tick: resume its agent, or spawn evor-tick when
+ * the tick has none. Main does not record nodes or run the roster itself, so a
+ * guard that names those calls to main asks for what the governor refuses.
+ */
+const routeToTick = (capital = true) => {
+  const r = tickRoute(runDir, payloadForContinuation?.session_id, payloadForContinuation?.transcript_path);
+  return capital ? r.charAt(0).toUpperCase() + r.slice(1) : r;
+};
 
 // ── §15E: Gate silent when mission is in a terminal/paused state ──────────────
 // If the orchestrator already completed, failed, or paused the run, the stop
@@ -147,7 +160,7 @@ try {
     if (!stopHookActive && !heartbeatArmed(runDir)) {
       process.stderr.write(
         `[evor:stop] Before ending your turn on a yield, arm the heartbeat: call ` +
-          `evor_wait({ heartbeat: true, wait_s: 540 }), then end your turn. It wakes this ` +
+          `evor_wait({ heartbeat: true }), then end your turn. It wakes this ` +
           `session if a completion notice never arrives.\n`
       );
       process.exit(2);
@@ -261,8 +274,7 @@ if (blockCount >= SOFT_CEILING && !hasPendingNodes()) {
 function blockStop(message) {
   const attempt = blockCount + 1;
   const reason =
-    message +
-    `\n\n[Attempt ${attempt}/${HARD_CEILING}] To force-stop regardless, set EVOR_SKIP_HOOKS=stop.`;
+    message + `\n\n[Attempt ${attempt}/${HARD_CEILING}]`;
   process.stdout.write(JSON.stringify({ decision: 'block', reason }) + '\n');
   // Mirrored to stderr so the reason is in the session log even if the JSON
   // protocol is not honoured by the host.
@@ -285,8 +297,9 @@ if (deadEndJobWait) {
       (state === 'running'
         ? `Call evor_wait({ job_id: "${deadEndJobWait}" }) to hold your turn until it ends. `
         : `It is no longer running. `) +
-      `Then finish the tick: if you are evor-tick, continue from step 6; if you are the ` +
-      `orchestrator, resume the evor-tick agent with SendMessage.`
+      (isSubagentStop
+        ? `Then finish the tick: continue from step 6.`
+        : `Then hand it back to the tick: ${routeToTick(false)}, and tell it the job's state.`)
   );
 }
 
@@ -342,9 +355,14 @@ if (pendingIds.length > 0) {
   } catch { /* fail-open — use count-only label */ }
 
   blockStop(
-    `[EVOR CONTINUATION GUARD] Tick ${tick} started but tree DB not updated.\n` +
-      `Call evor_record_node for: ${pendingLabel}.\n` +
-      `Do not finish until the tree is updated.\n`
+    isSubagentStop
+      ? `[EVOR CONTINUATION GUARD] Tick ${tick} started but tree DB not updated.\n` +
+          `Call evor_record_node for: ${pendingLabel}.\n` +
+          `Do not finish until the tree is updated.\n`
+      : `[EVOR CONTINUATION GUARD] Tick ${tick} started but tree DB not updated: no node is ` +
+          `recorded for ${pendingLabel}. The tick records nodes with evor_record_node, not you. ` +
+          `${routeToTick()}, ` +
+          `and tell it which nodes are pending.\n`
   );
 }
 
@@ -364,10 +382,12 @@ if (pendingIds.length > 0) {
 // `stop-incomplete-tick.test.ts`'s "the guard is scoped to the orchestrator"
 // cases have asserted this all along; they were passing for the wrong reason.
 try {
-  const isSubagentDrift = Boolean(payloadForContinuation?.agent_type ?? payloadForContinuation?.agent_id);
-  if (isSubagentDrift) process.exit(0);
+  if (isSubagentStop) process.exit(0);
 
+  /** Debts only the tick can discharge: main hands them to it. */
   const debtReasons = [];
+  /** Debts main discharges itself in this turn. */
+  const ownDebts = [];
 
   // (a+b) Check tree.json nodes for missing integrity verdicts or missing telemetry
   const treePath = join(runDir, 'tree.json');
@@ -494,11 +514,11 @@ try {
 
       if (!existsSync(proposalsPath)) {
         debtReasons.push(
-          `[EVOR DRIFT GUARD] Tick ${curTick}: evor-mutagen output not found. Spawn evor-mutagen via Task — do not role-play the roster inline.`
+          `tick ${curTick}: evor-mutagen output not found — the tick has not run Mutagen.`
         );
       } else if (!existsSync(verdictPath)) {
         debtReasons.push(
-          `[EVOR DRIFT GUARD] Tick ${curTick}: evor-selector output not found. Spawn evor-selector via Task.`
+          `tick ${curTick}: evor-selector output not found — the tick has not run Selector.`
         );
       }
 
@@ -507,7 +527,7 @@ try {
       // tick has no forge-report and legitimately adds 0 nodes — not flagged.)
       if (hasForgeReport(tickDir) && nodeCount === 0) {
         debtReasons.push(
-          `[EVOR DRIFT GUARD] Tick ${curTick}: Forge produced output but no tree node recorded. Call evor_record_node and evor_record_eval.`
+          `tick ${curTick}: Forge produced output but no tree node is recorded (evor_record_node, evor_record_eval).`
         );
       }
     }
@@ -546,7 +566,7 @@ try {
     for (let t = Math.max(1, start); t <= completed; t++) if (!recorded.has(t)) unrecorded.push(t);
     if (unrecorded.length > 0) {
       const shown = unrecorded.slice(0, 5).join(', ') + (unrecorded.length > 5 ? ', ...' : '');
-      debtReasons.push(
+      ownDebts.push(
         `tick(s) ${shown} finished with no tick_record. Call ` +
           `evor_state_write({tick_record:{tick, outcome, score?}}) for each — the circuit ` +
           `breaker and plateau window read these records and nothing else.`
@@ -571,20 +591,23 @@ try {
           const ellipsis = pendingSubagentIds.length > 3 ? '...' : '';
           debtReasons.push(
             `tick ${tickStateE?.tick ?? '?'} has ${pendingSubagentIds.length} sub-agent task(s) still pending: ` +
-              `${shown}${ellipsis}. Wait for sub-agents to complete before stopping.`
+              `${shown}${ellipsis}.`
           );
         }
       }
     } catch (_) { /* fail-open — tick-state absent or corrupt */ }
   }
 
-  if (debtReasons.length > 0) {
+  if (debtReasons.length > 0 || ownDebts.length > 0) {
     const tick = runState?.tick_count ?? '?';
+    const list = (xs) => xs.map((r, i) => `  ${i + 1}. ${r}`).join('\n') + '\n';
     blockStop(
       `[EVOR DRIFT GUARD] Active run has behavioral debt after tick ${tick}.\n` +
-        `Resolve the following before stopping:\n` +
-        debtReasons.map((r, i) => `  ${i + 1}. ${r}`).join('\n') + '\n' +
-        `\nDo not finish until drift is resolved.\n`
+        (ownDebts.length ? `Resolve these yourself before stopping:\n${list(ownDebts)}` : '') +
+        (debtReasons.length
+          ? `The tick owes these, not you: ${routeToTick(false)}, and tell it what is missing:\n` +
+            list(debtReasons)
+          : '')
     );
   }
 } catch (err) {
@@ -608,8 +631,7 @@ try {
 // Subagents are exempt — only the orchestrator owns tick completion.
 try {
   // stopPayload/tickStatePath above are block-scoped; re-derive rather than reuse.
-  const isSubagent = Boolean(payloadForContinuation?.agent_type ?? payloadForContinuation?.agent_id);
-  if (!isSubagent) {
+  if (!isSubagentStop) {
     const tsPathC = join(runDir, 'tick-state.json');
     const ts = existsSync(tsPathC) ? JSON.parse(readFileSync(tsPathC, 'utf8')) : null;
     const started = typeof ts?.tick === 'number' && ts.tick > 0;
@@ -628,18 +650,16 @@ try {
       blockStop(
         `[EVOR CONTINUATION] Tick ${ts.tick} is waiting on ${stalledOn}, and no agent is running ` +
           `that will deliver it: the agent that owes it ended its turn and is not woken again by ` +
-          `itself. Resume the evor-tick agent for this tick with SendMessage and tell it what it ` +
-          `is waiting on; it resumes the agent that owes the artifact. If no tick agent can be ` +
-          `resumed, spawn Task(subagent_type="oh-my-evor:evor-tick") again for this tick.\n`
+          `itself. ${routeToTick()}, and tell it what it is waiting on; it resumes the agent ` +
+          `that owes the artifact.\n`
       );
     } else if (started && !finished) {
       blockStop(
-        `[EVOR CONTINUATION] Tick ${ts.tick} is at step ${step} (${ts?.step_status ?? 'unknown'}) — not complete.\n` +
-          `Ending your turn now ends the mission with this tick unfinished.\n\n` +
-          `If you spawned or resumed an agent in the background, WAIT for it: call TaskOutput ` +
-          `with block:true on its task id, or Monitor the artifact it owes. If the tick failed ` +
-          `outright, spawn Task(subagent_type="oh-my-evor:evor-tick") again for this tick — the ` +
-          `tick is not done until it reports an outcome and a node is recorded.\n`
+        `[EVOR CONTINUATION] Tick ${ts.tick} is at step ${step} (${ts?.step_status ?? 'unknown'}) — not complete, ` +
+          `and nothing of it is running. Ending your turn now ends the mission with this tick ` +
+          `unfinished.\n\n` +
+          `${routeToTick()}. While it works, call ${HEARTBEAT_CALL}, then end your turn: its ` +
+          `completion notice wakes you. The tick is not done until it reports an outcome.\n`
       );
     }
   }

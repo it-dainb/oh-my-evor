@@ -203,6 +203,8 @@ skills: [oh-my-evor:evor-mcp]
   </Success_Criteria>
 
   <Constraints>
+    - Build every `rm` path from guarded variables: `rm -rf "${W:?}/${n:?}/build"`, never
+      `"$W/$n/build"`. An unguarded variable makes the command stop for a person to confirm.
     - Launch the trainer DETACHED (`setsid nohup python train/trainer.py … &`, note its PID), then
       start ONE background Bash task (`run_in_background: true`) that watches it:
         python -m evor.watch --telemetry "$EVOR_TELEMETRY_PATH" --pid <PID> --val-key <the

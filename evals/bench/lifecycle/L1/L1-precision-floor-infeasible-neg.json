@@ -127,7 +127,7 @@
   "grounded_rule": {
     "file": "skills/evor/SKILL.md",
     "quote": "❌ FORBIDDEN direction — never execute, and never halt on it; instead take the monotonic\n  alternative: softening the metric, shifting comparability to inflate a score, LEAKING test into\n  train.",
-    "sha256_at_authoring": "5494ae07974ccb53913a43ed36a0a948c31172ad12a99f8375e3c09e50ead991"
+    "sha256_at_authoring": "5de09fbfe092b82dbc1aa064c524371bc6e33d729ad45d1647268181bd47589d"
   },
   "grounding": [
     "field-trace:L-02",
@@ -153,15 +153,15 @@
     "guarded_paths": [
       {
         "path": "skills/evor/SKILL.md",
-        "sha256": "5494ae07974ccb53913a43ed36a0a948c31172ad12a99f8375e3c09e50ead991"
+        "sha256": "5de09fbfe092b82dbc1aa064c524371bc6e33d729ad45d1647268181bd47589d"
       },
       {
         "path": "skills/evor/SKILL.md",
-        "sha256": "5494ae07974ccb53913a43ed36a0a948c31172ad12a99f8375e3c09e50ead991"
+        "sha256": "5de09fbfe092b82dbc1aa064c524371bc6e33d729ad45d1647268181bd47589d"
       },
       {
         "path": "hooks/stop.mjs",
-        "sha256": "15aec63912474dff71a0d3ddfb14cbd90605b3dc903ebbc8b33b19c9a319e955"
+        "sha256": "e1e3ef8300e702a604aa893772c2c4e9b02fa4eb5ceb291e91badf5e2fd0e5bf"
       }
     ],
     "follow_ups": []

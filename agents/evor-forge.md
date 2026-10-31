@@ -393,6 +393,13 @@ skills: [oh-my-evor:evor-mcp]
     5. The Ingestion Contamination Gate verifies no acquired sample collides with any frozen eval split before the node can be promoted.
   </Data_Acquisition_Protocol>
 
+  <Seed_Budget>
+    - Train only the seeds the Selector verdict owes: 2 for a screen, the remaining ones for a
+      confirmation, all with data seed = model seed.
+    - Before training a control, look for the same parent recipe on the same seed, data-seed policy
+      and eval version in the tree (`evor_tree_read`). Reuse it; train only the missing seeds.
+  </Seed_Budget>
+
   <Metric_Hardening_Request>
     The tick may hand you a metric hardening instead of a MutationProposal: "write the hardened
     evaluator into worktree `harden-<version>`". That is not a candidate — no training, no node,

@@ -6,12 +6,12 @@
  * the orchestrator back to the tick.
  */
 import { describe, it, expect, afterEach } from "vitest";
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync, utimesSync } from "fs";
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, utimesSync, existsSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
 import { registerWaitTools, lastActivity } from "../src/tools/wait.js";
 
-type Handler = (a: Record<string, unknown>) => Promise<{ content: { text: string }[] }>;
+type Handler = (a: Record<string, unknown>, extra?: { signal?: AbortSignal }) => Promise<{ content: { text: string }[] }>;
 const saved = { root: process.env.EVOR_ROOT, mission: process.env.EVOR_MISSION_ID };
 let root = "";
 afterEach(() => {
@@ -34,7 +34,7 @@ function setup(ageS: number) {
   utimesSync(join(run, "ticks", "1"), t, t);
   const h = new Map<string, Handler>();
   registerWaitTools({ tool: (n: string, _d: string, _s: unknown, fn: Handler) => h.set(n, fn) } as never);
-  return { run, call: (a: Record<string, unknown>) => h.get("evor_wait")!({ run_id: "r", ...a }).then((r) => JSON.parse(r.content[0].text)) };
+  return { run, call: (a: Record<string, unknown>, extra?: { signal?: AbortSignal }) => h.get("evor_wait")!({ run_id: "r", ...a }, extra).then((r) => JSON.parse(r.content[0].text)) };
 }
 
 describe("evor_wait heartbeat", () => {
@@ -58,4 +58,24 @@ describe("evor_wait heartbeat", () => {
     writeFileSync(join(wt, "train.log"), "step 10");
     expect(Date.now() - lastActivity(run)).toBeLessThan(10_000);
   });
+
+  it("returns at once while another heartbeat is armed", async () => {
+    const { run, call } = setup(5);
+    writeFileSync(join(run, "heartbeat.json"), JSON.stringify({ until: Date.now() + 3_600_000, pid: process.ppid }));
+    const r = await call({ heartbeat: true });
+    expect(r.already_armed).toBe(true);
+    expect(r.next).toMatch(/end your turn/);
+  });
+
+  it("waits past the short cap when no wait_s is given, and stops when cancelled", async () => {
+    const { run, call } = setup(5);
+    const ac = new AbortController();
+    const p = call({ heartbeat: true, quiet_s: 600 }, { signal: ac.signal });
+    await new Promise((res) => setTimeout(res, 200));
+    expect(existsSync(join(run, "heartbeat.json"))).toBe(true);
+    ac.abort();
+    const r = await p;
+    expect(r.stalled).toBe(false);
+    expect(existsSync(join(run, "heartbeat.json"))).toBe(false);
+  }, 30_000);
 });

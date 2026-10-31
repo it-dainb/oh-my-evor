@@ -37,18 +37,6 @@
         ]
       }
     ],
-    "PostToolBatch": [
-      {
-        "matcher": "^oh-my-evor:evor-forge$",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$CLAUDE_PLUGIN_ROOT\"/hooks/post-tool-batch.mjs",
-            "timeout": 5
-          }
-        ]
-      }
-    ],
     "Stop": [
       {
         "matcher": "*",
@@ -128,19 +116,6 @@
           {
             "type": "command",
             "command": "node \"$CLAUDE_PLUGIN_ROOT\"/hooks/post-compact.mjs",
-            "timeout": 5
-          }
-        ]
-      }
-    ],
-    "FileChanged": [
-      {
-        "matcher": "status.json",
-        "asyncRewake": true,
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$CLAUDE_PLUGIN_ROOT\"/hooks/job-status-watcher.mjs",
             "timeout": 5
           }
         ]

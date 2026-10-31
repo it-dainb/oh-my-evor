@@ -157,12 +157,19 @@ describe("every other spawn is size-bounded, but not schema-bounded (S5)", () =>
     }
   });
 
-  it("but an oversized return is blocked, whatever the agent type", () => {
-    for (const t of ["oh-my-evor:evor-sage", "general-purpose", "Explore"]) {
+  it("but an oversized return is blocked, for every evor agent", () => {
+    for (const t of ["oh-my-evor:evor-sage", "oh-my-evor:evor-probe"]) {
       freshScope();
       const { json } = run({ agent_type: t, last_assistant_message: long });
       expect(json?.decision, t).toBe("block");
       expect(String(json?.reason)).toMatch(/pointer/i);
+    }
+  });
+
+  it("and never for an agent this plugin has no contract with", () => {
+    for (const t of ["general-purpose", "Explore", "oh-my-claudecode:architect"]) {
+      freshScope();
+      expect(run({ agent_type: t, last_assistant_message: long }).json?.decision, t).not.toBe("block");
     }
   });
 
@@ -177,7 +184,7 @@ describe("every other spawn is size-bounded, but not schema-bounded (S5)", () =>
 
   it("gives up after the cap here too — an agent that cannot shrink must not loop", () => {
     freshScope();
-    const d = [1, 2, 3].map(() => run({ agent_type: "Explore", last_assistant_message: long }).json?.decision);
+    const d = [1, 2, 3].map(() => run({ agent_type: "oh-my-evor:evor-sage", last_assistant_message: long }).json?.decision);
     expect(d.slice(0, 2)).toEqual(["block", "block"]);
     expect(d[2]).not.toBe("block");
   });
@@ -290,7 +297,8 @@ describe("evor-tick may not return mid-flight", () => {
     const { root, env } = runWithTick(4);
     const r = run({ agent_type: "oh-my-evor:evor-mutagen", last_assistant_message: "short" }, env);
     rmSync(root, { recursive: true, force: true });
-    expect(r.json).toBeNull();
+    // No block. A user-facing note about its missing artifact may be shown.
+    expect(r.json?.decision).toBeUndefined();
     expect(r.code).toBe(0);
   });
 });

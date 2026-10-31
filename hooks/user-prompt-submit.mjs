@@ -20,7 +20,8 @@
  * §19: NO `python -m evor` in any agent-facing string.
  */
 
-import { isMissionLive } from './lib/run-status.mjs';
+import { isMissionLive, isTickFinished } from './lib/run-status.mjs';
+import { tickOwner, nextStep } from './lib/next-step.mjs';
 import { existsSync, readFileSync, writeFileSync, mkdirSync, renameSync } from 'fs';
 import { join } from 'path';
 import { createHash } from 'node:crypto';
@@ -35,9 +36,13 @@ if (skipHooks.includes('user-prompt-submit')) process.exit(0);
 
 // ── Parse STDIN payload ───────────────────────────────────────────────────────
 let userText = '';
+let payloadSessionId = '';
+let payloadTranscript = '';
 try {
   const raw = readFileSync(0, 'utf8');
   const payload = JSON.parse(raw || '{}');
+  payloadSessionId = String(payload?.session_id ?? '');
+  payloadTranscript = String(payload?.transcript_path ?? '');
   // UserPromptSubmit payload typically has `prompt` or `content`
   userText = String(
     payload?.prompt ??
@@ -53,7 +58,29 @@ if (!userText.trim()) process.exit(0);
 // A background task's completion notice arrives through this hook too. It is not
 // a person's intent: its words ("finished", "resume", "tick") matched the resume
 // nudge and steered main into a blocking wait on an agent that was still running.
-if (/^\s*<task-notification>/.test(userText)) process.exit(0);
+// The notice is not always first: it can follow other text, or arrive wrapped in a
+// system-reminder. Any <task-notification> element, or a prompt that is nothing
+// but a system-reminder, is the host speaking, not a person.
+if (/<task-notification\b/.test(userText)) process.exit(0);
+if (/^\s*<system-reminder>[\s\S]*<\/system-reminder>\s*$/.test(userText)) process.exit(0);
+
+// A person's message during a tick is for the tick. Its agent id is the
+// SendMessage address; main may no longer have it in context.
+let tickNudge = '';
+try {
+  const ar = resolveActiveRun();
+  const er = resolveEvorRoot();
+  const rd = ar.runId ? (ar.missionId ? join(er, 'runs', ar.missionId, ar.runId) : join(er, 'runs', ar.runId)) : null;
+  const rj = (n) => { try { return JSON.parse(readFileSync(join(rd, n), 'utf8')); } catch { return {}; } };
+  if (rd && existsSync(rd) && isMissionLive(rj('mission-state.json'), rj('run-state.json'))) {
+    const { ts, owner } = tickOwner(rd, payloadSessionId, payloadTranscript);
+    if (owner && !isTickFinished(ts)) {
+      tickNudge =
+        `[EVOR TICK] Tick ${ts.tick} is run by agent ${owner.id}. To pass this message to the ` +
+        `tick, SendMessage({ to: "${owner.id}", message: ... }); it relays to its children.`;
+    }
+  }
+} catch { /* the hint is optional */ }
 
 // ── Intent detection (strict anchored keywords) ───────────────────────────────
 // Only fire on clear, unambiguous intent signals to avoid false positives.
@@ -73,7 +100,7 @@ const intents = {
 };
 
 const matched = Object.entries(intents).filter(([, v]) => v).map(([k]) => k);
-if (matched.length === 0) process.exit(0);
+if (matched.length === 0 && !tickNudge) process.exit(0);
 
 // ── Throttle per intent — 10 min ─────────────────────────────────────────────
 const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT ?? process.cwd();
@@ -94,7 +121,7 @@ const unthrottled = matched.filter(intent => {
   return !entry || (now - (entry.last_ms ?? 0)) >= THROTTLE_MS;
 });
 
-if (unthrottled.length === 0) process.exit(0);
+if (unthrottled.length === 0 && !tickNudge) process.exit(0);
 
 // Update throttle state
 try {
@@ -155,12 +182,10 @@ if (unthrottled.includes('resume-run') && runDir && existsSync(runDir)) {
     : false;
   nudges.push(
     live
-      ? `[EVOR RESUME]${tickHint} The mission is running, so resume through the tick boundary: ` +
-        'if an agent of this session is still running, end your turn and its completion notice ' +
-        'wakes you; if a tick agent yielded and nothing is running, SendMessage it; otherwise spawn ' +
-        'oh-my-evor:evor-tick for that tick, which continues from its last completed step. Progress ' +
-        'for the user comes from evor_check_stop. Do not call evor_state_read or evor_tree_read ' +
-        'here; the governor denies them to main while the mission runs.'
+      ? `[EVOR RESUME]${tickHint} The mission is running, so resume through the tick boundary. ` +
+        nextStep(runDir, payloadSessionId, payloadTranscript) + ' Progress for the user comes ' +
+        'from evor_check_stop. Do not call evor_state_read or evor_tree_read here; the governor ' +
+        'denies them to main while the mission runs.'
       : `[EVOR RESUME]${tickHint} ` +
         'Call evor_state_read to check current position, then call evor_tree_read to see the frontier. ' +
         'If a tick is mid-flight (step < 9), continue from the last completed step.'
@@ -185,6 +210,7 @@ if (unthrottled.includes('brownfield')) {
   );
 }
 
+if (tickNudge) nudges.push(tickNudge);
 if (nudges.length === 0) process.exit(0);
 
 process.stdout.write(

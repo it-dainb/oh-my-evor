@@ -60,7 +60,8 @@ describe("a stop on a job wait is a dead end, not a yield", () => {
     const r = stop({ ...mid, blocked: { on: "job:j1", since: "x" } }, "succeeded");
     expect(r.decision).toBe("block");
     expect(r.reason).toMatch(/no longer running/);
-    expect(r.reason).toMatch(/resume the evor-tick agent/);
+    // No tick agent exists in this fixture, so main is told to spawn one for the tick.
+    expect(r.reason).toMatch(/hand it back to the tick: spawn Task\(subagent_type="oh-my-evor:evor-tick"\) for tick 2/);
   });
 
   it("still treats an artifact wait as a yield while an agent is running", () => {

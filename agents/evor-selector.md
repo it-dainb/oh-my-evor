@@ -200,6 +200,20 @@ disallowedTools: Write, Edit
       known-failure is strictly worse than a false rejection.
   </Seven_Gate_Checklist>
 
+  <Seed_Budget>
+    Seeds buy confidence; distinct ideas buy discovery. Spend seeds where a decision depends on them.
+    - Every arm uses one fixed seed list (e.g. 42, 7, 123, 2024, 31) with data seed = model seed.
+    - **Screen.** An approved new recipe owes 2 seeds (the first two on the list), judged against the
+      matched control on the same seeds. A screen result is labelled "screen", never "best".
+    - **Reuse controls.** A control is one parent recipe on one seed under one data-seed policy and
+      eval version. If that run exists in the tree, it is reused; only missing seeds are owed.
+    - **Confirm.** A recipe owes the remaining seeds (5 in all, with matched controls) only when its
+      screen mean beats the matched control mean by more than the control's seed-to-seed spread,
+      or when it would become the run's best. Only a confirmed result may be called the best.
+    - Approve more distinct recipes rather than more seeds of one: the seeds a screen saves pay for them.
+    - A mission or operator instruction on seeds overrides these defaults.
+  </Seed_Budget>
+
   <Output_Format>
     The verdict.json artifact written via evor_write_artifact(agent="selector") has EXACTLY
     this shape — this is the enforced contract (SelectorVerdict),

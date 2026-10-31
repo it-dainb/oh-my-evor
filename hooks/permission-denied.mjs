@@ -103,8 +103,7 @@ try {
 // that benefits from not writing.
 //
 // So: a durable record with an occurrences count, always; and `systemMessage`,
-// which reaches the USER, instead of `additionalContext`, which reaches the
-// model. The 10-minute throttle still suppresses repetition in the model's
+// which reaches the USER. The 10-minute throttle still suppresses repetition in the model's
 // context — that part was right — but it no longer suppresses the record.
 const shortTool = toolName.replace(/^mcp__plugin_oh-my-evor_evor__/, 'evor_');
 const isEvorTool = /evor_/.test(shortTool);
@@ -145,19 +144,11 @@ const forUser =
       ? '. This may halt the active run.'
       : '.');
 
-process.stdout.write(
-  JSON.stringify({
-    hookSpecificOutput: {
-      hookEventName: 'PermissionDenied',
-      // To the user, by the hook.
-      systemMessage: forUser,
-      // To the model: what it can actually do, with no instruction to escalate.
-      additionalContext:
-        `[EVOR BLOCKED] "${shortTool}" was denied${denyReason ? ` (${denyReason.slice(0, 120)})` : ''}. ` +
-        `The operator has been notified — do not attempt to route around this. ` +
-        `If the work cannot proceed without it, record a capability-gap signal and stop.`,
-    },
-  }) + '\n'
-);
+// Output shape: `systemMessage` is a TOP-LEVEL field. Nested inside
+// hookSpecificOutput the CLI dropped it, so the user never saw the escalation.
+// PermissionDenied's hookSpecificOutput carries only `retry`; it has no
+// additionalContext, and the model already receives the denial itself from the
+// CLI, so there is nothing further to add for it.
+process.stdout.write(JSON.stringify({ systemMessage: forUser }) + '\n');
 
 process.exit(0);

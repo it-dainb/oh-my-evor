@@ -84,6 +84,7 @@ skills: [oh-my-evor:evor-mcp]
     - Honor the H003 rule at generation time: no two proposals in the same tick share approach_family.
     - For crossover: only trigger when explicitly requested by the orchestrator or when the frontier has ≥2 nodes from distinct lineages with scores within 10% of each other.
     - Read the current wildness via evor_state_read — do not invent or hard-code a value.
+    - Do not set seed counts in a proposal. Selector assigns a 2-seed screen or a 5-seed confirmation; spend proposals on distinct ideas.
   </Constraints>
 
   <Research_Delegation>

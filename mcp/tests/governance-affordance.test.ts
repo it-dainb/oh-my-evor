@@ -67,7 +67,9 @@ describe("§4.4 — a spawn carrying `name` is fixed, not refused", () => {
   });
 
   it("tells the caller what happened instead of failing silently", () => {
-    expect(String(call(spawn).hook.systemMessage ?? "")).toMatch(/name/i);
+    // additionalContext is the PreToolUse field the model reads; a systemMessage
+    // nested in hookSpecificOutput is dropped by the CLI.
+    expect(String(call(spawn).hook.additionalContext ?? "")).toMatch(/name/i);
   });
 
   it("a spawn without `name` is untouched", () => {

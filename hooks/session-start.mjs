@@ -6,9 +6,19 @@
  *   DISABLE_EVOR=1                 → exit 0 immediately
  *   EVOR_SKIP_HOOKS=session-start  → exit 0 immediately
  *
- * Reads .evor/active-run.json; emits JSON to stdout so Claude Code can set
- * session env vars (EVOR_ACTIVE_RUN_ID, EVOR_MISSION_ID, EVOR_RUN_DIR) for
- * subsequent hooks in the same session.
+ * Reads .evor/active-run.json. Session env vars (EVOR_ACTIVE_RUN_ID,
+ * EVOR_MISSION_ID, EVOR_RUN_DIR, the harness paths) reach the session's shell
+ * through the `export` lines appended to $CLAUDE_ENV_FILE (persistEnv).
+ *
+ * Model-visible text goes in hookSpecificOutput.additionalContext — the only
+ * SessionStart field the CLI puts in the model's context. Top-level `env`,
+ * `message` and `watchPaths` are not part of the hook output schema and were
+ * dropped by the CLI, so nothing this hook said ever reached the model.
+ *
+ * The payload's `source` picks the text. On `compact` (the re-hydration point
+ * after compaction) and `resume` with a live mission it is only the restore
+ * block plus main's next step (lib/next-step.mjs, shared with post-compact);
+ * on `startup`/`clear` it is the full orientation for a fresh context.
  *
  * Graceful degradation:
  *   - Missing active-run.json  → exit 0 (no active run; normal state)
@@ -22,6 +32,8 @@ import { join, dirname, delimiter } from 'path';
 import { spawnSync } from 'child_process';
 import { fileURLToPath } from 'url';
 import { resolveEvorRoot } from './lib/active-run.mjs';
+import { isMissionLive } from './lib/run-status.mjs';
+import { nextStep, HEARTBEAT_CALL } from './lib/next-step.mjs';
 
 /**
  * Build an <evor-restore> summary from on-disk state files.
@@ -61,7 +73,6 @@ function buildEvorRestore(rDir, rId, mId) {
   if (objective && objective !== header) lines.push(`Objective: ${objective}`);
   const bestStr = scoreStr + (nodeStr ? ` (${nodeStr})` : '');
   lines.push(`Tick ${currentTick} step ${currentStep} | Best: ${bestStr}`);
-  lines.push(`Spawn evor-tick to resume the loop; prioritise the user's newest request.`);
 
   return `<evor-restore>\n${lines.join('\n')}\n</evor-restore>`;
 }
@@ -318,17 +329,23 @@ function persistEnv(vars) {
 // One-time harness/deps health check (surfaces a clear fix on incomplete installs).
 const depWarning = checkHarnessDeps(pluginRoot, evorRoot);
 
-/** Emit clear-env JSON and exit 0 gracefully. */
+let hookPayload = {};
+try { hookPayload = JSON.parse(readFileSync(0, 'utf8') || '{}'); } catch { /* no payload */ }
+
+/** Print the hook output — model context, when there is any — and exit 0. */
+function emit(context) {
+  const out = context
+    ? { hookSpecificOutput: { hookEventName: 'SessionStart', additionalContext: context } }
+    : {};
+  process.stdout.write(JSON.stringify(out) + '\n');
+  process.exit(0);
+}
+
+/** Clear the active-run env and exit 0 gracefully. */
 function clearEnvAndExit(reason) {
   if (reason) process.stderr.write(`[evor:session-start] ${reason}\n`);
   persistEnv({ ...evorEnv, EVOR_ACTIVE_RUN_ID: '', EVOR_MISSION_ID: '', EVOR_RUN_DIR: '' });
-  process.stdout.write(
-    JSON.stringify({
-      env: { ...evorEnv, EVOR_ACTIVE_RUN_ID: '', EVOR_MISSION_ID: '', EVOR_RUN_DIR: '' },
-      ...(depWarning ? { message: depWarning } : {}),
-    }) + '\n'
-  );
-  process.exit(0);
+  emit(depWarning);
 }
 
 // No active run — normal state when no mission is in flight. Still export the
@@ -360,13 +377,8 @@ if (!existsSync(activeRunFile)) {
     }
   }
 
-  const parts = [depWarning, nudge].filter(Boolean);
   persistEnv(evorEnv);
-  process.stdout.write(JSON.stringify({
-    env: evorEnv,
-    ...(parts.length ? { message: parts.join('\n\n') } : {}),
-  }) + '\n');
-  process.exit(0);
+  emit([depWarning, nudge].filter(Boolean).join('\n\n'));
 }
 
 let activeRun;
@@ -424,136 +436,65 @@ const runDir = missionId
   ? join(evorRoot, 'runs', missionId, runId)
   : join(evorRoot, 'runs', runId);
 
-const output = {
-  env: {
-    ...evorEnv,
-    EVOR_ACTIVE_RUN_ID: runId,
-    EVOR_MISSION_ID: missionId,
-    EVOR_RUN_DIR: runDir,
-  },
-  message: `[EVOR CONTEXT] Active mission in progress — spawn evor-tick to resume the loop.`,
-};
+persistEnv({
+  ...evorEnv,
+  EVOR_ACTIVE_RUN_ID: runId,
+  EVOR_MISSION_ID: missionId,
+  EVOR_RUN_DIR: runDir,
+});
 
-// Prime session with recent wiki lessons (graceful — skip if evor.wiki not installed yet)
-if (missionId) {
-  const wiki = spawnSync(
-    process.env.EVOR_PYTHON ?? 'python3',
-    ['-m', 'evor.wiki', 'context', '--mission-id', missionId, '--limit', '5', '--evor-root', evorRoot],
-    { encoding: 'utf8', timeout: 4000 }
-  );
-  if (wiki.status === 0 && wiki.stdout?.trim()) {
-    // Budgeted, like pre-compact.mjs's RESTORE_LIMIT. `--limit 5` bounds the
-    // NUMBER of lessons, never their size, so five long lessons injected
-    // arbitrarily much — and a 100-200 tick mission accumulates lessons, so the
-    // injection grew with mission age. That is the same compounding shape as the
-    // tree-read leak, arriving through a different door.
-    //
-    // Truncation is announced rather than silent: a quietly cut list is
-    // indistinguishable from "there were no more lessons", which hides the budget
-    // from the reader (P5, fail loud).
-    const WIKI_INJECT_LIMIT = 2000;
-    const body = wiki.stdout.trim();
-    const injected =
-      body.length > WIKI_INJECT_LIMIT
-        ? `${body.slice(0, WIKI_INJECT_LIMIT)}\n… [truncated at ${WIKI_INJECT_LIMIT} chars — call evor_wiki_query for the full set]`
-        : body;
-    output.message += `\n\nRecent wiki lessons:\n${injected}`;
-  }
-}
+// A sub-agent's context is not main's: the mission orientation below is main's.
+if (hookPayload?.agent_type) emit(depWarning);
 
-// Inject <evor-restore> block so a fresh session re-hydrates from disk.
-// (PostCompact handles the re-inject after context compaction — this covers new sessions only.)
 resumeIfHookPaused(runDir);
 
+function readState(name) {
+  try { return JSON.parse(readFileSync(join(runDir, name), 'utf8')); } catch { return {}; }
+}
+const missionStateNow = readState('mission-state.json');
+const live = isMissionLive(missionStateNow, readState('run-state.json'));
 const restoreBlock = buildEvorRestore(runDir, runId, missionId);
-if (restoreBlock) {
-  output.message += `\n\n${restoreBlock}`;
+const next = live
+  ? nextStep(runDir, hookPayload?.session_id, String(hookPayload?.transcript_path ?? ''))
+  : '';
+const source = String(hookPayload?.source ?? 'startup');
+
+// ── compact / resume: restore + next step only ───────────────────────────────
+// After a compaction the summary keeps the conversation; what it cannot keep is
+// where the tick stands and which agent runs it. A resumed session has its own
+// transcript back. Both get exactly that, and nothing that grows with the run.
+if (live && (source === 'compact' || source === 'resume')) {
+  emit([depWarning, restoreBlock, next && `[NEXT] ${next}`].filter(Boolean).join('\n\n'));
 }
 
-// ── Compact Law primer (≤4 lines) — every session with an active run ─────────
-// Keeps the core contract visible without repeating the full SubagentStart block.
-// Main-facing only. This used to restate subagent-start's COMMON_HEADER in
-// different words — including a DIFFERENT hot-path tool list, so an agent's
-// guidance depended on which hook fired. Worse, it recommended evor_state_read,
-// which §3b.0 now denies to main: the primer was pointing the orchestrator at
-// forbidden tools, costing a denial round-trip every session and teaching the
-// behaviour the boundary exists to remove.
-//
-// The subagent protocol (READ-FIRST, artifact reads) is correct for subagents and
-// stays in subagent-start.mjs, which is the one place it belongs. Main gets its
-// own, genuinely different, job.
+// ── startup / clear: full orientation for a fresh context ────────────────────
+// Main-facing only. The subagent protocol (READ-FIRST, artifact reads) belongs
+// in subagent-start.mjs. Main orchestrates: it reads no per-tick detail, which
+// §3b.0 denies it, so nothing here may point it at evor_state_read and friends.
+// Recent wiki lessons are not injected: they are tick material (evor-tick reads
+// them), and their text grows with the mission.
 const LAW_PRIMER =
   `[EVOR LAW] Use evor_* MCP tools to change evor state — never write .evor/ directly.\n` +
-  `[ROLE] You orchestrate the mission: spawn evor-tick for each tick, record the outcome, ` +
-  `decide continue/stop. The tick's detail — artifacts, tree, run state — lives inside the ` +
-  `boundary and returns to you as a status line plus pointers.\n` +
-  `[WAIT] A tick is not done when you have spawned it — it is done when it reports an ` +
-  `outcome. While it runs, end your turn: its completion notice wakes you. Do not poll it ` +
-  `or emit "still waiting" turns.\n` +
-  `[TOOLS] Hot-path: evor-tick spawn, evor_check_stop, evor_check_plateau, evor_write_handoff.`;
-output.message += `\n\n${LAW_PRIMER}`;
+  `[ROLE] You orchestrate the mission: run each tick through one evor-tick agent, record the ` +
+  `outcome, decide continue/stop. While a tick is unfinished, talk to its agent with ` +
+  `SendMessage; never spawn a second one for it. The tick's detail lives inside the boundary ` +
+  `and returns to you as a status line plus pointers.\n` +
+  `[WAIT] A tick is done when it reports an outcome. While it runs, call ${HEARTBEAT_CALL} and ` +
+  `end your turn: its completion notice wakes you. Do not poll it or emit "still waiting" turns.\n` +
+  `[TOOLS] Hot-path: evor-tick spawn, SendMessage to the tick agent, evor_check_stop, ` +
+  `evor_check_plateau, evor_write_handoff.`;
 
-// ── Next-action hint: resume at the right step ────────────────────────────────
-try {
-  const tsPath = join(runDir, 'tick-state.json');
-  const rsPath = join(runDir, 'run-state.json');
-
-  const ts = existsSync(tsPath) ? JSON.parse(readFileSync(tsPath, 'utf8')) : {};
-  const rs = existsSync(rsPath) ? JSON.parse(readFileSync(rsPath, 'utf8')) : {};
-
-  const tick = ts?.tick ?? rs?.tick_count ?? 0;
-  const step = ts?.current_step ?? 0;
-
-  // Main's next action is always the same shape, because main only ever does one
-  // thing: run the next tick through the boundary. Naming the step tells it where
-  // the tick resumes; it does NOT license main to read the artifacts behind that
-  // step — those reads are denied for main and belong inside evor-tick.
-  const nextTick = step >= 9 || step === 0 ? tick + (step >= 9 ? 1 : 0) : tick;
-  const resume = step > 0 && step < 9 ? ` (resumes at step ${step})` : '';
-  const nextAction =
-    `Tick ${nextTick}${resume}: spawn evor-tick. When it returns, record the outcome, ` +
-    `then evor_check_stop / evor_check_plateau to decide continue or stop.`;
-
-  if (nextAction) {
-    output.message += `\n\n[NEXT] ${nextAction}`;
-  }
-} catch { /* next-action hint is advisory — never block session start */ }
-
-// ── watchPaths: register active job's status.json for FileChanged watcher ─────
-// §17D: FileChanged matcher is a literal watch-list. We register the path here
-// so the job-status-watcher.mjs hook fires when the job completes/fails.
-try {
-  // Find the active job's status.json (check common job directories)
-  const watchPaths = [];
-
-  // Look in jobs/ directory for a running job's status.json
-  const jobsDir = join(runDir, 'jobs');
-  if (existsSync(jobsDir)) {
-    const jobDirs = readdirSync(jobsDir, { withFileTypes: true })
-      .filter(e => e.isDirectory())
-      .map(e => join(jobsDir, e.name, 'status.json'))
-      .filter(p => existsSync(p));
-    watchPaths.push(...jobDirs);
-  }
-
-  // active-run.json may have a job_id; resolve status.json via the run dir (already known)
-  try {
-    const arData = JSON.parse(readFileSync(join(evorRoot, 'active-run.json'), 'utf8'));
-    if (arData?.job_id) {
-      const statusPath = join(runDir, 'jobs', String(arData.job_id), 'status.json');
-      if (!watchPaths.includes(statusPath)) watchPaths.push(statusPath);
-    }
-  } catch { /* no active-run.json job info — fine */ }
-
-  if (watchPaths.length > 0) {
-    output.watchPaths = watchPaths;
-  }
-} catch { /* watchPaths registration is advisory */ }
-
-// Surface any harness/deps warning first so an incomplete install is obvious.
-const prefixWarnings = [depWarning].filter(Boolean).join('\n\n');
-if (prefixWarnings) output.message = `${prefixWarnings}\n\n${output.message}`;
-
-persistEnv(output.env);
-process.stdout.write(JSON.stringify(output) + '\n');
-process.exit(0);
+const status = String(missionStateNow?.status ?? '');
+const parts = [
+  depWarning,
+  live
+    ? `[EVOR CONTEXT] An evor mission is running in this workspace.`
+    : `[EVOR CONTEXT] An evor mission exists in this workspace and is not running` +
+      (status ? ` (status: ${status})` : '') + `.`,
+  restoreBlock,
+  live ? LAW_PRIMER : '',
+  live
+    ? next && `[NEXT] ${next} Prioritise the user's newest request.`
+    : `[NEXT] /oh-my-evor:evor-run starts the tick loop; /oh-my-evor:evor-resume continues a paused mission.`,
+];
+emit(parts.filter(Boolean).join('\n\n'));

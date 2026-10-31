@@ -50,7 +50,7 @@ function callGovernor(payload: Record<string, unknown>) {
 
 const spawnAs = (agent: string | null, subagent: string) => ({
   tool_name: "Agent",
-  tool_input: { subagent_type: `oh-my-evor:${subagent}`, prompt: "…" },
+  tool_input: { subagent_type: `oh-my-evor:${subagent}`, description: "Tick 1", prompt: "…" },
   ...(agent ? { agent_type: `oh-my-evor:${agent}` } : {}),
 });
 

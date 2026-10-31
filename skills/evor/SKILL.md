@@ -210,8 +210,9 @@ record.
 
 **`outcome: "yielding"` is NOT a finished tick.** It means the boundary had to end its turn
 while waiting on an agent, artifact or job. Do not record it as an outcome and do not advance the
-tick counter. **If it waits on a child agent** (`artifact:<agent>@tick<n>`), end your turn: the
-tick is woken when its child finishes, and you get its notice when the tick is done. **If it
+tick counter. **If it waits on a child agent** (`artifact:<agent>@tick<n>`), arm the heartbeat and end
+your turn: the tick has ended its turn, so the child's completion notice comes to you. Pass it to
+the tick agent with `SendMessage`, verbatim; the tick resumes its child. **If it
 waits on a job** (`job:<id>`), nothing will wake either of you: `evor_wait({ job_id, wait_s:
 540 })` until `done:true`, **then resume that same tick agent with `SendMessage`.** Do
 not use `Monitor`: it is denied to main. Do not end your turn instead: a job is not a
@@ -653,11 +654,12 @@ before acting — the restore block is a navigation aid, not the authoritative s
   `SendMessage`, verbatim. If nothing is running and the tick's wait is unmet, resume the tick
   with `SendMessage`. Main is denied `Monitor`. There is no `job_complete` or
   `self_heal_event` signal; nothing emits them.
-- A completion notice can be lost. Each time the tick yields, call
-  `evor_wait({ heartbeat: true, wait_s: 540 })` and end your turn. It reports back with
-  `stalled: true` when nothing in the run has changed for ten minutes: then, if no agent of the
-  tick is running, resume the tick with `SendMessage` and tell it to check its children. With
-  `stalled: false`, the run is active: arm one more heartbeat and end your turn again.
+- A completion notice can be lost. When the tick yields, call `evor_wait({ heartbeat: true })`
+  and end your turn. It runs in the background and reports back only with `stalled: true`, when
+  nothing in the run has changed for ten minutes: then, if no agent of the tick is running,
+  resume the tick with `SendMessage` and tell it to check its children. While it runs, a notice
+  that wakes you needs no new heartbeat (a second call returns `already_armed`): handle the
+  notice and end your turn. If it returns `stalled: false`, arm it again.
 - Do not run more Forge agents AT ONCE than `resource_plan.concurrency`; queue the rest.
 - Respect budget.max_wall_clock_hours and budget.max_gpu_hours if set.
 - Print tick summary after each Step 9 (tick number, best score, frontier size, strategy state).

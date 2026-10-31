@@ -48,7 +48,6 @@ const SUBAGENT_STOP = join(HOOKS_DIR, "subagent-stop.mjs");
 const PRE_TOOL_USE = join(HOOKS_DIR, "pre-tool-use.mjs");
 const SUBAGENT_START = join(HOOKS_DIR, "subagent-start.mjs");
 const POST_COMPACT = join(HOOKS_DIR, "post-compact.mjs");
-const JOB_STATUS_WATCHER = join(HOOKS_DIR, "job-status-watcher.mjs");
 
 /** Spawn a hook script as a child process with a minimal, controlled env. */
 function runHook(scriptPath: string, env: Record<string, string>) {
@@ -76,6 +75,40 @@ function runHookWithStdin(
     encoding: "utf8",
     timeout: 5000,
   });
+}
+
+/**
+ * Run session-start and read its two real outputs: the model context
+ * (hookSpecificOutput.additionalContext — the only SessionStart field the CLI
+ * puts in the model's context) and the env it exports through the `export`
+ * lines appended to CLAUDE_ENV_FILE. A top-level `env`/`message` in stdout is
+ * dropped by the CLI, so these tests no longer read one.
+ */
+function runSessionStart(env: Record<string, string>, payload: Record<string, unknown> = {}) {
+  const envDir = mkdtempSync(join(tmpdir(), "evor-envfile-"));
+  const envFile = join(envDir, "env.sh");
+  const r = spawnSync(process.execPath, [SESSION_START], {
+    input: JSON.stringify(payload),
+    env: { PATH: process.env.PATH ?? "/usr/bin:/bin", CLAUDE_ENV_FILE: envFile, ...env },
+    encoding: "utf8",
+    timeout: 5000,
+  });
+  const exported: Record<string, string> = {};
+  try {
+    for (const line of readFileSync(envFile, "utf8").split("\n")) {
+      const m = line.match(/^export (\w+)='(.*)'$/);
+      if (m) exported[m[1]] = m[2].replace(/'\\''/g, "'");
+    }
+  } catch { /* nothing exported */ }
+  rmSync(envDir, { recursive: true, force: true });
+  const out = JSON.parse((r.stdout ?? "").trim());
+  return {
+    status: r.status,
+    stderr: r.stderr ?? "",
+    out,
+    env: exported,
+    context: out?.hookSpecificOutput?.additionalContext as string | undefined,
+  };
 }
 
 /**
@@ -121,15 +154,14 @@ describe("session-start hook", () => {
     // Pre-seed workspace-class cache so the scan never touches the OS temp parent,
     // keeping this test deterministic regardless of what sits above tmpDir.
     writeFileSync(join(tmpDir, ".workspace-class"), JSON.stringify({ class: "greenfield", counts: { models: 0, datasets: 0, configs: 0, logs: 0 } }));
-    const result = runHook(SESSION_START, { EVOR_ROOT: tmpDir });
+    const result = runSessionStart({ EVOR_ROOT: tmpDir });
     expect(result.status).toBe(0);
     expect(result.stderr).toBe("");
-    const output = JSON.parse(result.stdout.trim());
     // The plugin root is always exported so slash commands can resolve their SKILL.md.
-    expect(output.env.EVOR_PLUGIN_ROOT).toBeTruthy();
+    expect(result.env.EVOR_PLUGIN_ROOT).toBeTruthy();
     // …but with no mission in flight there is no active-run context or message.
-    expect(output.env.EVOR_ACTIVE_RUN_ID).toBeUndefined();
-    expect(output.message).toBeUndefined();
+    expect(result.env.EVOR_ACTIVE_RUN_ID).toBeUndefined();
+    expect(result.context).toBeUndefined();
   });
 
   it("exits 0 and emits env JSON when active-run.json is valid", () => {
@@ -137,13 +169,12 @@ describe("session-start hook", () => {
       join(tmpDir, "active-run.json"),
       JSON.stringify({ run_id: "run-001", mission_id: "mission-001" })
     );
-    const result = runHook(SESSION_START, { EVOR_ROOT: tmpDir });
+    const result = runSessionStart({ EVOR_ROOT: tmpDir });
     expect(result.status).toBe(0);
-    const output = JSON.parse(result.stdout.trim());
-    expect(output.env.EVOR_ACTIVE_RUN_ID).toBe("run-001");
-    expect(output.env.EVOR_MISSION_ID).toBe("mission-001");
-    expect(output.env.EVOR_RUN_DIR).toContain("run-001");
-    expect(output.env.EVOR_RUN_DIR).toContain("mission-001");
+    expect(result.env.EVOR_ACTIVE_RUN_ID).toBe("run-001");
+    expect(result.env.EVOR_MISSION_ID).toBe("mission-001");
+    expect(result.env.EVOR_RUN_DIR).toContain("run-001");
+    expect(result.env.EVOR_RUN_DIR).toContain("mission-001");
   });
 
   it("emits a message priming evor context", () => {
@@ -151,22 +182,20 @@ describe("session-start hook", () => {
       join(tmpDir, "active-run.json"),
       JSON.stringify({ run_id: "run-007", mission_id: "m-007" })
     );
-    const result = runHook(SESSION_START, { EVOR_ROOT: tmpDir });
+    const result = runSessionStart({ EVOR_ROOT: tmpDir });
     expect(result.status).toBe(0);
-    const output = JSON.parse(result.stdout.trim());
     // Must emit [EVOR CONTEXT] — raw run_id must NOT appear (context-leak fix)
-    expect(output.message).toMatch(/\[EVOR CONTEXT\]/);
-    expect(output.message).not.toMatch(/run-007/);
+    expect(result.context).toMatch(/\[EVOR CONTEXT\]/);
+    expect(result.context).not.toMatch(/run-007/);
   });
 
   it("exits 0 gracefully on corrupt active-run.json (invalid JSON)", () => {
     writeFileSync(join(tmpDir, "active-run.json"), "{corrupt: json,,}");
-    const result = runHook(SESSION_START, { EVOR_ROOT: tmpDir });
+    const result = runSessionStart({ EVOR_ROOT: tmpDir });
     expect(result.status).toBe(0);
     expect(result.stderr).toMatch(/corrupt/i);
-    const output = JSON.parse(result.stdout.trim());
-    expect(output.env.EVOR_ACTIVE_RUN_ID).toBe("");
-    expect(output.env.EVOR_MISSION_ID).toBe("");
+    expect(result.env.EVOR_ACTIVE_RUN_ID).toBe("");
+    expect(result.env.EVOR_MISSION_ID).toBe("");
   });
 
   it("exits 0 gracefully when active-run.json has no run_id field", () => {
@@ -174,11 +203,10 @@ describe("session-start hook", () => {
       join(tmpDir, "active-run.json"),
       JSON.stringify({ mission_id: "mission-001" })
     );
-    const result = runHook(SESSION_START, { EVOR_ROOT: tmpDir });
+    const result = runSessionStart({ EVOR_ROOT: tmpDir });
     expect(result.status).toBe(0);
     expect(result.stderr).toMatch(/run_id/i);
-    const output = JSON.parse(result.stdout.trim());
-    expect(output.env.EVOR_ACTIVE_RUN_ID).toBe("");
+    expect(result.env.EVOR_ACTIVE_RUN_ID).toBe("");
   });
 
   it("accepts a valid active-run.json without mission_id", () => {
@@ -186,14 +214,13 @@ describe("session-start hook", () => {
       join(tmpDir, "active-run.json"),
       JSON.stringify({ run_id: "run-solo" })
     );
-    const result = runHook(SESSION_START, { EVOR_ROOT: tmpDir });
+    const result = runSessionStart({ EVOR_ROOT: tmpDir });
     expect(result.status).toBe(0);
-    const output = JSON.parse(result.stdout.trim());
-    expect(output.env.EVOR_ACTIVE_RUN_ID).toBe("run-solo");
-    expect(output.env.EVOR_MISSION_ID).toBe("");
+    expect(result.env.EVOR_ACTIVE_RUN_ID).toBe("run-solo");
+    expect(result.env.EVOR_MISSION_ID).toBe("");
     // Without mission_id the run dir should not include an extra segment
-    expect(output.env.EVOR_RUN_DIR).toContain("run-solo");
-    expect(output.env.EVOR_RUN_DIR).not.toContain("undefined");
+    expect(result.env.EVOR_RUN_DIR).toContain("run-solo");
+    expect(result.env.EVOR_RUN_DIR).not.toContain("undefined");
   });
 });
 
@@ -1257,14 +1284,12 @@ describe("session-start hook — evor-restore injection", () => {
       JSON.stringify({ tick_count: 5, best_score: 0.92, best_node_id: "node-best", pending_node_ids: [] })
     );
 
-    const result = runHook(SESSION_START, { EVOR_ROOT: tmpDir });
+    const result = runSessionStart({ EVOR_ROOT: tmpDir });
     expect(result.status).toBe(0);
-
-    const output = JSON.parse(result.stdout.trim());
-    expect(output.message).toContain("<evor-restore>");
-    expect(output.message).toContain("</evor-restore>");
-    expect(output.message).toContain("beat baseline on MNIST");
-    expect(output.message).toContain("Tick 5");
+    expect(result.context).toContain("<evor-restore>");
+    expect(result.context).toContain("</evor-restore>");
+    expect(result.context).toContain("beat baseline on MNIST");
+    expect(result.context).toContain("Tick 5");
   });
 
   it("does not inject evor-restore when no state files exist (new run)", () => {
@@ -1278,12 +1303,10 @@ describe("session-start hook — evor-restore injection", () => {
       JSON.stringify({ run_id: runId })
     );
 
-    const result = runHook(SESSION_START, { EVOR_ROOT: tmpDir });
+    const result = runSessionStart({ EVOR_ROOT: tmpDir });
     expect(result.status).toBe(0);
-
-    const output = JSON.parse(result.stdout.trim());
     // message may or may not include evor-restore; just must not error
-    expect(output.env.EVOR_ACTIVE_RUN_ID).toBe(runId);
+    expect(result.env.EVOR_ACTIVE_RUN_ID).toBe(runId);
   });
 });
 
@@ -1615,7 +1638,9 @@ describe("pre-tool-use hook — main Evor code-authoring restrictions", () => {
     expect(result.status).toBe(0);
     const out = JSON.parse(result.stdout.trim());
     expect(out.hookSpecificOutput.permissionDecision).toBe("deny");
-    expect(out.hookSpecificOutput.permissionDecisionReason).toMatch(/evor-forge/i);
+    expect(out.hookSpecificOutput.permissionDecisionReason).toMatch(/evor-tick/i);
+    // Main hands candidate work to the tick; it is not told to spawn Forge.
+    expect(out.hookSpecificOutput.permissionDecisionReason).not.toMatch(/evor-forge"/);
   });
 
   it("denies Bash with torch training pattern by main Evor", () => {
@@ -2532,19 +2557,17 @@ describe("session-start hook — workspace classification (distill nudge)", () =
     writeFileSync(join(workspaceDir, "data", "train.csv"), "label,x\n1,0.5\n");
     writeFileSync(join(workspaceDir, "config.yaml"), "lr: 0.001\nbatch_size: 32\n");
 
-    const result = runHook(SESSION_START, { EVOR_ROOT: evorRootDir });
+    const result = runSessionStart({ EVOR_ROOT: evorRootDir });
     expect(result.status).toBe(0);
     expect(result.stderr).toBe("");
-
-    const output = JSON.parse(result.stdout.trim());
-    expect(output.message).toBeDefined();
-    expect(output.message).toMatch(/oh-my-evor/);
-    expect(output.message).toMatch(/existing ML project/);
-    expect(output.message).toMatch(/evor-distill/);
-    expect(output.message).toMatch(/evor-setup/);
-    expect(output.message).toMatch(/Nothing has been changed/);
+    expect(result.context).toBeDefined();
+    expect(result.context).toMatch(/oh-my-evor/);
+    expect(result.context).toMatch(/existing ML project/);
+    expect(result.context).toMatch(/evor-distill/);
+    expect(result.context).toMatch(/evor-setup/);
+    expect(result.context).toMatch(/Nothing has been changed/);
     // Must NOT include the possibly-training warning
-    expect(output.message).not.toMatch(/run may be active/);
+    expect(result.context).not.toMatch(/run may be active/);
   });
 
   it("stays silent (no nudge) for a greenfield workspace with no ML artifacts", () => {
@@ -2552,13 +2575,11 @@ describe("session-start hook — workspace classification (distill nudge)", () =
     writeFileSync(join(workspaceDir, "src", "app.py"), "print('hello')\n");
     writeFileSync(join(workspaceDir, "README.md"), "# My App\n");
 
-    const result = runHook(SESSION_START, { EVOR_ROOT: evorRootDir });
+    const result = runSessionStart({ EVOR_ROOT: evorRootDir });
     expect(result.status).toBe(0);
     expect(result.stderr).toBe("");
-
-    const output = JSON.parse(result.stdout.trim());
     // Greenfield: no nudge, no message at all (dep-check also skipped)
-    const msg = output.message ?? "";
+    const msg = result.context ?? "";
     expect(msg).not.toMatch(/evor-distill/);
     expect(msg).not.toMatch(/existing ML project/);
   });
@@ -2568,26 +2589,23 @@ describe("session-start hook — workspace classification (distill nudge)", () =
     writeFileSync(join(workspaceDir, "checkpoint.pt"), "fake ckpt data");
     mkdirSync(join(workspaceDir, "data"), { recursive: true });
 
-    const result = runHook(SESSION_START, { EVOR_ROOT: evorRootDir });
+    const result = runSessionStart({ EVOR_ROOT: evorRootDir });
     expect(result.status).toBe(0);
-
-    const output = JSON.parse(result.stdout.trim());
-    expect(output.message).toBeDefined();
-    expect(output.message).toMatch(/existing ML project/);
-    expect(output.message).toMatch(/run may be active/);
-    expect(output.message).toMatch(/EVOR will not touch it/);
+    expect(result.context).toBeDefined();
+    expect(result.context).toMatch(/existing ML project/);
+    expect(result.context).toMatch(/run may be active/);
+    expect(result.context).toMatch(/EVOR will not touch it/);
   });
 
   it("exits 0 and emits valid JSON on a totally missing EVOR_ROOT (fail-open)", () => {
     // EVOR_ROOT points to a path that does not exist — nothing should throw.
     const missingRoot = join(tmpdir(), `evor-missing-${Date.now()}`);
 
-    const result = runHook(SESSION_START, { EVOR_ROOT: missingRoot });
+    const result = runSessionStart({ EVOR_ROOT: missingRoot });
     expect(result.status).toBe(0);
-    // Must still emit valid JSON with env
-    const output = JSON.parse(result.stdout.trim());
-    expect(output.env).toBeDefined();
-    expect(output.env.EVOR_PLUGIN_ROOT).toBeTruthy();
+    // Must still emit valid JSON and export the plugin root
+    expect(result.out).toBeDefined();
+    expect(result.env.EVOR_PLUGIN_ROOT).toBeTruthy();
   });
 });
 
@@ -3073,7 +3091,9 @@ describe("stop hook — stop_hook_active escalation (§17D)", () => {
     expect(result.status).toBe(0);
     expect(blockOf(result), `expected a block; stdout=${result.stdout} stderr=${result.stderr}`).not.toBe("");
     expect(result.stdout).toContain("[Attempt");
-    expect(result.stdout).toMatch(/EVOR_SKIP_HOOKS=stop/);
+    // The kill switch is the operator's, not the model's: the block reason the
+    // model reads must not offer it a way to disarm the guard.
+    expect(blockOf(result)).not.toMatch(/EVOR_SKIP_HOOKS/);
   });
 
   it("releases on 8th attempt (stop_hook_active=true, count≥8, drift-only debt)", () => {
@@ -3763,102 +3783,3 @@ describe("stop hook — P0-4 pending_subagent_ids guard", () => {
   });
 });
 
-// ─── job-status-watcher hook — P2-3 stale-notification dedup ─────────────────
-
-describe("job-status-watcher hook — P2-3 stale-notification dedup", () => {
-  let tmpDir: string;
-  let dedupDir: string;
-  const RUN_ID = "run-jsw-dedup-001";
-
-  beforeEach(() => {
-    tmpDir = mkdtempSync(join(tmpdir(), "evor-jsw-test-"));
-    dedupDir = join(tmpDir, "dedup");
-    mkdirSync(dedupDir, { recursive: true });
-  });
-  afterEach(() => {
-    rmSync(tmpDir, { recursive: true, force: true });
-  });
-
-  function makeStatusFile(state: string, jobId: string, nodeId: string): string {
-    const dir = join(tmpDir, "status-files");
-    mkdirSync(dir, { recursive: true });
-    // Include state in filename so different-state files for the same job don't collide
-    const p = join(dir, `${jobId}-${state}-status.json`);
-    writeFileSync(p, JSON.stringify({ state, job_id: jobId, node_id: nodeId }));
-    return p;
-  }
-
-  function runWatcher(statusFilePath: string, extraEnv: Record<string, string> = {}) {
-    return runHookWithStdin(
-      JOB_STATUS_WATCHER,
-      {
-        EVOR_ACTIVE_RUN_ID: RUN_ID,
-        EVOR_DEDUP_DIR: dedupDir,
-        ...extraEnv,
-      },
-      JSON.stringify({ file_path: statusFilePath }),
-    );
-  }
-
-  it("emits notification on first succeeded event", () => {
-    const p = makeStatusFile("succeeded", "job-001", "node-abc");
-    const result = runWatcher(p);
-    expect(result.status).toBe(0);
-    expect(result.stdout).toContain("evor_record_eval");
-  });
-
-  it("P2-3: suppresses duplicate succeeded notification for same (node_id, job_id, state)", () => {
-    const p = makeStatusFile("succeeded", "job-002", "node-xyz");
-    // First fire — should notify
-    const r1 = runWatcher(p);
-    expect(r1.stdout).toContain("evor_record_eval");
-    // Second fire same state — must be silent
-    const r2 = runWatcher(p);
-    expect(r2.status).toBe(0);
-    expect(r2.stdout).not.toContain("EVOR JOB");
-  });
-
-  it("P2-3: suppresses duplicate failed notification for same (node_id, job_id, state)", () => {
-    const p = makeStatusFile("failed", "job-003", "node-fail");
-    const r1 = runWatcher(p);
-    expect(r1.stdout).toContain("evor_signal_emit");
-    const r2 = runWatcher(p);
-    expect(r2.status).toBe(0);
-    expect(r2.stdout).not.toContain("EVOR JOB FAILED");
-  });
-
-  it("P2-3: fires again when state transitions to a new value (succeeded → failed is different key)", () => {
-    const jobId = "job-004";
-    const nodeId = "node-trans";
-    const pSucceeded = makeStatusFile("succeeded", jobId, nodeId);
-    const pFailed = makeStatusFile("failed", jobId, nodeId);
-
-    // First: succeeded fires
-    const r1 = runWatcher(pSucceeded);
-    expect(r1.stdout).toContain("evor_record_eval");
-
-    // Then status changes to failed — different dedup key → must fire
-    const r2 = runWatcher(pFailed);
-    expect(r2.stdout).toContain("evor_signal_emit");
-  });
-
-  it("P2-3: running state is not deduped (informational, not terminal)", () => {
-    const p = makeStatusFile("running", "job-005", "node-run");
-    const r1 = runWatcher(p);
-    expect(r1.stdout).toContain("EVOR JOB RUNNING");
-    // running fires again (no dedup for non-terminal)
-    const r2 = runWatcher(p);
-    expect(r2.stdout).toContain("EVOR JOB RUNNING");
-  });
-
-  it("exits 0 silently when EVOR_ACTIVE_RUN_ID is unset", () => {
-    const p = makeStatusFile("succeeded", "job-006", "node-guard");
-    const result = runHookWithStdin(
-      JOB_STATUS_WATCHER,
-      { EVOR_DEDUP_DIR: dedupDir },
-      JSON.stringify({ file_path: p }),
-    );
-    expect(result.status).toBe(0);
-    expect(result.stdout).toBe("");
-  });
-});

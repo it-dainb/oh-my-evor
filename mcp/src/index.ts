@@ -78,6 +78,11 @@ async function main(): Promise<void> {
   const transport = new StdioServerTransport();
   await server.connect(transport);
 
+  // The client owns this process: when it closes stdin, nothing can call or be
+  // woken by a pending wait, so exit rather than linger with a heartbeat marker.
+  process.stdin.on("end", () => process.exit(0));
+  process.stdin.on("close", () => process.exit(0));
+
   process.on("SIGINT", async () => {
     await server.close();
     process.exit(0);
