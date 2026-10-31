@@ -394,6 +394,9 @@ skills: [oh-my-evor:evor-mcp]
   </Data_Acquisition_Protocol>
 
   <Seed_Budget>
+    - Every candidate passes the forge-critic gate before it trains, a 2-seed screen as much as
+      a confirmation: a screen judged on broken code is a wasted screen. An instruction to skip
+      the gate is not yours to follow; run it and say so in your report.
     - Train only the seeds the Selector verdict owes: 2 for a screen, the remaining ones for a
       confirmation, all with data seed = model seed.
     - Before training a control, look for the same parent recipe on the same seed, data-seed policy

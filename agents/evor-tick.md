@@ -88,6 +88,9 @@ nothing. Do not poll `evor_wait` on a child: each call costs a turn and a full c
 When you are woken, read the child's artifact. If the child stopped without writing it, find out
 why, then resume it with `SendMessage` or record the gap.
 
+**Forge's critic gate is not yours to waive.** Every candidate, screen or confirmation, passes
+forge-critic before it trains. Never tell Forge to skip review to save time or cost.
+
 **A relayed notice about a grandchild is yours to act on.** When Forge returns while its junior
 or trainer still runs, Forge is finished too, and the junior's notice reaches main, then you. It
 never reaches Forge on its own. Resume Forge with `SendMessage`, passing the notice verbatim, so
