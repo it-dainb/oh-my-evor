@@ -28,8 +28,12 @@ import { artifactPathFor, VALID_AGENTS } from "./artifact.js";
 
 /** Upper bound for one call. Kept under ten minutes so no host tool timeout is near. */
 export const MAX_WAIT_S = 540;
-/** A heartbeat runs as a background task and returns only on a stall, or at this cap. */
-export const HEARTBEAT_MAX_S = 6 * 3600;
+/**
+ * A heartbeat runs as a background task and returns on a stall, or at this cap. The
+ * client ends any tool call after 30 minutes without telling the server, so the cap
+ * stays under that: a result always reaches someone who is listening.
+ */
+export const HEARTBEAT_MAX_S = 25 * 60;
 const DEFAULT_WAIT_S = 300;
 const POLL_MS = 5_000;
 
@@ -145,8 +149,8 @@ export async function waitFor(probe: Probe, waitS: number, pollMs = POLL_MS, sig
   }
 }
 
-/** Run dirs with a heartbeat running in THIS server process. */
-const armedHere = new Set<string>();
+/** The heartbeat running in THIS server process for each run dir; a new one replaces it. */
+const armedHere = new Map<string, AbortController>();
 
 function pidAliveAny(pid: number): boolean {
   try { process.kill(pid, 0); return true; } catch (e) { return (e as NodeJS.ErrnoException).code === "EPERM"; }
@@ -158,7 +162,7 @@ export function registerWaitTools(server: McpServer): void {
     "Wait for a condition: an evor job finishes (job_id), a process exits (pid), a tick " +
       "artifact is written (artifact), an agent stops (agent_id), or the whole run stalls " +
       "(heartbeat). Returns {done:true,...} as soon as it holds, or {done:false} after wait_s " +
-      "(default 300, max 540; a heartbeat waits up to six hours). Use it only for what nothing " +
+      "(default 300, max 540; a heartbeat waits up to 25 minutes). Use it only for what nothing " +
       "will report: an agent you spawned, and a background task you started, wake you when " +
       "they finish. Give exactly one of job_id, pid, artifact, agent_id, heartbeat.",
     {
@@ -186,9 +190,9 @@ export function registerWaitTools(server: McpServer): void {
         "Watch the whole run instead of one condition. It runs in the background and returns " +
           "stalled:true only when nothing in the run (tick state, artifacts, jobs, node telemetry, " +
           "trainer logs) has changed for quiet_s; otherwise it keeps waiting, up to wait_s " +
-          "(default six hours). One heartbeat at a time: while one runs, a second call returns " +
-          "at once with already_armed:true. For the orchestrator, after a tick yields: a lost " +
-          "completion notice then still leads back to the tick.",
+          "(default and max 25 minutes), then returns stalled:false: arm it again. A new " +
+          "heartbeat replaces one still running. For the orchestrator, after a tick yields: a " +
+          "lost completion notice then still leads back to the tick.",
       ),
       quiet_s: z.number().int().min(60).max(3600).optional().describe(
         "With heartbeat: seconds without any change that count as stalled (default 600)",
@@ -219,26 +223,37 @@ export function registerWaitTools(server: McpServer): void {
           const hb = JSON.parse(readFileSync(marker, "utf8"));
           armedElsewhere = Number(hb.until) > Date.now() && Number(hb.pid) !== process.pid && pidAliveAny(Number(hb.pid));
         } catch { /* none armed */ }
-        if (armedHere.has(hbRunDir) || armedElsewhere) {
+        if (armedElsewhere) {
           return ok({
             condition: "heartbeat",
             already_armed: true,
             next: "a heartbeat is already running and wakes you on a stall: end your turn",
           });
         }
-        armedHere.add(hbRunDir);
+        // An older heartbeat here may have lost its listener when the client ended the
+        // call; the newest one is the one being listened to.
+        armedHere.get(hbRunDir)?.abort();
+        const mine = new AbortController();
+        armedHere.set(hbRunDir, mine);
+        extra?.signal?.addEventListener("abort", () => mine.abort(), { once: true });
         try { writeFileSync(marker, JSON.stringify({ armed_at: Date.now(), until: Date.now() + waitS * 1000, pid: process.pid })); } catch { /* the wait works without it */ }
         let r;
         try {
           r = await waitFor(() => {
             last = lastActivity(hbRunDir);
             return { done: Date.now() - last > quietMs };
-          }, waitS, 15_000, extra?.signal);
+          }, waitS, 15_000, mine.signal);
         } finally {
-          armedHere.delete(hbRunDir);
-          try {
-            if (Number(JSON.parse(readFileSync(marker, "utf8")).pid) === process.pid) rmSync(marker, { force: true });
-          } catch { /* already gone */ }
+          // A replaced heartbeat leaves the marker and the slot to its successor.
+          if (armedHere.get(hbRunDir) === mine) {
+            armedHere.delete(hbRunDir);
+            try {
+              if (Number(JSON.parse(readFileSync(marker, "utf8")).pid) === process.pid) rmSync(marker, { force: true });
+            } catch { /* already gone */ }
+          }
+        }
+        if (mine.signal.aborted && armedHere.get(hbRunDir) !== mine && armedHere.has(hbRunDir)) {
+          return ok({ condition: "heartbeat", replaced: true, next: "a newer heartbeat is running: end your turn" });
         }
         const ageS = Math.round((Date.now() - last) / 1000);
         return ok({

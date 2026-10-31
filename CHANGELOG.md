@@ -2,6 +2,16 @@
 
 All notable changes to Evor. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.2.45] — 2026-10-31 — a heartbeat someone hears
+
+### Fixed
+
+- **A long heartbeat outlived its listener.** The client ends any tool call after 30 minutes
+  without telling the server, so a six-hour heartbeat kept running unheard, and re-arming was
+  refused as `already_armed`: the session had no live heartbeat at all. A heartbeat now returns
+  within 25 minutes (`stalled: false`, arm again), and a new heartbeat replaces one still running
+  in the same server instead of being refused.
+
 ## [1.2.44] — 2026-10-31 — one strategy, two readers
 
 ### Fixed

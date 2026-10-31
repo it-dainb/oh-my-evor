@@ -9,7 +9,7 @@ import { describe, it, expect, afterEach } from "vitest";
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync, utimesSync, existsSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
-import { registerWaitTools, lastActivity } from "../src/tools/wait.js";
+import { registerWaitTools, lastActivity, HEARTBEAT_MAX_S } from "../src/tools/wait.js";
 
 type Handler = (a: Record<string, unknown>, extra?: { signal?: AbortSignal }) => Promise<{ content: { text: string }[] }>;
 const saved = { root: process.env.EVOR_ROOT, mission: process.env.EVOR_MISSION_ID };
@@ -76,6 +76,24 @@ describe("evor_wait heartbeat", () => {
     ac.abort();
     const r = await p;
     expect(r.stalled).toBe(false);
+    expect(existsSync(join(run, "heartbeat.json"))).toBe(false);
+  }, 30_000);
+
+  it("caps a heartbeat under the client's 30-minute call limit", () => {
+    expect(HEARTBEAT_MAX_S).toBeLessThan(30 * 60);
+  });
+
+  it("lets a new heartbeat replace one still running in the same server", async () => {
+    const { run, call } = setup(5);
+    const first = call({ heartbeat: true, quiet_s: 600 });
+    await new Promise((res) => setTimeout(res, 200));
+    const ac = new AbortController();
+    const second = call({ heartbeat: true, quiet_s: 600 }, { signal: ac.signal });
+    const r1 = await first;
+    expect(r1.replaced).toBe(true);
+    expect(existsSync(join(run, "heartbeat.json"))).toBe(true);
+    ac.abort();
+    await second;
     expect(existsSync(join(run, "heartbeat.json"))).toBe(false);
   }, 30_000);
 });
