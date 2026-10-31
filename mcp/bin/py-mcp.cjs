@@ -49,6 +49,13 @@ function cacheBase() {
 const venvDir = join(cacheBase(), pkg);
 const venvPy = isWin ? join(venvDir, "Scripts", "python.exe") : join(venvDir, "bin", "python");
 const marker = join(venvDir, ".script");
+// Optional extras a server needs to do its whole job: arxiv's read_paper converts
+// PDFs only with [pdf], and pymupdf4llm 2.0 is an empty placeholder, so it is pinned
+// below it. Heavy extras (arxiv [pro]: sentence-transformers) stay out.
+const REQUIREMENTS = { "arxiv-mcp-server": ["arxiv-mcp-server[pdf]", "pymupdf4llm<2"] };
+const reqs = REQUIREMENTS[pkg] ?? [pkg];
+const spec = reqs.join(" ");
+const specMarker = join(venvDir, ".spec");
 
 function run(cmd, args, opts) {
   return spawnSync(cmd, args, { encoding: "utf8", timeout: 900000, ...opts });
@@ -123,8 +130,9 @@ function build() {
   mkdirSync(join(venvDir, ".."), { recursive: true });
   let r = run(uv, ["venv", "--python", PY_VER, venvDir], { stdio: ["ignore", "ignore", "inherit"] });
   if (r.status !== 0) { log("uv venv failed"); return null; }
-  r = run(uv, ["pip", "install", "--python", venvPy, pkg], { stdio: ["ignore", "ignore", "inherit"] });
-  if (r.status !== 0) { log(`uv pip install ${pkg} failed`); return null; }
+  r = run(uv, ["pip", "install", "--python", venvPy, ...reqs], { stdio: ["ignore", "ignore", "inherit"] });
+  if (r.status !== 0) { log(`uv pip install ${spec} failed`); return null; }
+  try { writeFileSync(specMarker, spec); } catch {}
   const name = pinnedScript || discoverScript();
   if (!name) { log(`no console script found for ${pkg}`); return null; }
   try { writeFileSync(marker, name); } catch {}
@@ -153,6 +161,14 @@ if (!scriptPath || !existsSync(scriptPath)) {
     if (haveLock) { try { rmdirSync(lock); } catch {} }
     if (!scriptPath || !existsSync(scriptPath)) { log("build did not produce the server script"); process.exit(1); }
   } else if (haveLock) { try { rmdirSync(lock); } catch {} }
+}
+
+// A venv built before an extra was added is upgraded in place, once.
+if (scriptPath && existsSync(venvPy) && (existsSync(specMarker) ? readFileSync(specMarker, "utf8").trim() : pkg) !== spec) {
+  const uv = ensureUv();
+  const r = uv ? run(uv, ["pip", "install", "--python", venvPy, ...reqs], { stdio: ["ignore", "ignore", "inherit"] }) : { status: 1 };
+  if (r.status === 0) { try { writeFileSync(specMarker, spec); } catch {} }
+  else log(`could not add extras (${spec}); continuing without them`);
 }
 
 if (process.env.EVOR_MCP_PREBUILD || process.argv.includes("--prebuild")) { log(`prebuilt ${pkg}`); process.exit(0); }

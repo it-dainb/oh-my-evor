@@ -2,6 +2,26 @@
 
 All notable changes to Evor. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.2.31] — 2026-10-30 — papers can be read
+
+### Fixed
+
+- **arxiv `read_paper` could not convert PDFs.** The research server was installed without its
+  `pdf` extra, so every paper without an HTML version failed. It now installs
+  `arxiv-mcp-server[pdf]`, with `pymupdf4llm` pinned below 2.0 (2.0 is an empty placeholder
+  package), and an existing server environment is upgraded once in place.
+- **A lesson with `root_cause` or `telemetry_evidence` set to null was rejected.** Both are
+  optional; null now reads as absent.
+- **An empty proposal list validated nothing.** `evor_validate_proposals` with `proposals: []`
+  now validates every Mutagen proposal for the tick, as an omitted list does.
+- **Main blocked on artifacts an agent was going to deliver.** Even with the hints corrected,
+  main held nine-minute `evor_wait` calls on Forge's artifact. During a live mission the governor
+  now denies main a wait on an artifact or an agent and says to end the turn; job and pid waits
+  are still allowed, since nothing else reports those.
+- **Sage-junior misused research and evor tools.** It now downloads an arxiv paper before reading
+  it, passes Semantic Scholar's `fields` as a list, and is given the evor tools' full names to
+  load with ToolSearch instead of guessing them.
+
 ## [1.2.30] — 2026-10-30 — a write verb is a command
 
 ### Fixed

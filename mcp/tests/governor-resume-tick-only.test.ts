@@ -194,3 +194,18 @@ describe("a write verb counts only as a command", () => {
     expect(decide({ tool_name: "Bash", tool_input: { command: "ls | xargs rm -f .evor/runs/m1/r1/tree.json" } }, "draft").permissionDecision).toBe("deny");
   });
 });
+
+describe("main does not block on what an agent will deliver", () => {
+  const wait = (input: Record<string, unknown>) => ({ tool_name: "mcp__plugin_oh-my-evor_evor__evor_wait", tool_input: input });
+  it("denies main an artifact wait during a live mission", () => {
+    const d = decide(wait({ artifact: { tick: 7, agent: "forge" } }));
+    expect(d.permissionDecision).toBe("deny");
+    expect(d.permissionDecisionReason).toMatch(/End your turn/);
+  });
+  it("still lets main wait on a job", () => {
+    expect(decide(wait({ job_id: "j1" })).permissionDecision).not.toBe("deny");
+  });
+  it("leaves a sub-agent's artifact wait alone", () => {
+    expect(decide({ agent_type: "oh-my-evor:evor-tick", ...wait({ artifact: { tick: 7, agent: "forge" } }) }).permissionDecision).not.toBe("deny");
+  });
+});

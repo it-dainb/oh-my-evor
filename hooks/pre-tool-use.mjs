@@ -842,6 +842,16 @@ try {
     }
   }
   if (isMainB && _missionLive) {
+    // An artifact or an agent is delivered by an agent, whose completion notice
+    // wakes main; blocking on it holds main's turn for up to nine minutes at a
+    // time and repeats. Job and pid waits stay: nothing else reports those.
+    if (toolNameB === 'mcp__plugin_oh-my-evor_evor__evor_wait' && (input?.tool_input?.artifact || input?.tool_input?.agent_id)) {
+      deny(
+        `[EVOR GOVERNOR] Do not wait on an artifact or an agent: the agent that owes it wakes ` +
+          `you when it finishes. End your turn. If a completion notice from inside the tick ` +
+          `reaches you, pass it to the evor-tick agent with SendMessage.`
+      );
+    }
     const BOUNDARY_ABSORBED = new Set([
       'mcp__plugin_oh-my-evor_evor__evor_read_artifact',
       'mcp__plugin_oh-my-evor_evor__evor_tree_read',

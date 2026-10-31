@@ -415,10 +415,10 @@ export const LessonEntrySchema = z.object({
   approach_family: ApproachFamilySchema,
   hypothesis_verdict: z.enum(["confirmed", "refuted", "inconclusive"]),
   observation: z.string(),
-  root_cause: z.string().optional(),
+  root_cause: z.string().nullish().transform((v) => v ?? undefined),
   actionable_lesson: z.string(),
   citations: z.array(z.string()),
-  telemetry_evidence: z.string().optional(),
+  telemetry_evidence: z.string().nullish().transform((v) => v ?? undefined),
   tags: z.array(z.string()),
   // ── Item 5.3: a lesson refuted by measurement must be markable ──────────
   //

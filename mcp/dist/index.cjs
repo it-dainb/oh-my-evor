@@ -21307,10 +21307,10 @@ var LessonEntrySchema = external_exports.object({
   approach_family: ApproachFamilySchema,
   hypothesis_verdict: external_exports.enum(["confirmed", "refuted", "inconclusive"]),
   observation: external_exports.string(),
-  root_cause: external_exports.string().optional(),
+  root_cause: external_exports.string().nullish().transform((v) => v ?? void 0),
   actionable_lesson: external_exports.string(),
   citations: external_exports.array(external_exports.string()),
-  telemetry_evidence: external_exports.string().optional(),
+  telemetry_evidence: external_exports.string().nullish().transform((v) => v ?? void 0),
   tags: external_exports.array(external_exports.string()),
   // ── Item 5.3: a lesson refuted by measurement must be markable ──────────
   //
@@ -26188,8 +26188,9 @@ function registerProposalTools(server) {
       )
     },
     async ({ proposals: given, strategy = {}, run_id, tick }) => {
-      let proposals = given;
-      const needsLookup = !given || given.some((p) => !("approach_family" in p));
+      const listed = given?.length ? given : void 0;
+      let proposals = listed;
+      const needsLookup = !listed || listed.some((p) => !("approach_family" in p));
       if (needsLookup) {
         let atTick = tick;
         if (atTick === void 0 && run_id) {
@@ -26216,14 +26217,14 @@ function registerProposalTools(server) {
           }) }] };
         }
         const byId = new Map(all.map((p) => [p.proposal_id, p]));
-        const missing = (given ?? []).filter((p) => !("approach_family" in p) && !byId.has(p.proposal_id));
+        const missing = (listed ?? []).filter((p) => !("approach_family" in p) && !byId.has(p.proposal_id));
         if (missing.length) {
           return { content: [{ type: "text", text: JSON.stringify({
             ok: false,
             error: `no Mutagen proposal for tick ${tick_} has proposal_id ${missing.map((p) => p.proposal_id).join(", ")}`
           }) }] };
         }
-        proposals = given ? given.map((p) => "approach_family" in p ? p : byId.get(p.proposal_id)) : all;
+        proposals = listed ? listed.map((p) => "approach_family" in p ? p : byId.get(p.proposal_id)) : all;
       }
       if (!proposals?.length) {
         return { content: [{ type: "text", text: JSON.stringify({ ok: false, error: "no proposals to validate" }) }] };
