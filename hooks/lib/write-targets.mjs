@@ -190,11 +190,74 @@ function heredocs(command, cwd, vars) {
  * PATTERN merely mentions a trigger token, `stat` on a `.py` file.
  */
 function hasPythonWriteIntent(text) {
-  const py = text.match(PY_WRITE_CALL);
-  if (!py) return false;
-  const args = py[1] ?? py[2] ?? '';
-  if (/\.write_text|\.write_bytes|json\.dump|shutil\./.test(py[0])) return true;
-  return /,\s*['"][^'"]*[wax][^'"]*['"]/.test(args);
+  // Every file call counts, not only the first: a body that reads one file and then
+  // writes another writes.
+  const w = pythonWrites(text);
+  return w.exact.length > 0 || w.opaque;
+}
+
+/**
+ * The files a python body writes, when it names them. `exact` holds the literal
+ * (or f-string) paths of write-mode opens and copy destinations; `opaque` is set
+ * when any write's path is computed (`open(p, "w")`, `sys.argv[1]`), and only then
+ * is every path-like token in the body a candidate target. A string that merely
+ * MENTIONS a file (a dict value, a sentence in a report) is not written.
+ */
+function pythonWrites(text) {
+  const exact = [];
+  // Anything this reader does not model makes the body opaque, so the conservative
+  // reading (every path-like token) applies: a recognised literal write must never
+  // hide an unrecognised one.
+  let opaque = /\.open\s*\(|\bos\.(?:open|rename|renames|replace|system|popen|chdir|remove|unlink|link|symlink|makedirs|mkdir|write|fdopen)\b|\bsubprocess\b|\b(?:exec|eval|compile|__import__|getattr)\s*\(|\bsys\.argv\b|\bshutil\.move\b|\bimportlib\b|\bPath\s*\([^)]*,|\bos\.path\.join\b|\bpathlib\b/.test(text);
+  // A plain string literal only: no f-string braces, no quote of its own kind inside.
+  const lit = (arg) => {
+    const m = String(arg ?? '').trim().match(/^([rRbBuUfF]{0,2})(['"])((?:\\.|(?!\2)[^\\])*)\2$/s);
+    if (!m) return null;
+    if (/[fF]/.test(m[1]) && /[{}]/.test(m[3])) return null;
+    return m[3];
+  };
+  const take = (arg) => { const v = lit(arg); if (v === null) opaque = true; else if (v) exact.push(v); };
+  const args = (s, i) => {
+    // The argument list of the call whose "(" is at i, split on top-level commas.
+    let depth = 0, cur = '', q = null, esc = false;
+    const out = [];
+    for (let j = i + 1; j < s.length; j++) {
+      const c = s[j];
+      if (q) {
+        cur += c;
+        if (esc) esc = false; else if (c === '\\') esc = true; else if (c === q) q = null;
+        continue;
+      }
+      if (c === '"' || c === "'") { q = c; cur += c; continue; }
+      if (c === '(' || c === '[' || c === '{') depth++;
+      if (c === ')' || c === ']' || c === '}') { if (depth === 0) { out.push(cur); return out; } depth--; }
+      if (c === ',' && depth === 0) { out.push(cur); cur = ''; continue; }
+      cur += c;
+    }
+    opaque = true; // unterminated call
+    return out;
+  };
+  const re = /\b(open|io\.FileIO|io\.open|codecs\.open|shutil\.(?:copy|copy2|copyfile|copytree))\s*\(|(\bPath\s*\(([^()]*)\)|[\w.\]\)]+)\s*\.\s*(write_text|write_bytes)\s*\(/g;
+  let m;
+  while ((m = re.exec(text))) {
+    if (m[1]) {
+      const a = args(text, m.index + m[0].length - 1);
+      if (/^shutil/.test(m[1])) { take(a[1]); continue; }
+      const kw = a.find((x) => /^\s*mode\s*=/.test(x));
+      const modeArg = kw !== undefined ? kw.replace(/^\s*mode\s*=\s*/, '') : a[1];
+      if (modeArg === undefined) continue;          // open(path): read
+      const mode = lit(modeArg);
+      if (mode === null) { opaque = true; continue; } // a mode we cannot read may write
+      if (!/[wax+]/.test(mode)) continue;
+      const fileKw = a.find((x) => /^\s*file\s*=/.test(x));
+      take(fileKw !== undefined ? fileKw.replace(/^\s*file\s*=\s*/, '') : a[0]);
+    } else if (m[3] !== undefined) {
+      take(m[3]);
+    } else {
+      opaque = true;
+    }
+  }
+  return { exact, opaque };
 }
 
 function hasWriteIntent(text) {
@@ -307,22 +370,30 @@ export function resolveWriteTargets({ tool, toolInput = {}, cwd = process.cwd() 
     // (`python3 -c "…FileIO(sys.argv[1],'w')…" "$D/freeze.py"`). Then the
     // original command is judged whole, as it was before the lift. A lift can
     // only remove false positives from code that does not write.
-    ...(bodies.some((b) => hasPythonWriteIntent(foldConcat(expandVars(b.text, vars))))
+    ...(bodies.some((b) => {
+      const t = foldConcat(expandVars(b.text, vars));
+      return hasPythonWriteIntent(t) && pythonWrites(t).opaque;
+    })
       ? [{ text: command, cwd }]
       : []),
   ];
 
   let writes = false;
+  /** Targets a python body wrote: running such a script afterwards does not make it read-only. */
+  const fromBody = new Set();
   for (const unit of units) {
     const text = foldConcat(expandVars(unit.text, vars));
     if (!(unit.pythonOnly ? hasPythonWriteIntent(text) : hasWriteIntent(text))) continue;
     writes = true;
     const sed = !unit.pythonOnly && sedInPlaceFiles(text);
     const redirected = !unit.pythonOnly && !sed && redirectOnlyTargets(text);
-    for (const raw of sed || redirected || pathTokens(text)) {
+    const py = unit.pythonOnly ? pythonWrites(text) : null;
+    const named = py && !py.opaque ? py.exact : null;
+    for (const raw of sed || redirected || named || pathTokens(text)) {
       const t = raw.trim();
       if (!t || t === '-' || /^[a-z]+:\/\//i.test(t)) continue;
-      targets.add(isAbsolute(t) ? t : resolve(unit.cwd, t));
+      targets.add(resolve(unit.cwd, t));
+      if (unit.pythonOnly) fromBody.add(resolve(unit.cwd, t));
     }
   }
 
@@ -342,10 +413,12 @@ export function resolveWriteTargets({ tool, toolInput = {}, cwd = process.cwd() 
     const m = seg.text.match(/(?:^|\s)python[0-9.]*\s+(?:-(?![mc]\b)[A-Za-z]+\s+)*([^\s<>|;&]+\.py)\b/);
     if (!m) return;
     const script = isAbsolute(m[1]) ? m[1] : resolve(seg.cwd, m[1]);
-    const named = (s) => pathTokens(s.text).some((t) => (isAbsolute(t) ? t : resolve(s.cwd, t)) === script);
+    // A redirect destination is named too, bare (`cat > x.py`) as much as with a directory.
+    const named = (s) => [...pathTokens(s.text), ...(redirectOnlyTargets(s.text) ?? [])]
+      .some((t) => (isAbsolute(t) ? t : resolve(s.cwd, t)) === script);
     const rest = { ...seg, text: seg.text.slice((m.index ?? 0) + m[0].length).replace(/^[^>]*/, '') };
     const writtenElsewhere = segs.some((s, j) => j !== i && hasWriteIntent(s.text) && named(s)) || named(rest);
-    if (!writtenElsewhere) targets.delete(script);
+    if (!writtenElsewhere && !fromBody.has(script)) targets.delete(script);
   });
 
   return { targets: [...targets], writes };

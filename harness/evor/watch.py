@@ -250,6 +250,14 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--stuck-s", type=float, default=900.0)
     p.add_argument("--max-hours", type=float, default=48.0)
     args = p.parse_args(argv)
+    tel = Path(args.telemetry) if args.telemetry else None
+    if tel is None or tel.is_dir():
+        print(json.dumps({
+            "verdict": "bad_arguments",
+            "reason": f"--telemetry must name the trainer's telemetry file (e.g. <worktree>/telemetry.jsonl), "
+                      f"got {args.telemetry!r}; an empty $EVOR_TELEMETRY_PATH gives this",
+        }), flush=True)
+        return 2
     print(json.dumps(watch(args)), flush=True)
     return 0
 

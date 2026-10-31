@@ -2,6 +2,22 @@
 
 All notable changes to Evor. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.2.48] — 2026-10-31 — what a python body writes
+
+### Fixed
+
+- **A python heredoc's every string counted as a written file.** Forge's report script, writing
+  two JSON files in its own scratchpad, was refused as "author-code" because a sentence in it
+  mentioned `model/backbone_skipgate.py`. A body whose writes are all plain write-mode `open`s or
+  copy destinations with literal paths now writes exactly those files. Anything the reader does
+  not model (`Path.open`, `os.rename`/`replace`/`system`/`chdir`, `subprocess`, `exec`,
+  `sys.argv`, a computed mode or path, an f-string path) keeps the conservative reading.
+- **Writes the governor missed.** A write after a read in the same python body, a script written
+  (by a body or `cat > x.py`) and then run, a `/tmp/..` path that leaves the scratchpad, `r+` and
+  `mode=`/`file=` keyword opens: each is now seen as the write it is.
+- **The training watcher crashed on an empty `--telemetry`.** It now reports `bad_arguments`
+  with the file it needs instead of a traceback.
+
 ## [1.2.47] — 2026-10-31 — record what the evaluator wrote
 
 ### Fixed
