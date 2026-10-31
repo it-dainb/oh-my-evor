@@ -226,6 +226,7 @@ export const MutationLocusSchema = z.discriminatedUnion("family", [
     path: z.string(),
     genome_extension: z.string(),
   }),
+  z.object({ family: z.literal("other"), path: z.string() }),
 ]);
 export type MutationLocus = z.infer<typeof MutationLocusSchema>;
 

@@ -2,6 +2,21 @@
 
 All notable changes to Evor. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.2.49] — 2026-10-31 — names agents can find
+
+### Fixed
+
+- **Agents guessed evor tool names.** Critic and sage-junior called names with a wrong prefix
+  (`mcp__plugin_oh-my-evor__…`). Every evor agent's start-up context now gives the exact form,
+  `mcp__plugin_oh-my-evor_evor__<tool>`, and says to load it with ToolSearch.
+- **An idea of family `other` could not state its locus.** `other` is one of the seven approach
+  families but had no `mutation_locus` shape, so Mutagen's proposal failed validation. Both
+  contracts now carry `{ family: "other", path }`, and a test requires a locus for every family.
+- **"Node not found" now names the near matches**, e.g. asking for `emactl` lists
+  `emactl-s42-01, emactl-s7-01`.
+- **Forge reads tick artifacts with `evor_read_artifact`** rather than opening files under
+  `.evor/runs`.
+
 ## [1.2.48] — 2026-10-31 — what a python body writes
 
 ### Fixed

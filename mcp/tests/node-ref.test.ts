@@ -97,6 +97,12 @@ describe("resolveNodeRef", () => {
     expect(() => resolveNodeRef(RUN, "never-recorded", MISSION)).toThrow(/not in this run's tree/);
   });
 
+  it("names the recorded nodes that contain an unknown ref", () => {
+    const [u1, u2, u3] = ["11111111-1111-4111-8111-111111111111", "22222222-2222-4222-8222-222222222222", "33333333-3333-4333-8333-333333333333"];
+    writeTree({ [u1]: node(u1, "emactl-s42-01"), [u2]: node(u2, "emactl-s7-01"), [u3]: node(u3, "cldice-s7-01") });
+    expect(() => resolveNodeRef(RUN, "emactl", MISSION)).toThrow(/emactl-s42-01, emactl-s7-01\./);
+  });
+
   it("still fails open when tree.json is missing", () => {
     // Unchanged, and the distinction that makes the refusal above safe: an
     // ABSENT tree is not a registry that excludes the ref, it is the absence of

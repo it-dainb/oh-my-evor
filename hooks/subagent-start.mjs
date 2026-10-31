@@ -35,7 +35,8 @@ if (skipHooks.includes('subagent-start')) process.exit(0);
 const COMMON_HEADER = `\
 [EVOR LAW] To change or read evor state, call the evor_* MCP tools. Do not author .evor files by hand.
 [READ-FIRST] Before acting, call evor_read_artifact for the upstream artifact you depend on. If it returns {error:"not found"}, that step has not produced output — stop and surface the gap; do not fabricate.
-[TOOLS] Full catalog + schemas: the evor-mcp skill. Hot-path: evor_record_node, evor_record_eval, evor_state_read, evor_tree_read. Signals: evor_signal_emit / evor_signal_query.`;
+[TOOLS] Full catalog + schemas: the evor-mcp skill. Hot-path: evor_record_node, evor_record_eval, evor_state_read, evor_tree_read. Signals: evor_signal_emit / evor_signal_query.
+[TOOL NAMES] Every evor tool is named mcp__plugin_oh-my-evor_evor__<tool>, e.g. mcp__plugin_oh-my-evor_evor__evor_write_artifact. Load one with ToolSearch("select:<that name>") before its first call; never guess the prefix.`;
 
 // ── Per-role addenda (bare role → text) ───────────────────────────────────────
 const ROLE_ADDENDA = {

@@ -615,6 +615,12 @@ class MutationLocusAlgo(BaseEvorModel):
     genome_extension: str
 
 
+class MutationLocusOther(BaseEvorModel):
+    model_config = ConfigDict(strict=True, exclude_none=True)
+    family: Literal["other"]
+    path: str
+
+
 MutationLocus = Union[
     MutationLocusArch,
     MutationLocusTraining,
@@ -622,6 +628,7 @@ MutationLocus = Union[
     MutationLocusDataAugmentation,
     MutationLocusDataAcquisition,
     MutationLocusAlgo,
+    MutationLocusOther,
 ]
 
 
