@@ -324,7 +324,8 @@ try {
     .filter((a) => a !== undefined);
   // A script in the agent's own session scratchpad is its analysis tooling (an
   // EDA pass over telemetry), not the candidate: candidate code lives in a worktree.
-  const SCRATCH_SCRIPT = /^\/tmp\/claude-[^/]+\/[^/]+\/[^/]+\/scratchpad\/\S+\.py\b/;
+  // The same holds for a temp directory (`mktemp -d`, which Forge is told to use).
+  const SCRATCH_SCRIPT = /^\/tmp\/\S+\.py\b/;
   const runsTraining = pyArgs.some(
     (a) =>
       !INSPECTION_MODULES.test(a) &&
@@ -640,7 +641,7 @@ try {
     // through the evor_run_start MCP tool, not raw training.
     const isForgeLead = agentType === 'evor-forge';
     // A script in the agent's own session scratchpad is its tooling, not candidate code.
-    const inScratchpad = /^\/tmp\/claude-[^/]+\/[^/]+\/[^/]+\/scratchpad\//.test(filePath);
+    const inScratchpad = /^\/tmp\//.test(filePath);
     if ((tool === 'Write' || tool === 'Edit') && /\.py$/.test(filePath) && !inScratchpad) {
       deny(
         `[EVOR GOVERNOR] ${agentType} does not author code. ` +

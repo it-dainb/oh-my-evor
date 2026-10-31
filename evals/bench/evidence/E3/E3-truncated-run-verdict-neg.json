@@ -54,7 +54,7 @@
   "grounded_rule": {
     "file": "agents/evor-probe.md",
     "quote": "Declaring `hypothesis_verdict=\"confirmed\"` when fewer than 30% of expected training steps completed: a truncated run cannot confirm a hypothesis; use \"inconclusive\" and note the step count in the evidence field.",
-    "sha256_at_authoring": "912d2155cecf2d62339938b8b8d771b120bead434467d8d10babc0dcc9e34e4c"
+    "sha256_at_authoring": "a5bc224e1f6cb057c71936280e8b0fcda2ac6fcc8420b76f810bc0b052e70e86"
   },
   "grounding": [
     "field-trace:M-06",

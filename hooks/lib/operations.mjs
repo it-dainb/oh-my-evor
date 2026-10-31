@@ -82,8 +82,12 @@ const GRANTS = {
   'evor-forge-analyst': { may: ['write-artifact'] },
 };
 
-/** A Claude Code session scratchpad: /tmp/claude-<uid>/<project>/<session>/scratchpad/… */
-const SCRATCHPAD = /^\/tmp\/claude-[^/]+\/[^/]+\/[^/]+\/scratchpad(\/|$)/;
+/**
+ * Temp space — a session scratchpad or a `mktemp -d` directory. Helper files there
+ * are an agent's own tooling, never candidate code or run state, so they do not
+ * make an operation.
+ */
+const SCRATCHPAD = /^\/tmp\//;
 
 /**
  * What a role may do. Unknown roles — including every generic agent type — get

@@ -525,7 +525,13 @@ export function registerWikiTools(server: McpServer): void {
     ].join(" "),
     {
       run_id: z.string().describe("Active run identifier"),
-      entry: LessonEntrySchema.describe("LessonEntry to persist"),
+      // A null on an optional field means "absent"; models send it for fields they leave empty.
+      entry: z.preprocess(
+        (v) => (v && typeof v === "object" && !Array.isArray(v)
+          ? Object.fromEntries(Object.entries(v).filter(([, x]) => x !== null))
+          : v),
+        LessonEntrySchema,
+      ).describe("LessonEntry to persist"),
     },
     async ({ run_id, entry }) => {
       const missionId = process.env.EVOR_MISSION_ID;

@@ -16,7 +16,7 @@ import { fileURLToPath } from "url";
 
 const HOOK = resolve(dirname(fileURLToPath(import.meta.url)), "../../hooks/stop.mjs");
 
-function stop(tickState: Record<string, unknown>, jobState?: string, liveTick = false) {
+function stop(tickState: Record<string, unknown>, jobState?: string, liveTick = false, heartbeat = true) {
   const root = mkdtempSync(join(tmpdir(), "evor-jobwait-"));
   const runDir = join(root, ".evor", "runs", "m1", "r1");
   mkdirSync(runDir, { recursive: true });
@@ -24,6 +24,7 @@ function stop(tickState: Record<string, unknown>, jobState?: string, liveTick = 
   writeFileSync(join(runDir, "mission-state.json"), JSON.stringify({ mission_id: "m1", status: "running" }));
   writeFileSync(join(runDir, "run-state.json"), JSON.stringify({ run_id: "r1", tick_count: 1, pending_node_ids: [] }));
   writeFileSync(join(runDir, "tick-state.json"), JSON.stringify(tickState));
+  if (heartbeat) writeFileSync(join(runDir, "heartbeat.json"), JSON.stringify({ until: Date.now() + 540_000, pid: process.pid }));
   if (jobState) {
     mkdirSync(join(runDir, "jobs", "j1"), { recursive: true });
     writeFileSync(join(runDir, "jobs", "j1", "status.json"), JSON.stringify({ state: jobState, job_id: "j1" }));
@@ -43,7 +44,7 @@ function stop(tickState: Record<string, unknown>, jobState?: string, liveTick = 
   });
   rmSync(root, { recursive: true, force: true });
   const line = (r.stdout ?? "").trim().split("\n").pop() || "{}";
-  try { return { ...JSON.parse(line), stderr: r.stderr }; } catch { return { stderr: r.stderr }; }
+  try { return { ...JSON.parse(line), stderr: r.stderr, status: r.status }; } catch { return { stderr: r.stderr, status: r.status }; }
 }
 
 const mid = { tick: 2, current_step: 6, step_status: "running" };
@@ -66,6 +67,13 @@ describe("a stop on a job wait is a dead end, not a yield", () => {
     const r = stop({ ...mid, blocked: { on: "artifact:forge@tick2", since: "x" } }, "running", true);
     expect(r.decision).toBeUndefined();
     expect(r.stderr).toMatch(/yielding, not ending/);
+    expect(r.status).toBe(0);
+  });
+
+  it("refuses a yield with no heartbeat armed, naming the call that arms it", () => {
+    const r = stop({ ...mid, blocked: { on: "artifact:forge@tick2", since: "x" } }, "running", true, false);
+    expect(r.status).toBe(2);
+    expect(r.stderr).toMatch(/evor_wait\(\{ heartbeat: true/);
   });
 
   it("does not act on a job wait left behind by a finished tick", () => {
@@ -76,5 +84,6 @@ describe("a stop on a job wait is a dead end, not a yield", () => {
   it("does not block main while the tick itself is still live and waiting", () => {
     const r = stop({ ...mid, blocked: { on: "job:j1", since: "x" } }, "running", true);
     expect(r.decision).toBeUndefined();
+    expect(r.status).toBe(0);
   });
 });

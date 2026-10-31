@@ -109,6 +109,16 @@ try {
 // with EVOR_SKIP_HOOKS=stop, which disarms every legitimate guard here too.
 //
 // So this runs BEFORE the block counter: a yield must not consume attempts.
+/** True while an evor_wait heartbeat runs for this run (its marker is live). */
+function heartbeatArmed(dir) {
+  try {
+    const hb = JSON.parse(readFileSync(join(dir, 'heartbeat.json'), 'utf8'));
+    if (!(Number(hb.until) > Date.now() - 60_000)) return false;
+    if (hb.pid) { try { process.kill(hb.pid, 0); } catch (e) { if (e.code === 'ESRCH') return false; } }
+    return true;
+  } catch { return false; }
+}
+
 /** Set when the stop would leave a recorded job wait with nobody to wake on it. */
 let deadEndJobWait = null;
 try {
@@ -132,6 +142,16 @@ try {
   if (jobWait && /^job:/.test(jobWait.on) && !isTickFinished(tickStateForYield) && !tickLive) {
     deadEndJobWait = jobWait.on.slice('job:'.length);
   } else if (isYieldingStop(payloadForContinuation, tickStateForYield)) {
+    // A completion notice can be lost, and then nothing wakes this session.
+    // A yield is only safe with a heartbeat wait armed to wake it.
+    if (!stopHookActive && !heartbeatArmed(runDir)) {
+      process.stderr.write(
+        `[evor:stop] Before ending your turn on a yield, arm the heartbeat: call ` +
+          `evor_wait({ heartbeat: true, wait_s: 540 }), then end your turn. It wakes this ` +
+          `session if a completion notice never arrives.\n`
+      );
+      process.exit(2);
+    }
     const wait = recordedWait(tickStateForYield);
     const live = liveSubagents(payloadForContinuation?.session_id, payloadForContinuation?.transcript_path);
     process.stderr.write(

@@ -2,6 +2,24 @@
 
 All notable changes to Evor. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.2.41] — 2026-10-31 — temp space is the agent's own
+
+### Fixed
+
+- **Forge's helper script in a temp directory counted as candidate code.** Forge is told to make
+  scratch space with `mktemp -d`, but the exemptions for writing and running an agent's own
+  scripts covered only the session scratchpad, so `python /tmp/…/gen.py` was refused as training.
+  Scripts and files under `/tmp` are now the agent's own tooling; candidate code still lives in
+  the worktrees.
+- **A lesson with any optional field set to null was rejected.** `evor_wiki_add` now reads a
+  null on any field as absent (`superseded_by` failed the same way `root_cause` did).
+- **Probe kept failing to file long findings.** Its protocol now tells it to write a payload of
+  more than a few kilobytes to a file with `json.dump` and pass `payload_path`.
+- **Main yielded without arming the heartbeat.** 1.2.40 told the orchestrator to arm one,
+  and tick 14 showed that instruction is not enough. The stop hook now refuses a yield
+  unless an `evor_wait` heartbeat is running; the wait keeps a `heartbeat.json` marker in
+  the run directory while it runs, and that marker does not count as run activity.
+
 ## [1.2.40] — 2026-10-31 — a lost notice is found by a heartbeat
 
 ### Fixed

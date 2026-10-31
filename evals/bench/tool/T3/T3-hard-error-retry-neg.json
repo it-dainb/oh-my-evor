@@ -13,7 +13,7 @@
   "grounded_rule": {
     "file": "agents/evor-probe.md",
     "quote": "If telemetry.jsonl is empty or absent, report a telemetry gap as a CRITICAL finding in the LessonEntry and set hypothesis_verdict=\"inconclusive\".",
-    "sha256_at_authoring": "912d2155cecf2d62339938b8b8d771b120bead434467d8d10babc0dcc9e34e4c"
+    "sha256_at_authoring": "a5bc224e1f6cb057c71936280e8b0fcda2ac6fcc8420b76f810bc0b052e70e86"
   },
   "grounding": [
     "field-trace:O-07",
