@@ -1,12 +1,14 @@
 #!/usr/bin/env node
 /**
- * oh-my-evor PostCompact hook — re-inject <evor-restore> after compaction
+ * oh-my-evor PostCompact hook — show <evor-restore> to the user after compaction
  *
- * Reads the latest precompact checkpoint written by pre-compact.mjs and
- * re-injects <evor-restore> into the fresh post-compact context via
- * systemMessage. This is the CORRECT re-hydration point: PreCompact's
- * systemMessage gets summarized INTO the compact; PostCompact injects into
- * the fresh context AFTER compaction so nothing is lost.
+ * Reads the latest precompact checkpoint written by pre-compact.mjs and shows
+ * <evor-restore> plus the next step to the USER via systemMessage. The CLI
+ * displays systemMessage and never puts it in the model's context, so this is
+ * not the re-hydration point: SessionStart fires with source "compact" right
+ * after compaction, and session-start.mjs injects the model-visible restore
+ * there (hookSpecificOutput.additionalContext). Keeping this user-only is what
+ * stops the restore from reaching the model twice.
  *
  * Kill switches (checked FIRST):
  *   DISABLE_EVOR=1                → exit 0 immediately
@@ -22,6 +24,10 @@
 import { existsSync, readFileSync, readdirSync } from 'fs';
 import { join } from 'path';
 import { resolveEvorRoot } from './lib/active-run.mjs';
+import { nextStep } from './lib/next-step.mjs';
+
+let hookPayload = {};
+try { hookPayload = JSON.parse(readFileSync(0, 'utf8') || '{}'); } catch { /* no payload */ }
 
 // ── Kill switches ─────────────────────────────────────────────────────────────
 if (process.env.DISABLE_EVOR) process.exit(0);
@@ -58,10 +64,25 @@ const runDir = missionId
   ? join(evorRoot, 'runs', missionId, activeRunId)
   : join(evorRoot, 'runs', activeRunId);
 
+// ── Next-action hint ──────────────────────────────────────────────────────────
+// The same next step SessionStart(source=compact) gives the model; see
+// lib/next-step.mjs. This copy is for the user's display only.
+const nextHint = () =>
+  nextStep(runDir, hookPayload?.session_id, String(hookPayload?.transcript_path ?? ''));
+
+/** The restore block (if a checkpoint exists) plus the next step, then exit. */
+function emit(restoreBlock, tick) {
+  const hint = nextHint() || (restoreBlock ? 'No tick is running: call evor_state_read to check the position.' : '');
+  if (!restoreBlock && !hint) process.exit(0);
+  const parts = [restoreBlock, hint && `[NEXT] ${hint}`].filter(Boolean);
+  process.stdout.write(JSON.stringify({ systemMessage: parts.join('\n\n') }) + '\n');
+  process.exit(0);
+}
+
 // ── Find the latest precompact checkpoint ─────────────────────────────────────
 try {
   const checkpointsDir = join(runDir, 'checkpoints');
-  if (!existsSync(checkpointsDir)) process.exit(0);
+  if (!existsSync(checkpointsDir)) emit('', undefined);
 
   let files;
   try {
@@ -69,10 +90,10 @@ try {
       .filter(f => f.startsWith('precompact-') && f.endsWith('.json'))
       .sort(); // ISO timestamp sort = chronological
   } catch {
-    process.exit(0);
+    emit('', undefined);
   }
 
-  if (files.length === 0) process.exit(0);
+  if (files.length === 0) emit('', undefined);
 
   const latest = files[files.length - 1];
   const cpPath = join(checkpointsDir, latest);
@@ -81,7 +102,7 @@ try {
   try {
     cp = JSON.parse(readFileSync(cpPath, 'utf8'));
   } catch {
-    process.exit(0); // corrupt checkpoint — fail-open
+    emit('', undefined); // corrupt checkpoint — fail-open
   }
 
   // ── Build <evor-restore> from checkpoint ─────────────────────────────────
@@ -105,36 +126,11 @@ try {
     ...(objText && objText !== header ? [`Objective: ${objText}`] : []),
     `Tick ${tick} step ${step} | Best: ${score}`,
     ...(pending ? [pending] : []),
-    `Call evor_state_read to check position.`,
   ];
 
   const restoreBlock = `<evor-restore>\n${restoreLines.join('\n')}\n</evor-restore>`;
 
-  // ── Build next-action hint ────────────────────────────────────────────────
-  let nextHint = '';
-  try {
-    // Read current tick-state for a precise resume hint
-    const tsPath = join(runDir, 'tick-state.json');
-    const rs = existsSync(tsPath) ? JSON.parse(readFileSync(tsPath, 'utf8')) : {};
-    const curStep = rs?.current_step ?? step;
-    const curTick = rs?.tick ?? tick;
-
-    if (curStep === 0 || curStep >= 9) {
-      nextHint = `Resume at tick ${curTick + (curStep >= 9 ? 1 : 0)} — start a new tick: spawn evor-mutagen with evor_read_artifact(sage) + evor_tree_read.`;
-    } else if (curStep < 3) {
-      nextHint = `Resume tick ${curTick} at step ${curStep} — Sage/Mutagen phase in progress; check evor_read_artifact for their output.`;
-    } else if (curStep < 6) {
-      nextHint = `Resume tick ${curTick} at step ${curStep} — Selector/Forge phase; call evor_read_artifact(mutagen) → spawn evor-selector if verdict missing.`;
-    } else {
-      nextHint = `Resume tick ${curTick} at step ${curStep} — evaluation phase; call evor_record_eval → evor_integrity_check → evor_state_write.`;
-    }
-  } catch {
-    nextHint = `Resume tick ${tick} — call evor_state_read to check current position.`;
-  }
-
-  const systemMessage = `${restoreBlock}\n\n[NEXT] ${nextHint}`;
-
-  process.stdout.write(JSON.stringify({ systemMessage }) + '\n');
+  emit(restoreBlock, tick);
 } catch {
   // Fail-open — post-compact must never crash the session
 }

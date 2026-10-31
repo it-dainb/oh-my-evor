@@ -465,9 +465,10 @@ describe("A3 — the feedback edge: Mutagen reads Probe", () => {
     expect(d.decision).toBe("deny");
   });
 
-  it("does not open the feedback edge to everyone — selector still cannot read probe", () => {
+  // Selector reads Probe too (its seed-budget edge); forge-junior has no such edge.
+  it("does not open the feedback edge to everyone — forge-junior still cannot read probe", () => {
     const d = callGovernor(
-      as("evor-selector", "mcp__plugin_oh-my-evor_evor__evor_read_artifact", {
+      as("evor-forge-junior", "mcp__plugin_oh-my-evor_evor__evor_read_artifact", {
         run_id: "r1",
         tick: 1,
         agent: "probe",

@@ -30,7 +30,9 @@
 
 import { readFileSync } from 'fs';
 import { resolveActiveRun, resolveRunDir } from './lib/active-run.mjs';
-import { isMissionLive } from './lib/run-status.mjs';
+import { isMissionLive, isTickFinished } from './lib/run-status.mjs';
+import { currentTickAgent } from './lib/waiting.mjs';
+import { tickRoute } from './lib/next-step.mjs';
 import { turnStartedByHuman, lastSlashCommand } from './lib/transcript.mjs';
 import { existsSync as _exists } from 'fs';
 import { join as _join } from 'path';
@@ -113,6 +115,19 @@ let pendingNameStrip = null;
 
 /** §4.3: constraints to graft onto a generic child's prompt, applied last. */
 let pendingPromptInherit = null;
+
+/**
+ * Main during a live mission hands work to the tick: this is how, in the words
+ * of lib/next-step.mjs — resume the tick's agent by id, or spawn evor-tick when
+ * the tick has none. Never a lead or a second tick agent, which the rules
+ * further down refuse main.
+ */
+function mainTickRoute(capital = true) {
+  let r;
+  try { r = tickRoute(resolveRunDir(), input?.session_id, String(input?.transcript_path ?? '')); }
+  catch (err) { logError('tick-route', err); r = 'spawn Task(subagent_type="oh-my-evor:evor-tick")'; }
+  return capital ? r.charAt(0).toUpperCase() + r.slice(1) : r;
+}
 
 function deny(reason, meta = {}) {
   logDecision({ verdict: 'deny', reason, ...meta });
@@ -449,7 +464,11 @@ try {
       const who = isMain ? 'Evor (orchestrator)' : agentType || 'this agent';
       deny(
         `[EVOR GOVERNOR] ${spawnType} may be spawned ONLY by ${requiredParent}. ${who} must not ` +
-          `spawn it directly — delegate the work to ${requiredParent}, which owns and fans out its own sub-team.`
+          `spawn it directly — ` +
+          (isMain && _missionLive
+            ? `the tick runs ${requiredParent}, which fans out its own sub-team. ${mainTickRoute()}, ` +
+              `and tell it what you need.`
+            : `delegate the work to ${requiredParent}, which owns and fans out its own sub-team.`)
       );
     }
 
@@ -585,7 +604,7 @@ try {
       // a denial the model cannot act on stalls the run.
       const roleNote = agentType
         ? ''
-        : ' Evor is orchestrator-only: it spawns agents and records results.';
+        : ` Evor is orchestrator-only: the tick's agents do this. ${mainTickRoute()}, and tell it what you need.`;
       const ADVICE = {
         'author-code': 'Only evor-forge-junior authors candidate code, and only on its own surface. ' +
                        'Emit your JSON artifact instead, or delegate the code to forge-junior.',
@@ -602,8 +621,8 @@ try {
       deny(
         `[EVOR GOVERNOR] ${who} may not perform the operation "${operation}"` +
           (opTargets[0] ? ` (target: ${opTargets[0]})` : '') + '.' + roleNote + ' ' +
-          (ADVICE[operation] ?? '') +
-          ' This rule is scoped to the OPERATION, not to a tool name: the same act through ' +
+          (agentType ? (ADVICE[operation] ?? '') + ' ' : '') +
+          'This rule is scoped to the OPERATION, not to a tool name: the same act through ' +
           'Bash, a heredoc or a redirect is the same act.',
         { rule: `operation:${operation}`, tool, agentType, target: opTargets[0] },
       );
@@ -617,16 +636,13 @@ try {
     if ((tool === 'Write' || tool === 'Edit') && isCodeOrArtifactWrite) {
       deny(
         `[EVOR GOVERNOR] Evor is orchestrator-only and must not author code or sub-agent artifacts ` +
-          `(${filePath}). Spawn the specialist via Task(subagent_type="oh-my-evor:evor-forge") for code/` +
-          `training, or the matching evor-mutagen/sage/selector/probe for its artifact. That sub-agent ` +
-          `writes this file — you coordinate and record it.`
+          `(${filePath}). The tick's agents write it. ${mainTickRoute()}, and tell it what you need.`
       );
     }
     if (tool === 'Bash' && runsTraining) {
       deny(
-        `[EVOR GOVERNOR] Evor must not run training/model code inline. Spawn ` +
-          `Task(subagent_type="oh-my-evor:evor-forge", …) to implement and run this candidate; Forge writes ` +
-          `nodes/<id>/results.json + telemetry, then you call evor_record_node / evor_record_eval.`
+        `[EVOR GOVERNOR] Evor must not run training/model code inline. Candidates are implemented, ` +
+          `run and recorded inside the tick. ${mainTickRoute()}, and tell it what you need.`
       );
     }
     // The broad orchestrator-only rule runs AFTER the .evor write-guard below —
@@ -725,7 +741,7 @@ try {
       if (BASH_PYTHON_EVOR_RE.test(cmdG)) {
         // Extract what they're trying to do to name the right tool
         let replacement = 'the appropriate evor_* MCP tool';
-        if (/evor\s+run\b/.test(cmdG)) replacement = 'evor_run_start + Monitor';
+        if (/evor\s+run\b/.test(cmdG)) replacement = 'evor_run_start, then evor_wait({ job_id })';
         else if (/evor\s+validate/.test(cmdG)) replacement = 'evor_validate';
         else if (/evor\s+doctor/.test(cmdG)) replacement = 'evor_doctor';
         else if (/evor\.wiki/.test(cmdG)) replacement = 'evor_wiki_add or evor_wiki_query';
@@ -799,11 +815,10 @@ try {
       ? `\`${String(tiO?.command ?? '').slice(0, 80)}\``
       : String(tiO?.file_path ?? '');
     deny(
-      `[EVOR GOVERNOR] Evor is orchestrator-only: it spawns agents and records results, and does ` +
-        `not run ${toolNameO} itself (${target}). Delegate this to the agent that owns it — ` +
-        `Task(subagent_type="oh-my-evor:evor-probe") to inspect run state or logs, "…evor-forge" for ` +
-        `code and training, "…evor-sage" for evidence. Read run state through the evor_* MCP tools ` +
-        `rather than the shell.`
+      `[EVOR GOVERNOR] Evor is orchestrator-only: it runs ticks and records results, and does ` +
+        `not run ${toolNameO} itself (${target}). Inspection, code, training and evidence happen ` +
+        `inside the tick. ${mainTickRoute()}, and tell it what you need. Progress for the user ` +
+        `comes from evor_check_stop.`
     );
   }
 } catch (err) {
@@ -881,8 +896,9 @@ try {
     if (toolNameB === 'mcp__plugin_oh-my-evor_evor__evor_wait' && (input?.tool_input?.artifact || input?.tool_input?.agent_id)) {
       deny(
         `[EVOR GOVERNOR] Do not wait on an artifact or an agent: the agent that owes it wakes ` +
-          `you when it finishes. End your turn. If a completion notice from inside the tick ` +
-          `reaches you, pass it to the evor-tick agent with SendMessage.`
+          `you when it finishes. Call evor_wait({ heartbeat: true }), then end your ` +
+          `turn. If a completion notice from inside the tick reaches you, pass it to the evor-tick ` +
+          `agent with SendMessage.`
       );
     }
     const BOUNDARY_ABSORBED = new Set([
@@ -893,11 +909,9 @@ try {
     if (BOUNDARY_ABSORBED.has(toolNameB)) {
       deny(
         `[EVOR GOVERNOR] ${toolNameB.replace('mcp__plugin_oh-my-evor_evor__', '')} belongs inside the ` +
-          `tick boundary, not in the mission orchestrator. Spawn ` +
-          `Task(subagent_type="oh-my-evor:evor-tick") for the tick; it reads artifacts, tree and ` +
-          `state on your behalf and returns a status line plus pointers. The pointers are for the ` +
-          `next tick: pass them in its spawn prompt and it reads them. To ask about a finished ` +
-          `tick, resume its evor-tick agent with SendMessage and your question.`
+          `tick boundary, not in the mission orchestrator. The tick agent reads artifacts, tree and ` +
+          `state on your behalf and returns a status line plus pointers. ${mainTickRoute()}, and ` +
+          `ask it. Pointers are for the next tick: pass them in its spawn prompt and it reads them.`
       );
     }
 
@@ -919,12 +933,41 @@ try {
           if (/^evor-/.test(targetType) && targetType !== 'evor-tick') {
             deny(
               `[EVOR GOVERNOR] ${targetType} belongs to the tick, so main does not resume it. ` +
-                `SendMessage the evor-tick agent that owns this tick instead; it resumes or ` +
-                `waits on its own children. Messaging a tick's child makes every later notice ` +
-                `from that child land in your context.`
+                `Message the evor-tick agent that owns this tick instead: ${mainTickRoute(false)}; ` +
+                `it resumes or waits on its own children. Messaging ` +
+                `a tick's child makes every later notice from that child land in your context.`
             );
           }
         }
+      }
+    }
+
+    // One agent owns a tick. While the tick is unfinished and its agent exists,
+    // a second evor-tick for it would run beside the first and its children.
+    // The agent is resumable by id even after a session restart.
+    if ((toolNameB === 'Task' || toolNameB === 'Agent')
+        && /evor-tick$/.test(String(input?.tool_input?.subagent_type ?? ''))) {
+      const rd = resolveRunDir();
+      const ts = rd && _exists(_join(rd, 'tick-state.json')) ? JSON.parse(readFileSync(_join(rd, 'tick-state.json'), 'utf8')) : null;
+      const owner = ts && !isTickFinished(ts) && typeof ts.tick === 'number'
+        ? currentTickAgent(input?.session_id, String(input?.transcript_path ?? ''), ts.tick)
+        : null;
+      // The tick agent is found again by the tick its description names.
+      if (!/\btick\s*\d+/i.test(String(input?.tool_input?.description ?? ''))) {
+        deny(
+          `[EVOR GOVERNOR] Name the tick in the evor-tick description, e.g. ` +
+            `description: "Tick ${ts && typeof ts.tick === 'number' ? (isTickFinished(ts) ? ts.tick + 1 : ts.tick) : 'N'}". ` +
+            `The tick's agent is found again by that name.`
+        );
+      }
+      if (owner && owner.tick === ts.tick) {
+        deny(
+          `[EVOR GOVERNOR] Tick ${ts.tick} already has its agent: ${owner.id}` +
+            (owner.working ? ', and it or its children are still working' : '') +
+            `. Resume it with SendMessage({ to: "${owner.id}", message: ... }) — it continues ` +
+            `from its last completed step and passes your message to its children. A second ` +
+            `tick agent would run beside it.`
+        );
       }
     }
 
@@ -937,9 +980,8 @@ try {
     if ((toolNameB === 'Task' || toolNameB === 'Agent') && LEADS.has(spawnB)) {
       deny(
         `[EVOR GOVERNOR] ${spawnB} is spawned by the tick boundary, not by the mission ` +
-          `orchestrator. Spawn Task(subagent_type="oh-my-evor:evor-tick") and let it fan out — ` +
-          `spawning leads directly pulls their results into your own context, which is exactly ` +
-          `what the boundary exists to prevent.`
+          `orchestrator. ${mainTickRoute()}, and let it fan out — spawning leads directly pulls ` +
+          `their results into your own context, which is exactly what the boundary exists to prevent.`
       );
     }
   }
@@ -967,7 +1009,7 @@ try {
       deny(
         `[EVOR GOVERNOR] evor_harden_eval is applied by the evor-tick agent. ` +
           (mainH
-            ? 'Spawn Task(subagent_type="oh-my-evor:evor-tick") and pass the hardening proposal as a pointer; the tick applies it.'
+            ? `${mainTickRoute()}, and pass the hardening proposal as a pointer; the tick applies it.`
             : `${roleH} proposes a hardening (metric_hardening proposal) or writes the stricter evaluator; the tick applies it.`),
         { rule: 'harden-eval-tick-only', tool: toolNameH, agentType: roleH },
       );
@@ -1138,6 +1180,10 @@ try {
     // the line, after every verdict is in.
     READ_EXTRA_GRANTS['evor-probe'] = new Set([...(READ_EXTRA_GRANTS['evor-probe'] ?? []),
       'forge-critic', 'forge-architect', 'forge-analyst']);
+    // SEED-BUDGET EDGE. A recipe Probe promoted after a short-seed screen owes
+    // its remaining seeds, and Selector budgets them. That verdict lives in the
+    // previous tick's Probe artifact, so Selector reads Probe.
+    READ_EXTRA_GRANTS['evor-selector'] = new Set([...(READ_EXTRA_GRANTS['evor-selector'] ?? []), 'probe']);
     // evor-tick is deliberately absent from AGENT_ROLE_MAP, so this guard skips it
     // entirely: the tick boundary reads every stage's artifact by design — that is
     // the context the orchestrator is denied and evor-tick absorbs on its behalf.
@@ -1148,8 +1194,13 @@ try {
         const extra = isReadToolS ? READ_EXTRA_GRANTS[agentTypeS] : undefined;
         const permitted = allowed.has(claimedAgent) || (extra && extra.has(claimedAgent));
         if (!permitted) {
+          // Name what the role CAN reach, so the denial redirects rather than stalls.
+          const reachable = [...allowed, ...(extra ?? [])];
           deny(
-            `[EVOR GUARD] This artifact slot is not accessible from your role. Use the correct evor_* tool for your role.`
+            `[EVOR GUARD] The "${claimedAgent}" artifact slot is not accessible from your role. ` +
+              (isReadToolS
+                ? `Your role reads: ${reachable.join(', ')}.`
+                : `Your role writes: ${[...allowed].join(', ')}.`)
           );
         }
       }
@@ -1243,7 +1294,9 @@ try {
         hookSpecificOutput: {
           hookEventName: 'PreToolUse',
           updatedInput: withoutName,
-          systemMessage:
+          // additionalContext is the PreToolUse field the model reads; a
+          // systemMessage nested here was dropped by the CLI.
+          additionalContext:
             `[EVOR GOVERNOR] Dropped \`name="${pendingNameStrip.name}"\` from the ` +
             `oh-my-evor:${pendingNameStrip.spawnType} spawn. Passing \`name\` makes it ` +
             `an in-process teammate, so it inherits the session model instead of its ` +

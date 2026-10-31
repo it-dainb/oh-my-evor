@@ -52,9 +52,13 @@ try {
     missionState = JSON.parse(readFileSync(missionStatePath, 'utf8'));
   } catch { /* missing or corrupt — start fresh */ }
 
-  // Do not overwrite a terminal or already-paused status
+  // Only a mission that is actually `locked` or `running` is paused, and the
+  // origin recorded is the status it really had. Terminal and paused missions
+  // are left alone; so is one with no readable status or a `draft` one. This
+  // used to write `paused_from: "locked"` when there was no status at all,
+  // inventing a mission state the next session-start then "restored".
   const currentStatus = String(missionState?.status ?? '');
-  if (['completed', 'failed', 'paused'].includes(currentStatus)) {
+  if (!['locked', 'running'].includes(currentStatus)) {
     process.exit(0);
   }
 
@@ -73,7 +77,7 @@ try {
   const updated = {
     ...missionState,
     status: 'paused',
-    paused_from: currentStatus || 'locked',
+    paused_from: currentStatus,
     paused_at: new Date().toISOString(),
     paused_by: 'session-end-hook',
   };

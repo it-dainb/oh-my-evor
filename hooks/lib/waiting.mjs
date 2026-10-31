@@ -186,3 +186,34 @@ export function isYieldingStop(payload, tickState) {
   // wait on its artifact with nothing live is a stall, not a yield.
   return liveSubagents(payload?.session_id, payload?.transcript_path).length > 0;
 }
+
+/**
+ * The evor-tick agent of this session that runs `tick` (its description names
+ * that tick; the most recently active one if several do): its id, the
+ * SendMessage address, and whether it is still working itself or through a
+ * child. Without `tick`, the most recently active evor-tick. null when none.
+ */
+export function currentTickAgent(sessionId, transcriptPath, tick = undefined, now = Date.now()) {
+  const dir = subagentsDir(sessionId, transcriptPath);
+  if (!dir) return null;
+  let best = null;
+  let files;
+  try { files = readdirSync(dir).filter(f => f.startsWith('agent-') && f.endsWith('.meta.json')); } catch { return null; }
+  for (const f of files) {
+    let meta;
+    try { meta = JSON.parse(readFileSync(join(dir, f), 'utf8')); } catch { continue; }
+    if (!/evor-tick$/.test(String(meta?.agentType ?? ''))) continue;
+    const path = join(dir, f.replace(/\.meta\.json$/, '.jsonl'));
+    let mtime = 0;
+    try { mtime = statSync(path).mtimeMs; } catch { continue; }
+    const m = String(meta?.description ?? '').match(/\btick\s*(\d+)/i);
+    const named = m ? Number(m[1]) : null;
+    if (tick !== undefined && named !== tick) continue;
+    if (best && best.mtime >= mtime) continue;
+    best = { id: f.slice('agent-'.length, -'.meta.json'.length), tick: named, mtime, path };
+  }
+  if (!best) return null;
+  const working = !agentFinished(best.path) || liveChildren(best.path, now).length > 0;
+  return { id: best.id, tick: best.tick, working };
+}
+

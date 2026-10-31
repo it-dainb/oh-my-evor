@@ -43,7 +43,8 @@ function callGovernor(payload: Record<string, unknown>) {
       decision: parsed?.hookSpecificOutput?.permissionDecision,
       reason: parsed?.hookSpecificOutput?.permissionDecisionReason,
       updatedInput: parsed?.hookSpecificOutput?.updatedInput,
-      systemMessage: parsed?.hookSpecificOutput?.systemMessage,
+      // The model reads additionalContext; a nested systemMessage is dropped by the CLI.
+      systemMessage: parsed?.hookSpecificOutput?.additionalContext,
     };
   } finally {
     rmSync(dir, { recursive: true, force: true });
@@ -109,7 +110,7 @@ describe("governor — spawns must not become teammates", () => {
     // one here would pass for the wrong reason (boundary rule, not the name ban).
     const d = callGovernor({
       tool_name: "Agent",
-      tool_input: { subagent_type: "oh-my-evor:evor-tick", prompt: "…" },
+      tool_input: { subagent_type: "oh-my-evor:evor-tick", description: "Tick 1", prompt: "…" },
     });
     expect(d.decision).not.toBe("deny");
   });
@@ -125,7 +126,7 @@ describe("governor — spawns must not become teammates", () => {
   it("tolerates an empty `name` rather than denying on the key alone", () => {
     const d = callGovernor({
       tool_name: "Agent",
-      tool_input: { subagent_type: "oh-my-evor:evor-tick", name: "", prompt: "…" },
+      tool_input: { subagent_type: "oh-my-evor:evor-tick", name: "", description: "Tick 1", prompt: "…" },
     });
     expect(d.decision).not.toBe("deny");
   });

@@ -132,7 +132,7 @@
     "file": "agents/evor-tick.md",
     "line": 116,
     "quote": "- **You delegate leaf work.** Code, training, evidence, verdicts belong to the specialists.",
-    "sha256_at_authoring": "969107db854d0d79d37ffa5004f97c2dc79c2ed3630f43718c1a1de67932b0b3"
+    "sha256_at_authoring": "011ce514831371d229a3aa73652c48a5d6851754d0376c85d4c24f2c28cb1060"
   },
   "grounding": [
     "field-trace:G-09",

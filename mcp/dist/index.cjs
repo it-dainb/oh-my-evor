@@ -26797,6 +26797,7 @@ var import_fs21 = require("fs");
 var import_path22 = require("path");
 var import_os5 = require("os");
 var MAX_WAIT_S = 540;
+var HEARTBEAT_MAX_S = 6 * 3600;
 var DEFAULT_WAIT_S = 300;
 var POLL_MS = 5e3;
 var STOPPED_QUIET_MS = 15e3;
@@ -26857,7 +26858,7 @@ function lastActivity(runDir) {
       return;
     }
     for (const e of entries) {
-      if (e === HEARTBEAT_FILE) continue;
+      if (e === HEARTBEAT_FILE || e.startsWith("stop-blocks-")) continue;
       const p = (0, import_path22.join)(dir, e);
       let st;
       try {
@@ -26874,22 +26875,38 @@ function lastActivity(runDir) {
   visit((0, import_path22.join)(runDir, "..", "..", "..", "worktrees"), 1);
   return newest;
 }
-async function waitFor(probe, waitS, pollMs = POLL_MS) {
+async function waitFor(probe, waitS, pollMs = POLL_MS, signal) {
   const started = Date.now();
   const deadline = started + Math.max(0, waitS) * 1e3;
   for (; ; ) {
+    if (signal?.aborted) return { done: false, waited_s: Math.round((Date.now() - started) / 1e3), cancelled: true };
     const r = probe();
     const waited_s = Math.round((Date.now() - started) / 1e3);
     if (r.error) return { done: false, waited_s, error: r.error };
     if (r.done) return { done: true, waited_s, ...r.detail ?? {} };
     if (Date.now() + pollMs > deadline) return { done: false, waited_s, ...r.detail ?? {} };
-    await new Promise((res) => setTimeout(res, pollMs));
+    await new Promise((res) => {
+      const t = setTimeout(res, pollMs);
+      signal?.addEventListener("abort", () => {
+        clearTimeout(t);
+        res();
+      }, { once: true });
+    });
+  }
+}
+var armedHere = /* @__PURE__ */ new Set();
+function pidAliveAny(pid) {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (e) {
+    return e.code === "EPERM";
   }
 }
 function registerWaitTools(server) {
   server.tool(
     "evor_wait",
-    "BLOCK until a condition holds, holding your turn: an evor job finishes (job_id), a process exits (pid), or a tick artifact is written (artifact). Returns {done:true,...} as soon as it holds, or {done:false} after wait_s (default 300, max 540). Use it only for what nothing will report: a job or a process. An agent you spawned, and a background task you started, wake you when they finish \u2014 end your turn instead. Give exactly one of job_id, pid, artifact.",
+    "Wait for a condition: an evor job finishes (job_id), a process exits (pid), a tick artifact is written (artifact), an agent stops (agent_id), or the whole run stalls (heartbeat). Returns {done:true,...} as soon as it holds, or {done:false} after wait_s (default 300, max 540; a heartbeat waits up to six hours). Use it only for what nothing will report: an agent you spawned, and a background task you started, wake you when they finish. Give exactly one of job_id, pid, artifact, agent_id, heartbeat.",
     {
       run_id: external_exports.string().optional().describe("Active run identifier; resolved from the active run when omitted"),
       job_id: external_exports.string().optional().describe("Wait for this evor_run_start job to leave state 'running'"),
@@ -26906,18 +26923,18 @@ function registerWaitTools(server) {
         "With artifact: the agentId of the child that owes it (from the spawn result). If that child stops without writing it, the wait returns at once with producer_stopped:true instead of running out the clock."
       ),
       heartbeat: external_exports.boolean().optional().describe(
-        "Watch the whole run instead of one condition: returns early with stalled:true when nothing in it (tick state, artifacts, jobs, node telemetry, trainer logs) has changed for quiet_s, otherwise at wait_s with stalled:false. For the orchestrator, after a tick yields: a lost completion notice then still leads back to the tick."
+        "Watch the whole run instead of one condition. It runs in the background and returns stalled:true only when nothing in the run (tick state, artifacts, jobs, node telemetry, trainer logs) has changed for quiet_s; otherwise it keeps waiting, up to wait_s (default six hours). One heartbeat at a time: while one runs, a second call returns at once with already_armed:true. For the orchestrator, after a tick yields: a lost completion notice then still leads back to the tick."
       ),
       quiet_s: external_exports.number().int().min(60).max(3600).optional().describe(
         "With heartbeat: seconds without any change that count as stalled (default 600)"
       ),
-      wait_s: external_exports.number().int().min(0).max(MAX_WAIT_S).optional().describe(`Seconds to wait at most (default ${DEFAULT_WAIT_S}, max ${MAX_WAIT_S})`),
+      wait_s: external_exports.number().int().min(0).max(HEARTBEAT_MAX_S).optional().describe(`Seconds to wait at most (default ${DEFAULT_WAIT_S}, max ${MAX_WAIT_S}; a heartbeat defaults to and allows up to ${HEARTBEAT_MAX_S})`),
       mission_id: external_exports.string().optional().describe("Mission id; resolved from the active run when omitted")
     },
-    async ({ run_id, job_id, pid, artifact, wait_s, mission_id, producer_agent_id, agent_id, heartbeat, quiet_s }) => {
+    async ({ run_id, job_id, pid, artifact, wait_s, mission_id, producer_agent_id, agent_id, heartbeat, quiet_s }, extra) => {
       const given = [job_id, pid, artifact, agent_id, heartbeat || void 0].filter((v) => v !== void 0).length;
       if (given !== 1) return err("give exactly one of job_id, pid, artifact, agent_id, heartbeat");
-      const waitS = wait_s ?? DEFAULT_WAIT_S;
+      const waitS = heartbeat ? wait_s ?? HEARTBEAT_MAX_S : Math.min(wait_s ?? DEFAULT_WAIT_S, MAX_WAIT_S);
       if (heartbeat) {
         let hbRunDir;
         try {
@@ -26930,6 +26947,20 @@ function registerWaitTools(server) {
         const quietMs = (quiet_s ?? 600) * 1e3;
         let last = lastActivity(hbRunDir);
         const marker = (0, import_path22.join)(hbRunDir, HEARTBEAT_FILE);
+        let armedElsewhere = false;
+        try {
+          const hb = JSON.parse((0, import_fs21.readFileSync)(marker, "utf8"));
+          armedElsewhere = Number(hb.until) > Date.now() && Number(hb.pid) !== process.pid && pidAliveAny(Number(hb.pid));
+        } catch {
+        }
+        if (armedHere.has(hbRunDir) || armedElsewhere) {
+          return ok({
+            condition: "heartbeat",
+            already_armed: true,
+            next: "a heartbeat is already running and wakes you on a stall: end your turn"
+          });
+        }
+        armedHere.add(hbRunDir);
         try {
           (0, import_fs21.writeFileSync)(marker, JSON.stringify({ armed_at: Date.now(), until: Date.now() + waitS * 1e3, pid: process.pid }));
         } catch {
@@ -26939,10 +26970,11 @@ function registerWaitTools(server) {
           r2 = await waitFor(() => {
             last = lastActivity(hbRunDir);
             return { done: Date.now() - last > quietMs };
-          }, waitS, 15e3);
+          }, waitS, 15e3, extra?.signal);
         } finally {
+          armedHere.delete(hbRunDir);
           try {
-            (0, import_fs21.rmSync)(marker, { force: true });
+            if (Number(JSON.parse((0, import_fs21.readFileSync)(marker, "utf8")).pid) === process.pid) (0, import_fs21.rmSync)(marker, { force: true });
           } catch {
           }
         }
@@ -26952,7 +26984,7 @@ function registerWaitTools(server) {
           stalled: r2.done,
           waited_s: r2.waited_s,
           last_activity_age_s: ageS,
-          next: r2.done ? `nothing in the run has changed for ${ageS}s: if no agent of the tick is running, resume the evor-tick agent with SendMessage and tell it to check its children` : "the run is active: end your turn, arming one more heartbeat"
+          next: r2.done ? `nothing in the run has changed for ${ageS}s: if no agent of the tick is running, resume the evor-tick agent with SendMessage and tell it to check its children` : "the run is still active: arm the heartbeat again and end your turn"
         });
       }
       if (agent_id !== void 0) {
@@ -27097,6 +27129,8 @@ async function main() {
   registerWaitTools(server);
   const transport = new StdioServerTransport();
   await server.connect(transport);
+  process.stdin.on("end", () => process.exit(0));
+  process.stdin.on("close", () => process.exit(0));
   process.on("SIGINT", async () => {
     await server.close();
     process.exit(0);

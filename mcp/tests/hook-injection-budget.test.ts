@@ -85,10 +85,53 @@ describe("session-start wiki injection is budgeted", () => {
     expect(injected).toBeLessThanOrEqual(2_000);
   });
 
-  it("says it truncated rather than silently dropping content", () => {
+  it("injects no wiki lessons into main at all", () => {
+    // Lessons are tick material: evor-tick reads them, main orchestrates. Their
+    // text grows with the mission and carries dated history, so session-start
+    // does not relay them.
     const out = runWithHugeWiki(40_000);
-    // A silent truncation looks identical to "there were no more lessons" —
-    // the reader cannot tell signal from budget. Fail loud (P5).
-    expect(out).toMatch(/truncat/i);
+    expect(out).not.toMatch(/L{50,}/);
+  });
+});
+
+/** session-start's model context for a live mission, for the given payload source. */
+function contextFor(source: string) {
+  const dir = mkdtempSync(join(tmpdir(), "evor-inject-src-"));
+  try {
+    const evorRoot = join(dir, ".evor");
+    const runDir = join(evorRoot, "runs", "m1", "r1");
+    mkdirSync(runDir, { recursive: true });
+    writeFileSync(join(evorRoot, "active-run.json"), JSON.stringify({ run_id: "r1", mission_id: "m1" }));
+    writeFileSync(join(evorRoot, ".deps-ok"), "cached");
+    writeFileSync(join(runDir, "mission-state.json"), JSON.stringify({ status: "running", objective: "o".repeat(400) }));
+    writeFileSync(join(runDir, "run-state.json"), JSON.stringify({ tick_count: 7, best_score: 0.5 }));
+    writeFileSync(join(runDir, "tick-state.json"), JSON.stringify({ tick: 7, current_step: 4, step_status: "running" }));
+    const r = spawnSync(process.execPath, [join(HOOKS, "session-start.mjs")], {
+      input: JSON.stringify({ hook_event_name: "SessionStart", source, session_id: "s-budget" }),
+      env: { PATH: process.env.PATH ?? "/usr/bin:/bin", EVOR_ROOT: evorRoot, HOME: dir },
+      encoding: "utf8",
+      timeout: 15_000,
+    });
+    return String(JSON.parse(r.stdout || "{}")?.hookSpecificOutput?.additionalContext ?? "");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+describe("session-start context stays small", () => {
+  it("startup orientation is bounded", () => {
+    const ctx = contextFor("startup");
+    expect(ctx).toMatch(/EVOR LAW/);
+    expect(ctx.length).toBeLessThanOrEqual(2_000);
+  });
+
+  it("compact and resume carry only the restore block and the next step", () => {
+    for (const source of ["compact", "resume"]) {
+      const ctx = contextFor(source);
+      expect(ctx).toMatch(/<evor-restore>/);
+      expect(ctx).toMatch(/\[NEXT\]/);
+      expect(ctx, `${source} must not repeat the startup primer`).not.toMatch(/EVOR LAW/);
+      expect(ctx.length).toBeLessThanOrEqual(800);
+    }
   });
 });

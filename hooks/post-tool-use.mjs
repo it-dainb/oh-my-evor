@@ -7,8 +7,12 @@
  *   EVOR_SKIP_HOOKS=post-tool-use → exit 0 immediately
  *
  * Validates that recording tool calls left the expected artifacts on disk.
- * Emits [EVOR WARNING] lines to stdout (non-blocking, exit 0) when files are
- * missing or empty so the model is informed without halting the session.
+ * Emits [EVOR WARNING] lines (non-blocking, exit 0) when files are missing or
+ * empty so the model is informed without halting the session.
+ *
+ * Everything for the model goes out as ONE hookSpecificOutput.additionalContext
+ * object, written when the process exits. Plain stdout on exit 0 never reaches
+ * the model, and two JSON objects on stdout are not one parseable output.
  *
  * evor_record_eval:
  *   - Checks nodes/<node_id>/results.json exists
@@ -23,7 +27,7 @@
  * Guard is inert (immediate exit 0) when EVOR_ACTIVE_RUN_ID is unset.
  */
 
-import { existsSync, statSync, appendFileSync, mkdirSync, readFileSync, readdirSync } from 'fs';
+import { existsSync, statSync, appendFileSync, mkdirSync, readFileSync, readdirSync, writeSync } from 'fs';
 import { join } from 'path';
 import { createHash } from 'node:crypto';
 import { resolveActiveRun, resolveEvorRoot } from './lib/active-run.mjs';
@@ -48,6 +52,18 @@ try {
   // Malformed hook input — do not block; exit safely
   process.exit(0);
 }
+
+/** Model-visible text collected by every rule below; written once, on exit. */
+const contextParts = [];
+const addContext = (text) => { if (text) contextParts.push(text); };
+process.on('exit', () => {
+  if (!contextParts.length) return;
+  try {
+    writeSync(1, JSON.stringify({
+      hookSpecificOutput: { hookEventName: 'PostToolUse', additionalContext: contextParts.join('\n\n') },
+    }) + '\n');
+  } catch { /* stdout gone */ }
+});
 
 const toolName = input?.tool_name ?? '';
 // Wire names are `mcp__plugin_oh-my-evor_evor__evor_<name>` — note BOTH `evor`
@@ -195,7 +211,7 @@ if (bareTool === 'record_node') {
 }
 
 if (warnings.length > 0) {
-  process.stdout.write(warnings.map((w) => `[EVOR WARNING] ${w}`).join('\n') + '\n');
+  addContext(warnings.map((w) => `[EVOR WARNING] ${w}`).join('\n'));
 }
 
 // ── <evor-remember> tag capture ───────────────────────────────────────────────
@@ -419,8 +435,8 @@ try {
     if (relPath) {
       const artPath = pathJoin(runDir(runId2), relPath);
       if (!fsExists(artPath)) {
-        process.stdout.write(
-          `[EVOR WARNING] artifact for agent='${agentSlot}' not confirmed — the write may not have completed\n`
+        addContext(
+          `[EVOR WARNING] artifact for agent='${agentSlot}' not confirmed — the write may not have completed`
         );
       }
     }
@@ -428,18 +444,14 @@ try {
     // Role-continuity nudge (once per tick per role)
     const ROLE_NEXT = {
       mutagen:  { key: 'write_artifact:mutagen:return', msg: 'Proposals recorded. Return — the orchestrator routes to evor-selector for verdict.' },
-      selector: { key: 'write_artifact:selector:return', msg: 'Verdict recorded. Return — the orchestrator routes to evor-forge for the winning proposal.' },
+      selector: { key: 'write_artifact:selector:return', msg: 'Verdict recorded. Return — the tick runs one evor-forge per selected proposal.' },
       sage:     { key: 'write_artifact:sage:wiki', msg: 'Findings recorded. Call evor_wiki_add to persist durable lessons before returning.' },
       probe:    { key: 'write_artifact:probe:return', msg: 'Probe findings recorded. Return — the orchestrator evaluates them.' },
     };
     const roleNext = ROLE_NEXT[agentSlot];
     if (roleNext && !isThrottled(roleNext.key)) {
       markThrottled(roleNext.key);
-      process.stdout.write(
-        JSON.stringify({
-          hookSpecificOutput: { hookEventName: 'PostToolUse', additionalContext: `[EVOR REFLEX] ${roleNext.msg}` },
-        }) + '\n'
-      );
+      addContext(`[EVOR REFLEX] ${roleNext.msg}`);
     }
     process.exit(0);
   }
@@ -453,16 +465,10 @@ try {
     if (isNotFound && !isThrottled('read_artifact:not_found')) {
       markThrottled('read_artifact:not_found');
       const upstreamAgent = String(toolInpR?.agent ?? 'upstream');
-      process.stdout.write(
-        JSON.stringify({
-          hookSpecificOutput: {
-            hookEventName: 'PostToolUse',
-            additionalContext:
-              `[EVOR REFLEX] evor_read_artifact returned "not found" for agent="${upstreamAgent}". ` +
-              `That step has not produced output — do NOT fabricate or proceed on assumptions. ` +
-              `Surface the dependency gap to the orchestrator.`,
-          },
-        }) + '\n'
+      addContext(
+        `[EVOR REFLEX] evor_read_artifact returned "not found" for agent="${upstreamAgent}". ` +
+          `That step has not produced output — do NOT fabricate or proceed on assumptions. ` +
+          `Surface the dependency gap to the orchestrator.`
       );
     }
     process.exit(0);
@@ -478,11 +484,7 @@ try {
         `do sleep 30; done, and end your turn; you are woken once when it exits. Without Bash: ` +
         `evor_wait({ job_id, wait_s: 540 }). Never arm a Monitor and stop. ` +
         `When the run succeeds → call evor_record_eval; when it fails → call evor_signal_emit(kind="runtime-failure") + PushNotification.`;
-      process.stdout.write(
-        JSON.stringify({
-          hookSpecificOutput: { hookEventName: 'PostToolUse', additionalContext: nudge },
-        }) + '\n'
-      );
+      addContext(nudge);
     }
     process.exit(0);
   }
@@ -501,11 +503,7 @@ try {
           `Call evor_record_eval(${nodeName2 ? `node_id="${nodeName2}"` : 'node_id=<name>'}) for the active run ` +
           `then evor_integrity_check to verify before propagating the score. ` +
           `If best_score improved, call PushNotification to alert the user of the breakthrough.`;
-        process.stdout.write(
-          JSON.stringify({
-            hookSpecificOutput: { hookEventName: 'PostToolUse', additionalContext: nudge },
-          }) + '\n'
-        );
+        addContext(nudge);
       }
     } else if (respState === 'failed' || respState === 'error' || respState === 'crashed') {
       if (!isThrottled('run_status:failed')) {
@@ -516,14 +514,10 @@ try {
           `[EVOR REFLEX] Run failed${errorReason ? `: ${errorReason}` : ''}. ` +
           `Call evor_signal_emit(kind="${isOom ? 'oom' : 'runtime-failure'}", severity="high") with the error. ` +
           `If this blocks the mission, call PushNotification to alert the user.`;
-        process.stdout.write(
-          JSON.stringify({
-            hookSpecificOutput: { hookEventName: 'PostToolUse', additionalContext: nudge },
-          }) + '\n'
-        );
+        addContext(nudge);
       }
     }
-    // running: stay silent (watcher/Monitor handles it)
+    // running: stay silent (the caller's background wait or evor_wait covers it)
     process.exit(0);
   }
 
@@ -538,11 +532,7 @@ try {
         `[EVOR REFLEX] Node recorded${nodeName ? ` (${nodeName})` : ''}. ` +
         `Launch its evaluation: call evor_run_start(node_id="${nodeName || '<name>'}"` +
         `${worktree ? `, worktree="${worktree}"` : ''}).`;
-      process.stdout.write(
-        JSON.stringify({
-          hookSpecificOutput: { hookEventName: 'PostToolUse', additionalContext: nudge },
-        }) + '\n'
-      );
+      addContext(nudge);
     }
     process.exit(0);
   }
@@ -565,11 +555,7 @@ try {
           ? ` New best score ${String(newScore).slice(0, 8)} > ${String(prevBest).slice(0, 8)} — ` +
             `call PushNotification to alert the user of the breakthrough.`
           : '');
-      process.stdout.write(
-        JSON.stringify({
-          hookSpecificOutput: { hookEventName: 'PostToolUse', additionalContext: nudge },
-        }) + '\n'
-      );
+      addContext(nudge);
     }
     process.exit(0);
   }
@@ -586,21 +572,13 @@ try {
       const nudge =
         `[EVOR REFLEX] Integrity check failed${nodeId5 ? ` for ${nodeId5}` : ''}. ` +
         `Do NOT propagate this score — mark the node and call evor_signal_emit(kind="integrity-violation", severity="critical").`;
-      process.stdout.write(
-        JSON.stringify({
-          hookSpecificOutput: { hookEventName: 'PostToolUse', additionalContext: nudge },
-        }) + '\n'
-      );
+      addContext(nudge);
     } else if (integrityPassed && !isThrottled('integrity_check:passed')) {
       markThrottled('integrity_check:passed');
       const nudge =
         `[EVOR REFLEX] Integrity verified. ` +
         `Record the lesson: evor_wiki_add. Then update the frontier: evor_state_write.`;
-      process.stdout.write(
-        JSON.stringify({
-          hookSpecificOutput: { hookEventName: 'PostToolUse', additionalContext: nudge },
-        }) + '\n'
-      );
+      addContext(nudge);
     }
     process.exit(0);
   }
@@ -613,11 +591,7 @@ try {
         `[EVOR REFLEX] Run initialized. Lock the mission: ` +
         `call evor_validate to check the config, then evor_state_write(mission_status="locked"). ` +
         `If any goal field was ambiguous, use AskUserQuestion to confirm before locking.`;
-      process.stdout.write(
-        JSON.stringify({
-          hookSpecificOutput: { hookEventName: 'PostToolUse', additionalContext: nudge },
-        }) + '\n'
-      );
+      addContext(nudge);
     }
     process.exit(0);
   }
@@ -630,13 +604,10 @@ try {
       const selectedNames = Array.isArray(toolResp?.selected_names) ? toolResp.selected_names : [];
       const winnerHint = selectedNames.length > 0 ? selectedNames.join(', ') : null;
       const nudge =
-        `[EVOR REFLEX] Selector verdict recorded${winnerHint ? ` (winner: ${winnerHint})` : ''}. ` +
-        `Spawn Forge for the winning proposal: Task(subagent_type="oh-my-evor:evor-forge").`;
-      process.stdout.write(
-        JSON.stringify({
-          hookSpecificOutput: { hookEventName: 'PostToolUse', additionalContext: nudge },
-        }) + '\n'
-      );
+        `[EVOR REFLEX] Selector verdict recorded${winnerHint ? ` (selected: ${winnerHint})` : ''}. ` +
+        `Spawn one Forge per selected proposal, Task(subagent_type="oh-my-evor:evor-forge") each: ` +
+        `every selected proposal owes a trained and evaluated node, not only the primary.`;
+      addContext(nudge);
     }
     process.exit(0);
   }
@@ -648,11 +619,7 @@ try {
       const nudge =
         `[EVOR REFLEX] Citation captured. ` +
         `Include the implementation_spec from this citation in your findings via evor_write_artifact.`;
-      process.stdout.write(
-        JSON.stringify({
-          hookSpecificOutput: { hookEventName: 'PostToolUse', additionalContext: nudge },
-        }) + '\n'
-      );
+      addContext(nudge);
     }
     process.exit(0);
   }

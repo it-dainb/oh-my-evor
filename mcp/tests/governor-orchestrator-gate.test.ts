@@ -138,7 +138,7 @@ describe("governor — orchestrator may not do leaf work", () => {
     // Delegation itself must survive the orchestrator-only rule. The target is the
     // tick boundary: §3b.0 routes lead spawns through it, so main delegates the
     // whole tick rather than each lead.
-    const d = callGovernor(asMain("Agent", { subagent_type: "oh-my-evor:evor-tick" }));
+    const d = callGovernor(asMain("Agent", { subagent_type: "oh-my-evor:evor-tick", description: "Tick 1" }));
     expect(d.decision).not.toBe("deny");
   });
 

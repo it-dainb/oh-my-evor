@@ -54,7 +54,9 @@ describe("main stopping on a wait nothing will deliver", () => {
     const r = stopMain({ finishedFlag: true, tail: [END, HOOK_ATTACHMENT] });
     expect(r.stderr).not.toMatch(/yielding, not ending/);
     expect(r.reason).toMatch(/no agent is running/);
-    expect(r.reason).toMatch(/SendMessage/);
+    // The finished agent is Forge, the tick's child; no tick agent exists, so
+    // main hands the wait to a new evor-tick for the tick.
+    expect(r.reason).toMatch(/spawn Task\(subagent_type="oh-my-evor:evor-tick"\) for tick 1/i);
   });
 
   it("without the flag, the last message still decides, not the trailing attachment", () => {

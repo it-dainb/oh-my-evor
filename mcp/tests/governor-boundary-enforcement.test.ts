@@ -104,7 +104,7 @@ describe("boundary enforcement — S2 read-grant change does not touch main's bo
 
 describe("boundary enforcement — main keeps what it needs to run the mission", () => {
   const ALLOWED = [
-    ["Agent", { subagent_type: "oh-my-evor:evor-tick" }, "spawning the boundary"],
+    ["Agent", { subagent_type: "oh-my-evor:evor-tick", description: "Tick 1" }, "spawning the boundary"],
     [`${MCP}evor_check_stop`, { run_id: "r1" }, "the stop decision is main's"],
     [`${MCP}evor_check_plateau`, { run_id: "r1" }, "plateau detection is mission-level"],
     [`${MCP}evor_read_goal_contract`, { run_id: "r1" }, "the mission's own contract"],

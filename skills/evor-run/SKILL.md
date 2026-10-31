@@ -114,8 +114,8 @@ evor_state_write({
 
 Choose the appropriate run-watch mode based on context:
 
-- **Attended** (interactive session, run expected ≤~4h): jobs are waited on INSIDE the tick with `evor_wait({ job_id })`; main waits for the tick's completion notice, and if a tick yields it calls `evor_wait` on what the tick named, then resumes it. Main may not use `Monitor` while the mission runs. The session stays live.
-- **Scheduled / unattended** (multi-hour or overnight runs): the plugin job-status watcher (registered via `watchPaths` at run_start) fires a `FileChanged` wake when `jobs/<id>/status.json` changes. Use `CronCreate` to establish a recurring check-in cadence for multi-day missions. Session sleeps between check-ins.
+- **Attended** (interactive session, run expected ≤~4h): jobs are waited on INSIDE the tick with `evor_wait({ job_id })`. Main waits for the tick's completion notice; when the tick yields, main arms `evor_wait({ heartbeat: true })`, which wakes it only on a stall, and ends its turn, and relays any notice from inside the tick to the tick agent with SendMessage. Main may not use `Monitor` while the mission runs. The session stays live.
+- **Scheduled / unattended** (multi-hour or overnight runs): the same heartbeat wakes the session when a notice is lost. Use `CronCreate` to establish a recurring check-in cadence for multi-day missions. Session sleeps between check-ins.
 
 The tick loop in the `evor` skill manages this automatically; this note is for orientation when choosing `/evor-run` vs a scheduled invocation.
 

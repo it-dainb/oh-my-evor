@@ -81,12 +81,17 @@ all of them. Never pass `run_in_background` — it is denied for sub-agents. A b
 ends the caller's turn, and its completion notice goes to main rather than to the caller, so
 nothing wakes the agent that is waiting.
 
-**When a spawn returns "Async agent launched", end your turn and let the CLI wake you.** A
-sub-agent that ends its turn after such a spawn is woken when its child finishes, and the
-session shows "Waiting for N background agents" meanwhile. Waiting this way costs nothing.
-Do not poll `evor_wait` on a child: each call costs a turn and a full context re-send. When
-you are woken, read the child's artifact. If the child stopped without writing it, find out
+**When a spawn returns "Async agent launched", end your turn and return `outcome: "yielding"`.**
+An agent that ends its turn is marked finished, so its children's completion notices go to main,
+not to it. Main relays each such notice to you with `SendMessage`. Waiting this way costs
+nothing. Do not poll `evor_wait` on a child: each call costs a turn and a full context re-send.
+When you are woken, read the child's artifact. If the child stopped without writing it, find out
 why, then resume it with `SendMessage` or record the gap.
+
+**A relayed notice about a grandchild is yours to act on.** When Forge returns while its junior
+or trainer still runs, Forge is finished too, and the junior's notice reaches main, then you. It
+never reaches Forge on its own. Resume Forge with `SendMessage`, passing the notice verbatim, so
+it continues from the junior's result.
 
 **Jobs are the exception: nothing wakes you for an `evor_run_start` job.** You have no Bash,
 so wait on a job you started yourself (a sealed re-score, minutes long) with

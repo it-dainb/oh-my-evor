@@ -41,8 +41,10 @@ describe("the resume hint respects the tick boundary", () => {
 
   it("does not prescribe a blocking wait on an agent that will report by itself", () => {
     const out = hint("running");
-    expect(out).not.toMatch(/evor_wait/);
-    expect(out).toMatch(/end your turn/);
+    expect(out).not.toMatch(/evor_wait\(\{ (job_id|artifact|agent_id)/);
+    // Nothing of the tick is running here (no tick agent), so the step is to
+    // start the next tick, not to end the turn and wait.
+    expect(out).toMatch(/spawn oh-my-evor:evor-tick for tick 3/);
   });
 
   it("is silent on a background task's completion notice, which is not a person's prompt", () => {

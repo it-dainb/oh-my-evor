@@ -200,7 +200,8 @@ describe("main does not block on what an agent will deliver", () => {
   it("denies main an artifact wait during a live mission", () => {
     const d = decide(wait({ artifact: { tick: 7, agent: "forge" } }));
     expect(d.permissionDecision).toBe("deny");
-    expect(d.permissionDecisionReason).toMatch(/End your turn/);
+    // Ending the turn on a yield needs the heartbeat armed first (stop.mjs).
+    expect(d.permissionDecisionReason).toMatch(/evor_wait\(\{ heartbeat: true \}\), then end your turn/);
   });
   it("still lets main wait on a job", () => {
     expect(decide(wait({ job_id: "j1" })).permissionDecision).not.toBe("deny");

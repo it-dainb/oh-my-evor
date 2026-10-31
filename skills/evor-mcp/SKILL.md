@@ -183,8 +183,8 @@ evor_record_node         # register the candidate node in the evolution tree
 evor_run_start           # EVALUATE the trained candidate (async); returns job_id immediately
                          # NOT training — it runs the sealed evaluate.py. Weights must already
                          # be on disk; forge-junior does the training, before this call.
-                         # → watch with Monitor (attended) or FileChanged+asyncRewake (unattended)
-evor_run_status          # check state when monitor fires
+                         # → wait with evor_wait({ job_id }) inside the tick
+evor_run_status          # check a job's state
 evor_telemetry_ingest    # ingest telemetry records from the run
 evor_record_eval         # record evaluation result (auto-triggers integrity check)
 evor_integrity_check     # verify result; if verified=false → evor_signal_emit(integrity-violation)

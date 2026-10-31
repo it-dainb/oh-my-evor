@@ -33,7 +33,7 @@
  * Fail-open: any error → exit 0. Never crash or block.
  */
 
-import { existsSync, statSync, readFileSync, appendFileSync, renameSync, writeFileSync, mkdirSync } from 'fs';
+import { existsSync, statSync, readFileSync, appendFileSync, renameSync, writeFileSync, mkdirSync, writeSync } from 'fs';
 import { hasForgeReport } from './lib/forge-reports.mjs';
 import { join } from 'path';
 import { tmpdir } from 'os';
@@ -81,11 +81,15 @@ const TERMINAL_OUTCOMES = ['scored', 'rejected', 'skipped', 'failed'];
 const MAX_RETURN_CHARS = 1500;   // ~400 tokens, per the agent's own budget
 const MAX_RETRIES = 2;
 
-// Every OTHER agent gets a size bound only — no schema. evor-tick's four returns
+// Every OTHER evor agent gets a size bound only — no schema. evor-tick's four returns
 // totalled 2,304 chars while one generic Explore spawn returned 9,306, four times
 // all of them combined and the single largest thing the orchestrator ingested.
 // Bounding one doorway and leaving the others open does not bound context.
 const MAX_GENERIC_RETURN_CHARS = 2000;
+// Scoped to this plugin's agents. The hook fires for every sub-agent in the
+// session, and a cap on someone else's agent (a general-purpose architect the
+// user spawned) truncated work this plugin has no contract with.
+const isEvorAgent = (t) => /^oh-my-evor:evor-/.test(t);
 
 const agentType = String(payload.agent_type ?? '').toLowerCase();
 const isTick = agentType.endsWith('evor-tick');
@@ -160,7 +164,7 @@ if (isTick) {
     }) + '\n');
     process.exit(0);
   }
-} else {
+} else if (isEvorAgent(agentType)) {
   const msg = String(payload.last_assistant_message ?? '');
   if (
     msg.length > MAX_GENERIC_RETURN_CHARS &&
@@ -179,6 +183,17 @@ if (isTick) {
   }
 }
 
+// ── Notes for the user ────────────────────────────────────────────────────────
+// Advisories below are for the operator and go out as ONE systemMessage, which
+// the CLI shows to the user. Plain stdout/stderr on exit 0 reached nobody, and
+// a SubagentStop additionalContext would make the stopping agent continue. The
+// agent that spawned it checks the artifact itself when it is woken.
+const userNotes = [];
+process.on('exit', () => {
+  if (!userNotes.length) return;
+  try { writeSync(1, JSON.stringify({ systemMessage: userNotes.join('\n') }) + '\n'); } catch { /* stdout gone */ }
+});
+
 // ── Near-cap warning (PM1 detector) ───────────────────────────────────────────
 // Raising the turn caps in §S3 removed the truncate-then-resume cycle, but a cap
 // is still a runaway backstop. An agent that lands within a few turns of its cap
@@ -189,10 +204,10 @@ try {
   if (declaredCap) {
     const turns = countTurns(payload.agent_transcript_path);
     if (turns && declaredCap - turns <= 3) {
-      process.stderr.write(
+      userNotes.push(
         `[EVOR CAP] ${agentType} stopped at ${turns}/${declaredCap} turns. ` +
           `At the cap the agent is truncated mid-task and resuming it re-primes its whole ` +
-          `context as cache_creation — raise the cap or narrow the role.\n`
+          `context as cache_creation — raise the cap or narrow the role.`
       );
     }
   }
@@ -336,6 +351,7 @@ try {
     const yielding = isYieldingStop(payload, ts);
     if (started && !isTickFinished(ts) && !yielding && bumpRetries(payload.agent_id) <= MAX_RETRIES) {
       const step = typeof ts?.current_step === 'number' ? ts.current_step : 0;
+      userNotes.length = 0; // a block is the whole output; the agent continues anyway
       process.stdout.write(JSON.stringify({
         decision: 'block',
         reason:
@@ -456,10 +472,7 @@ try {
   // An agent waiting on its own children has yielded; its artifact comes after they report.
   if (artifactMissing && liveChildren(payload.agent_transcript_path).length) process.exit(0);
   if (artifactMissing) {
-    process.stdout.write(
-      `[EVOR SUBAGENT WARNING] ${agentRole} stopped but artifact not confirmed for this tick.\n` +
-        `  Agent may not have externalized its work. Orchestrator should verify via evor_read_artifact.\n`
-    );
+    userNotes.push(`[EVOR SUBAGENT WARNING] ${agentRole} stopped but artifact not confirmed for this tick; check it with evor_read_artifact.`);
     process.exit(0);
   }
 
@@ -467,9 +480,9 @@ try {
   if (agentRole === 'forge') process.exit(0);
   const size = statSync(artifactPath).size;
   if (size < MIN_ARTIFACT_BYTES) {
-    process.stdout.write(
-      `[EVOR SUBAGENT WARNING] ${agentRole} artifact is trivially small (${size} bytes) for this tick.\n` +
-        `  Agent may have written a stub rather than a full deliverable.\n`
+    userNotes.push(
+      `[EVOR SUBAGENT WARNING] ${agentRole} artifact is trivially small (${size} bytes) for this tick; ` +
+        `it may be a stub rather than a full deliverable.`
     );
     process.exit(0);
   }

@@ -71,9 +71,9 @@ const ROLE_ADDENDA = {
     '4. evor_signal_emit for each anomaly.',
 
   'forge':
-    '1. FIRST evor_read_artifact(agent="selector") + evor_read_artifact(agent="mutagen") for the winning proposal. ' +
+    '1. FIRST evor_read_artifact(agent="selector") + evor_read_artifact(agent="mutagen") for the proposal you were given. ' +
     '2. Team sequence: forge-junior writes code → lsp_diagnostics pre-flight → PARALLEL {forge-critic, forge-analyst, forge-architect} → all pass → evor_record_node → evor_run_start. ' +
-    '3. Watch the launched run with the native Monitor tool. ' +
+    '3. Wait for the job with ONE background Bash task that exits when its status.json leaves "running", then end your turn; you are woken when it exits. Never arm a Monitor. ' +
     '4. evor_write_artifact(agent="forge"). ' +
     '[GATE] Do not call evor_run_start until all three reviewers pass; any rejection routes back to forge-junior.',
 

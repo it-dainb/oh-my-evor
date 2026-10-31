@@ -96,7 +96,7 @@
     "file": "agents/evor-mutagen.md",
     "line": 90,
     "quote": "    Mutagen NEVER performs research or gathers evidence itself. All evidence-gathering MUST be",
-    "sha256_at_authoring": "464ec5e41d66b2a40f9fb9b1d9a71a332129c56fa370c7b68c655882684dce16"
+    "sha256_at_authoring": "c65a5a7ec341b70067ccc4dffee7aba0f73930608234d5db4925e0e6f641ef04"
   },
   "grounding": [
     "field-trace:G-03",

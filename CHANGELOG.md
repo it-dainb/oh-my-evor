@@ -2,6 +2,55 @@
 
 All notable changes to Evor. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.2.42] — 2026-10-31 — screen ideas, confirm winners
+
+### Changed
+
+- **Seeds are spent where a decision needs them.** Selector, Probe, Forge and Mutagen share one
+  policy: a new recipe is screened on 2 seeds against the matched control on the same seeds;
+  existing control runs are reused; only a recipe that beats its control by more than the
+  control's seed spread (or would become the run's best) gets the remaining seeds, 5 in all.
+  Only a confirmed recipe is called the best. The saved compute goes to more distinct ideas.
+
+### Fixed
+
+- **Main spawned a second tick agent for a tick that already had one.** After a compaction main
+  no longer had the tick agent's id, so it could not relay a person's message and started a
+  replacement beside the running one. The governor now refuses a second evor-tick for an
+  unfinished tick and names the agent to resume, and a person's message during a tick carries
+  that agent's id.
+- **After a compaction main was steered to do tick work itself.** The post-compact hint told it
+  to spawn Mutagen or record evals, which the governor refuses to main while a mission runs. It
+  now names the agent running the current tick and how to resume it, or says to start the next
+  tick through evor-tick, and it does so even when no pre-compact checkpoint exists.
+
+### Changed (waiting)
+
+- **A heartbeat costs nothing while the run is healthy.** `evor_wait({ heartbeat: true })` now
+  runs as a background task and returns only when nothing in the run has changed for ten minutes
+  (or after six hours), instead of every nine minutes. A second call while one runs returns
+  `already_armed`; a cancelled call stops and clears its marker.
+
+### Fixed (hook audit)
+
+- **Hook text reached the user, not the model.** Session start, compaction and permission-denied
+  hooks emitted `systemMessage` or top-level fields the CLI does not pass to the model. The
+  restore and next-step text now arrives as `additionalContext` from SessionStart, including after
+  a compaction, from one shared next-step helper.
+- **Hints and blocks asked main for work it is refused.** The stop hook, the governor's denials
+  and the prompt hints pointed main at spawning leads, recording evals or a second tick agent. They
+  now route through the current tick agent.
+- **Smaller fixes.** Selector reads Probe's verdicts; a refused artifact read names the readable
+  slots; Forge's waiting advice is consistent; the return-size cap applies to evor agents only;
+  notifications wrapped in a reminder no longer trigger prompt intents; two hooks that could not
+  deliver anything (`job-status-watcher`, `post-tool-batch`) are removed.
+- **The tick waited for Forge to wake by itself.** The tick's instructions said an agent that
+  ends its turn after a background spawn is woken by its child; it is not, so a junior's notice
+  reaches main, then the tick. The tick now resumes Forge with the relayed notice, and the main
+  skill says the same. The tick agent is found by the tick its description names, and an
+  evor-tick spawn must name its tick.
+- **Juniors kept writing unguarded `rm` paths.** Their constraints now give the guarded form.
+
 ## [1.2.41] — 2026-10-31 — temp space is the agent's own
 
 ### Fixed

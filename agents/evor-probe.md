@@ -156,6 +156,15 @@ disallowedTools: Write, Edit
        Skip ONLY when `hypothesis_verdict="inconclusive"` (no valid prediction error to compute).
   </Hypothesis_Verdict_Protocol>
 
+  <Seed_Budget_Verdicts>
+    - Compare a multi-seed arm with the matched control on the same seeds, never with a parent's
+      best seed. Report mean and SD for both arms.
+    - A 2-seed screen verdict is "promote" (screen mean beats the matched control mean by more than
+      the control's seed-to-seed spread), "drop" (it does not), or "inconclusive". Name promoted
+      recipes so the next tick owes their remaining seeds.
+    - Only a confirmed recipe (5 matched seeds) may be named the run's best.
+  </Seed_Budget_Verdicts>
+
   <BenchmarkUpgrade_Protocol>
     Submit a BenchmarkUpgradeProposal only when BOTH conditions hold:
     1. Saturation: EACH of the last 3 tick-over-tick improvements is under 1% RELATIVE on the

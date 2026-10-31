@@ -98,7 +98,11 @@ describe("main may not end its turn with a tick in flight", () => {
     expect(r.reason).toMatch(/EVOR CONTINUATION/);
     // The reason must name the recovery, since "you stopped early" alone is not
     // actionable — the observed failure was main having nothing left to await.
-    expect(r.reason).toMatch(/TaskOutput|Monitor/);
+    // Hand the tick back to an evor-tick agent (spawn one: this fixture has none),
+    // and arm the heartbeat before ending the turn on the yield.
+    expect(r.reason).toMatch(/spawn Task\(subagent_type="oh-my-evor:evor-tick"\)/i);
+    expect(r.reason).toMatch(/evor_wait\(\{ heartbeat: true \}\)/);
+    expect(r.reason).not.toMatch(/TaskOutput|Monitor/);
   });
 
   it("blocks even when pending_node_ids is empty — that is the exact gap", () => {

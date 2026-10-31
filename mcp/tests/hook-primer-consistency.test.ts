@@ -35,7 +35,7 @@ const subagentStart = readFileSync(join(HOOKS, "subagent-start.mjs"), "utf8");
  * Everything main is actually told at session start.
  *
  * This used to extract the LAW_PRIMER string literal and assert on it. That test
- * was green while three OTHER concatenations into the same `output.message` — the
+ * was green while three OTHER concatenations into the same injected message — the
  * `[EVOR CONTEXT]` header, the `<evor-restore>` block, and the `[NEXT]` hint —
  * each still told main to call evor_state_read. A fix landed in one string, a test
  * locked that string down, and the adjacent code paths emitting the same forbidden
@@ -51,13 +51,16 @@ function sessionStartMessage(tick = 2, step = 4): string {
   writeFileSync(join(root, ".evor", "active-run.json"), JSON.stringify({ run_id: "r1", mission_id: "m1" }));
   writeFileSync(join(runDir, "tick-state.json"), JSON.stringify({ tick, current_step: step, step_status: "running" }));
   writeFileSync(join(runDir, "run-state.json"), JSON.stringify({ tick_count: tick }));
+  // Main's primer is for orchestrating a running mission.
+  writeFileSync(join(runDir, "mission-state.json"), JSON.stringify({ status: "running" }));
   const r = spawnSync("node", [join(HOOKS, "session-start.mjs")], {
     input: JSON.stringify({ hook_event_name: "SessionStart", session_id: "s1" }),
     encoding: "utf8",
     env: { ...process.env, EVOR_ROOT: join(root, ".evor"), CLAUDE_PLUGIN_ROOT: resolve(HOOKS, "..") },
   });
   rmSync(root, { recursive: true, force: true });
-  return JSON.parse(r.stdout || "{}").message ?? "";
+  // additionalContext is what the model reads; nothing else in the output is.
+  return JSON.parse(r.stdout || "{}")?.hookSpecificOutput?.additionalContext ?? "";
 }
 
 describe("session-start tells main nothing the governor will deny", () => {
