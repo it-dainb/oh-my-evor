@@ -151,8 +151,11 @@ def main() -> int:
     candidates: list[Path] = []
     if args.split_path:
         candidates.append(args.split_path)
+    # A metric hardening scores its parent's split; resolve the version that froze it.
+    from evor.benchmark import split_version
     candidates += [
         frozen_dir / f"{goal.eval_version}-test.json",  # canonical (matches freeze.py output)
+        frozen_dir / f"{split_version(run_dir, goal.eval_version)}-test.json",
         frozen_dir / "test.json",                        # legacy
         frozen_dir / "frozen-test.json",                 # legacy
     ]

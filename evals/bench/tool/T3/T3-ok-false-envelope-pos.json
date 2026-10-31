@@ -13,7 +13,7 @@
   "grounded_rule": {
     "file": "skills/evor-mcp/SKILL.md",
     "quote": "If the read returns an error object, the upstream step has not run \u2014 stop and surface the gap; do not fabricate.",
-    "sha256_at_authoring": "643829d3bf88abcb1b9f3d164842d9e70ae31fd26be99297bb2eae86abb5cb6b"
+    "sha256_at_authoring": "0151dfa7ab97d31a9bd171b4f2f921e0929ce449b0ee9197a2247df1d1e524c5"
   },
   "grounding": [
     "field-trace:N-03",

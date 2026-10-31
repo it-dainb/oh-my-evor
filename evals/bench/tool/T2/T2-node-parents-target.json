@@ -13,7 +13,7 @@
   "grounded_rule": {
     "file": "skills/evor/SKILL.md",
     "quote": "Pass the proposal by NAME. Do NOT pass raw `node_id` UUIDs or internal path literals.",
-    "sha256_at_authoring": "72972df4f576185948977f3d2cbd2b037f100fc907aeeef773e1741f0131c41b"
+    "sha256_at_authoring": "db9c338e90c8729b1b579756c5532da85283d056f1bfaae8ccbf42023fffc2aa"
   },
   "grounding": [
     "field-trace:E",

@@ -111,6 +111,12 @@ def _build_parser() -> argparse.ArgumentParser:
         "--no-selfheal", action="store_true",
         help="Disable SelfHealMonitor (for debugging).",
     )
+    run_p.add_argument(
+        "--eval-version", default=None,
+        help="Eval version the caller expects to score under. Must equal the "
+             "contract's current eval_version; a node is never scored under "
+             "a version that is no longer in force.",
+    )
 
     # preflight subcommand
     pre_p = sub.add_parser("preflight", help="Run environment smoke-test")
@@ -435,6 +441,15 @@ def _cmd_run(args: argparse.Namespace) -> int:
         print("[evor run] ERROR: cannot run without GoalContract.", file=sys.stderr)
         return 1
 
+    if args.eval_version and args.eval_version != goal.eval_version:
+        print(
+            f"[evor run] ERROR: --eval-version {args.eval_version!r} is not the contract's "
+            f"current eval_version {goal.eval_version!r}. Nodes are scored only under the "
+            "version in force.",
+            file=sys.stderr,
+        )
+        return 1
+
     # ── Verify telemetry instrumentation in worktree trainer ─────────
     # Forge is responsible for the instrumentation before calling `python -m evor run`.
     # Required pattern: EVOR_TELEMETRY_PATH + open() (§19-clean env-path write).
@@ -511,20 +526,73 @@ def _cmd_run(args: argparse.Namespace) -> int:
         print(f"[evor run] ERROR: EvaluatorAdapter raised: {exc}", file=sys.stderr)
         return 1
 
+    # ── Metric hardening: score the node under the sealed parent too ───
+    # A hardened evaluator may only be stricter. The parent's score is measured
+    # here, by the harness, from the parent's sealed bytes — never reported by the
+    # hardened evaluator about itself — and the integrity gate's
+    # not_softer_than_parent check compares the two.
+    if run_dir is not None and result.status in ("success", "regression"):
+        from evor.benchmark import hardening_parent, sealed_script
+
+        parent_version = hardening_parent(run_dir, goal.eval_version)
+        if parent_version:
+            parent_fitness = None
+            parent_script = sealed_script(run_dir, parent_version)
+            if parent_script is None:
+                print(
+                    f"[evor run] WARNING: parent evaluator {parent_version!r} is not sealed "
+                    "as recorded; the hardened score cannot be checked against it.",
+                    file=sys.stderr,
+                )
+            else:
+                try:
+                    parent_result = evaluator.run(
+                        eval_script=parent_script,
+                        worktree=worktree,
+                        goal=goal.model_copy(update={"eval_version": parent_version}),
+                        node=node,
+                        env=env,
+                    )
+                    if parent_result.status in ("success", "regression"):
+                        parent_fitness = parent_result.fitness_value
+                except Exception as exc:
+                    print(f"[evor run] WARNING: parent evaluator raised: {exc}", file=sys.stderr)
+            result = result.model_copy(update={
+                "parent_eval_version": parent_version,
+                "parent_fitness_value": parent_fitness,
+            })
+
     # ── Write EvaluationResult ─────────────────────────────────────────
     if run_dir:
         results_dir = run_dir / "nodes" / args.node_id
         results_dir.mkdir(parents=True, exist_ok=True)
-        (results_dir / "results.json").write_text(result.model_dump_json(indent=2))
+        # Evidence, not override: a result under another eval_version is kept as
+        # results.<version>.json before the current one replaces results.json, so
+        # a re-score under a hardened version never erases the parent's score.
+        for name in ("results.json", "results.evaluator.json"):
+            prior = results_dir / name
+            try:
+                prior_version = json.loads(prior.read_text()).get("eval_version")
+            except (OSError, ValueError, AttributeError):
+                prior_version = None
+            kept = results_dir / f"{prior.stem}.{prior_version}.json"
+            if prior_version and prior_version != result.eval_version and not kept.exists():
+                kept.write_text(prior.read_text())
+        payload = result.model_dump_json(indent=2)
+        (results_dir / "results.json").write_text(payload)
+        (results_dir / f"results.{result.eval_version}.json").write_text(payload)
         # The evaluator's own output, never rewritten: evor_record_eval keeps these
         # values over any the recording agent sends.
-        (results_dir / "results.evaluator.json").write_text(result.model_dump_json(indent=2))
+        (results_dir / "results.evaluator.json").write_text(payload)
+        (results_dir / f"results.evaluator.{result.eval_version}.json").write_text(payload)
 
     # Report
     print(json.dumps({
         "status": result.status,
         "fitness_value": result.fitness_value,
         "eval_version": result.eval_version,
+        **({"parent_fitness_value": result.parent_fitness_value}
+           if result.parent_eval_version else {}),
     }))
 
     # ── Map status to exit code ────────────────────────────────────────

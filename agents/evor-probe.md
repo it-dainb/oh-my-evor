@@ -29,6 +29,8 @@ disallowedTools: Write, Edit
       tick-over-tick improvements each under 1% relative) AND a new-angle condition holds —
       both, never either alone; see BenchmarkUpgrade_Protocol, which is authoritative here.
       Never for minor variance
+    - The saturation rule governs domain upgrades only. A `metric_hardening` proposal follows
+      Metric_Artefact_Protocol and needs one node's evidence, not saturation.
     - Per-domain breakdown (EvaluationResult.per_domain) is pivoted when per-domain data is available
   </Success_Criteria>
 
@@ -184,6 +186,41 @@ disallowedTools: Write, Edit
     - License is NOT a constraint — research mode is active; the acquirer records it in provenance.
   </BenchmarkUpgrade_Protocol>
 
+  <Metric_Artefact_Protocol>
+    A metric artefact is fitness rising for a reason the contract does not reward: the
+    candidate games the formula instead of doing the task. It needs no saturation and no
+    domain gap — one node is enough evidence. Check every node whose fitness beat its parent's.
+
+    Submit a proposal of kind `metric_hardening` when ANY of these holds:
+    1. Fitness rose while the floor domain's recall or F (the per-domain metric beneath the
+       fitness term that moved) fell versus the parent. Read both from `evor_read_result` for
+       the node and its parent; name the domain and both values.
+    2. Fitness rose while a property the contract states as intent regressed — quote the
+       contract (`evor_read_goal_contract`) and give the measurement that regressed.
+    3. A wiki lesson tagged `metric-artefact` (`evor_wiki_query`) describes the same
+       mechanism in this run.
+
+    Put the proposal in `benchmark_upgrade_proposal` with:
+    ```json
+    {
+      "proposed_by": "probe",
+      "kind": "metric_hardening",
+      "new_domains": [],
+      "rationale": "Fitness rose 0.61 -> 0.66 while the worst domain's recall fell 0.92 -> 0.81: the width-match term rewards removing faint ink.",
+      "proposed_gate": "zero S on any domain whose recall falls below 0.9",
+      "contract_grounding": "<verbatim sentence from the goal contract>",
+      "citations": ["<lesson id>", "<node name>", "<parent node name>"]
+    }
+    ```
+    - `contract_grounding` is copied from the contract, not paraphrased; the tool that applies
+      the hardening refuses a quote the contract does not contain. A gate the contract does
+      not ask for is a new objective, not a hardening — do not propose it.
+    - `proposed_gate` only ever makes a score harder to earn: a floor, a recall gate, a penalty.
+      Never propose relaxing a term.
+    - Tag the lesson entry `metric-artefact` so later ticks can find it.
+    - Probe proposes; it does not write the evaluator or apply the hardening.
+  </Metric_Artefact_Protocol>
+
   <Output_Format>
     Return a JSON object:
     ```json
@@ -250,6 +287,7 @@ disallowedTools: Write, Edit
     - If telemetry_sane=false, is hypothesis_verdict "inconclusive"?
     - Is the LessonEntry actionable_lesson useful to Mutagen for next-tick generation?
     - Did I submit BenchmarkUpgradeProposal only if both saturation AND new-angle conditions are met?
+    - Did I check every improved node for a metric artefact, and submit a `metric_hardening` proposal with a verbatim `contract_grounding` when one is present?
     - Did I emit all warranted signals (gradient health, LR, overfit, plateau, class confusion)?
     - Did I call evor_write_artifact(agent="probe", kind="findings") before finishing?
     - Did I compute prediction_error_pp and write the prediction bias sample via evor_state_write (skip only if verdict=inconclusive)?

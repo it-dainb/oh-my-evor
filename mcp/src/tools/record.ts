@@ -4,7 +4,7 @@
  * evor_record_eval — write EvaluationResult + auto-trigger integrity check
  */
 
-import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "fs";
+import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from "fs";
 import { dirname, join } from "path";
 import { randomUUID } from "crypto";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -257,7 +257,38 @@ export function updateBestScore(
 }
 
 /** Fields only the sealed evaluator may set; a recording agent's copy never replaces them. */
-const EVALUATOR_FIELDS = ["fitness_value", "metrics", "per_domain", "status", "benchmark_raw", "eval_version"];
+const EVALUATOR_FIELDS = [
+  "fitness_value", "metrics", "per_domain", "status", "benchmark_raw", "eval_version",
+  // The parent evaluator's score under a metric hardening is measured by the
+  // runner; a recording agent's copy must not be able to raise it.
+  "parent_eval_version", "parent_fitness_value",
+];
+
+/**
+ * Re-score bookkeeping for a metric hardening: once every node the hardening
+ * marked has a result under the new version, the upgrade record says so.
+ * Best-effort — the record is evidence for a reader, not a gate.
+ */
+function markRescored(runDir: string, nodeId: string, evalVersion: unknown): void {
+  if (typeof evalVersion !== "string") return;
+  const dir = join(runDir, "benchmark-upgrades");
+  if (!existsSync(dir)) return;
+  try {
+    for (const f of readdirSync(dir).filter((n) => n.endsWith(".json"))) {
+      const path = join(dir, f);
+      const up = JSON.parse(readFileSync(path, "utf8")) as Record<string, unknown>;
+      const ids = Array.isArray(up.rescore_node_ids) ? (up.rescore_node_ids as string[]) : [];
+      if (up.to_eval_version !== evalVersion || !ids.includes(nodeId)) continue;
+      const done = new Set(Array.isArray(up.rescored_node_ids) ? (up.rescored_node_ids as string[]) : []);
+      done.add(nodeId);
+      up.rescored_node_ids = [...done];
+      up.rescore_status = ids.every((i) => done.has(i)) ? "complete" : "partial";
+      const tmp = `${path}.tmp`;
+      writeFileSync(tmp, JSON.stringify(up, null, 2), "utf8");
+      renameSync(tmp, path);
+    }
+  } catch { /* best-effort by design */ }
+}
 
 export function recordEval(
   runId: string,
@@ -297,7 +328,44 @@ export function recordEval(
   }
 
   const resultsPath = join(nodeDir, "results.json");
+  const scoredUnder = (result as Record<string, unknown> | null)?.eval_version;
+
+  // Evidence, not override: results.json is the CURRENT version's result, and a
+  // result under any other version survives as results.<version>.json. A run
+  // whose earlier results predate per-version files gets its copy made here,
+  // before the re-score replaces results.json.
+  if (typeof scoredUnder === "string") {
+    try {
+      const prior = JSON.parse(readFileSync(resultsPath, "utf8")) as Record<string, unknown>;
+      const priorVersion = prior.eval_version;
+      const kept = join(nodeDir, `results.${String(priorVersion)}.json`);
+      if (typeof priorVersion === "string" && priorVersion !== scoredUnder && !existsSync(kept)) {
+        writeFileSync(kept, JSON.stringify(prior, null, 2), "utf8");
+      }
+    } catch { /* no prior result */ }
+  }
   writeFileSync(resultsPath, JSON.stringify(result, null, 2), "utf8");
+  if (typeof scoredUnder === "string" && /^[A-Za-z0-9._-]+$/.test(scoredUnder)) {
+    writeFileSync(join(nodeDir, `results.${scoredUnder}.json`), JSON.stringify(result, null, 2), "utf8");
+  }
+
+  // The node is now scored under the result's eval_version, and check 10
+  // (eval_version_consistent) reads the TREE node — so a re-score under a new
+  // version has to reach the tree before the integrity check runs, or a node
+  // re-scored under the current version still fails as stale. The score it had
+  // under the previous version stays in scores_by_version.
+  if (typeof scoredUnder === "string") {
+    try {
+      const node = readTree(runId, missionId)[nodeId];
+      if (node && node.eval_version !== scoredUnder) {
+        const scores = { ...(node.scores_by_version ?? {}) };
+        if (typeof node.fitness_value === "number" && !(node.eval_version in scores)) {
+          scores[node.eval_version] = node.fitness_value;
+        }
+        upsertNode(runId, { ...node, eval_version: scoredUnder, scores_by_version: scores }, missionId);
+      }
+    } catch { /* the integrity check reports a stale version if this did not land */ }
+  }
 
   // P1-1: atomic integrity check — same call path as evor_integrity_check tool.
   // Resolves eval-script/split-path via P1-11 and seeds P2-2 cache on first call.
@@ -341,6 +409,9 @@ export function recordEval(
       }
       if (typeof r?.fitness_value === "number") {
         updates.fitness_value = r.fitness_value;
+        if (typeof scoredUnder === "string") {
+          updates.scores_by_version = { ...(node.scores_by_version ?? {}), [scoredUnder]: r.fitness_value };
+        }
       }
       upsertNode(runId, { ...node, ...updates }, missionId);
     }
@@ -351,6 +422,7 @@ export function recordEval(
 
   // Stage 1.7: propagate fitness so the score-based stop conditions can fire.
   updateBestScore(runId, nodeId, result, integrityVerdict, missionId);
+  markRescored(paths.runDir, nodeId, scoredUnder);
 
   return { resultsPath, integrityVerdict, integrityError, integrityReport, evaluatorValuesKept: evaluatorKept };
 }
@@ -364,9 +436,13 @@ export function readResult(
   runId: string,
   nodeId: string,
   missionId?: string,
+  evalVersion?: string,
 ): { ok: boolean; data?: unknown; error?: string } {
   const paths = resolveRunPaths(runId, missionId);
-  const resultPath = join(paths.nodesDir, nodeId, "results.json");
+  if (evalVersion !== undefined && !/^[A-Za-z0-9._-]+$/.test(evalVersion)) {
+    return { ok: false, error: "eval_version must be a version name such as v1." };
+  }
+  const resultPath = join(paths.nodesDir, nodeId, evalVersion ? `results.${evalVersion}.json` : "results.json");
   if (!existsSync(resultPath)) {
     return {
       ok: false,
@@ -549,14 +625,18 @@ export function registerRecordTools(server: McpServer): void {
       mission_id: z.string().optional().describe(
         "Mission identifier (resolved from EVOR_MISSION_ID env when omitted)",
       ),
+      eval_version: z.string().optional().describe(
+        "Read the result under this eval_version (e.g. the parent of a hardening); "
+        + "omit for the current one",
+      ),
     },
-    async ({ run_id, node_id: given, name, node, mission_id }) => {
+    async ({ run_id, node_id: given, name, node, mission_id, eval_version }) => {
       const node_id = given ?? name ?? node;
       if (!node_id) {
         return { content: [{ type: "text" as const, text: JSON.stringify({ ok: false, error: "give the node's name as node_id" }) }] };
       }
       const missionId = mission_id ?? process.env.EVOR_MISSION_ID;
-      const result = readResult(run_id, resolveNodeRef(run_id, node_id, missionId), missionId);
+      const result = readResult(run_id, resolveNodeRef(run_id, node_id, missionId), missionId, eval_version);
       return {
         content: [
           {

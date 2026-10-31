@@ -2,6 +2,46 @@
 
 All notable changes to Evor. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [Unreleased] — metric hardening
+
+### Added
+
+- **A running mission can make its evaluator stricter.** A binarization mission found that
+  candidates raised worst-domain S by erasing faint ink (removing ink from a too-thick domain
+  lifts m_width off a cliff), and its own lesson said the fix was a recall gate under a new
+  eval_version — which nothing could apply mid-mission: a sealed evaluator cannot be rewritten,
+  and `apply_upgrade` only adds domains. `evor_harden_eval` (evor-tick only) validates, records
+  and seals `eval-suites/<to>.py` as EvalSuite `<to>` with `kind: "metric_hardening"` (same
+  domains, same frozen split, parent `<from>`), moves the contract and run state to it, logs a
+  `harden-eval` DecisionLogEntry naming the parent, the rationale and its evidence, and returns
+  the frontier to re-score. No consent step: the Monotonic-Honesty Invariant pre-authorizes a
+  harder evaluation. The rationale must quote the contract (`contract_grounding`), or it is
+  refused as a new objective.
+- **Only stricter.** Under a hardened version `python -m evor run` also scores the node with the
+  sealed parent evaluator and records `parent_fitness_value` (evaluator-owned, like
+  `fitness_value`). Integrity check 15, `not_softer_than_parent`, fails a node whose hardened
+  fitness exceeds its parent fitness, or that carries no parent score.
+- **Evidence, not override.** Results are kept per version (`results.<v>.json`,
+  `results.evaluator.<v>.json`; `results.json` is the current version's), the tree node keeps
+  `scores_by_version`, and `evor_read_result(eval_version=…)` reads an earlier version.
+- **Re-score path.** `evor_run_start(eval_version=<v>)` installs and re-locks the sealed `<v>`
+  evaluator in the worktree — only when it matches its seal and the contract anchor.
+  `evor_record_eval` moves the tree node's `eval_version` before the integrity check, so check
+  10 passes after a re-score, and marks the hardening's re-score progress.
+- Probe `Metric_Artefact_Protocol`, Forge `Metric_Hardening_Request`, skill Step 7b, and an
+  evor-tick section describe the flow.
+
+### Fixed
+
+- `evor_run_start` with `eval_version` passed `--eval-version` to `python -m evor run`, which
+  did not accept it, so every such job exited 2. It is accepted now and must equal the
+  contract's current version.
+- Sealing a version that is not the contract's `eval_version` moved the contract anchor and
+  failed `no_eval_shift` for every node of the version in force; it now writes the receipt only.
+- The integrity tool cached the contract's eval_version per run and never saw it change; a
+  hardening invalidates it. The integrity bridge resolves a hardened version's frozen split
+  through its parent.
+
 ## [1.2.36] — 2026-10-31 — scratch tooling is not candidate code
 
 ### Fixed

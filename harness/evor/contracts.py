@@ -651,6 +651,9 @@ class TreeNode(BaseEvorModel):
     metrics: dict[str, float]
     eval_version: str
     fitness_value: Optional[float] = None
+    scores_by_version: Optional[dict[str, float]] = None
+    """fitness under every eval_version the node was scored with. A re-score under
+    a hardened version adds an entry; it never erases the parent's."""
     telemetry_ref: Optional[str] = None
     # Server-owned bookkeeping — optional at agent-facing input; server fills defaults.
     lesson_ids: list[str] = Field(default_factory=list)
@@ -840,6 +843,11 @@ class EvaluationResult(BaseEvorModel):
     benchmark_raw: str
     # Server-owned: filled via now().
     timestamp: Optional[str] = None
+    # Set only under a metric-hardening eval version: the same node scored by the
+    # sealed PARENT evaluator, run by the harness beside the hardened one. The
+    # integrity gate's not_softer_than_parent check compares the two.
+    parent_eval_version: Optional[str] = None
+    parent_fitness_value: Optional[float] = None
 
 
 # ────────────────────────────────────────────────────────────────────────────
@@ -896,6 +904,11 @@ class IntegrityChecks(BaseEvorModel):
     structure_ok: Optional[bool] = None
     """ForgeStructureGate passed: genome seams + forward pass + telemetry + eval lock.
     None = gate not run (candidate_dir not provided to IntegrityGate.check())."""
+    not_softer_than_parent: Optional[bool] = None
+    """Check 15: under a metric-hardening eval version, fitness <= the sealed parent
+    evaluator's fitness for the same node. False = the "hardened" evaluator scored
+    the node higher (a softening) or the parent score is missing.
+    None = not a hardened version, or the node did not evaluate."""
 
 
 class IntegrityReport(BaseEvorModel):
@@ -1030,8 +1043,13 @@ class DecisionLogEntry(BaseEvorModel):
         "stop",
         "meta-evolve",
         "contract-infeasible",
+        "harden-eval",
     ]
     """Kinds of decision the log can record.
+
+    ``harden-eval`` records a metric hardening: the evaluator was replaced by a
+    stricter one under a new eval_version, pre-authorized by the
+    Monotonic-Honesty Invariant (no consent step).
 
     ``contract-infeasible`` is item 9.4 / L-02. The autonomy charter states that
     "a monotonic move ALWAYS exists" — as prose on ``AutonomyCharter.invariant``,
@@ -1044,6 +1062,8 @@ class DecisionLogEntry(BaseEvorModel):
     rationale: str
     node_ids: list[str]
     strategy_delta: Optional[dict[str, Any]] = None
+    evidence: Optional[list[str]] = None
+    """What the decision rests on — a wiki lesson id, a probe proposal pointer."""
 
 
 # ────────────────────────────────────────────────────────────────────────────
@@ -1219,6 +1239,16 @@ class EvalSuite(BaseEvorModel):
     created_at: str
     created_by: Literal["user", "policy"]
     consent_log_ref: str
+    kind: Optional[Literal["domain_upgrade", "metric_hardening"]] = None
+    """How this version differs from its parent. None = the initial suite.
+
+    ``domain_upgrade`` adds domains (a strict superset, same evaluator).
+    ``metric_hardening`` keeps the domains and the frozen split and replaces the
+    evaluator with a stricter one; every score under it must be <= the parent
+    evaluator's score for the same node (integrity: not_softer_than_parent).
+    """
+    hardening_rationale: Optional[str] = None
+    """For a metric hardening: the gate added, grounded in the contract's text."""
 
 
 # EvalVersion is the same schema as EvalSuite
@@ -1249,6 +1279,13 @@ class BenchmarkUpgrade(BaseEvorModel):
     """tick count after which not-yet-rescored nodes are demoted to v{old}-only (R-2)"""
     decision_log_ref: str
     created_at: str
+    kind: Literal["domain_upgrade", "metric_hardening"] = "domain_upgrade"
+    """``metric_hardening`` upgrades never go through apply_upgrade: they add no
+    domains and need no consent — BenchmarkManager.apply_hardening owns them."""
+    rescore_node_ids: list[str] = Field(default_factory=list)
+    """Frontier nodes marked for re-score under to_eval_version."""
+    rescored_node_ids: list[str] = Field(default_factory=list)
+    """Marked nodes already re-scored; rescore_status is complete when it covers all."""
 
 
 # ────────────────────────────────────────────────────────────────────────────
@@ -1263,6 +1300,11 @@ class BenchmarkUpgradeProposal(BaseEvorModel):
     new_domains: list[str]
     rationale: str
     citations: list[str]
+    kind: Literal["domain_upgrade", "metric_hardening"] = "domain_upgrade"
+    proposed_gate: Optional[str] = None
+    """metric_hardening: the stricter gate (e.g. a recall floor on the floor domain)."""
+    contract_grounding: Optional[str] = None
+    """metric_hardening: the contract text whose intent the current metric fails to enforce."""
 
 
 # ────────────────────────────────────────────────────────────────────────────

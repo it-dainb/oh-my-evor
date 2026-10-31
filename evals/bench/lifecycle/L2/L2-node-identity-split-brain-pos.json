@@ -113,7 +113,7 @@
   "grounded_rule": {
     "file": "agents/evor-probe.md",
     "quote": "evidence string in LessonEntry is specific: references actual metric values from the telemetry stream, not generic descriptions",
-    "sha256_at_authoring": "40f005e8d34f40941cf6e1f7a18b1cb9ff358dbd6a996faca5a119cc11ea4e75"
+    "sha256_at_authoring": "912d2155cecf2d62339938b8b8d771b120bead434467d8d10babc0dcc9e34e4c"
   },
   "grounding": [
     "field-trace:O-01",
@@ -137,11 +137,11 @@
     "guarded_paths": [
       {
         "path": "agents/evor-probe.md",
-        "sha256": "40f005e8d34f40941cf6e1f7a18b1cb9ff358dbd6a996faca5a119cc11ea4e75"
+        "sha256": "912d2155cecf2d62339938b8b8d771b120bead434467d8d10babc0dcc9e34e4c"
       },
       {
         "path": "skills/evor/SKILL.md",
-        "sha256": "72972df4f576185948977f3d2cbd2b037f100fc907aeeef773e1741f0131c41b"
+        "sha256": "db9c338e90c8729b1b579756c5532da85283d056f1bfaae8ccbf42023fffc2aa"
       },
       {
         "path": "hooks/stop.mjs",

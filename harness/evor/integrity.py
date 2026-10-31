@@ -13,6 +13,9 @@ BASE CHECKS (1–10):
   9. data_provenance_valid   — source_sample_ids trace to train only (Pillar 2 layer 4)
  10. eval_version_consistent — node.eval_version == GoalContract.eval_version (Pillar 3)
 
+METRIC HARDENING (15; active only when the result's eval_version is a metric hardening):
+ 15. not_softer_than_parent  — fitness <= the sealed parent evaluator's fitness for the same node
+
 INGESTION CONTAMINATION GATE (11–13; active only when mutation_locus.family == 'data-acquisition'):
  11. acquisition_contamination_clear — no acquired sample in any frozen eval split (all versions)
  12. acquired_data_provenance_valid  — license + citation present; synthetic needs generator_config (R-3)
@@ -346,6 +349,40 @@ class IntegrityGate:
                 "node must be re-scored under the current eval_version"
             )
 
+        # ── Check 15: not_softer_than_parent ──────────────────────────────
+        #
+        # A metric hardening is pre-authorized because it can only make scores
+        # harder to earn. That is a claim about every node, so it is checked on
+        # every node: the runner scores the node under the sealed parent too, and
+        # a hardened score above the parent's is a softening wearing a new version
+        # number. A missing parent score is a failure, not a pass — the claim was
+        # not shown. Not applicable (None) outside a hardened version or when the
+        # node did not evaluate at all.
+        not_softer_than_parent: bool | None = None
+        if run_dir is not None and result.status in ("success", "regression"):
+            from .benchmark import HARDENING_EPSILON, hardening_parent
+
+            parent_version = hardening_parent(run_dir, result.eval_version)
+            if parent_version is not None:
+                pf = result.parent_fitness_value
+                if result.parent_eval_version != parent_version or pf is None:
+                    not_softer_than_parent = False
+                    failures.append(
+                        f"not_softer_than_parent: {result.eval_version!r} hardens "
+                        f"{parent_version!r}, but the result carries no {parent_version!r} "
+                        "score for this node — re-score it with evor_run_start so the parent "
+                        "evaluator runs beside the hardened one"
+                    )
+                elif result.fitness_value > pf + HARDENING_EPSILON * max(1.0, abs(pf)):
+                    not_softer_than_parent = False
+                    failures.append(
+                        f"not_softer_than_parent: fitness {result.fitness_value!r} under "
+                        f"{result.eval_version!r} exceeds {pf!r} under its parent "
+                        f"{parent_version!r} — a hardened evaluator may only be stricter"
+                    )
+                else:
+                    not_softer_than_parent = True
+
         # ── Checks 11–13: Ingestion Contamination Gate ────────────────────
         acquisition_contamination_clear: bool | None = None
         acquired_data_provenance_valid: bool | None = None
@@ -433,6 +470,7 @@ class IntegrityGate:
                 acquired_data_provenance_valid=acquired_data_provenance_valid,
                 acquisition_namespace_enforced=acquisition_namespace_enforced,
                 structure_ok=structure_ok,
+                not_softer_than_parent=not_softer_than_parent,
             ),
             verdict=verdict,  # type: ignore[arg-type]
             failure_reason="; ".join(failures) if failures else None,
