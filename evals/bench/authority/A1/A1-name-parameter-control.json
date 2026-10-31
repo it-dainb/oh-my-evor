@@ -99,7 +99,7 @@
     "file": "agents/evor-forge.md",
     "line": 256,
     "quote": "    **Only Forge spawns forge-* agents.** Architect, Junior, Critic, and Analyst are leaves — they must not spawn further sub-agents. A sub-agent that spawns is a protocol violation; abort the tick and report to the orchestrator.",
-    "sha256_at_authoring": "25e9b40756818bdaa15c5a460fcc934c994cd709e4be08662cbd234c244c84f8"
+    "sha256_at_authoring": "b067cc0da09f19b89b8d98263288dbf2da3cab06e94ca558f330b7c752377f77"
   },
   "grounding": [
     "field-trace:J-name-gate",
