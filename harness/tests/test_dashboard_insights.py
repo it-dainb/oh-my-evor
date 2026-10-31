@@ -543,3 +543,57 @@ def test_uvicorn_app_attribute_reads_env(tmp_path: Path, monkeypatch) -> None:
     client = TestClient(server._app_from_env())
     assert client.get("/api/runs").json()[0]["default"] is True
     assert client.post(url("/steer"), json={"note": "x", "author": "y"}).status_code == 403
+
+
+# ── robustness (review findings) ──────────────────────────────────────────────
+
+
+def test_non_finite_and_odd_shapes_do_not_break_bundle_or_export(tmp_path: Path) -> None:
+    from fastapi.testclient import TestClient
+
+    from evor.dashboard.export import build_snapshot, render_snapshot_html
+    from evor.dashboard.server import create_app
+
+    run = build_viz_run(tmp_path / ".evor")
+    tree = json.loads((run / "tree.json").read_text())
+    tree["nodes"]["u-e7"]["config"] = "not-a-dict"
+    tree["nodes"]["u-e7"]["metrics"] = ["odd"]
+    tree["nodes"]["u-e123"]["config"] = {"seed": 0}
+    (run / "tree.json").write_text(json.dumps(tree))
+    (run / "nodes/u-e42/results.json").write_text(
+        '{"fitness_value": 0.04, "metrics": {"fmeasure": NaN, "vram": Infinity}, "per_domain": {"a": {"S": NaN}, "b": "x"}}')
+    (run / "nodes/u-b7/results.json").write_text('{"fitness_value": 0.022, "per_domain": ["not", "a", "dict"]}')
+    client = TestClient(create_app(tmp_path / ".evor"))
+    assert client.get(url("/bundle")).status_code == 200
+    ev = client.get(url("/nodes/u-e42/evidence")).json()
+    assert ev["metrics"]["fmeasure"] is None and ev["metrics"]["vram"] is None
+    assert client.get(url("/nodes/u-e7/evidence")).status_code == 200
+    ema = _recipe(client.get(url("/recipes")).json(), "ema")
+    assert next(m for m in ema["members"] if m["id"] == "u-e123")["seed"] == "0"
+    render_snapshot_html(build_snapshot(run))  # allow_nan=False must not raise
+
+
+def test_lower_is_better_flips_best_and_lucky(tmp_path: Path) -> None:
+    from evor.dashboard.insights import RunInsights
+
+    run = build_viz_run(tmp_path / ".evor")
+    gc = json.loads((run / "goal-contract.json").read_text())
+    gc["metric_specs"] = json.dumps([{"metric_name": "error", "direction": "lower", "role": "primary_fitness"}])
+    (run / "goal-contract.json").write_text(json.dumps(gc))
+    ins = RunInsights(run)
+    assert ins.best_node()["name"] == "ema-s123-01"            # lowest credible fitness
+    ema = next(r for r in ins.recipes() if r["label"] == "ema")
+    lucky = [m["name"] for m in ema["members"] if "lucky-seed" in m["badges"]]
+    assert lucky == ["ema-s123-01"]
+    assert ins.progress()[-1]["best_node"]["name"] == "ema-s123-01"
+
+
+def test_run_path_traversal_and_cross_origin_steer_rejected(viz) -> None:
+    client, run, _ = viz
+    assert client.get(f"/api/runs/..%2F..%2F/{RUN}/bundle").status_code == 404
+    assert client.get(f"/api/runs/{MISSION}/..%2F{MISSION}%2F{RUN}/bundle").status_code == 404
+    r = client.post(url("/steer"), json={"note": "x", "author": "y"}, headers={"Origin": "http://evil.example"})
+    assert r.status_code == 403
+    assert not (run / "signals-inbox.jsonl").exists()
+    ok = client.post(url("/steer"), json={"note": "x", "author": "y"}, headers={"Origin": "http://testserver"})
+    assert ok.status_code == 201

@@ -208,6 +208,24 @@ def recipe_label(stem: str) -> str:
     return _TRAIL_IDX_RE.sub("", stem) or stem
 
 
+def _dict(v: Any) -> dict[str, Any]:
+    return v if isinstance(v, dict) else {}
+
+
+def clean_json(obj: Any) -> Any:
+    """Replace non-finite floats with None so the payload is strict JSON."""
+    if isinstance(obj, float):
+        return obj if math.isfinite(obj) else None
+    if isinstance(obj, dict):
+        return {str(k): clean_json(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [clean_json(v) for v in obj]
+    return obj
+
+
+_VERDICT_PRIORITY = {"artefact": 0, "refuted": 1, "confirmed": 2, "inconclusive": 3}
+
+
 def _median(values: list[float]) -> float | None:
     return statistics.median(values) if values else None
 
@@ -297,12 +315,14 @@ class RunInsights:
         return self._m(key, load)
 
     def integrity(self, node: dict[str, Any]) -> dict[str, Any] | None:
-        for key in (node.get("id"), node.get("name")):
-            if key:
-                r = _read_json(self.run_dir / "evaluations" / f"{key}.json")
-                if isinstance(r, dict):
-                    return r
-        return None
+        def load():
+            for key in (node.get("id"), node.get("name")):
+                if key:
+                    r = _read_json(self.run_dir / "evaluations" / f"{key}.json")
+                    if isinstance(r, dict):
+                        return r
+            return None
+        return self._m(f"integ:{node['id']}", load)
 
     def fitness(self, node: dict[str, Any]) -> float | None:
         v = _num(node.get("fitness_value"))
@@ -325,6 +345,17 @@ class RunInsights:
         if node.get("parent_id"):
             return self.resolve(node.get("parent_id"))
         return None
+
+    def higher_is_better(self) -> bool:
+        return self.primary_metric()["direction"] != "lower"
+
+    def better(self, a: float | None, b: float | None) -> bool:
+        """True when fitness *a* beats *b* under the contract's direction."""
+        if a is None:
+            return False
+        if b is None:
+            return True
+        return a > b if self.higher_is_better() else a < b
 
     def primary_metric(self) -> dict[str, Any]:
         gc = self.contract()
@@ -679,7 +710,7 @@ class RunInsights:
                 rows.append({
                     "id": n["id"],
                     "name": n.get("name") or n["id"],
-                    "seed": str((n.get("config") or {}).get("seed") or seed_and_stem(str(n.get("name") or ""))[1] or "") or None,
+                    "seed": _seed_label(n),
                     "fitness": fit,
                     "has_result": res is not None,
                     "status": n.get("status"),
@@ -694,16 +725,26 @@ class RunInsights:
             med = _median(valid)
             lo, hi = (min(valid), max(valid)) if valid else (None, None)
             spread = None
-            if len(valid) >= 2 and hi is not None:
-                spread = math.inf if lo is not None and lo <= 0 < hi else (hi / lo if lo else None)
-            # Lucky seed: one seed far above the median of its siblings.
+            if len(valid) >= 2 and lo is not None and hi is not None:
+                if lo > 0:
+                    spread = hi / lo
+                elif lo <= 0 < hi:
+                    spread = math.inf
+            # Lucky seed: one seed far better than the median of its siblings
+            # (a factor of the median for higher-is-better, of its inverse otherwise).
             if len(valid) >= 2:
+                higher = self.higher_is_better()
+                top = hi if higher else lo
                 for r in rows:
-                    if r["fitness"] is None or r["integrity_failed"]:
+                    f = r["fitness"]
+                    if f is None or r["integrity_failed"] or f != top:
                         continue
                     others = [x["fitness"] for x in rows if x is not r and x["fitness"] is not None and not x["integrity_failed"]]
                     om = _median(others)
-                    if r["fitness"] > 0 and om is not None and r["fitness"] >= LUCKY_FACTOR * max(om, 0.0) and r["fitness"] == hi:
+                    if om is None:
+                        continue
+                    lucky = (f > 0 and f >= LUCKY_FACTOR * max(om, 0.0)) if higher else (om > 0 and f >= 0 and f * LUCKY_FACTOR <= om)
+                    if lucky:
                         r["badges"].append("lucky-seed")
             for r in rows:
                 if r["pruned"]:
@@ -734,7 +775,7 @@ class RunInsights:
                 evidence = (art or {}).get("lesson") or next(
                     ((verdicts.get(r["id"]) or {}).get("evidence") for r in rows if (verdicts.get(r["id"]) or {}).get("evidence")), None)
             elif node_vs:
-                verdict = max(set(node_vs), key=node_vs.count)
+                verdict = sorted(set(node_vs), key=lambda v: (-node_vs.count(v), _VERDICT_PRIORITY.get(v, 9)))[0]
                 pv = next(verdicts[r["id"]] for r in rows if r["verdict"] == verdict)
                 source, evidence = f"probe:tick{pv.get('tick')}", pv.get("evidence")
             elif any(normalize_verdict(l.get("verdict")) for l in rec_lessons):
@@ -969,9 +1010,9 @@ class RunInsights:
                 if med is None or not r["credible"]:
                     continue
                 cand = {"recipe": r["id"], "label": r["label"], "median": med, "n": len(vals), "since_tick": t}
-                if len(vals) >= 2 and (cur_robust is None or med > cur_robust["median"]):
+                if len(vals) >= 2 and (cur_robust is None or self.better(med, cur_robust["median"])):
                     cur_robust = cand
-                if cur_any is None or med > cur_any["median"]:
+                if cur_any is None or self.better(med, cur_any["median"]):
                     cur_any = dict(cand)
             for prev, cur in ((robust_best, cur_robust), (any_best, cur_any)):
                 if prev and cur and prev["recipe"] == cur["recipe"] and prev["median"] == cur["median"]:
@@ -980,7 +1021,7 @@ class RunInsights:
             for n in self.nodes():
                 if node_tick.get(n["id"]) == t and not self.integrity_failed(n):
                     f = self.fitness(n)
-                    if f is not None and (node_best is None or f > node_best["fitness"]):
+                    if f is not None and (node_best is None or self.better(f, node_best["fitness"])):
                         node_best = {"id": n["id"], "name": n.get("name"), "fitness": f, "since_tick": t}
             this_tick = [
                 {"recipe": r["id"], "label": r["label"], "median": r["median"], "min": r["min"], "max": r["max"],
@@ -1010,10 +1051,10 @@ class RunInsights:
             if parent is None or self.integrity_failed(n):
                 continue
             f, pf = self.fitness(n), self.fitness(parent)
-            if f is None or pf is None or f <= pf:
+            if f is None or pf is None or not self.better(f, pf):
                 continue
             res, pres = self.result(n) or {}, self.result(parent) or {}
-            pd, ppd = res.get("per_domain") or {}, pres.get("per_domain") or {}
+            pd, ppd = _dict(res.get("per_domain")), _dict(pres.get("per_domain"))
             if not pd or not ppd:
                 continue
             fm = self.floor_metric(pd)
@@ -1023,7 +1064,7 @@ class RunInsights:
                 if d and d not in [x[1] for x in floors]:
                     floors.append((which, d))
             for which, d in floors:
-                a, b = pd.get(d) or {}, ppd.get(d) or {}
+                a, b = _dict(pd.get(d)), _dict(ppd.get(d))
                 drops = []
                 for key in self._quality_keys(a, b):
                     va, vb = _num(a.get(key)), _num(b.get(key))
@@ -1138,8 +1179,8 @@ class RunInsights:
                 rep = self.integrity(n) or {}
                 reason = str(rep.get("failure_reason") or "integrity check failed").split(":")[0]
                 reasons.setdefault(reason, []).append(str(n.get("name") or n["id"]))
-            best_val = (best or {}).get("fitness") or 0
-            would_lead = [n for n in failed if (self.fitness(n) or 0) > best_val]
+            best_val = (best or {}).get("fitness")
+            would_lead = [n for n in failed if self.fitness(n) is not None and self.better(self.fitness(n), best_val)]
             alerts.append({
                 "kind": "integrity", "severity": "high" if would_lead else "medium",
                 "title": f"{len(failed)} node{'s' if len(failed) != 1 else ''} failed integrity",
@@ -1243,7 +1284,7 @@ class RunInsights:
             for m in r["members"]:
                 if m["fitness"] is None or m["integrity_failed"]:
                     continue
-                if best is None or m["fitness"] > best["fitness"]:
+                if best is None or self.better(m["fitness"], best["fitness"]):
                     best = dict(m, recipe=r["id"], recipe_label=r["label"], recipe_median=r["median"], recipe_n=r["n_valid"], recipe_verdict=r["verdict"])
         return best
 
@@ -1470,14 +1511,14 @@ class RunInsights:
         res = self.result(n) or {}
         parent = self.parent_of(n)
         pres = (self.result(parent) or {}) if parent else {}
-        pd = res.get("per_domain") or {}
-        ppd = pres.get("per_domain") or {}
+        pd = _dict(res.get("per_domain"))
+        ppd = _dict(pres.get("per_domain"))
         fm = self.floor_metric(pd) if pd else "S"
         floor = self.floor_domain(pd, fm) if pd else None
         pfloor = self.floor_domain(ppd, fm) if ppd else None
         cols = [c for c in ("S", "fmeasure", "recall", "precision", "stroke_width_ratio") if any(isinstance(v, dict) and c in v for v in pd.values())]
         if not cols and pd:
-            sample = next(iter(pd.values()))
+            sample = next((v for v in pd.values() if isinstance(v, dict)), {})
             cols = [k for k, v in sample.items() if _num(v) is not None and k != "n"][:6]
         rows = []
         for d, v in pd.items():
@@ -1499,13 +1540,13 @@ class RunInsights:
         verdict = self.node_verdicts().get(n["id"]) or {}
         integ = self.integrity(n) or {}
         gaming = [g for g in self.gaming_checks() if g["node_id"] == n["id"]]
-        metric_keys = [k for k in ("recall", "precision", "fmeasure", "stroke_width_ratio", "mean_domain_S", "min_domain_fmeasure") if k in (res.get("metrics") or {})]
-        return {
+        metric_keys = [k for k in ("recall", "precision", "fmeasure", "stroke_width_ratio", "mean_domain_S", "min_domain_fmeasure") if k in _dict(res.get("metrics"))]
+        return clean_json({
             "node": {k: n.get(k) for k in ("id", "name", "approach_family", "mutation_tier", "status", "integrity_status", "created_at", "hypothesis_id", "config", "eval_version")},
             "fitness": self.fitness(n),
-            "metrics": res.get("metrics") or {},
+            "metrics": _dict(res.get("metrics")),
             "headline_metrics": metric_keys,
-            "parent": ({"id": parent["id"], "name": parent.get("name"), "fitness": self.fitness(parent), "metrics": pres.get("metrics") or {}} if parent else None),
+            "parent": ({"id": parent["id"], "name": parent.get("name"), "fitness": self.fitness(parent), "metrics": _dict(pres.get("metrics"))} if parent else None),
             "floor_metric": fm,
             "floor_domain": floor,
             "parent_floor_domain": pfloor,
@@ -1522,7 +1563,7 @@ class RunInsights:
             "parent_telemetry": self.telemetry(parent, max_points // 2) if parent else None,
             "samples": self.samples(n),
             "tick": self.node_ticks().get(n["id"]),
-        }
+        })
 
     def telemetry(self, node: dict[str, Any] | None, max_points: int = 400) -> dict[str, list[list[float]]]:
         if node is None:
@@ -1661,8 +1702,8 @@ class RunInsights:
         out = []
         for n in self.nodes():
             res = self.result(n)
-            metrics = dict(n.get("metrics") or {})
-            metrics.update((res or {}).get("metrics") or {})
+            metrics = dict(_dict(n.get("metrics")))
+            metrics.update(_dict((res or {}).get("metrics")))
             values: dict[str, float | None] = {}
             for m in specs:
                 v = self.fitness(n) if m["name"] == primary else _num(metrics.get(m["name"]))
@@ -1726,8 +1767,8 @@ class RunInsights:
                                                    for k, v in rep.items() if k not in ("node_id",)}}
         parent = self.parent_of(n)
         changes = []
-        pcfg = (parent or {}).get("config") or {}
-        for k, v in (n.get("config") or {}).items():
+        pcfg = _dict((parent or {}).get("config"))
+        for k, v in _dict(n.get("config")).items():
             if pcfg.get(k) != v:
                 changes.append({"key": k, "parent": pcfg.get(k), "node": v})
         return {
@@ -1743,7 +1784,7 @@ class RunInsights:
             "mutation_locus": n.get("mutation_locus"),
             "family": n.get("approach_family"),
             "data_version": n.get("data_version_ref"),
-            "config": n.get("config") or {},
+            "config": _dict(n.get("config")),
             "config_changes": changes,
             "genome": self.genome_text(n),
             "selector": review,
@@ -1833,7 +1874,7 @@ class RunInsights:
 
     def bundle(self) -> dict[str, Any]:
         gc = self.contract()
-        return {
+        return clean_json({
             "generated_at": _iso(self.now),
             "mission_id": gc.get("mission_id") or self.run_dir.parent.name,
             "run_id": self.run_dir.name,
@@ -1848,7 +1889,7 @@ class RunInsights:
             "timeline": self.timeline(),
             "steers": self.steer_notes(),
             "strategy": {k: self.strategy().get(k) for k in ("selection_policy", "wildness", "family_mix", "wins_by_family", "meta_iteration") if k in self.strategy()},
-        }
+        })
 
 
 # ── steer writer ──────────────────────────────────────────────────────────────
@@ -1891,7 +1932,8 @@ def append_steer(run_dir: Path, note: str, author: str, axis: str = "accuracy") 
         raise ValueError("not a run directory")
     line = build_steer_line(note, author, axis)
     data = (json.dumps(line, ensure_ascii=False) + "\n").encode()
-    fd = os.open(run_dir / INBOX_FILENAME, os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o644)
+    flags = os.O_WRONLY | os.O_APPEND | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0)
+    fd = os.open(run_dir / INBOX_FILENAME, flags, 0o644)
     try:
         os.write(fd, data)
     finally:
@@ -1916,6 +1958,13 @@ def _fmt(v: Any) -> str:
     if a >= 1e-3:
         return f"{x:.4f}".rstrip("0").rstrip(".")
     return f"{x:.2e}"
+
+
+def _seed_label(n: dict[str, Any]) -> str | None:
+    seed = _dict(n.get("config")).get("seed")
+    if seed is None or seed == "":
+        seed = seed_and_stem(str(n.get("name") or ""))[1]
+    return None if seed is None else str(seed)
 
 
 def _spread_txt(r: dict[str, Any]) -> str:

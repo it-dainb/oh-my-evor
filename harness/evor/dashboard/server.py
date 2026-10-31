@@ -31,7 +31,7 @@ from typing import Any
 
 from ..run_status import read_run_status
 
-from fastapi import Body, FastAPI, HTTPException, Query
+from fastapi import Body, FastAPI, HTTPException, Query, Request
 from fastapi.responses import FileResponse, StreamingResponse
 
 from evor.dashboard.insights import SIGNAL_AXES, RunInsights, append_steer
@@ -44,8 +44,10 @@ _STATIC_DIR = Path(__file__).parent / "static"
 
 
 def _get_store(evor_root: Path, mission_id: str, run_id: str) -> RunStore:
-    run_dir = evor_root / "runs" / mission_id / run_id
-    if not run_dir.exists():
+    runs = (evor_root / "runs").resolve()
+    run_dir = (runs / mission_id / run_id).resolve()
+    # Both segments must name a directory exactly two levels under runs/.
+    if run_dir.parent.parent != runs or not run_dir.is_dir():
         raise HTTPException(
             status_code=404, detail=f"Run not found: {mission_id}/{run_id}"
         )
@@ -181,10 +183,19 @@ def create_app(
     def post_steer(
         mission_id: str,
         run_id: str,
+        request: Request,
         payload: dict[str, Any] = Body(..., examples=[{"note": "Stop tuning ckpt selection; test a recall floor in the loss.", "author": "dai"}]),
     ) -> dict[str, Any]:
         if not allow_steer:
             raise HTTPException(status_code=403, detail="Steering is disabled on this dashboard")
+        # Cross-site guard: a page on another origin must not be able to post
+        # notes into the run's inbox through a researcher's browser.
+        origin = request.headers.get("origin")
+        if origin:
+            from urllib.parse import urlparse
+
+            if urlparse(origin).netloc != request.headers.get("host", ""):
+                raise HTTPException(status_code=403, detail="Cross-origin steer rejected")
         store = _get_store(root, mission_id, run_id)
         try:
             line = append_steer(

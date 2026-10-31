@@ -365,6 +365,7 @@ const vbadge = (v) => `<span class="vb ${esc(v || "pending")}">${esc(v === "pend
 const badges = (bs) => (bs || []).map((b) => `<span class="bd ${esc(b)}" title="${esc(BLABEL[b] || b)}">${GLYPH[b] || ""} ${esc(BLABEL[b] || b)}</span>`).join(" ");
 const tickBtn = (t) => (t === null || t === undefined) ? "" : `<button class="tk" data-tick="${t}" aria-label="Open tick ${t}">t${t}</button>`;
 const nodeBtn = (id, name) => id ? `<button class="nl" data-node="${esc(id)}">${esc(name || id.slice(0, 8))}</button>` : esc(name || "");
+const higherBetter = () => ((S.bundle && S.bundle.overview.metric) || {}).direction !== "lower";
 const prettyId = (s) => String(s || "").replace(/^lesson-/, "").replace(/[-_]/g, " ");
 
 // ── theme ───────────────────────────────────────────────────────────────────
@@ -404,14 +405,14 @@ async function boot() {
   if (runs.length > 1) {
     const pick = $("runPick"); pick.hidden = false;
     pick.innerHTML = runs.map((r, i) => `<option value="${i}" ${r === S.run ? "selected" : ""}>${esc(r.mission_id)} / ${esc(r.run_id)}</option>`).join("");
-    pick.onchange = () => { S.run = runs[+pick.value]; location.hash = `${S.run.mission_id}/${S.run.run_id}`; S.sel = null; S.evidence = {}; closeDrawer(); refresh(); };
+    pick.onchange = () => { S.run = runs[+pick.value]; location.hash = `${S.run.mission_id}/${S.run.run_id}`; S.sel = null; S.evidence = {}; S.treeT = null; S.tick = null; closeDrawer(); refresh(); };
   }
   await refresh();
   setInterval(() => { if (document.visibilityState === "visible") refresh(true); }, 20000);
 }
 
 async function refresh(quiet) {
-  try { S.bundle = await api(`${runBase()}/bundle`); }
+  try { S.bundle = await api(`${runBase()}/bundle`); S.evidence = {}; }
   catch (e) { if (!quiet) $("mission").textContent = `Failed to load run: ${e.message}`; return; }
   renderAll();
 }
@@ -443,7 +444,7 @@ function renderVerdict() {
   const rb = o.robust_best, rr = o.robust_recipe, bn = o.best_node;
   const x = (v) => (m.baseline && v !== null && v !== undefined && m.baseline > 0) ? `${(v / m.baseline).toFixed(1)}× baseline` : "";
   const bestRecipeMember = rr ? (S.bundle.recipes.find((r) => r.id === rr.id) || {}).members || [] : [];
-  const topMember = bestRecipeMember.filter((mm) => mm.fitness !== null && !mm.integrity_failed).sort((a, b) => b.fitness - a.fitness)[0];
+  const topMember = bestRecipeMember.filter((mm) => mm.fitness !== null && !mm.integrity_failed).sort((a, b) => higherBetter() ? b.fitness - a.fitness : a.fitness - b.fitness)[0];
   $("kpis").innerHTML = `
     <div class="kpi"><div class="eyebrow">Robust best · median of seeds</div>
       <div class="val" style="color:var(--robust)">${fmt(rb && rb.median)}</div>
@@ -634,8 +635,10 @@ function figureFallback() {
   const svg = $("fig"); svg.style.display = "none";
   let el = document.getElementById("figFallback");
   if (!el) { el = document.createElement("div"); el.id = "figFallback"; el.className = "fallback"; svg.after(el); }
+  const spec = (S.bundle.metrics || []).find((m) => m.name === S.metric) || {};
+  const hi = spec.direction !== "lower";
   let best = null; const rows = [];
-  for (const p of pts) { if (p.integrity_failed || p.artefact) continue; if (best === null || p.values[S.metric] > best) { best = p.values[S.metric]; rows.push(p); } }
+  for (const p of pts) { const v = p.values[S.metric]; if (p.integrity_failed || p.artefact) continue; if (best === null || (hi ? v > best : v < best)) { best = v; rows.push(p); } }
   el.innerHTML = `<p>The chart library could not load (offline?). Best-so-far nodes:</p><table class="dt"><tr><th>node</th><th>tick</th><th>${esc(S.metric)}</th></tr>${rows.map((p) => `<tr><td>${nodeBtn(p.id, p.name)}</td><td>${p.tick}</td><td>${fmt(p.values[S.metric])}</td></tr>`).join("")}</table>`;
 }
 
@@ -704,7 +707,7 @@ function d3safeGroup(recipes) { const ids = new Set(recipes.map((r) => r.id)); c
 
 function selectedRecipe() { if (!S.sel) return null; const p = (S.bundle.points || []).find((x) => x.id === S.sel); if (p && p.recipe) return p.recipe; const r = (S.bundle.recipes || []).find((rr) => rr.members.some((m) => m.id === S.sel)); return r ? r.id : null; }
 function selectRecipe(r) {
-  const ok = r.members.filter((m) => m.fitness !== null && !m.integrity_failed).sort((a, b) => b.fitness - a.fitness);
+  const ok = r.members.filter((m) => m.fitness !== null && !m.integrity_failed).sort((a, b) => higherBetter() ? b.fitness - a.fitness : a.fitness - b.fitness);
   selectNode((ok[0] || r.members[0]).id);
 }
 
@@ -734,13 +737,14 @@ function renderDrawer(ev) {
   $("dMeta").innerHTML = `${vbadge(rec ? rec.verdict : (ev.probe || {}).verdict)} ${badges(ev.badges)} <span class="bd">${esc(n.approach_family || "?")}</span> <span class="bd">${esc(n.mutation_tier || "?")}</span> ${tickBtn(ev.tick)}`;
   const pf = ev.parent ? ev.parent.fitness : null;
   const d = (a, b) => (a !== null && b !== null && a !== undefined && b !== undefined) ? a - b : null;
-  const dl = (x, digits) => x === null ? "" : `<span class="${x >= 0 ? "delta-up" : "delta-dn"}">${x >= 0 ? "▲" : "▼"} ${fmt(Math.abs(x))}</span>`;
+  // Arrow shows the sign; colour shows good/bad (lower-is-better flips it; neutral metrics stay uncoloured).
+  const dl = (x, goodWhenUp = true) => x === null ? "" : `<span class="${goodWhenUp === null ? "" : (x >= 0) === goodWhenUp ? "delta-up" : "delta-dn"}">${x >= 0 ? "▲" : "▼"} ${fmt(Math.abs(x))}</span>`;
   const H = [];
   // headline numbers
   H.push(`<div class="sec"><div class="stat-row">
     <div class="stat"><span class="v" style="color:var(--best)">${fmt(ev.fitness)}</span><span class="l">fitness</span></div>
     <div class="stat"><span class="v">${fmt(pf)}</span><span class="l">parent ${ev.parent ? nodeBtn(ev.parent.id, ev.parent.name) : "—"}</span></div>
-    <div class="stat"><span class="v">${dl(d(ev.fitness, pf)) || "—"}</span><span class="l">vs parent</span></div>
+    <div class="stat"><span class="v">${dl(d(ev.fitness, pf), higherBetter()) || "—"}</span><span class="l">vs parent</span></div>
     ${rec && rec.n_valid > 1 ? `<div class="stat"><span class="v" style="color:var(--robust)">${fmt(rec.median)}</span><span class="l">recipe median · ${rec.n_valid} seeds</span></div>` : ""}
     <div class="stat"><span class="v">${base ? (ev.fitness / base).toFixed(2) + "×" : "—"}</span><span class="l">of baseline</span></div></div>
     ${(ev.gaming || []).map((g) => `<div class="alert high" style="margin-top:10px"><b>Possible metric gaming on ${esc(g.domain)}</b><p>Fitness rose vs ${esc(g.parent_name)} while ${g.drops.map((x) => `${esc(x.metric)} fell ${fmt(x.parent)} → ${fmt(x.node)}`).join(", ")} (${esc(g.floor_metric)} ${fmt(g.floor_metric_parent)} → ${fmt(g.floor_metric_node)}).</p></div>`).join("")}
@@ -776,7 +780,7 @@ function renderDrawer(ev) {
     const gamed = new Set((ev.gaming || []).map((g) => g.domain));
     H.push(`<div class="sec"><h4>Per-domain · worst first${ev.parent ? " · Δ vs parent" : ""}</h4><div style="overflow-x:auto;max-height:440px"><table class="dt"><thead><tr><th>domain</th>${cols.map((c) => `<th>${esc(c === "stroke_width_ratio" ? "stroke w." : c === "fmeasure" ? "F" : c)}</th>`).join("")}</tr></thead><tbody>
       ${ev.per_domain.map((r) => `<tr class="${r.is_floor ? "floor" : ""} ${gamed.has(r.domain) ? "gamed" : ""}"><td>${esc(r.domain)}${r.is_floor ? '<span class="tag">floor</span>' : ""}${r.is_parent_floor && !r.is_floor ? '<span class="tag">parent floor</span>' : ""}</td>
-      ${cols.map((c) => { const v = r.values[c], pv = r.parent ? r.parent[c] : null; const dd = d(v, pv); const bar = c === fm && fmax ? `<span class="sbar" style="width:${Math.max(2, 40 * (v || 0) / fmax)}px"></span>` : ""; return `<td>${bar}${fmt(v)}${dd !== null ? `<span class="cell-d">${dl(dd)}</span>` : ""}</td>`; }).join("")}</tr>`).join("")}
+      ${cols.map((c) => { const v = r.values[c], pv = r.parent ? r.parent[c] : null; const dd = d(v, pv); const bar = c === fm && fmax ? `<span class="sbar" style="width:${Math.max(2, 40 * (v || 0) / fmax)}px"></span>` : ""; return `<td>${bar}${fmt(v)}${dd !== null ? `<span class="cell-d">${dl(dd, c === "stroke_width_ratio" ? null : true)}</span>` : ""}</td>`; }).join("")}</tr>`).join("")}
       </tbody></table></div></div>`);
   }
   // telemetry

@@ -40,7 +40,7 @@ def build_snapshot(run_dir: Path, evor_root: Path | None = None) -> dict[str, An
 
 
 def render_snapshot_html(snapshot: dict[str, Any]) -> str:
-    template = _STATIC.read_text()
+    template = _STATIC.read_text(encoding="utf-8")
     payload = json.dumps(snapshot, ensure_ascii=False, default=str, allow_nan=False)
     # "</" inside a <script> would end it early; "<\\/" is the same JSON string.
     payload = payload.replace("</", "<\\/").replace("\u2028", "\\u2028").replace("\u2029", "\\u2029")
@@ -54,5 +54,5 @@ def export_snapshot(run_dir: Path, out_path: Path, evor_root: Path | None = None
     html = render_snapshot_html(build_snapshot(run_dir, evor_root))
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    out_path.write_text(html)
+    out_path.write_text(html, encoding="utf-8")
     return out_path
