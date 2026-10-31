@@ -1021,14 +1021,19 @@ class RunInsights:
         for t in ticks:
             # Recomputed every tick, not a running max: a recipe's median falls
             # when a new seed disappoints, and the robust trend must show that.
-            cur_robust, cur_any = None, None
+            # Suspect recipes (a tagged seed or a recipe-wide artefact call)
+            # cannot be the robust best; the best of them is reported aside.
+            cur_robust, cur_any, cur_suspect = None, None, None
             for r in recipes:
                 vals = [m["fitness"] for m in r["members"] if m["fitness"] is not None and not m["integrity_failed"] and not m["artefact"] and m["tick"] is not None and m["tick"] <= t]
                 med = _median(vals)
                 if med is None or not r["credible"]:
                     continue
                 cand = {"recipe": r["id"], "label": r["label"], "median": med, "n": len(vals), "since_tick": t}
-                if len(vals) >= 2 and (cur_robust is None or self.better(med, cur_robust["median"])):
+                if len(vals) >= 2 and r.get("suspect"):
+                    if cur_suspect is None or self.better(med, cur_suspect["median"]):
+                        cur_suspect = dict(cand)
+                elif len(vals) >= 2 and (cur_robust is None or self.better(med, cur_robust["median"])):
                     cur_robust = cand
                 if cur_any is None or self.better(med, cur_any["median"]):
                     cur_any = dict(cand)
@@ -1051,6 +1056,7 @@ class RunInsights:
                 "tick": t,
                 "robust_best": dict(robust_best) if robust_best else None,
                 "recipe_best": dict(any_best) if any_best else None,
+                "suspect_leader": dict(cur_suspect) if cur_suspect and (robust_best is None or self.better(cur_suspect["median"], robust_best["median"])) else None,
                 "best_node": dict(node_best) if node_best else None,
                 "tick_score": _num(rec.get("score")),
                 "outcome": rec.get("outcome"),
@@ -1346,10 +1352,12 @@ class RunInsights:
             ratio = f" ({robust['median'] / base:.1f}× baseline)" if base and robust["median"] and base > 0 else ""
             why.append(f"Robust best recipe {robust['label']}: median {_fmt(robust['median'])} over {robust['n']} seeds{ratio}"
                        + (f", first credible beat of the baseline at tick {first_beat}." if first_beat else ", still below the baseline.")
-                       + (" It is flagged suspect: sibling seeds or the recipe were tagged as artefacts (tagged seeds are excluded from the median)."
-                          if rob_recipe and rob_recipe.get("suspect") else ""))
+                       )
         else:
-            why.append("No recipe has two or more credible seeds yet, so there is no robust trend.")
+            why.append("No non-suspect recipe has two or more credible seeds yet, so there is no robust trend.")
+        suspect_leader = prog[-1].get("suspect_leader") if prog else None
+        suspect_note = (f"{suspect_leader['label']} leads on score (median {_fmt(suspect_leader['median'])}) but is suspect: see Learnings."
+                        if suspect_leader else None)
         if best:
             lucky = " — a lucky seed; its recipe median is " + _fmt(best["recipe_median"]) if "lucky-seed" in best["badges"] else ""
             why.append(f"Single best node {best['name']} scores {_fmt(best['fitness'])}{lucky}.")
@@ -1361,6 +1369,8 @@ class RunInsights:
             "why": why,
             "metric": pm,
             "robust_best": robust,
+            "suspect_leader": suspect_leader,
+            "suspect_note": suspect_note,
             "robust_recipe": {k: rob_recipe[k] for k in ("id", "label", "verdict", "n_valid", "min", "max", "median", "family", "suspect")} if rob_recipe else None,
             "best_node": best,
             "first_beat_tick": first_beat,

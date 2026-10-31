@@ -669,3 +669,29 @@ def test_run_listing_skips_non_run_folders(tmp_path: Path) -> None:
     (root / "runs" / MISSION / "jobs" / "abc").mkdir(parents=True)
     runs = TestClient(create_app(root)).get("/api/runs").json()
     assert [r["run_id"] for r in runs] == [RUN]
+
+
+def test_headline_robust_best_skips_suspect_recipes(tmp_path: Path) -> None:
+    from evor.dashboard.insights import RunInsights
+
+    run = build_viz_run(tmp_path / ".evor")
+    # A third band seed gives the suspect band recipe two counted seeds
+    # (s7 0.022, s123 0.030: median 0.026), beating alt's 0.013.
+    tree = json.loads((run / "tree.json").read_text())
+    s123 = dict(tree["nodes"]["u-b7"], id="u-b123", name="band-s123-01", fitness_value=0.030)
+    tree["nodes"]["u-b123"] = s123
+    (run / "tree.json").write_text(json.dumps(tree))
+    (run / "nodes" / "u-b123").mkdir(parents=True)
+    (run / "nodes" / "u-b123" / "results.json").write_text(json.dumps({"fitness_value": 0.030, "per_domain": {}}))
+    ins = RunInsights(run)
+    band = next(r for r in ins.recipes() if r["label"] == "band")
+    assert band["suspect"] and band["median"] == pytest.approx(0.026)
+    ov = ins.overview()
+    assert ov["robust_best"]["label"] == "alt"
+    assert ov["suspect_leader"]["label"] == "band"
+    assert ov["suspect_note"].startswith("band leads on score") and "suspect" in ov["suspect_note"]
+    assert all(p["robust_best"] is None or p["robust_best"]["label"] != "band" for p in ins.progress())
+    # still shown everywhere else, flagged
+    assert any(p["name"] == "band-s123-01" and p["suspect"] for p in ins.points())
+    # without a suspect leader there is no note
+    assert RunInsights(build_viz_run(tmp_path / "b" / ".evor")).overview()["suspect_note"] is None

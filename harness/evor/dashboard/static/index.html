@@ -81,6 +81,8 @@ main { padding: 18px 20px 60px; display: flex; flex-direction: column; gap: 18px
 .v-word { font: 700 26px/1.1 var(--cond); letter-spacing: -.005em; }
 .v-main[data-s="on-track"] .v-word { color: var(--ok); } .v-main[data-s="watch"] .v-word { color: var(--art); } .v-main[data-s="off-track"] .v-word { color: var(--bad); }
 .v-why { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 4px; color: var(--ink-2); }
+.v-note { font-size: 12.5px; color: var(--art); border: 1px dashed var(--art); border-radius: 6px; padding: 4px 9px; align-self: flex-start; }
+.v-note button { all: unset; cursor: pointer; text-decoration: underline; }
 .v-why li::before { content: "—"; color: var(--ink-3); margin-right: 8px; }
 .kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-left: 1px solid var(--line); }
 .kpi { padding: 16px 18px; border-right: 1px solid var(--line); display: flex; flex-direction: column; gap: 4px; min-width: 0; }
@@ -274,7 +276,7 @@ details > summary { cursor: pointer; color: var(--ink-2); font-size: 12px; }
 <div class="layout">
 <main id="main">
   <section class="card verdict" aria-labelledby="vword">
-    <div class="v-main" id="vmain"><div class="eyebrow">Is it on the right path?</div><div class="v-word" id="vword">—</div><ul class="v-why" id="vwhy"></ul></div>
+    <div class="v-main" id="vmain"><div class="eyebrow">Is it on the right path?</div><div class="v-word" id="vword">—</div><ul class="v-why" id="vwhy"></ul><div class="v-note" id="vnote" hidden></div></div>
     <div class="kpis" id="kpis"></div>
   </section>
 
@@ -287,7 +289,7 @@ details > summary { cursor: pointer; color: var(--ink-2); font-size: 12px; }
       <div class="legend" aria-hidden="true">
         <span><i class="sw best"></i>best so far</span><span><i class="ln"></i>staircase</span>
         <span><i class="sw other"></i>other nodes</span><span><i class="ln med"></i>recipe median</span>
-        <span id="lgRobust"><i class="ln rob"></i>robust best (median of seeds)</span>
+        <span id="lgRobust"><i class="ln rob"></i>robust best (median of seeds, suspect recipes skipped)</span>
         <span><i class="ln dash"></i>baseline</span><span><i class="sw hollow"></i>tagged artefact (excluded)</span><span><i class="sw x"></i>failed integrity</span>
       </div>
     </div>
@@ -442,6 +444,9 @@ function renderVerdict() {
   $("vmain").dataset.s = o.status;
   $("vword").textContent = o.headline;
   $("vwhy").innerHTML = (o.why || []).map((w) => `<li>${esc(w)}</li>`).join("");
+  const vn = $("vnote"); vn.hidden = !o.suspect_note;
+  if (o.suspect_note) vn.innerHTML = `⚠ ${esc(o.suspect_note.replace(/ see Learnings\.$/, ""))} <button id="toLearn">see Learnings</button>`;
+  const tl = $("toLearn"); if (tl) tl.onclick = () => $("learnTitle").scrollIntoView({ behavior: "smooth", block: "start" });
   const rb = o.robust_best, rr = o.robust_recipe, bn = o.best_node;
   const x = (v) => (m.baseline && v !== null && v !== undefined && m.baseline > 0) ? `${(v / m.baseline).toFixed(1)}× baseline` : "";
   const bestRecipeMember = rr ? (S.bundle.recipes.find((r) => r.id === rr.id) || {}).members || [] : [];
