@@ -98,6 +98,30 @@ export function pidAlive(pid: number): boolean {
 }
 
 /** Poll `probe` until it reports done, errors, or `waitS` elapses. */
+/**
+ * Newest modification time among the files that move while a tick makes progress:
+ * the run's state and artifacts, its jobs and node telemetry, and the trainers'
+ * logs in the worktrees beside it. Bounded depth keeps one scan cheap.
+ */
+export function lastActivity(runDir: string): number {
+  let newest = 0;
+  const visit = (dir: string, depth: number) => {
+    let entries: string[];
+    try { entries = readdirSync(dir); } catch { return; }
+    for (const e of entries) {
+      const p = join(dir, e);
+      let st;
+      try { st = statSync(p); } catch { continue; }
+      if (st.isDirectory()) { if (depth > 0) visit(p, depth - 1); }
+      else if (st.mtimeMs > newest) newest = st.mtimeMs;
+    }
+  };
+  visit(runDir, 4);
+  // <evor root>/runs/<mission>/<run> → <evor root>/worktrees/<node>/{train.log,telemetry.jsonl,...}
+  visit(join(runDir, "..", "..", "..", "worktrees"), 1);
+  return newest;
+}
+
 export async function waitFor(probe: Probe, waitS: number, pollMs = POLL_MS) {
   const started = Date.now();
   const deadline = started + Math.max(0, waitS) * 1000;
@@ -141,14 +165,50 @@ export function registerWaitTools(server: McpServer): void {
           "child stops without writing it, the wait returns at once with producer_stopped:true " +
           "instead of running out the clock.",
       ),
+      heartbeat: z.boolean().optional().describe(
+        "Watch the whole run instead of one condition: returns early with stalled:true when " +
+          "nothing in it (tick state, artifacts, jobs, node telemetry, trainer logs) has changed " +
+          "for quiet_s, otherwise at wait_s with stalled:false. For the orchestrator, after a " +
+          "tick yields: a lost completion notice then still leads back to the tick.",
+      ),
+      quiet_s: z.number().int().min(60).max(3600).optional().describe(
+        "With heartbeat: seconds without any change that count as stalled (default 600)",
+      ),
       wait_s: z.number().int().min(0).max(MAX_WAIT_S).optional()
         .describe(`Seconds to wait at most (default ${DEFAULT_WAIT_S}, max ${MAX_WAIT_S})`),
       mission_id: z.string().optional().describe("Mission id; resolved from the active run when omitted"),
     },
-    async ({ run_id, job_id, pid, artifact, wait_s, mission_id, producer_agent_id, agent_id }) => {
-      const given = [job_id, pid, artifact, agent_id].filter((v) => v !== undefined).length;
-      if (given !== 1) return err("give exactly one of job_id, pid, artifact, agent_id");
+    async ({ run_id, job_id, pid, artifact, wait_s, mission_id, producer_agent_id, agent_id, heartbeat, quiet_s }) => {
+      const given = [job_id, pid, artifact, agent_id, heartbeat || undefined].filter((v) => v !== undefined).length;
+      if (given !== 1) return err("give exactly one of job_id, pid, artifact, agent_id, heartbeat");
       const waitS = wait_s ?? DEFAULT_WAIT_S;
+
+      if (heartbeat) {
+        let hbRunDir: string;
+        try {
+          const rid = resolveRunId(run_id);
+          if (!rid) return err("no run_id given and no active run found — pass run_id");
+          hbRunDir = resolveRunPaths(rid, mission_id ?? process.env.EVOR_MISSION_ID).runDir;
+        } catch (e) {
+          return err(`cannot resolve the run: ${String(e)}`);
+        }
+        const quietMs = (quiet_s ?? 600) * 1000;
+        let last = lastActivity(hbRunDir);
+        const r = await waitFor(() => {
+          last = lastActivity(hbRunDir);
+          return { done: Date.now() - last > quietMs };
+        }, waitS, 15_000);
+        const ageS = Math.round((Date.now() - last) / 1000);
+        return ok({
+          condition: "heartbeat",
+          stalled: r.done,
+          waited_s: r.waited_s,
+          last_activity_age_s: ageS,
+          next: r.done
+            ? `nothing in the run has changed for ${ageS}s: if no agent of the tick is running, resume the evor-tick agent with SendMessage and tell it to check its children`
+            : "the run is active: end your turn, arming one more heartbeat",
+        });
+      }
 
       if (agent_id !== undefined) {
         let outcome = agentOutcome(agent_id);

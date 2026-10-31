@@ -235,3 +235,10 @@ describe("scratchpad tooling written and run from inside the scratchpad", () => 
   });
 });
 
+
+describe("main's heartbeat", () => {
+  it("main may arm a heartbeat wait during a live mission", () => {
+    const d = decide({ tool_name: "mcp__plugin_oh-my-evor_evor__evor_wait", tool_input: { heartbeat: true, wait_s: 540 } });
+    expect(d.permissionDecision).not.toBe("deny");
+  });
+});

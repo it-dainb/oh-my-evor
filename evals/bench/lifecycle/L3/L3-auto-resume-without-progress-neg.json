@@ -142,7 +142,7 @@
       },
       {
         "path": "skills/evor/SKILL.md",
-        "sha256": "7f029aea0b19132b1c09801cc854832c23ef1716677a33b01cf8d2f75b81fedd"
+        "sha256": "5494ae07974ccb53913a43ed36a0a948c31172ad12a99f8375e3c09e50ead991"
       },
       {
         "path": "hooks/stop.mjs",

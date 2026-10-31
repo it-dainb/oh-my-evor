@@ -26842,6 +26842,32 @@ function pidAlive(pid) {
     return e.code === "EPERM";
   }
 }
+function lastActivity(runDir) {
+  let newest = 0;
+  const visit = (dir, depth) => {
+    let entries;
+    try {
+      entries = (0, import_fs21.readdirSync)(dir);
+    } catch {
+      return;
+    }
+    for (const e of entries) {
+      const p = (0, import_path22.join)(dir, e);
+      let st;
+      try {
+        st = (0, import_fs21.statSync)(p);
+      } catch {
+        continue;
+      }
+      if (st.isDirectory()) {
+        if (depth > 0) visit(p, depth - 1);
+      } else if (st.mtimeMs > newest) newest = st.mtimeMs;
+    }
+  };
+  visit(runDir, 4);
+  visit((0, import_path22.join)(runDir, "..", "..", "..", "worktrees"), 1);
+  return newest;
+}
 async function waitFor(probe, waitS, pollMs = POLL_MS) {
   const started = Date.now();
   const deadline = started + Math.max(0, waitS) * 1e3;
@@ -26873,13 +26899,43 @@ function registerWaitTools(server) {
       producer_agent_id: external_exports.string().optional().describe(
         "With artifact: the agentId of the child that owes it (from the spawn result). If that child stops without writing it, the wait returns at once with producer_stopped:true instead of running out the clock."
       ),
+      heartbeat: external_exports.boolean().optional().describe(
+        "Watch the whole run instead of one condition: returns early with stalled:true when nothing in it (tick state, artifacts, jobs, node telemetry, trainer logs) has changed for quiet_s, otherwise at wait_s with stalled:false. For the orchestrator, after a tick yields: a lost completion notice then still leads back to the tick."
+      ),
+      quiet_s: external_exports.number().int().min(60).max(3600).optional().describe(
+        "With heartbeat: seconds without any change that count as stalled (default 600)"
+      ),
       wait_s: external_exports.number().int().min(0).max(MAX_WAIT_S).optional().describe(`Seconds to wait at most (default ${DEFAULT_WAIT_S}, max ${MAX_WAIT_S})`),
       mission_id: external_exports.string().optional().describe("Mission id; resolved from the active run when omitted")
     },
-    async ({ run_id, job_id, pid, artifact, wait_s, mission_id, producer_agent_id, agent_id }) => {
-      const given = [job_id, pid, artifact, agent_id].filter((v) => v !== void 0).length;
-      if (given !== 1) return err("give exactly one of job_id, pid, artifact, agent_id");
+    async ({ run_id, job_id, pid, artifact, wait_s, mission_id, producer_agent_id, agent_id, heartbeat, quiet_s }) => {
+      const given = [job_id, pid, artifact, agent_id, heartbeat || void 0].filter((v) => v !== void 0).length;
+      if (given !== 1) return err("give exactly one of job_id, pid, artifact, agent_id, heartbeat");
       const waitS = wait_s ?? DEFAULT_WAIT_S;
+      if (heartbeat) {
+        let hbRunDir;
+        try {
+          const rid = resolveRunId(run_id);
+          if (!rid) return err("no run_id given and no active run found \u2014 pass run_id");
+          hbRunDir = resolveRunPaths(rid, mission_id ?? process.env.EVOR_MISSION_ID).runDir;
+        } catch (e) {
+          return err(`cannot resolve the run: ${String(e)}`);
+        }
+        const quietMs = (quiet_s ?? 600) * 1e3;
+        let last = lastActivity(hbRunDir);
+        const r2 = await waitFor(() => {
+          last = lastActivity(hbRunDir);
+          return { done: Date.now() - last > quietMs };
+        }, waitS, 15e3);
+        const ageS = Math.round((Date.now() - last) / 1e3);
+        return ok({
+          condition: "heartbeat",
+          stalled: r2.done,
+          waited_s: r2.waited_s,
+          last_activity_age_s: ageS,
+          next: r2.done ? `nothing in the run has changed for ${ageS}s: if no agent of the tick is running, resume the evor-tick agent with SendMessage and tell it to check its children` : "the run is active: end your turn, arming one more heartbeat"
+        });
+      }
       if (agent_id !== void 0) {
         let outcome = agentOutcome(agent_id);
         const r2 = await waitFor(() => {
