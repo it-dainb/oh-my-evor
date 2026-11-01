@@ -533,6 +533,38 @@ export function registerRecordTools(server: McpServer): void {
     },
     async ({ run_id, node }) => {
       const missionId = process.env.EVOR_MISSION_ID;
+      // Recording the same candidate twice returns the first record. An agent resumed
+      // after a session ends repeats the call; a second record of one worktree would
+      // split the node in two (`emactl-s1-01` and `emactl-s1-01-2` on one directory).
+      const asked = (node as { name?: string; code_ref?: string });
+      if (asked.name && asked.code_ref) {
+        let existing: TreeNode | undefined;
+        try {
+          existing = Object.values(readTree(run_id, missionId)).find(
+            (n) => n?.name === asked.name && n?.code_ref === asked.code_ref,
+          );
+        } catch { existing = undefined; }
+        const evaluated = existing && existsSync(join(resolveRunPaths(run_id, missionId).nodesDir, existing.id, "results.json"));
+        if (existing && !evaluated) {
+          const telemetryPath = join(resolveRunPaths(run_id, missionId).nodesDir, existing.id, "telemetry.jsonl");
+          try { mkdirSync(dirname(telemetryPath), { recursive: true }); } catch { /* reported by the trainer's open() */ }
+          return {
+            content: [{
+              type: "text" as const,
+              text: JSON.stringify({
+                ok: true,
+                name: existing.name,
+                run_id,
+                already_recorded: true,
+                telemetry_path: telemetryPath,
+                telemetry_note:
+                  "This candidate was already recorded under this name and worktree; this is its record. " +
+                  "Export telemetry_path EXACTLY as EVOR_TELEMETRY_PATH for the training subprocess.",
+              }),
+            }],
+          };
+        }
+      }
       // Server always mints the internal id — never accepted from the agent.
       const filledNode = fillNodeId(node as Partial<TreeNode> & Omit<TreeNode, "id">);
       // Name-only surface: ensure a readable, unique name so we never expose the id.

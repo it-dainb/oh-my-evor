@@ -66,3 +66,38 @@ describe("pending nodes", () => {
     expect(JSON.parse(res.content[0].text).pending_remaining).toBe(0);
   });
 });
+
+describe("recording the same candidate twice", () => {
+  const nodeFor = (code_ref: string) => ({
+    name: "emactl-s1-01", parent_ids: [], approach_family: "training", hypothesis_id: "h-1",
+    code_ref, genome_ref: "sha:g", data_version_ref: "sha:d", config: {}, metrics: {},
+    eval_version: "v1", lesson_ids: [], citations: [], integrity_status: "pending", status: "pending",
+    is_crossover: false, visit_count: 0, depth: 0, created_at: new Date().toISOString(),
+  });
+  const setup = () => {
+    root = mkdtempSync(join(tmpdir(), "evor-rn-"));
+    process.env.EVOR_ROOT = root;
+    process.env.EVOR_MISSION_ID = "m";
+    ensureRunDirs("r", "m");
+    const h = new Map<string, Handler>();
+    registerRecordTools({ tool: (n: string, _d: string, _s: unknown, f: Handler) => h.set(n, f) } as never);
+    return (code_ref: string) => h.get("evor_record_node")!({ run_id: "r", node: nodeFor(code_ref) }).then((r) => JSON.parse(r.content[0].text));
+  };
+
+  it("returns the first record for the same name and worktree", async () => {
+    const record = setup();
+    const first = await record("/wt/emactl-s1-01");
+    const again = await record("/wt/emactl-s1-01");
+    expect(again.name).toBe("emactl-s1-01");
+    expect(again.already_recorded).toBe(true);
+    expect(again.telemetry_path).toBe(first.telemetry_path);
+  });
+
+  it("still gives a different candidate under the same name its own record", async () => {
+    const record = setup();
+    await record("/wt/emactl-s1-01");
+    const other = await record("/wt/somewhere-else");
+    expect(other.name).toBe("emactl-s1-01-2");
+    expect(other.already_recorded).toBeUndefined();
+  });
+});
