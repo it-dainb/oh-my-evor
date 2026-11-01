@@ -2,6 +2,16 @@
 
 All notable changes to Evor. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.2.53] — 2026-11-01 — the patch is computed, not typed
+
+### Changed
+
+- **`evor_store_patch` computes the patch when none is given.** Forge typed its patches out by
+  hand, and the saved patches for tick 18's runs carried one-line copying errors: they passed the
+  unified-diff check but did not reproduce their nodes. With `patch_content` omitted, the tool now
+  diffs the node's worktree against its first parent's (`diff -ruN`, with weights, checkpoints,
+  logs, telemetry and caches excluded) and stores that. Forge's instructions say to omit it.
+
 ## [1.2.52] — 2026-11-01 — null is absent
 
 ### Fixed
