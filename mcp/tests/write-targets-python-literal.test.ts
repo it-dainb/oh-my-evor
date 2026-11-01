@@ -40,4 +40,12 @@ describe("python write targets", () => {
   it("still treats a script that is only run as read", () => {
     expect(targets("python3 /w/n/eval.py > /w/n/out.json")).toEqual(["/w/n/out.json"]);
   });
+
+  it("does not treat a read-only analysis script that takes a path argument as a write", () => {
+    const t = targets(
+      "python3 - /proj/.evor/runs/m/r/nodes <<'EOF'\nimport json, sys, os\nbase = sys.argv[1]\n" +
+        "for n in os.listdir(base):\n    print(json.load(open(os.path.join(base, n, 'results.json')))['fitness_value'])\nEOF",
+    );
+    expect(t).toEqual([]);
+  });
 });

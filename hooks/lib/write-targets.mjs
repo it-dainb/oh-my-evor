@@ -210,7 +210,14 @@ function pythonWrites(text) {
   // Anything this reader does not model makes the body opaque, so the conservative
   // reading (every path-like token) applies: a recognised literal write must never
   // hide an unrecognised one.
-  let opaque = /\.open\s*\(|\bos\.(?:open|rename|renames|replace|system|popen|chdir|remove|unlink|link|symlink|makedirs|mkdir|write|fdopen)\b|\bsubprocess\b|\b(?:exec|eval|compile|__import__|getattr)\s*\(|\bsys\.argv\b|\bshutil\.move\b|\bimportlib\b|\bPath\s*\([^)]*,|\bos\.path\.join\b|\bpathlib\b/.test(text);
+  // Constructs that can write by themselves: any of them makes the body a possible write
+  // whose targets this reader cannot name. Loading a module (`import`, `importlib`) is not
+  // one: the module's own writes are as invisible here as any imported code's.
+  const writer = /\.open\s*\(|\bos\.(?:open|rename|renames|replace|system|popen|remove|unlink|link|symlink|makedirs|mkdir|write|fdopen)\b|\bsubprocess\b|\b(?:exec|eval|compile|__import__)\s*\(|\bshutil\.move\b/.test(text);
+  // Constructs that compute paths: harmless in a body that writes nothing, but they make a
+  // write's literal path untrustworthy.
+  const computesPaths = /\bsys\.argv\b|\bos\.chdir\b|\bos\.path\.join\b|\bpathlib\b|\bPath\s*\([^)]*,|\bgetattr\s*\(/.test(text);
+  let opaque = writer;
   // A plain string literal only: no f-string braces, no quote of its own kind inside.
   const lit = (arg) => {
     const m = String(arg ?? '').trim().match(/^([rRbBuUfF]{0,2})(['"])((?:\\.|(?!\2)[^\\])*)\2$/s);
@@ -259,6 +266,8 @@ function pythonWrites(text) {
       opaque = true;
     }
   }
+  // A path computer next to a write: the literal paths may not be the real ones.
+  if (computesPaths && (exact.length || opaque)) opaque = true;
   return { exact, opaque };
 }
 

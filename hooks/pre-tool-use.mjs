@@ -643,7 +643,8 @@ try {
         : ` Evor is orchestrator-only: the tick's agents do this. ${mainTickRoute()}, and tell it what you need.`;
       const ADVICE = {
         'author-code': 'Only evor-forge-junior authors candidate code, and only on its own surface. ' +
-                       'Emit your JSON artifact instead, or delegate the code to forge-junior.',
+                       'Emit your JSON artifact instead, or delegate the code to forge-junior. ' +
+                       'A scratch script of your own goes under /tmp (e.g. mktemp -d), which is not candidate code.',
         'run-training': 'Only evor-forge-junior runs candidate code. Launch evaluation with evor_run_start.',
         'write-run-state': 'Run state is written through evor_state_write / evor_record_node / ' +
                            'evor_record_eval, never by hand.',

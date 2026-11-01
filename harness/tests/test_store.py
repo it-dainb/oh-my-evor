@@ -362,3 +362,16 @@ def test_gc_respects_symlink_refcount(
     assert target.read_bytes() == b"symlink-protected data", (
         "symlink must not dangle after gc()"
     )
+
+
+def test_put_leaves_the_source_file_writable_and_unlinked(tmp_path):
+    """The store copies; the caller's file keeps its mode and its own inode."""
+    import os, stat
+    src = tmp_path / "genome.yaml"
+    src.write_text("seed: 7\n")
+    before = stat.S_IMODE(src.stat().st_mode)
+    store = ContentAddressedStore(tmp_path / "store")
+    store.put(src)
+    assert stat.S_IMODE(src.stat().st_mode) == before
+    assert src.stat().st_nlink == 1
+    src.write_text("seed: 31\n")  # editing the worktree file must not touch the blob
