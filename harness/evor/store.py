@@ -104,8 +104,11 @@ class ContentAddressedStore:
     def put(self, src_path: Path) -> str:
         """Store blob; return sha256 hex digest.
 
-        Hardlink attempt first (zero-copy dedup on same filesystem).
-        Falls back to shutil.copy2() + chmod 444 on OSError (e.g. cross-device).
+        The blob is a COPY, made read-only. A hard link would share the inode with
+        the caller's file: making the blob immutable made the worktree file read-only
+        too (and copies of it inherited that), and an in-place write to that file
+        would have changed a content-addressed blob under its own hash. Identical
+        content still lands at one path, so dedup by content is unchanged.
         Orphaned .refcounts.json.tmp from a prior crash is removed before any
         refcount update.
         """
@@ -114,13 +117,10 @@ class ContentAddressedStore:
 
         if not dest.exists():
             dest.parent.mkdir(parents=True, exist_ok=True)
-            try:
-                os.link(src_path, dest)
-            except OSError:
-                # cross-device link or unsupported FS — copy instead
-                shutil.copy2(src_path, dest)
-            # make immutable regardless of how the blob landed
-            dest.chmod(stat.S_IRUSR | stat.S_IRGRP | stat.S_IROTH)
+            tmp = dest.with_name(dest.name + f".tmp.{os.getpid()}")
+            shutil.copy2(src_path, tmp)
+            tmp.chmod(stat.S_IRUSR | stat.S_IRGRP | stat.S_IROTH)
+            os.replace(tmp, dest)
 
         # ── The refcount update is a read-modify-write (item 1.8) ────────────
         #

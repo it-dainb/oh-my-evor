@@ -2,6 +2,28 @@
 
 All notable changes to Evor. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.2.51] — 2026-11-01 — reading is not writing
+
+### Fixed
+
+- **A read-only analysis script counted as a write.** 1.2.48 marked a python body opaque when
+  it used `sys.argv`, `os.path.join` or `pathlib`, and an opaque body was taken to write. Probe's
+  analysis, which reads every node's results through a path argument, was refused as writing the
+  run's `nodes/` directory. Path-computing constructs now only make a real write's path
+  untrustworthy; constructs that can write by themselves (`subprocess`, `os.system`,
+  `os.rename`/`replace`/`remove`, `.open(`, `exec`, `shutil.move`) still count as a write.
+  Loading a module with `importlib` is not one, as a plain `import` is not: forge-critic's check
+  that loads `transforms.py` to test it was refused as author-code.
+- **Storing a blob made the worktree file read-only.** `evor_store_blob` hard-linked the file
+  into the content store and then set the blob to 0444, which is the same inode, so the node's
+  `genome.yaml` became read-only and every worktree copied from it with `cp -p` inherited that
+  (a junior could not write its new genome). An in-place write to such a file would also have
+  changed a stored blob under its own hash. The store now copies; the source keeps its mode
+  and inode.
+- **The author-code refusal now says a scratch script goes under /tmp.**
+- **Forge's patch step names the diff it means** (`diff -ru <parent> <node>`; a replicate's patch
+  is its genome lines).
+
 ## [1.2.50] — 2026-10-31 — the guard writes the guard
 
 ### Changed
