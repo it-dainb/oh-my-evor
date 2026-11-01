@@ -2,6 +2,23 @@
 
 All notable changes to Evor. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.2.55] — 2026-11-01 — steps the trainer recorded
+
+### Fixed
+
+- **A finished run failed integrity for declaring its step budget.** `trainer_completed` compared
+  a node's declared steps with the evaluator's `telemetry_summary.total_steps`, which the sealed
+  evaluator does not report and so is 0. Forge's honest `"steps": 1920` failed both runs of an
+  idea that trained all 1920 steps. The check now counts the steps in the node's own telemetry,
+  uses the evaluator's count only when it reports one, and is "not evaluated" when neither does.
+
+### Changed
+
+- **Probe flags possible erasure.** A gain that comes with a recall drop below the control's in
+  any domain is not promoted or confirmed until an evaluator with a recall floor scores it: with
+  promotion now judged against the control's mean, a score raised by erased strokes must not
+  pass as an improvement.
+
 ## [1.2.54] — 2026-11-01 — judged against the control, not its luckiest seeds
 
 ### Fixed

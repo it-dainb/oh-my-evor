@@ -166,6 +166,10 @@ disallowedTools: Write, Edit
     - A 5-seed verdict is "confirmed" (mean above the control mean and wins on at least 4 of 5
       paired seeds), "extend" (3 of 5, or a mean gain under one standard error of the paired
       differences: 3 more seeds are owed) or "refuted" (mean at or below the control mean).
+    - A gain that comes with a recall drop below the control's in any domain is flagged "possible
+      erasure": a score that rises while text is missed may come from erased strokes, not a
+      better model. Such a recipe is not promoted or confirmed until an evaluator with a recall
+      floor scores it.
     - Only a confirmed recipe may be named the run's best.
   </Seed_Budget_Verdicts>
 
