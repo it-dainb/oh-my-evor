@@ -89,6 +89,9 @@ const GRANTS = {
  */
 const SCRATCHPAD = /^\/tmp\//;
 
+/** A scratch path: neither candidate code nor run state. */
+export const isScratch = (t) => SCRATCHPAD.test(t);
+
 /**
  * What a role may do. Unknown roles — including every generic agent type — get
  * the empty grant, which is why 4.3 hands a generic child its SPAWNER's set:

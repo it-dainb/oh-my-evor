@@ -2,6 +2,26 @@
 
 All notable changes to Evor. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.2.62] — 2026-11-01 — a %-formatted scratch path
+
+### Fixed
+
+- **The critic was refused for writing its verdicts to scratch.** Its script saved each verdict
+  with `open("…/scratchpad/%s.json" % n, "w")` inside `for n, s in ((…), (…)):`, and its
+  feedback text named `evaluate.py` and `train/trainer.py`. `%`-formatting was not read and an
+  inline-literal loop was not a component-safe source, so the body was opaque and those names
+  became `.py` targets: "author-code". The Python write reader now resolves `"…%s…" % name`
+  and `% (a, b)` under the same rules as f-strings, and accepts a loop over a literal written in
+  place. The refusal also named the exempt scratch file as its target while advising `/tmp`; it
+  now names a target that caused it.
+- **A junior refused its own Forge's correction.** Its brief said CPU only; when the GPU sat
+  idle, the Forge that spawned it lifted the limit by message, and the tick relayed the same,
+  and the junior declined both, answering that only its brief could lift the limit: about an
+  hour of CPU inference on an idle GPU. The junior now takes a message from the Forge that
+  spawned it (or the tick relaying through it) as amending its brief, and Forge does the same
+  for its tick; only a contract rule (sealed evaluator, frozen splits, test data) stays beyond
+  any message.
+
 ## [1.2.61] — 2026-11-01 — a script's text is not its run
 
 ### Fixed
