@@ -2,6 +2,20 @@
 
 All notable changes to Evor. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.2.57] — 2026-11-01 — a scratch write is a scratch write
+
+### Fixed
+
+- **The write guard refused a Python body that wrote only to scratch.** A Forge script built
+  record payloads in a loop and saved each with `open(f"{sd}/{n}.json","w")`, after
+  `os.makedirs(sd)`; a run's `nodes/` path appeared only as a string value. The f-string and
+  `os.makedirs` made the body opaque, so every path-like token counted as a target and the
+  call was denied. The Python write reader now resolves a name bound exactly once to a plain
+  literal, reads `os.makedirs`/`os.mkdir` targets, and accepts an f-string field bound by a
+  `for` over a literal whose strings hold no separator, only in the last path component.
+  Anything else (a rebound name, a parameter, a non-literal iterable, a value with `/` or
+  `..`, a field in a directory position) keeps the conservative reading.
+
 ## [1.2.56] — 2026-11-01 — one candidate, one record
 
 ### Fixed

@@ -213,7 +213,7 @@ function pythonWrites(text) {
   // Constructs that can write by themselves: any of them makes the body a possible write
   // whose targets this reader cannot name. Loading a module (`import`, `importlib`) is not
   // one: the module's own writes are as invisible here as any imported code's.
-  const writer = /\.open\s*\(|\bos\.(?:open|rename|renames|replace|system|popen|remove|unlink|link|symlink|makedirs|mkdir|write|fdopen)\b|\bsubprocess\b|\b(?:exec|eval|compile|__import__)\s*\(|\bshutil\.move\b/.test(text);
+  const writer = /\.open\s*\(|\bos\.(?:open|rename|renames|replace|system|popen|remove|unlink|link|symlink|write|fdopen)\b|\bsubprocess\b|\b(?:exec|eval|compile|__import__)\s*\(|\bshutil\.move\b/.test(text);
   // Constructs that compute paths: harmless in a body that writes nothing, but they make a
   // write's literal path untrustworthy.
   const computesPaths = /\bsys\.argv\b|\bos\.chdir\b|\bos\.path\.join\b|\bpathlib\b|\bPath\s*\([^)]*,|\bgetattr\s*\(/.test(text);
@@ -225,7 +225,7 @@ function pythonWrites(text) {
     if (/[fF]/.test(m[1]) && /[{}]/.test(m[3])) return null;
     return m[3];
   };
-  const take = (arg) => { const v = lit(arg); if (v === null) opaque = true; else if (v) exact.push(v); };
+  const take = (arg) => { const v = pathOf(arg); if (v === null) opaque = true; else if (v) exact.push(v); };
   const args = (s, i) => {
     // The argument list of the call whose "(" is at i, split on top-level commas.
     let depth = 0, cur = '', q = null, esc = false;
@@ -246,12 +246,75 @@ function pythonWrites(text) {
     opaque = true; // unterminated call
     return out;
   };
-  const re = /\b(open|io\.FileIO|io\.open|codecs\.open|shutil\.(?:copy|copy2|copyfile|copytree))\s*\(|(\bPath\s*\(([^()]*)\)|[\w.\]\)]+)\s*\.\s*(write_text|write_bytes)\s*\(/g;
+  // How many times a name is bound anywhere in the body. Every form that can rebind it
+  // counts (assignment, augmented assignment, loop or `with` target, parameter, keyword
+  // argument, import, `global`); over-counting only declines a resolution.
+  const reEsc = (n) => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const bindings = (n) => {
+    const e = reEsc(n);
+    const forms = [
+      new RegExp(`\\b${e}\\s*(?:[-+*/%&|^@]|//|\\*\\*|<<|>>|:)?=(?!=)`, 'g'),
+      new RegExp(`\\bfor\\b[^\\n:]*?\\b${e}\\b[^\\n:]*?\\bin\\b`, 'g'),
+      new RegExp(`\\bas\\s+${e}\\b|\\b(?:global|nonlocal|del|import)\\b[^\\n]*\\b${e}\\b|\\b(?:def|lambda)\\b[^\\n:]*\\b${e}\\b`, 'g'),
+    ];
+    return forms.reduce((k, r) => k + (text.match(r) || []).length, 0);
+  };
+  // A name bound exactly once, by `NAME = <plain string literal>` on a line of its own.
+  const boundLiteral = (n) => {
+    if (bindings(n) !== 1) return null;
+    const m = text.match(new RegExp(`^[ \\t]*${reEsc(n)}[ \\t]*=[ \\t]*([^\\n#]+?)[ \\t]*$`, 'm'));
+    return m ? lit(m[1]) : null;
+  };
+  // A name bound exactly once, as a target of `for ... in ITER:` where ITER is bound once
+  // to a literal made only of numbers, booleans and strings that hold no path separator
+  // and are not `.`/`..`: every value it takes stays inside one path component.
+  const componentLoopVar = (n) => {
+    if (bindings(n) !== 1) return false;
+    const f = text.match(new RegExp(`\\bfor\\b([^\\n:]*?\\b${reEsc(n)}\\b[^\\n:]*?)\\bin\\s+([A-Za-z_]\\w*)\\s*:`));
+    if (!f || bindings(f[2]) !== 1) return false;
+    const a = text.match(new RegExp(`^[ \\t]*${reEsc(f[2])}[ \\t]*=[ \\t]*([\\[(])`, 'm'));
+    if (!a) return false;
+    const body = args(text, a.index + a[0].length - 1);
+    if (!body.length) return false;
+    const src = body.join(',');
+    const strs = [...src.matchAll(/(['"])((?:\\.|(?!\1)[^\\])*)\1/g)].map((x) => x[2]);
+    if (strs.some((v) => /[\/\\]/.test(v) || v === '.' || v === '..')) return false;
+    const rest = src.replace(/[rRbBuU]?(['"])(?:\\.|(?!\1)[^\\])*\1/g, '').replace(/\b(?:True|False|None)\b/g, '');
+    return /^[\s\d.,()[\]+\-eE]*$/.test(rest);
+  };
+  // The path a write argument names: a plain literal, a name bound once to one, or an
+  // f-string whose fields are such names; a field bound by a component-safe loop may
+  // stand only in the last path component, where it cannot leave the directory.
+  const pathOf = (arg) => {
+    const a = String(arg ?? '').trim();
+    const v = lit(a);
+    if (v !== null) return v;
+    if (/^[A-Za-z_]\w*$/.test(a)) return boundLiteral(a);
+    const f = a.match(/^(?:[fF][rR]?|[rR][fF])(['"])((?:\\.|(?!\1)[^\\])*)\1$/s);
+    if (!f) return null;
+    const tpl = f[2];
+    let out = '';
+    let i = 0;
+    for (const m of tpl.matchAll(/\{([^{}]*)\}/g)) {
+      out += tpl.slice(i, m.index);
+      i = m.index + m[0].length;
+      const name = m[1].trim();
+      if (!/^[A-Za-z_]\w*$/.test(name)) return null;
+      const known = boundLiteral(name);
+      if (known !== null) { out += known; continue; }
+      if (tpl.slice(i).includes('/') || !componentLoopVar(name)) return null;
+      out += '_';
+    }
+    out += tpl.slice(i);
+    return /[{}]/.test(out) ? null : out;
+  };
+  const re = /\b(open|io\.FileIO|io\.open|codecs\.open|os\.(?:makedirs|mkdir)|shutil\.(?:copy|copy2|copyfile|copytree))\s*\(|(\bPath\s*\(([^()]*)\)|[\w.\]\)]+)\s*\.\s*(write_text|write_bytes)\s*\(/g;
   let m;
   while ((m = re.exec(text))) {
     if (m[1]) {
       const a = args(text, m.index + m[0].length - 1);
       if (/^shutil/.test(m[1])) { take(a[1]); continue; }
+      if (/^os\./.test(m[1])) { take(a[0]); continue; }
       const kw = a.find((x) => /^\s*mode\s*=/.test(x));
       const modeArg = kw !== undefined ? kw.replace(/^\s*mode\s*=\s*/, '') : a[1];
       if (modeArg === undefined) continue;          // open(path): read
