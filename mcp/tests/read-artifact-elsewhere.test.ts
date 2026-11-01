@@ -52,6 +52,14 @@ describe("evor_read_artifact not found", () => {
     expect(res.next).toMatch(/tick 19, 15/);
   });
 
+  it("says a newer tick's artifact is owed, not to be read from an older tick", async () => {
+    for (const t of [1, 2, 3, 4, 5]) put(t, "mutagen");
+    const res = await read({ run_id: RUN, tick: 6, agent: "mutagen" });
+    expect(res.found_at_ticks).toEqual([5, 4, 3]);
+    expect(res.next).toMatch(/not been written for tick 6 yet \(newest: tick 5\)/);
+    expect(res.next).not.toMatch(/read that tick/);
+  });
+
   it("adds nothing when no tick holds it", async () => {
     const res = await read({ run_id: RUN, tick: 19, agent: "selector" });
     expect(res).toEqual({ ok: false, error: "not found" });
