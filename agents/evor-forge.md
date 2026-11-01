@@ -171,9 +171,9 @@ skills: [oh-my-evor:evor-mcp]
       Call evor_record_node(node_id, genome_ref=genome_ref,
            mutation_tier=..., mutation_locus=...).
       Call evor_store_patch(run_id, node_id, patch_content) — after evor_record_node, which
-           gives the node the identity its patch is stored under. patch_content is the literal
-           output of `diff -ru <parent-worktree> <node-worktree>` (weights and logs excluded);
-           for a seed replicate it is just the changed genome lines. A summary is refused.
+           gives the node the identity its patch is stored under. Omit patch_content: the
+           tool diffs the node's worktree against its parent's (weights and logs excluded),
+           so no patch is typed or copied by hand.
 
     Phase 6 — Launch
       Call evor_run_start(node_id=node_id, run_id=run_id, run_dir=run_dir,

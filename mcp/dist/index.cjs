@@ -24746,6 +24746,7 @@ function registerArtifactTools(server) {
 // src/tools/lineage.ts
 var import_fs15 = require("fs");
 var import_path16 = require("path");
+var import_child_process2 = require("child_process");
 var import_os3 = require("os");
 function storePatch(runId, nodeId, patchContent, missionId) {
   const paths = resolveRunPaths(runId, missionId);
@@ -24877,18 +24878,49 @@ function drainInbox(runId, kind, missionId) {
     error: String(d?.error ?? "unknown error from inbox_bridge")
   };
 }
+function diffFromParent(runId, nodeId, missionId) {
+  let nodes;
+  try {
+    nodes = readTree(runId, missionId);
+  } catch (e) {
+    return { ok: false, error: `cannot read the tree: ${String(e)}` };
+  }
+  const key = resolveNodeRef(runId, nodeId, missionId);
+  const node = nodes[key];
+  if (!node?.code_ref) return { ok: false, error: `node '${nodeId}' has no worktree (code_ref) to diff; pass patch_content` };
+  const parent = node.parent_ids?.length ? nodes[node.parent_ids[0]] : void 0;
+  if (!parent?.code_ref) return { ok: false, error: `node '${nodeId}' has no parent worktree to diff against; pass patch_content` };
+  if (!(0, import_fs15.existsSync)(node.code_ref) || !(0, import_fs15.existsSync)(parent.code_ref)) {
+    return { ok: false, error: `a worktree is missing (${(0, import_fs15.existsSync)(node.code_ref) ? parent.code_ref : node.code_ref}); pass patch_content` };
+  }
+  const exclude = ["weights.pt", "*.ckpt", "*.log", "telemetry.jsonl", "__pycache__", "*.pyc", "train.rc", "*.lock"];
+  const r = (0, import_child_process2.spawnSync)("diff", ["-ruN", ...exclude.flatMap((x) => ["--exclude", x]), parent.code_ref, node.code_ref], {
+    encoding: "utf8",
+    maxBuffer: 64 * 1024 * 1024
+  });
+  if (r.status !== 0 && r.status !== 1) return { ok: false, error: `diff failed: ${r.stderr || r.error}` };
+  return { ok: true, patch: r.stdout };
+}
 function registerLineageTools(server) {
   server.tool(
     "evor_store_patch",
-    "Write a unified-diff parent patch for a node atomically. Call it after evor_record_node; the node is named by the name it was recorded under.",
+    "Write a unified-diff parent patch for a node atomically. Call it after evor_record_node; the node is named by the name it was recorded under. Omit patch_content to have the patch computed from the node's worktree against its parent's (weights, logs and telemetry excluded): nothing is typed by hand.",
     {
       run_id: external_exports.string().describe("Active run identifier"),
       node_id: external_exports.string().describe("Node whose parent patch to store"),
-      patch_content: external_exports.string().describe("Unified-diff patch content (e.g. git format-patch output)")
+      patch_content: external_exports.string().optional().describe("Unified-diff patch content. Omit it to diff the node's worktree against its parent's")
     },
     async ({ run_id, node_id, patch_content }) => {
       const missionId = process.env.EVOR_MISSION_ID;
-      const result = storePatch(run_id, node_id, patch_content, missionId);
+      let content = patch_content;
+      if (content === void 0) {
+        const d = diffFromParent(run_id, node_id, missionId);
+        if (!d.ok) {
+          return { content: [{ type: "text", text: JSON.stringify({ ok: false, error: d.error }) }] };
+        }
+        content = d.patch;
+      }
+      const result = storePatch(run_id, node_id, content, missionId);
       if (!result.ok) {
         return {
           content: [

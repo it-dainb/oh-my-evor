@@ -8,6 +8,8 @@
 
 import { existsSync, mkdirSync, mkdtempSync, renameSync, rmdirSync, unlinkSync, writeFileSync } from "fs";
 import { join } from "path";
+import { spawnSync } from "child_process";
+import { readTree } from "../tree-store.js";
 import { tmpdir } from "os";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
@@ -209,6 +211,34 @@ export function drainInbox(
   };
 }
 
+/**
+ * The unified diff of a node's worktree against its first parent's, computed here so
+ * nobody types a patch by hand. Weights, checkpoints, logs, telemetry and caches are
+ * outputs, not the change, and are left out.
+ */
+export function diffFromParent(
+  runId: string,
+  nodeId: string,
+  missionId?: string,
+): { ok: true; patch: string } | { ok: false; error: string } {
+  let nodes: Record<string, { id?: string; name?: string; code_ref?: string; parent_ids?: string[] }>;
+  try { nodes = readTree(runId, missionId) as typeof nodes; } catch (e) { return { ok: false, error: `cannot read the tree: ${String(e)}` }; }
+  const key = resolveNodeRef(runId, nodeId, missionId);
+  const node = nodes[key];
+  if (!node?.code_ref) return { ok: false, error: `node '${nodeId}' has no worktree (code_ref) to diff; pass patch_content` };
+  const parent = node.parent_ids?.length ? nodes[node.parent_ids[0]] : undefined;
+  if (!parent?.code_ref) return { ok: false, error: `node '${nodeId}' has no parent worktree to diff against; pass patch_content` };
+  if (!existsSync(node.code_ref) || !existsSync(parent.code_ref)) {
+    return { ok: false, error: `a worktree is missing (${existsSync(node.code_ref) ? parent.code_ref : node.code_ref}); pass patch_content` };
+  }
+  const exclude = ["weights.pt", "*.ckpt", "*.log", "telemetry.jsonl", "__pycache__", "*.pyc", "train.rc", "*.lock"];
+  const r = spawnSync("diff", ["-ruN", ...exclude.flatMap((x) => ["--exclude", x]), parent.code_ref, node.code_ref], {
+    encoding: "utf8", maxBuffer: 64 * 1024 * 1024,
+  });
+  if (r.status !== 0 && r.status !== 1) return { ok: false, error: `diff failed: ${r.stderr || r.error}` };
+  return { ok: true, patch: r.stdout };
+}
+
 // ── Tool registrations ────────────────────────────────────────────────────────
 
 export function registerLineageTools(server: McpServer): void {
@@ -216,17 +246,28 @@ export function registerLineageTools(server: McpServer): void {
   server.tool(
     "evor_store_patch",
     "Write a unified-diff parent patch for a node atomically. Call it after evor_record_node; " +
-      "the node is named by the name it was recorded under.",
+      "the node is named by the name it was recorded under. Omit patch_content to have the " +
+      "patch computed from the node's worktree against its parent's (weights, logs and " +
+      "telemetry excluded): nothing is typed by hand.",
     {
       run_id: z.string().describe("Active run identifier"),
       node_id: z.string().describe("Node whose parent patch to store"),
       patch_content: z
         .string()
-        .describe("Unified-diff patch content (e.g. git format-patch output)"),
+        .optional()
+        .describe("Unified-diff patch content. Omit it to diff the node's worktree against its parent's"),
     },
     async ({ run_id, node_id, patch_content }) => {
       const missionId = process.env.EVOR_MISSION_ID;
-      const result = storePatch(run_id, node_id, patch_content, missionId);
+      let content = patch_content;
+      if (content === undefined) {
+        const d = diffFromParent(run_id, node_id, missionId);
+        if (!d.ok) {
+          return { content: [{ type: "text" as const, text: JSON.stringify({ ok: false, error: d.error }) }] };
+        }
+        content = d.patch;
+      }
+      const result = storePatch(run_id, node_id, content, missionId);
       if (!result.ok) {
         return {
           content: [
