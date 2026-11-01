@@ -48,4 +48,35 @@ describe("python write targets", () => {
     );
     expect(t).toEqual([]);
   });
+
+  it("resolves a name bound once to a literal, and f-string fields drawn from a separator-free loop", () => {
+    const t = targets(
+      "python3 - <<'E'\nimport json,os\nsd=\"/tmp/s\"\nos.makedirs(sd,exist_ok=True)\n" +
+        "base=\"/proj/.evor/runs/m/r/nodes/\"\nrows=[(\"a-01\",1,\"x y\"),(\"b-01\",2,\"z\")]\n" +
+        "for n,k,c in rows:\n    p={\"result_path\":base+n+\"/results.json\"}\n    json.dump(p,open(f\"{sd}/{n}.json\",\"w\"))\nE",
+    );
+    expect(t).toEqual(["/tmp/s", "/tmp/s/_.json"]);
+  });
+
+  it("stays conservative when a bound name or loop value could leave the directory", () => {
+    const run = "/proj/.evor/runs/m/r/nodes";
+    const cases = [
+      // rebound name
+      `sd="/tmp/s"\nsd="${run}"\nopen(f"{sd}/a.json","w")`,
+      // loop value with a separator
+      `sd="/tmp/s"\nrows=[("../../${run}/x",)]\nfor (n,) in rows:\n    open(f"{sd}/{n}","w")`,
+      // loop value `..`
+      `sd="/tmp/s"\nrows=[("..",)]\nfor (n,) in rows:\n    open(f"{sd}/{n}","w")`,
+      // loop iterable that is not a pure literal
+      `sd="/tmp/s"\nrows=[(x,)]\nfor (n,) in rows:\n    open(f"{sd}/{n}","w")`,
+      // loop field in a directory position
+      `rows=[("a",)]\nfor (n,) in rows:\n    open(f"/tmp/{n}/${run}.json","w")`,
+      // name shadowed by a parameter
+      `sd="/tmp/s"\ndef w(sd):\n    open(f"{sd}/a.json","w")\nw("${run}")`,
+    ];
+    for (const body of cases) {
+      const t = targets(`python3 - <<'E'\nimport os\nr="${run}/a.json"\n${body}\nE`);
+      expect(t, body).toContain(`${run}/a.json`);
+    }
+  });
 });
