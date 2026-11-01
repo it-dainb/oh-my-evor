@@ -157,8 +157,11 @@ disallowedTools: Write, Edit
   </Hypothesis_Verdict_Protocol>
 
   <Seed_Budget_Verdicts>
-    - Compare a multi-seed arm with the control, never with a parent's best seed. Report mean and
-      SD for both arms, and the control mean over ALL its recorded seeds.
+    - Compare a multi-seed arm with the control, never with a parent's best seed. The control is
+      the parent recipe the change was applied to, on the same seeds; for a recipe built on a
+      promoted recipe that is the promoted recipe, not the original baseline. Report mean and SD
+      for both arms, the control mean over ALL its recorded seeds, and the baseline comparison
+      beside it.
     - A 2-seed screen verdict is "promote" (screen mean above the control's all-seed mean), "drop"
       (at or below it), or "inconclusive" (a run failed or integrity did not pass). Judge against
       the all-seed control mean, not the two paired control runs: a single control draw can be

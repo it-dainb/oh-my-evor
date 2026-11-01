@@ -2,6 +2,17 @@
 
 All notable changes to Evor. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.2.59] — 2026-11-01 — judge a child against its parent
+
+### Fixed
+
+- **Ideas built on a promoted recipe were judged against the original baseline.** `alpha025`,
+  `fusion` and `recguard` were all changes to `lcnblend`, yet each was compared only with the
+  plain EMA control, so `lcnblend`'s own gain counted as theirs: `recguard` passed the control
+  on 4 of 7 seeds while losing to its parent, and `alpha025`'s 6-of-8 win over its parent was
+  never stated. Selector and Probe now name the control as the parent recipe the change was
+  applied to, on the same seeds, with the baseline comparison reported beside it.
+
 ## [1.2.58] — 2026-11-01 — watch the process, not its marker
 
 ### Fixed

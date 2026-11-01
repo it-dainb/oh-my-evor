@@ -13,7 +13,7 @@
   "grounded_rule": {
     "file": "agents/evor-selector.md",
     "quote": "Call `evor_state_read` to read the current approach-family win history (never use memory or prior context).",
-    "sha256_at_authoring": "cfb0d7c6ce07cf01c2cfdc48c74d2838c381a949ac209bd40c250c4c5cc1b962"
+    "sha256_at_authoring": "83b8e18efb741c42ef925c6f952885fab217df84da6e22740f9b370860e4e9a3"
   },
   "grounding": [
     "field-trace:N-06",
