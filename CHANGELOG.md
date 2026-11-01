@@ -2,6 +2,17 @@
 
 All notable changes to Evor. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.2.63] — 2026-11-01 — mkdir of what exists
+
+### Fixed
+
+- **A trainer launch was refused for "writing" its telemetry file.** The junior ensured the node
+  directory with `mkdir -p "$(dirname "$TEL")"` before pointing `EVOR_TELEMETRY_PATH` at it; the
+  directory already existed (`evor_record_node` creates it), but the guard took every path token
+  of the segment as a target, including the telemetry file. A plain `mkdir` segment now names
+  only the directories it creates: `$(dirname "<path>")` resolves to that directory, and one that
+  already exists is no write.
+
 ## [1.2.62] — 2026-11-01 — a %-formatted scratch path
 
 ### Fixed

@@ -6,6 +6,9 @@
  * hidden behind a read, or a script written and then run, is still seen.
  */
 import { describe, it, expect } from "vitest";
+import { mkdtempSync, mkdirSync, rmSync } from "fs";
+import { join } from "path";
+import { tmpdir } from "os";
 import { resolveWriteTargets } from "../../hooks/lib/write-targets.mjs";
 
 const targets = (command: string) =>
@@ -112,6 +115,21 @@ describe("python write targets", () => {
     ]) {
       const t = targets(`python3 - <<'E'\nr="${run}/a.json"\n${body}\nE`);
       expect(t, body).toContain(`${run}/a.json`);
+    }
+  });
+
+  it("counts mkdir -p of an existing directory as no write, and resolves $(dirname …)", () => {
+    const root = mkdtempSync(join(tmpdir(), "evor-mkdir-"));
+    try {
+      const node = join(root, "runs/r/nodes/n1");
+      mkdirSync(node, { recursive: true });
+      const tel = join(node, "telemetry.jsonl");
+      expect(targets(`TEL="${tel}"\nmkdir -p "$(dirname "$TEL")"`)).toEqual([]);
+      expect(targets(`mkdir -p "${node}"`)).toEqual([]);
+      const fresh = join(root, "runs/r/nodes/n2");
+      expect(targets(`mkdir -p "$(dirname "${fresh}/telemetry.jsonl")"`)).toEqual([fresh]);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
     }
   });
 });
