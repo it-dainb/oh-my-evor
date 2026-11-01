@@ -407,7 +407,8 @@ skills: [oh-my-evor:evor-mcp]
     - After an `evor_run_start` job, record it with `evor_record_eval({ run_id, node_id })` and no
       `result`: the job's own output is recorded, so nothing is copied by hand.
     - Train only the seeds the Selector verdict owes: 2 for a screen, the remaining ones for a
-      confirmation, all with data seed = model seed.
+      confirmation (5 in all, or 8 when a confirmation is extended), all with data seed = model
+      seed. A control with fewer than 5 recorded seeds is completed first.
     - Before training a control, look for the same parent recipe on the same seed, data-seed policy
       and eval version in the tree (`evor_tree_read`). Reuse it; train only the missing seeds.
   </Seed_Budget>

@@ -203,13 +203,21 @@ disallowedTools: Write, Edit
   <Seed_Budget>
     Seeds buy confidence; distinct ideas buy discovery. Spend seeds where a decision depends on them.
     - Every arm uses one fixed seed list (e.g. 42, 7, 123, 2024, 31) with data seed = model seed.
-    - **Screen.** An approved new recipe owes 2 seeds (the first two on the list), judged against the
-      matched control on the same seeds. A screen result is labelled "screen", never "best".
+    - **Screen.** An approved new recipe owes 2 seeds (the first two on the list). Its screen
+      mean is judged against the control's mean over ALL of its recorded seeds, not against the two
+      paired control runs: one control draw can be extreme, and a pair of extremes makes almost
+      every recipe look up on one seed and down on the other. A screen result is labelled "screen",
+      never "best".
     - **Reuse controls.** A control is one parent recipe on one seed under one data-seed policy and
-      eval version. If that run exists in the tree, it is reused; only missing seeds are owed.
-    - **Confirm.** A recipe owes the remaining seeds (5 in all, with matched controls) only when its
-      screen mean beats the matched control mean by more than the control's seed-to-seed spread,
-      or when it would become the run's best. Only a confirmed result may be called the best.
+      eval version. If that run exists in the tree, it is reused; only missing seeds are owed. The
+      control holds at least 5 seeds before screens are judged against its mean.
+    - **Promote.** A recipe whose screen mean is above the control's all-seed mean owes the
+      remaining seeds (5 in all, with matched controls). Promotion is cheap and the screen is
+      noisy, so the bar is the point estimate, not a margin; the confirmation is the strict step.
+    - **Confirm.** At 5 seeds a recipe is confirmed when its mean is above the control's mean AND it
+      beats the paired control on at least 4 of the 5 seeds. With 3 of 5, or a mean gain smaller
+      than one standard error of the paired differences, it owes 3 more seeds (8 in all) before a
+      verdict. Only a confirmed result may be called the best.
     - Approve more distinct recipes rather than more seeds of one: the seeds a screen saves pay for them.
     - A mission or operator instruction on seeds overrides these defaults.
   </Seed_Budget>

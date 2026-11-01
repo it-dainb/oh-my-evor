@@ -2,6 +2,19 @@
 
 All notable changes to Evor. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.2.54] — 2026-11-01 — judged against the control, not its luckiest seeds
+
+### Fixed
+
+- **The 2-seed screen dropped almost every idea as noise.** A screen was promoted only when it
+  beat the paired control by more than the control's seed-to-seed spread. The control's spread
+  (SD about 0.016) exceeded any realistic gain (about 0.006), and its two paired runs were extreme
+  draws (0.0026 and 0.0382 against a 5-seed mean of 0.0208), so nearly every idea read "up on one
+  seed, down on the other" and four ticks promoted one recipe. A screen is now judged against the
+  control's mean over all its recorded seeds and promoted when its mean is above it; the strict
+  step is the confirmation: at 5 seeds, mean above the control and wins on at least 4 of 5 paired
+  seeds, with a borderline result extended to 8 seeds before a verdict.
+
 ## [1.2.53] — 2026-11-01 — the patch is computed, not typed
 
 ### Changed
