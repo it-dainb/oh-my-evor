@@ -24569,6 +24569,20 @@ function readArtifact(runId, tick, agent, kind, partial2, missionId) {
     error: String(data?.error ?? "unknown error from read_artifact_bridge")
   };
 }
+function elsewhere(runId, tick, agent, kind, missionId, error2) {
+  if (error2 !== "not found") return {};
+  try {
+    const { runDir } = resolveRunPaths(runId, missionId);
+    const ticks = (0, import_fs14.readdirSync)((0, import_path15.join)(runDir, "ticks")).filter((d) => /^\d+$/.test(d)).map(Number).filter((t) => t !== tick && (0, import_fs14.existsSync)(artifactPathFor(runDir, t, agent, kind))).sort((a, b) => b - a);
+    if (!ticks.length) return {};
+    return {
+      found_at_ticks: ticks,
+      next: `this ${agent}${kind ? ` artifact (kind ${kind})` : " artifact"} exists at tick ${ticks.join(", ")}; read that tick`
+    };
+  } catch {
+    return {};
+  }
+}
 function artifactPathFor(runDir, tick, agent, kind) {
   const slug = (kind ?? "").replace(/[^a-zA-Z0-9._-]+/g, "-").replace(/^-+|-+$/g, "");
   const base = (0, import_path15.join)(runDir, "ticks", String(tick));
@@ -24766,7 +24780,7 @@ function registerArtifactTools(server) {
                 // assume.
                 validated: CONTRACT_VALIDATED_AGENTS.has(agent),
                 payload: result.payload
-              } : { ok: false, error: result.error }
+              } : { ok: false, error: result.error, ...elsewhere(run_id, tick, agent, kind, missionId, result.error) }
             )
           }
         ]

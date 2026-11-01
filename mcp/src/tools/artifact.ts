@@ -19,7 +19,7 @@
  * sage, sage-junior, acquirer); all other agents pass through as plain JSON.
  */
 
-import { existsSync, mkdtempSync, readFileSync, renameSync, rmdirSync, unlinkSync, writeFileSync } from "fs";
+import { existsSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmdirSync, unlinkSync, writeFileSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -171,6 +171,32 @@ export function readArtifact(
 }
 
 // ── Tool registration ─────────────────────────────────────────────────────────
+
+/**
+ * For a "not found" read: the other ticks that hold this agent's artifact of the same
+ * kind, newest first, so the caller reads the right tick instead of guessing.
+ */
+function elsewhere(
+  runId: string, tick: number, agent: string, kind: string | undefined,
+  missionId: string | undefined, error: string | undefined,
+): { found_at_ticks?: number[]; next?: string } {
+  if (error !== "not found") return {};
+  try {
+    const { runDir } = resolveRunPaths(runId, missionId);
+    const ticks = readdirSync(join(runDir, "ticks"))
+      .filter((d) => /^\d+$/.test(d))
+      .map(Number)
+      .filter((t) => t !== tick && existsSync(artifactPathFor(runDir, t, agent, kind)))
+      .sort((a, b) => b - a);
+    if (!ticks.length) return {};
+    return {
+      found_at_ticks: ticks,
+      next: `this ${agent}${kind ? ` artifact (kind ${kind})` : " artifact"} exists at tick ${ticks.join(", ")}; read that tick`,
+    };
+  } catch {
+    return {};
+  }
+}
 
 /**
  * Where an agent's tick artifact lands. Mirrors the map in this file's header
@@ -420,7 +446,7 @@ export function registerArtifactTools(server: McpServer): void {
                     validated: CONTRACT_VALIDATED_AGENTS.has(agent),
                     payload: result.payload,
                   }
-                : { ok: false, error: result.error }
+                : { ok: false, error: result.error, ...elsewhere(run_id, tick, agent, kind, missionId, result.error) }
             ),
           },
         ],

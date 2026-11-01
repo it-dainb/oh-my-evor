@@ -2,6 +2,20 @@
 
 All notable changes to Evor. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.2.58] — 2026-11-01 — watch the process, not its marker
+
+### Fixed
+
+- **A finished training chain woke nobody.** A junior ran three trainers in one detached script
+  and waited in the background for a `chain.done` file the script would write at the end. The
+  script's marker path used a variable it never set, so the file was never written: all three
+  runs ended with exit 0 and the watcher kept waiting until the tick nudged Forge. The junior is
+  now told to watch a multi-run script by its PID, never by a marker file the script writes.
+- **A wrong-tick artifact read left the caller guessing.** Forge asked for `alpha025-s31-01` at
+  ticks 17 and 16 before finding it at 19; each answer was a bare `not found`. A `not found`
+  from `evor_read_artifact` now carries `found_at_ticks` (newest first) and a `next` line when
+  the same agent and kind exist at other ticks.
+
 ## [1.2.57] — 2026-11-01 — a scratch write is a scratch write
 
 ### Fixed

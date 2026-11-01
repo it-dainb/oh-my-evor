@@ -57,7 +57,7 @@
     "file": "agents/evor-forge-junior.md",
     "line": 16,
     "quote": "    You are a leaf agent. You must not spawn further sub-agents (no Task or Agent calls).",
-    "sha256_at_authoring": "51c49d60cf45af69b04e64e18872dd96b31b11d0bec43487b81388f4dc492385"
+    "sha256_at_authoring": "4982f491c3336b7a107b039fc8158c5ae23d68e56c45c9fa68420670c8881d39"
   },
   "grounding": [
     "field-trace:H-08",
