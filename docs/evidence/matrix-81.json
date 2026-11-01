@@ -3992,7 +3992,7 @@
       ],
       "stale": {
         "since": "2026-09-06",
-        "agent_sha256_now": "09f63ca118cf8f83",
+        "agent_sha256_now": "4e20b33bf2716c0c",
         "reason": "The agent file changed after the 8.1 run: this role gained a capability-gap disclosure channel, closed-set kind vocabulary and severity-by-consequence guidance during the evor-eval-bench loop. The tier comparison in §3 was measured against the PREVIOUS text and no longer describes what ships. The numbers are not wrong about what they measured; they are no longer about this agent.",
         "action": "re-measure this role before citing its §3 row"
       }

@@ -147,7 +147,7 @@
   "grounded_rule": {
     "file": "agents/evor-selector.md",
     "quote": "Using memory for H002: always call evor_state_read for strategy.json.winning_families. The state changes every tick.",
-    "sha256_at_authoring": "e7c3f245e8cbc2f33b3697572d68e4d147656c270026d2996b294e79c78b540b"
+    "sha256_at_authoring": "cfb0d7c6ce07cf01c2cfdc48c74d2838c381a949ac209bd40c250c4c5cc1b962"
   },
   "grounding": [
     "field-trace:C-01",
@@ -172,7 +172,7 @@
     "guarded_paths": [
       {
         "path": "agents/evor-selector.md",
-        "sha256": "e7c3f245e8cbc2f33b3697572d68e4d147656c270026d2996b294e79c78b540b"
+        "sha256": "cfb0d7c6ce07cf01c2cfdc48c74d2838c381a949ac209bd40c250c4c5cc1b962"
       },
       {
         "path": "skills/evor/SKILL.md",

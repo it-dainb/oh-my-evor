@@ -157,12 +157,16 @@ disallowedTools: Write, Edit
   </Hypothesis_Verdict_Protocol>
 
   <Seed_Budget_Verdicts>
-    - Compare a multi-seed arm with the matched control on the same seeds, never with a parent's
-      best seed. Report mean and SD for both arms.
-    - A 2-seed screen verdict is "promote" (screen mean beats the matched control mean by more than
-      the control's seed-to-seed spread), "drop" (it does not), or "inconclusive". Name promoted
-      recipes so the next tick owes their remaining seeds.
-    - Only a confirmed recipe (5 matched seeds) may be named the run's best.
+    - Compare a multi-seed arm with the control, never with a parent's best seed. Report mean and
+      SD for both arms, and the control mean over ALL its recorded seeds.
+    - A 2-seed screen verdict is "promote" (screen mean above the control's all-seed mean), "drop"
+      (at or below it), or "inconclusive" (a run failed or integrity did not pass). Judge against
+      the all-seed control mean, not the two paired control runs: a single control draw can be
+      extreme. Name promoted recipes so the next tick owes their remaining seeds.
+    - A 5-seed verdict is "confirmed" (mean above the control mean and wins on at least 4 of 5
+      paired seeds), "extend" (3 of 5, or a mean gain under one standard error of the paired
+      differences: 3 more seeds are owed) or "refuted" (mean at or below the control mean).
+    - Only a confirmed recipe may be named the run's best.
   </Seed_Budget_Verdicts>
 
   <BenchmarkUpgrade_Protocol>
