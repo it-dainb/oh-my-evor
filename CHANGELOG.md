@@ -2,6 +2,20 @@
 
 All notable changes to Evor. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.2.60] — 2026-11-01 — a restart stops every agent
+
+### Fixed
+
+- **Agents cut off by a restart counted as live forever.** After a session restart, the stop
+  hook saw 31 "live sub-agents": transcripts of agents stopped mid-call, whose last message is
+  a pending tool call. Every stop then read as a yield and no guard ran, while the tick waited
+  on a Mutagen and a Forge the restart had stopped. An agent whose transcript was last written
+  before the current CLI process started is no longer live (`cliStartMs`, from `/proc`).
+- **An owed artifact read like a misplaced one.** A `not found` for the current tick listed
+  every older tick that held that agent's artifact and said "read that tick". When the
+  requested tick is newer than all of them, the answer now says the artifact is owed by this
+  tick's agent and names only the newest tick; at most three ticks are listed.
+
 ## [1.2.59] — 2026-11-01 — judge a child against its parent
 
 ### Fixed

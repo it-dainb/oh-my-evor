@@ -24575,9 +24575,16 @@ function elsewhere(runId, tick, agent, kind, missionId, error2) {
     const { runDir } = resolveRunPaths(runId, missionId);
     const ticks = (0, import_fs14.readdirSync)((0, import_path15.join)(runDir, "ticks")).filter((d) => /^\d+$/.test(d)).map(Number).filter((t) => t !== tick && (0, import_fs14.existsSync)(artifactPathFor(runDir, t, agent, kind))).sort((a, b) => b - a);
     if (!ticks.length) return {};
+    const what = `this ${agent}${kind ? ` artifact (kind ${kind})` : " artifact"}`;
+    if (tick > ticks[0]) {
+      return {
+        found_at_ticks: ticks.slice(0, 3),
+        next: `${what} has not been written for tick ${tick} yet (newest: tick ${ticks[0]}); it is owed by this tick's ${agent}, not read from an older tick`
+      };
+    }
     return {
-      found_at_ticks: ticks,
-      next: `this ${agent}${kind ? ` artifact (kind ${kind})` : " artifact"} exists at tick ${ticks.join(", ")}; read that tick`
+      found_at_ticks: ticks.slice(0, 3),
+      next: `${what} exists at tick ${ticks.slice(0, 3).join(", ")}; read that tick`
     };
   } catch {
     return {};

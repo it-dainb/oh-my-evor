@@ -87,6 +87,28 @@ function lastMessageRecord(path) {
   }
 }
 
+/**
+ * When the CLI process running this hook started (ms since epoch), or null.
+ * A restart stops every agent and task of the session, so a transcript last written
+ * before this moment belongs to an agent that can no longer report: without this,
+ * an agent cut off mid-call by a crash or restart reads as live forever.
+ */
+export function cliStartMs() {
+  try {
+    const btime = Number(/^btime (\d+)$/m.exec(readFileSync('/proc/stat', 'utf8'))[1]);
+    const hz = 100; // USER_HZ on Linux
+    let pid = process.ppid;
+    for (let i = 0; i < 8 && pid > 1; i++) {
+      const stat = readFileSync(`/proc/${pid}/stat`, 'utf8');
+      const rest = stat.slice(stat.lastIndexOf(')') + 2).split(' ');
+      const cmd = readFileSync(`/proc/${pid}/cmdline`, 'utf8').split('\0');
+      if (cmd.some((a) => /(^|\/)claude$/.test(a))) return (btime + Number(rest[19]) / hz) * 1000;
+      pid = Number(rest[1]);
+    }
+  } catch { /* not Linux, or /proc unreadable */ }
+  return null;
+}
+
 /** The session's subagents directory, or null. */
 function subagentsDir(sessionId, transcriptPath) {
   // Preferred: sibling of the transcript the payload names.
@@ -112,7 +134,7 @@ function subagentsDir(sessionId, transcriptPath) {
  * Returns [] when the directory cannot be read — absence of evidence, so the
  * caller falls back to the recorded-wait signal rather than to a block.
  */
-export function liveSubagents(sessionId, transcriptPath, now = Date.now()) {
+export function liveSubagents(sessionId, transcriptPath, now = Date.now(), since = cliStartMs()) {
   const dir = subagentsDir(sessionId, transcriptPath);
   if (!dir) return [];
   const live = [];
@@ -126,10 +148,11 @@ export function liveSubagents(sessionId, transcriptPath, now = Date.now()) {
     const path = join(dir, f);
     let mtime = 0;
     try { mtime = statSync(path).mtimeMs; } catch { continue; }
+    if (since !== null && mtime < since) continue; // written before this process: stopped by the restart
 
     // Finished by the CLI's reckoning, but still waiting on a task of its own
     // that will wake it, is not finished.
-    const finished = agentFinished(path) && liveChildren(path, now).length === 0;
+    const finished = agentFinished(path) && liveChildren(path, now, since).length === 0;
     // A parked agent reads as finished. If its transcript moved recently, the
     // chain is still turning over and the parent has not been woken yet.
     const recent = now - mtime < RECENT_MS;
@@ -153,7 +176,7 @@ export function liveSubagents(sessionId, transcriptPath, now = Date.now()) {
  * on its team, or on a background shell task watching its job. The children are
  * the async launches and background tasks its own transcript records.
  */
-export function liveChildren(agentTranscriptPath, now = Date.now()) {
+export function liveChildren(agentTranscriptPath, now = Date.now(), since = cliStartMs()) {
   if (typeof agentTranscriptPath !== 'string' || !agentTranscriptPath.endsWith('.jsonl')) return [];
   let text;
   try { text = readFileSync(agentTranscriptPath, 'utf8'); } catch { return []; }
@@ -171,6 +194,7 @@ export function liveChildren(agentTranscriptPath, now = Date.now()) {
     const path = join(dir, `agent-${id}.jsonl`);
     let mtime = 0;
     try { mtime = statSync(path).mtimeMs; } catch { live.push(id); continue; }  // launched, not written yet
+    if (since !== null && mtime < since) continue;
     if (!agentFinished(path) || now - mtime < RECENT_MS) live.push(id);
   }
   return live;

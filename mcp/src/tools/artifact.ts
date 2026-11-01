@@ -174,7 +174,9 @@ export function readArtifact(
 
 /**
  * For a "not found" read: the other ticks that hold this agent's artifact of the same
- * kind, newest first, so the caller reads the right tick instead of guessing.
+ * kind, newest first, so a caller that asked the wrong tick reads the right one. When the
+ * requested tick is newer than all of them, the artifact is owed rather than misplaced:
+ * an older tick's copy is not this tick's output, so the answer says so.
  */
 function elsewhere(
   runId: string, tick: number, agent: string, kind: string | undefined,
@@ -189,9 +191,17 @@ function elsewhere(
       .filter((t) => t !== tick && existsSync(artifactPathFor(runDir, t, agent, kind)))
       .sort((a, b) => b - a);
     if (!ticks.length) return {};
+    const what = `this ${agent}${kind ? ` artifact (kind ${kind})` : " artifact"}`;
+    if (tick > ticks[0]) {
+      return {
+        found_at_ticks: ticks.slice(0, 3),
+        next: `${what} has not been written for tick ${tick} yet (newest: tick ${ticks[0]}); ` +
+          `it is owed by this tick's ${agent}, not read from an older tick`,
+      };
+    }
     return {
-      found_at_ticks: ticks,
-      next: `this ${agent}${kind ? ` artifact (kind ${kind})` : " artifact"} exists at tick ${ticks.join(", ")}; read that tick`,
+      found_at_ticks: ticks.slice(0, 3),
+      next: `${what} exists at tick ${ticks.slice(0, 3).join(", ")}; read that tick`,
     };
   } catch {
     return {};
