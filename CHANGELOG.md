@@ -2,6 +2,21 @@
 
 All notable changes to Evor. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.2.56] — 2026-11-01 — one candidate, one record
+
+### Fixed
+
+- **A resumed agent recorded its candidate twice.** After a session ended mid-tick, Forge called
+  `evor_record_node` again for `emactl-s1-01`; the name was taken, so the server minted
+  `emactl-s1-01-2` on the same worktree, and one run had two records. Recording a name whose
+  existing, not-yet-evaluated node has the same `code_ref` now returns that node and its
+  telemetry path (`already_recorded: true`). A different candidate under a taken name still gets
+  its own suffixed record.
+- **A junior's own guard kept its trainer from starting.** A `pgrep -f "train/trainer.py"` check
+  matched the shell running it, so the junior believed a trainer was running and never launched
+  one. Its constraints now say to track the trainer by PID or use a pattern that cannot match
+  itself.
+
 ## [1.2.55] — 2026-11-01 — steps the trainer recorded
 
 ### Fixed

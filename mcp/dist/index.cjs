@@ -22483,6 +22483,38 @@ function registerRecordTools(server) {
     },
     async ({ run_id, node }) => {
       const missionId = process.env.EVOR_MISSION_ID;
+      const asked = node;
+      if (asked.name && asked.code_ref) {
+        let existing;
+        try {
+          existing = Object.values(readTree(run_id, missionId)).find(
+            (n) => n?.name === asked.name && n?.code_ref === asked.code_ref
+          );
+        } catch {
+          existing = void 0;
+        }
+        const evaluated = existing && (0, import_fs5.existsSync)((0, import_path6.join)(resolveRunPaths(run_id, missionId).nodesDir, existing.id, "results.json"));
+        if (existing && !evaluated) {
+          const telemetryPath2 = (0, import_path6.join)(resolveRunPaths(run_id, missionId).nodesDir, existing.id, "telemetry.jsonl");
+          try {
+            (0, import_fs5.mkdirSync)((0, import_path6.dirname)(telemetryPath2), { recursive: true });
+          } catch {
+          }
+          return {
+            content: [{
+              type: "text",
+              text: JSON.stringify({
+                ok: true,
+                name: existing.name,
+                run_id,
+                already_recorded: true,
+                telemetry_path: telemetryPath2,
+                telemetry_note: "This candidate was already recorded under this name and worktree; this is its record. Export telemetry_path EXACTLY as EVOR_TELEMETRY_PATH for the training subprocess."
+              })
+            }]
+          };
+        }
+      }
       const filledNode = fillNodeId(node);
       filledNode.name = filledNode.name ? assignUniqueName(run_id, filledNode.name, missionId) : deriveName(run_id, filledNode.approach_family, missionId);
       if (Array.isArray(filledNode.parent_ids)) {

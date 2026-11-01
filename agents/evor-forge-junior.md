@@ -203,6 +203,10 @@ skills: [oh-my-evor:evor-mcp]
   </Success_Criteria>
 
   <Constraints>
+    - Track a trainer by the PID you launched it with. A `pgrep -f "train/trainer.py"` check also
+      matches the shell that runs it, so it always finds "a trainer" and a guard built on it never
+      starts one; if you must search, write the pattern so it cannot match itself
+      (`pgrep -f '[t]rain/trainer.py'`).
     - Build every `rm` path from guarded variables: `rm -rf "${W:?}/${n:?}/build"`, never
       `"$W/$n/build"`. An unguarded variable makes the command stop for a person to confirm.
     - Launch the trainer DETACHED (`setsid nohup python train/trainer.py … &`, note its PID), then
