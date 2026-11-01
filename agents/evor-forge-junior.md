@@ -214,7 +214,10 @@ skills: [oh-my-evor:evor-mcp]
         python -m evor.watch --telemetry "$EVOR_TELEMETRY_PATH" --pid <PID> --val-key <the
         validation metric your trainer logs, e.g. val_min_S>
       and end your turn. The host wakes you when the watcher exits, however long the run is, with
-      no calls in between. The watcher exits when the trainer does, OR early with a verdict when
+      no calls in between. Several runs in one detached script are watched by that script's PID
+      (`--pid`, or `while kill -0 <PID>; do sleep 30; done`), never by a marker file the script
+      writes: a marker the script fails to write (an unset variable in its path) keeps the watcher
+      waiting after every run has ended. The watcher exits when the trainer does, OR early with a verdict when
       the run stops learning:
         stalled  - validation set no new best in 5 evaluations; `diagnosis` is overfitting (train
                    loss still falling or the train-val gap widening) or underfitting (both flat)
