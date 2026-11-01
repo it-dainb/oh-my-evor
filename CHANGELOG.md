@@ -2,6 +2,18 @@
 
 All notable changes to Evor. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.2.64] — 2026-11-01 — a parked Forge's go-ahead
+
+### Fixed
+
+- **A junior and its Forge each waited on the other.** Forge told its junior to build the
+  `erodedgt` candidates and wait for Forge's go-ahead before training, then parked. The
+  coordinator may not resume a Forge, so the go-ahead came from the tick and the coordinator,
+  and the junior refused it: its rule accepted amendments only from its own Forge or relayed
+  through it. The rule now names the whole chain (the Forge, the evor-tick agent, the mission
+  coordinator), and Forge gives a held junior its go-ahead, or names who will, before ending
+  its turn.
+
 ## [1.2.63] — 2026-11-01 — mkdir of what exists
 
 ### Fixed
