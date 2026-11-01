@@ -23343,19 +23343,23 @@ var RunStatePatchSchema = external_exports.object({
   // One record per COMPLETED tick, upserted by tick number, so a repeated call
   // for the same tick corrects rather than duplicates. The server derives
   // `tick_history_scores` from these; neither key is writable directly.
-  tick_record: external_exports.object({
-    tick: external_exports.number().int().min(1),
-    // Terminal outcomes only. `yielding` is a tick that has not finished, so it
-    // has nothing to record — recording it would count a wait as a tick.
-    outcome: external_exports.enum(["scored", "rejected", "skipped", "failed"]),
-    score: external_exports.number().optional().describe(
-      "The tick's best fitness, when it evaluated at least one node. Omit otherwise."
-    ),
-    failure_kind: external_exports.enum(["experiment", "contract", "infrastructure"]).optional().describe(
-      "With outcome 'failed': 'experiment' (the candidate itself failed), 'contract' (two parts of the plugin disagree, so every retry fails the same way), or 'infrastructure' (the machine, a tool or a service failed). 'contract' and 'infrastructure' make evor_check_stop report blocked:true."
-    ),
-    error: external_exports.string().optional().describe("With outcome 'failed': the reason, as the tick reported it")
-  }).optional().describe(
+  // A null on an optional field means "absent": a scored tick sends failure_kind: null.
+  tick_record: external_exports.preprocess(
+    (v) => v && typeof v === "object" && !Array.isArray(v) ? Object.fromEntries(Object.entries(v).filter(([, x]) => x !== null)) : v,
+    external_exports.object({
+      tick: external_exports.number().int().min(1),
+      // Terminal outcomes only. `yielding` is a tick that has not finished, so it
+      // has nothing to record — recording it would count a wait as a tick.
+      outcome: external_exports.enum(["scored", "rejected", "skipped", "failed"]),
+      score: external_exports.number().optional().describe(
+        "The tick's best fitness, when it evaluated at least one node. Omit otherwise."
+      ),
+      failure_kind: external_exports.enum(["experiment", "contract", "infrastructure"]).optional().describe(
+        "With outcome 'failed': 'experiment' (the candidate itself failed), 'contract' (two parts of the plugin disagree, so every retry fails the same way), or 'infrastructure' (the machine, a tool or a service failed). 'contract' and 'infrastructure' make evor_check_stop report blocked:true."
+      ),
+      error: external_exports.string().optional().describe("With outcome 'failed': the reason, as the tick reported it")
+    })
+  ).optional().describe(
     "Call once per tick, after it returns a terminal outcome. Feeds the circuit breaker (consecutive FAILED ticks) and the plateau window (ticks with no improvement), which read nothing else."
   ),
   // ── Area 3: prediction bias sample (server-side rolling avg) ──────────────
