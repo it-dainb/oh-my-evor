@@ -68,6 +68,12 @@ describe("tick_record", () => {
     expect(state.tick_history_scores).toEqual([0.4, 0.6]);
   });
 
+  it("reads a null optional field as absent", () => {
+    const r = RunStatePatchSchema.safeParse({ tick_record: { tick: 3, outcome: "scored", score: 0.01, failure_kind: null, error: null } });
+    expect(r.success).toBe(true);
+    expect((r as { data: { tick_record: Record<string, unknown> } }).data.tick_record.failure_kind).toBeUndefined();
+  });
+
   it("rejects `yielding` — a tick that has not finished has nothing to record", () => {
     expect(() =>
       RunStatePatchSchema.parse({ tick_record: { tick: 1, outcome: "yielding" } }),

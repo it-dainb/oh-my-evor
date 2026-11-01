@@ -2,6 +2,15 @@
 
 All notable changes to Evor. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.2.52] — 2026-11-01 — null is absent
+
+### Fixed
+
+- **A scored tick's record was refused for `failure_kind: null`.** The tick reports every field,
+  and an outcome with no failure sends `failure_kind: null`; the schema took that as an invalid
+  enum value. `evor_state_write` now reads a null on any optional `tick_record` field as absent,
+  as `evor_wiki_add` already does for lesson entries.
+
 ## [1.2.51] — 2026-11-01 — reading is not writing
 
 ### Fixed
