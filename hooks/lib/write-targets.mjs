@@ -181,9 +181,28 @@ function heredocs(command, cwd, vars) {
   while ((m = re.exec(command))) {
     const before = command.slice(0, m.index);
     const segs = segments(before, cwd, vars);
-    out.push({ text: m[2], cwd: segs.length ? segs[segs.length - 1].cwd : cwd });
+    const last = segs.length ? segs[segs.length - 1] : { text: '', cwd };
+    // `cat > x.py <<EOF` / `tee x.py <<EOF`: the body is the file's content, not code run here.
+    const sink = foldConcat(expandVars(last.text, vars))
+      .match(/^\s*(?:cat\s*>\s*|tee\s+(?:-a\s+)?)['"]?([^\s'"<>|;&]+)['"]?\s*$/);
+    out.push({
+      text: m[2],
+      cwd: last.cwd ?? cwd,
+      sink: sink ? (isAbsolute(sink[1]) ? sink[1] : resolve(last.cwd ?? cwd, sink[1])) : null,
+    });
   }
   return out;
+}
+
+/**
+ * Is `file` run as a script by any segment of the command (`python3 file`, `bash file`)?
+ * A module run (`python3 -m py_compile file`) only reads it.
+ */
+function runsScript(segs, file) {
+  return segs.some(({ text, cwd }) => {
+    const m = text.match(/(?:^|\s)(?:python[0-9.]*|bash|sh)\s+(?:-(?![mc]\b)[A-Za-z]+\s+)*([^\s<>|;&]+)/);
+    return !!m && (isAbsolute(m[1]) ? m[1] : resolve(cwd, m[1])) === file;
+  });
 }
 
 /**
@@ -416,8 +435,13 @@ export function resolveWriteTargets({ tool, toolInput = {}, cwd = process.cwd() 
   // architect's read-only JSON comparison "write" a node's results.json
   // (binarization mission, tick 4). Bodies are judged by the Python write
   // shapes only, and removed from the text the shell rules read.
-  const bodies = heredocs(command, cwd, vars);
+  const allBodies = heredocs(command, cwd, vars);
   let shellText = command.replace(/(<<-?\s*['"]?([A-Za-z_][A-Za-z0-9_]*)['"]?)\n[\s\S]*?\n\s*\2\b/g, '$1');
+  // A body written to a file is that file's content. It is judged as code only when this
+  // command also runs the file; otherwise it runs, if ever, under a later command, and the
+  // write here is the redirect to the file, which the shell rules already count.
+  const runSegs = segments(shellText, cwd, vars).map((sg) => ({ ...sg, text: foldConcat(expandVars(sg.text, vars)) }));
+  const bodies = allBodies.filter((b) => !b.sink || runsScript(runSegs, b.sink));
   // `python -c "<code>"` is interpreter input too: `'first->last %'` in it read
   // as a `>` redirect, and its string literals as paths (Probe, tick 4). Only
   // python's code argument is lifted out; `bash -c "…"` stays shell.

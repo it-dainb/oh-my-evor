@@ -2,6 +2,18 @@
 
 All notable changes to Evor. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.2.61] — 2026-11-01 — a script's text is not its run
+
+### Fixed
+
+- **Writing a script file was judged as running it.** A junior wrote an inference script with
+  `cat > infer_cpu.py <<'EOF' … EOF` and only compiled it; the script built its output path
+  from `sys.argv` and named the run directory as an input, so the body read as an opaque write
+  and the guard denied the `cat` twice in one hour. A heredoc whose consumer is `cat > file` or
+  `tee file` is that file's content: it is judged as code only when the same command also runs
+  the file (`python3 file`, `bash file`; `python3 -m …` only reads it). The redirect to the
+  file is still a write.
+
 ## [1.2.60] — 2026-11-01 — a restart stops every agent
 
 ### Fixed

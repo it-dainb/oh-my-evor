@@ -79,4 +79,19 @@ describe("python write targets", () => {
       expect(t, body).toContain(`${run}/a.json`);
     }
   });
+
+  it("treats a heredoc written to a file as that file's content when the command does not run it", () => {
+    const t = targets(
+      "cd /tmp/s && cat > infer.py <<'EOF'\nimport sys\nfrom pathlib import Path\n" +
+        "RUN = Path(\"/proj/.evor/runs/m/r\")\nout = Path(sys.argv[1])\nopen(out / 'a.json', 'w')\nEOF\n" +
+        "python3 -m py_compile infer.py && echo OK",
+    );
+    expect(t).toEqual(["/tmp/s/infer.py"]);
+  });
+
+  it("still judges a heredoc written to a file and run in the same command", () => {
+    const t = targets("cd /w/n && cat > x.py <<'EOF'\nopen('evaluate.py','w').write('x')\nEOF\npython3 x.py");
+    expect(t).toContain("/w/n/evaluate.py");
+  });
 });
+
