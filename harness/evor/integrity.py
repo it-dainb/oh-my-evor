@@ -265,7 +265,9 @@ class IntegrityGate:
         # any other — it just looks like a worse model. Nothing distinguished
         # "this approach did not work" from "this run was cut off at step 254 of
         # 450", and only the first is evidence about the approach.
-        trainer_completed = self._check_trainer_completed(node, result)
+        trainer_completed = self._check_trainer_completed(
+            node, result, resolve_node_artifact(telemetry_path, node) or telemetry_path
+        )
         if trainer_completed is False:
             failures.append(
                 "trainer_completed: telemetry stops well short of the node's declared "
@@ -591,7 +593,7 @@ class IntegrityGate:
         overlap = set(frozen_test.per_sample_hashes.values()) & set(train_hashes)
         return not overlap
 
-    def _check_trainer_completed(self, node, result) -> Optional[bool]:
+    def _check_trainer_completed(self, node, result, telemetry_path: Path | None = None) -> Optional[bool]:
         """Did the trainer reach the step budget the node declared? (Item 6.4.)
 
         Returns None when the node declares no budget: with nothing to compare
@@ -612,12 +614,39 @@ class IntegrityGate:
         if declared is None:
             return None
 
-        summary = getattr(result, "telemetry_summary", None)
-        actual = getattr(summary, "total_steps", None) if summary is not None else None
-        if not isinstance(actual, (int, float)):
+        # The evaluator's summary carries a step count only when the eval script
+        # reports one; a sealed evaluator that does not leaves it 0, which means
+        # "not reported", not "trained zero steps". The node's own telemetry is
+        # the trainer's record, so it is read first.
+        actual = self._steps_in_telemetry(telemetry_path)
+        if actual is None:
+            summary = getattr(result, "telemetry_summary", None)
+            reported = getattr(summary, "total_steps", None) if summary is not None else None
+            if isinstance(reported, (int, float)) and reported > 0:
+                actual = int(reported)
+        if actual is None:
             return None
 
         return int(actual) >= int(declared * 0.9)
+
+    @staticmethod
+    def _steps_in_telemetry(telemetry_path: Path | None) -> Optional[int]:
+        """Steps the trainer recorded: the highest `step` in its telemetry, plus one."""
+        if telemetry_path is None or not Path(telemetry_path).exists():
+            return None
+        top = None
+        try:
+            with open(telemetry_path) as fh:
+                for line in fh:
+                    try:
+                        step = json.loads(line).get("step")
+                    except (ValueError, AttributeError):
+                        continue
+                    if isinstance(step, (int, float)) and (top is None or step > top):
+                        top = step
+        except OSError:
+            return None
+        return None if top is None else int(top) + 1
 
     def _check_source_page_leakage(
         self, frozen_test: FrozenSplit, provenance_path: Path | None

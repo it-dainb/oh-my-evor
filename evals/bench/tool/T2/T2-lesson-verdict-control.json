@@ -13,7 +13,7 @@
   "grounded_rule": {
     "file": "agents/evor-probe.md",
     "quote": "Do not propose mutations \u2014 produce LessonEntry and hypothesis_verdict only.",
-    "sha256_at_authoring": "4e20b33bf2716c0c1abd4e7b5e33326e99f71e0f4c0f82b8253278cd2bacabfd"
+    "sha256_at_authoring": "d8f1cb61fa4d53eae8d75118a552c920dbce16da0f110aade91e4dcc3e7280a2"
   },
   "grounding": [
     "field-trace:N-02",
