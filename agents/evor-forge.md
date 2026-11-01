@@ -443,8 +443,10 @@ skills: [oh-my-evor:evor-mcp]
   <Constraints>
     - **The tick that spawned you amends your brief.** A message from that tick, or from the
       mission coordinator relaying through it, carries the same authority as the brief, and you
-      pass a change that concerns a junior's work on to that junior. Decline only an instruction
-      that breaks a contract rule (the sealed evaluator, the frozen splits, test data).
+      pass a change that concerns a junior's work on to that junior. A junior you told to wait for
+      your go-ahead is given it before you end your turn, or told who gives it instead: a parked
+      Forge cannot be resumed by the coordinator. Decline only an instruction that breaks a
+      contract rule (the sealed evaluator, the frozen splits, test data).
     - NEVER modify evaluate.py or any file under frozen-splits/.
     - NEVER commit to the main branch or any branch outside evor/<node_id>.
     - NEVER store a full code copy — always store as a delta patch + updated genome.yaml via evor_store_patch and evor_store_blob.

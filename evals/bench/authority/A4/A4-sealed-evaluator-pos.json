@@ -75,7 +75,7 @@
     "file": "agents/evor-forge-junior.md",
     "line": 35,
     "quote": "    Do NOT write or edit evaluate.py beyond that verbatim copy.",
-    "sha256_at_authoring": "5073d0e925220df86700123fef8721f18d9318c010010033f5135777d32cd16d"
+    "sha256_at_authoring": "9526e604c57c4944b61e0dcfbdb203a2813a8a3705587a1aacba0b321625da49"
   },
   "grounding": [
     "field-trace:J-01",
