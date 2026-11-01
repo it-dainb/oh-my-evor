@@ -26,7 +26,8 @@
  * cannot resolve, it reports nothing and the caller falls back to its other rules.
  */
 
-import { isAbsolute, resolve } from 'path';
+import { dirname, isAbsolute, resolve } from 'path';
+import { statSync } from 'fs';
 
 /**
  * Commands whose presence means the line intends to modify something — as a
@@ -384,6 +385,29 @@ function pythonWrites(text) {
   return { exact, opaque };
 }
 
+/**
+ * The directories a plain `mkdir` segment creates, or null when the segment is not one.
+ * `$(dirname "<path>")` resolves to that path's directory. A directory that already exists
+ * is not created, so `mkdir -p` on it writes nothing: a trainer launch that ensures its node
+ * directory before pointing telemetry into it was refused for "writing" the telemetry file.
+ */
+function mkdirTargets(text, cwd) {
+  const m = text.match(/^\s*mkdir\s+(.*)$/s);
+  if (!m || /[<>|;&`]/.test(m[1].replace(/\$\(dirname\s+"?[^"()]+"?\)/g, ''))) return null;
+  const out = [];
+  for (const raw of m[1].match(/"\$\(dirname\s+"?[^"()]+"?\)"|\$\(dirname\s+"?[^"()]+"?\)|"[^"]*"|'[^']*'|\S+/g) ?? []) {
+    if (/^-/.test(raw)) continue;
+    const dn = raw.match(/\$\(dirname\s+"?([^"()]+?)"?\)/);
+    const p = dn ? dirname(dn[1]) : raw.replace(/^['"]|['"]$/g, '');
+    if (/[$`*?]/.test(p)) return null; // unresolved: leave it to the general rules
+    const abs = isAbsolute(p) ? p : resolve(cwd, p);
+    let isDir = false;
+    try { isDir = statSync(abs).isDirectory(); } catch { /* absent: it will be created */ }
+    if (!isDir) out.push(abs);
+  }
+  return out;
+}
+
 function hasWriteIntent(text) {
   if (/(^|[^0-9<>&])>>?\s*[^\s|&;>]/.test(text.replace(/2>&1|&>|>&\d/g, ''))) return true;
   if (/\btee\b/.test(text)) return true;
@@ -514,6 +538,8 @@ export function resolveWriteTargets({ tool, toolInput = {}, cwd = process.cwd() 
     const text = foldConcat(expandVars(unit.text, vars));
     if (!(unit.pythonOnly ? hasPythonWriteIntent(text) : hasWriteIntent(text))) continue;
     writes = true;
+    const made = !unit.pythonOnly ? mkdirTargets(text, unit.cwd) : null;
+    if (made) { for (const t of made) targets.add(t); continue; }
     const sed = !unit.pythonOnly && sedInPlaceFiles(text);
     const redirected = !unit.pythonOnly && !sed && redirectOnlyTargets(text);
     const py = unit.pythonOnly ? pythonWrites(text) : null;
