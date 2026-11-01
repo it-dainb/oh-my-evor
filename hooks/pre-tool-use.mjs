@@ -37,7 +37,7 @@ import { turnStartedByHuman, lastSlashCommand } from './lib/transcript.mjs';
 import { existsSync as _exists } from 'fs';
 import { join as _join } from 'path';
 import { resolveWriteTargets, shellVars, expandVars } from './lib/write-targets.mjs';
-import { mayPerform, operationFor } from './lib/operations.mjs';
+import { isScratch, mayPerform, operationFor } from './lib/operations.mjs';
 import { classifyWriteTarget, selfPatchAllowed } from './lib/protected-paths.mjs';
 import { emitDenialSignal, logDecision, logError, logSkip } from './lib/audit.mjs';
 
@@ -655,13 +655,16 @@ try {
         'retrieve-cited-source': 'You may not fetch sources. Read the finding your upstream ' +
                                  'stage already produced.',
       };
+      // Name a target that caused the refusal: scratch paths are exempt, so naming one
+      // made the refusal read as contradicting its own advice to use /tmp.
+      const shown = opTargets.find((t) => !isScratch(t)) ?? opTargets[0];
       deny(
         `[EVOR GOVERNOR] ${who} may not perform the operation "${operation}"` +
-          (opTargets[0] ? ` (target: ${opTargets[0]})` : '') + '.' + roleNote + ' ' +
+          (shown ? ` (target: ${shown})` : '') + '.' + roleNote + ' ' +
           (agentType ? (ADVICE[operation] ?? '') + ' ' : '') +
           'This rule is scoped to the OPERATION, not to a tool name: the same act through ' +
           'Bash, a heredoc or a redirect is the same act.',
-        { rule: `operation:${operation}`, tool, agentType, target: opTargets[0] },
+        { rule: `operation:${operation}`, tool, agentType, target: shown },
       );
     }
   } catch (err) {

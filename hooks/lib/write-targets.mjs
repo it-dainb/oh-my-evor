@@ -289,11 +289,19 @@ function pythonWrites(text) {
   // and are not `.`/`..`: every value it takes stays inside one path component.
   const componentLoopVar = (n) => {
     if (bindings(n) !== 1) return false;
-    const f = text.match(new RegExp(`\\bfor\\b([^\\n:]*?\\b${reEsc(n)}\\b[^\\n:]*?)\\bin\\s+([A-Za-z_]\\w*)\\s*:`));
-    if (!f || bindings(f[2]) !== 1) return false;
-    const a = text.match(new RegExp(`^[ \\t]*${reEsc(f[2])}[ \\t]*=[ \\t]*([\\[(])`, 'm'));
-    if (!a) return false;
-    const body = args(text, a.index + a[0].length - 1);
+    // The iterable is a name bound once to a literal, or a literal written in place.
+    const f = text.match(new RegExp(`\\bfor\\b([^\\n:]*?\\b${reEsc(n)}\\b[^\\n:]*?)\\bin\\s+(?:([A-Za-z_]\\w*)\\s*:|([\\[(]))`));
+    if (!f) return false;
+    let open;
+    if (f[3]) {
+      open = f.index + f[0].length - 1;
+    } else {
+      if (bindings(f[2]) !== 1) return false;
+      const a = text.match(new RegExp(`^[ \\t]*${reEsc(f[2])}[ \\t]*=[ \\t]*([\\[(])`, 'm'));
+      if (!a) return false;
+      open = a.index + a[0].length - 1;
+    }
+    const body = args(text, open);
     if (!body.length) return false;
     const src = body.join(',');
     const strs = [...src.matchAll(/(['"])((?:\\.|(?!\1)[^\\])*)\1/g)].map((x) => x[2]);
@@ -304,10 +312,36 @@ function pythonWrites(text) {
   // The path a write argument names: a plain literal, a name bound once to one, or an
   // f-string whose fields are such names; a field bound by a component-safe loop may
   // stand only in the last path component, where it cannot leave the directory.
+  // A value standing in a path: a name bound once to a literal, else '_' for a field drawn
+  // from a component-safe loop, which may stand only in the last path component.
+  const fieldValue = (name, last) => {
+    if (!/^[A-Za-z_]\w*$/.test(name)) return null;
+    const known = boundLiteral(name);
+    if (known !== null) return known;
+    return last && componentLoopVar(name) ? '_' : null;
+  };
   const pathOf = (arg) => {
     const a = String(arg ?? '').trim();
     const v = lit(a);
     if (v !== null) return v;
+    // `"…/%s.json" % n` and `"…/%s_%d" % (n, k)`.
+    const pct = a.match(/^(.*?)\s*%\s*(\(([^()]*)\)|[A-Za-z_]\w*)$/s);
+    if (pct && lit(pct[1]) !== null) {
+      const tpl = lit(pct[1]);
+      const names = (pct[3] ?? pct[2]).split(',').map((x) => x.trim()).filter(Boolean);
+      const holes = [...tpl.matchAll(/%[sd]/g)];
+      if (holes.length !== names.length || /%[^sd%]/.test(tpl.replace(/%%/g, ''))) return null;
+      let out = '';
+      let i = 0;
+      for (let k = 0; k < holes.length; k++) {
+        out += tpl.slice(i, holes[k].index);
+        i = holes[k].index + 2;
+        const val = fieldValue(names[k], !tpl.slice(i).includes('/'));
+        if (val === null) return null;
+        out += val;
+      }
+      return out + tpl.slice(i);
+    }
     if (/^[A-Za-z_]\w*$/.test(a)) return boundLiteral(a);
     const f = a.match(/^(?:[fF][rR]?|[rR][fF])(['"])((?:\\.|(?!\1)[^\\])*)\1$/s);
     if (!f) return null;
@@ -317,12 +351,9 @@ function pythonWrites(text) {
     for (const m of tpl.matchAll(/\{([^{}]*)\}/g)) {
       out += tpl.slice(i, m.index);
       i = m.index + m[0].length;
-      const name = m[1].trim();
-      if (!/^[A-Za-z_]\w*$/.test(name)) return null;
-      const known = boundLiteral(name);
-      if (known !== null) { out += known; continue; }
-      if (tpl.slice(i).includes('/') || !componentLoopVar(name)) return null;
-      out += '_';
+      const val = fieldValue(m[1].trim(), !tpl.slice(i).includes('/'));
+      if (val === null) return null;
+      out += val;
     }
     out += tpl.slice(i);
     return /[{}]/.test(out) ? null : out;

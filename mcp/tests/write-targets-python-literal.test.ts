@@ -93,5 +93,26 @@ describe("python write targets", () => {
     const t = targets("cd /w/n && cat > x.py <<'EOF'\nopen('evaluate.py','w').write('x')\nEOF\npython3 x.py");
     expect(t).toContain("/w/n/evaluate.py");
   });
+
+  it("resolves a %-formatted path whose field comes from an inline literal loop", () => {
+    const t = targets(
+      "python3 - <<'E'\nimport json\nfor n,s in ((\"a-01\",42),(\"b-01\",7)):\n" +
+        "    p={\"note\":\"verified evaluate.py and train/trainer.py\"}\n" +
+        "    json.dump(p,open(\"/tmp/s/%s.json\"%n,\"w\"))\nE",
+    );
+    expect(t).toEqual(["/tmp/s/_.json"]);
+  });
+
+  it("stays conservative for a %-formatted path that could leave its directory", () => {
+    const run = "/proj/.evor/runs/m/r/nodes";
+    for (const body of [
+      `for (n,) in (("../x",),):\n    open("/tmp/s/%s.json"%n,"w")`,
+      `for (n,) in (("a",),):\n    open("/tmp/%s/${run}.json"%n,"w")`,
+      `open("/tmp/s/%s.json"%unknown,"w")`,
+    ]) {
+      const t = targets(`python3 - <<'E'\nr="${run}/a.json"\n${body}\nE`);
+      expect(t, body).toContain(`${run}/a.json`);
+    }
+  });
 });
 
