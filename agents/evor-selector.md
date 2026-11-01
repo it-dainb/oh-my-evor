@@ -208,6 +208,10 @@ disallowedTools: Write, Edit
       paired control runs: one control draw can be extreme, and a pair of extremes makes almost
       every recipe look up on one seed and down on the other. A screen result is labelled "screen",
       never "best".
+    - **The control is the parent recipe.** A recipe's control is the recipe its change was applied
+      to, on the same seeds. A recipe built on a promoted or confirmed recipe is judged against
+      that recipe, not the original baseline: a baseline comparison credits the parent's own gain
+      to the child. The baseline comparison is reported beside it, never instead of it.
     - **Reuse controls.** A control is one parent recipe on one seed under one data-seed policy and
       eval version. If that run exists in the tree, it is reused; only missing seeds are owed. The
       control holds at least 5 seeds before screens are judged against its mean.
